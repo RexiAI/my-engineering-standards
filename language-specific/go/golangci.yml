@@ -1,0 +1,78 @@
+linters-settings:
+  gci:
+    local-prefixes: git.ods.ok-cloud.net
+  govet:
+    check-shadowing: true
+  golint:
+    min-confidence: 0.8
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+  misspell:
+    locale: US
+  lll:
+    line-length: 140
+  goimports:
+    local-prefixes: git.ods.ok-cloud.net
+
+linters:
+  enable-all: true
+  disable:
+    - dupl
+    - funlen
+    - gochecknoinits
+    - gochecknoglobals
+    - godox
+    - gomnd
+    - lll
+    - testpackage
+    - wsl
+    - nlreturn
+    - paralleltest
+    - tparallel
+    - cyclop
+    - exhaustive
+    - forbidigo
+    - forcetypeassert
+    - gci
+    - gocognit
+    - gocyclo
+    - goerr113
+    - gofumpt
+    - gomoddirectives
+    - gomodguard
+    - grouper
+    - ifshort
+    - ireturn
+    - maintidx
+    - nakedret
+    - nestif
+    - nilnil
+    - noctx
+    - nonamedreturns
+    - nosnakecase
+    - promlinter
+    - reassign
+    - rowserrcheck
+    - sqlclosecheck
+    - tagliatelle
+    - tenv
+    - thelper
+    - varnamelen
+    - wrapcheck
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - bodyclose
+        - noctx
+        - scopelint
+    - path: src/constants/
+      linters:
+        - deadcode
+        - varcheck
+    - path: src/models/
+      linters:
+        - structcheck
+        - unused

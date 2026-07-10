@@ -1,0 +1,18 @@
+FROM amazoncorretto:17 AS build
+WORKDIR /app
+COPY target/*.jar app.jar
+RUN java -Djarmode=layertools -jar app.jar extract
+
+FROM amazoncorretto:17
+RUN yum -y install openssl ca-certificates curl && yum clean all
+WORKDIR /app
+COPY --from=build app/dependencies/ ./
+COPY --from=build app/spring-boot-loader/ ./
+COPY --from=build app/snapshot-dependencies/ ./
+COPY --from=build app/application/ ./
+RUN adduser --system --group appuser
+USER appuser
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s \
+  CMD curl -f http://localhost:8080/health || exit 1
+ENTRYPOINT ["java", "org.springframework.boot.loader.JarLauncher"]
