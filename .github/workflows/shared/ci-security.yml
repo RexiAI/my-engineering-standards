@@ -1,0 +1,60 @@
+name: Security Scan
+
+on:
+  workflow_call:
+    inputs:
+      codeql-enabled:
+        description: Enable CodeQL SAST analysis
+        default: true
+        type: boolean
+      trivy-enabled:
+        description: Enable Trivy filesystem scan
+        default: true
+        type: boolean
+      trivy-severity:
+        description: Minimum severity for Trivy (CRITICAL,HIGH,MEDIUM)
+        default: CRITICAL,HIGH
+        type: string
+    secrets:
+      GHCR_TOKEN:
+        description: GitHub Container Registry token
+        required: false
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  codeql:
+    name: CodeQL SAST
+    if: inputs.codeql-enabled
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-and-quality
+      - uses: github/codeql-action/autobuild@v3
+      - uses: github/codeql-action/analyze@v3
+
+  trivy:
+    name: Trivy Filesystem Scan
+    if: inputs.trivy-enabled
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-results.sarif
+          severity: ${{ inputs.trivy-severity }}
+      - uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif

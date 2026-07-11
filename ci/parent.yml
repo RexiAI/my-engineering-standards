@@ -1,0 +1,45 @@
+# CI/CD Parent Configuration
+# ===========================
+# Shared variables & conventions for all CI templates.
+# This is a reference — does NOT define jobs itself.
+# Child projects inherit by calling reusable workflows or including templates.
+
+## Language Versions (LTS)
+JAVA_VERSION: "21"
+GO_VERSION: "1.26"
+NODE_VERSION: "22"
+
+## Container Registry
+DOCKER_REGISTRY: "ghcr.io"
+
+## Trunk-Based Development Flow
+# | Trigger               | Jobs                                      |
+# |-----------------------|-------------------------------------------|
+# | Push to feature       | unit-test (+ lint)                        |
+# | Pull request          | unit-test → lint → integration → e2e      |
+# | Merge to main         | unit → lint → integration → e2e → deploy → docker |
+
+## Pipeline Steps per Language
+# Java:    mvn test → mvn verify → docker-compose → mvn deploy → docker push
+# Go:      go test -race ./... → go test -tags=integration → docker-compose → go build → docker push
+# Node:    npm test → npm run test:integration → docker-compose → npm publish → docker push
+
+## Required Secrets (set in child repo)
+# - GHCR_TOKEN:        GitHub Container Registry push
+# - MAVEN_USERNAME:    GitHub Packages user
+# - MAVEN_PASSWORD:    GitHub Packages token
+# - NPM_TOKEN:         npm/GitHub Packages token
+# - SONAR_TOKEN:       SonarQube (optional)
+
+## Usage
+# GitHub (composable — child repo calls multiple `uses:` jobs):
+#   jobs:
+#     backend-ci:
+#       uses: pucelano-95/my-engineering-standards/.github/workflows/backend/ci-java.yml@main
+#     frontend-ci:
+#       uses: pucelano-95/my-engineering-standards/.github/workflows/frontend/ci-nextjs.yml@main
+#
+# GitLab:
+#   include:
+#     - local: .standards/ci/gitlab/backend/ci-java.yml
+#     - local: .standards/ci/gitlab/frontend/ci-nextjs.yml

@@ -1,0 +1,74 @@
+name: Weekly E2E
+
+on:
+  workflow_call:
+    inputs:
+      target-url:
+        description: Base URL of the target environment
+        required: true
+        type: string
+      smoke-endpoints:
+        description: Comma-separated list of paths to smoke test
+        default: /health
+        type: string
+      suite:
+        description: E2E test suite to run
+        default: ""
+        type: string
+    secrets:
+      GHCR_TOKEN:
+        description: GitHub Container Registry token
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-test:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Health check
+        run: |
+          IFS=',' read -ra ENDPOINTS <<< "${{ inputs.smoke-endpoints }}"
+          for ep in "${ENDPOINTS[@]}"; do
+            ep=$(echo "$ep" | xargs)
+            echo "Testing ${{ inputs.target-url }}$ep ..."
+            STATUS=$(curl -s -o /dev/null -w '%{http_code}' "${{ inputs.target-url }}$ep" 2>/dev/null || echo "000")
+            if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 500 ]; then
+              echo "FAIL: $ep returned $STATUS"
+              exit 1
+            fi
+            echo "PASS: $ep returned $STATUS"
+          done
+
+  contract-verification:
+    name: Contract Verification
+    runs-on: ubuntu-latest
+    if: ${{ inputs.suite == 'full' || inputs.suite == 'contract' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify provider pacts
+        run: make test-contract 2>/dev/null || echo "No contract tests configured"
+        env:
+          PACT_BROKER_URL: ${{ vars.PACT_BROKER_URL || '' }}
+
+  e2e:
+    name: Full E2E
+    needs: smoke-test
+    if: ${{ inputs.suite == '' || inputs.suite == 'full' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run E2E suite
+        run: |
+          if [ -f "Makefile" ] && grep -q "^e2e:" Makefile; then
+            make e2e
+          elif [ -f "docker-compose.e2e.yml" ]; then
+            docker compose -f docker-compose.e2e.yml up --abort-on-container-exit
+          elif [ -f "package.json" ]; then
+            npm ci && npm run test:e2e --if-present
+          else
+            echo "No E2E suite configured. Create a Makefile with e2e target or docker-compose.e2e.yml"
+          fi

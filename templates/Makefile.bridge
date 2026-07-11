@@ -1,0 +1,57 @@
+# Makefile Bridge Template
+# Copy this to your child repo root as `Makefile`
+# Then run: make init-ai
+
+.PHONY: init-ai init-standards help
+
+help:
+	@echo "Available targets:"
+	@echo "  init-ai         Symlink AGENTS.md and copy opencode.json from .standards/"
+	@echo "  init-standards  Initialize .standards/ submodule"
+
+init-standards:
+	@if [ ! -d ".standards" ]; then \
+		echo "Adding standards submodule..."; \
+		git submodule add git@github.com:pucelano-95/my-engineering-standards.git .standards; \
+	else \
+		echo ".standards/ already exists. Run 'make init-ai' to set up the bridge."; \
+	fi
+
+init-ai:
+	@echo "Setting up AI rules bridge from .standards/..."
+
+	# Symlink AGENTS.md so OpenCode auto-discovers it
+	@if [ ! -f "AGENTS.md" ]; then \
+		ln -sf .standards/AGENTS.md AGENTS.md; \
+		echo "  [SYMLINK] .standards/AGENTS.md -> AGENTS.md"; \
+	elif [ ! -L "AGENTS.md" ]; then \
+		echo "  [SKIP] AGENTS.md exists and is not a symlink (manual backup required)"; \
+	else \
+		ln -sf .standards/AGENTS.md AGENTS.md; \
+		echo "  [UPDATE] .standards/AGENTS.md -> AGENTS.md"; \
+	fi
+
+	# Copy opencode.json bridge if not already present
+	@if [ ! -f "opencode.json" ]; then \
+		cp .standards/templates/opencode.json.bridge opencode.json; \
+		echo "  [COPY] opencode.json.bridge -> opencode.json"; \
+	else \
+		echo "  [SKIP] opencode.json already exists"; \
+	fi
+
+	# Copy language-specific configs if project type is detected
+	@if [ -f "pom.xml" ]; then \
+		echo "  [JAVA] Detected Maven project"; \
+		cp -n .standards/language-specific/java/*.xml . 2>/dev/null || true; \
+	elif ls *.go 2>/dev/null | head -1 > /dev/null 2>&1; then \
+		echo "  [GO] Detected Go project"; \
+		[ ! -f ".golangci.yml" ] && cp -n .standards/language-specific/go/golangci.yml . 2>/dev/null || true; \
+	elif [ -f "package.json" ]; then \
+		echo "  [JS/TS] Detected Node.js project"; \
+		[ ! -f ".eslintrc.js" ] && [ ! -f "eslint.config.js" ] && cp -n .standards/language-specific/javascript/eslint.config.js . 2>/dev/null || true; \
+		[ ! -f ".prettierrc.js" ] && [ ! -f "prettier.config.js" ] && cp -n .standards/language-specific/javascript/prettier.config.js . 2>/dev/null || true; \
+	fi
+
+	@echo ""
+	@echo "Done! AGENTS.md is now linked to .standards/."
+	@echo "OpenCode will auto-discover AGENTS.md and load instructions from .standards/"

@@ -1,0 +1,22 @@
+# Generated CI for Node.js project
+# Template: ci/templates/child-ci-node.yml
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  ci:
+    uses: pucelano-95/my-engineering-standards/.github/workflows/backend/ci-node.yml@main
+    with:
+      node-version: "22"
+      deploy-on-main: true
+      docker-registry: DOCKER_REGISTRY
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}

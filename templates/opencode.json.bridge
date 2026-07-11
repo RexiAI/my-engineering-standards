@@ -1,0 +1,15 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    ".standards/AGENTS.md",
+    ".standards/docs/ARCHITECTURE.md",
+    ".standards/docs/TESTING.md",
+    ".standards/docs/DEPLOYMENT.md",
+    ".standards/docs/SECURITY.md",
+    ".standards/docs/CODING_CONVENTIONS.md",
+    ".standards/docs/GIT_WORKFLOW.md",
+    ".standards/language-specific/java/",
+    ".standards/language-specific/go/",
+    ".standards/language-specific/javascript/"
+  ]
+}

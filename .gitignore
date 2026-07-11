@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+target/
+bin/
+reports/
+.idea/
+.vscode/
+*.iml
+.DS_Store
+*.swp
+*.swo
+*~
+.env
+.env.local
+.serena/

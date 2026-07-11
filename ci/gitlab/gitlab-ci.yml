@@ -1,0 +1,56 @@
+# GitLab CI parent template
+# Child projects include this via:
+#   include:
+#     - local: .standards/ci/gitlab/gitlab-ci.yml
+#
+# Then compose backend + frontend + shared jobs:
+#   include:
+#     - local: .standards/ci/gitlab/gitlab-ci.yml
+#     - local: .standards/ci/gitlab/backend/ci-java.yml
+#     - local: .standards/ci/gitlab/frontend/ci-nextjs.yml
+#     - local: .standards/ci/gitlab/shared/ci-release.yml
+
+stages:
+  - test
+  - lint
+  - contract
+  - integration
+  - deploy
+  - docker
+
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: "/certs"
+  CI_REGISTRY: ${CI_REGISTRY:-ghcr.io}
+
+# Default cache for all jobs
+cache: &global-cache
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - .m2/repository/
+    - node_modules/
+    - go/pkg/mod/
+  policy: pull-push
+
+default:
+  tags: [docker]
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+
+# Reusable job definitions (extend these in language-specific files)
+#
+# Child .gitlab-ci.yml example:
+#   include:
+#     - local: .standards/ci/gitlab/gitlab-ci.yml
+#     - local: .standards/ci/gitlab/backend/ci-java.yml
+#     - local: .standards/ci/gitlab/frontend/ci-nextjs.yml
+#
+#   unit-test:
+#     extends: .java-unit
+#     stage: test
+#   frontend-lint:
+#     extends: .nextjs-lint
+#     stage: lint

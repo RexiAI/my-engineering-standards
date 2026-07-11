@@ -1,0 +1,21 @@
+# Weekly E2E CI jobs for GitLab — include from child .gitlab-ci.yml
+
+.e2e-variables:
+  variables:
+    TARGET_URL: "https://staging.example.com"
+
+.e2e-smoke:
+  image: curlimages/curl:latest
+  tags: [docker]
+  script:
+    - curl -sf ${TARGET_URL}/health > /dev/null || (echo "Health check failed"; exit 1)
+
+.e2e-full:
+  image: node:22
+  tags: [docker]
+  before_script:
+    - npm ci
+  script:
+    - npm run test:e2e --if-present
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"

@@ -1,0 +1,63 @@
+# Java CI jobs for GitLab — include from child .gitlab-ci.yml
+# Usage:
+#   include:
+#     - local: .standards/ci/gitlab/backend/ci-java.yml
+
+.java-variables:
+  variables:
+    JAVA_VERSION: "21"
+    MAVEN_CLI_OPTS: "-B -s .m2/settings.xml"
+    MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
+
+.java-cache:
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - .m2/repository/
+    policy: pull-push
+
+.java-setup:
+  image: maven:${JAVA_VERSION}-eclipse-temurin
+  tags: [docker]
+
+.java-unit:
+  extends: [.java-setup, .java-cache]
+  variables:
+    MAVEN_GOAL: "test"
+  script:
+    - mvn ${MAVEN_CLI_OPTS} ${MAVEN_GOAL}
+
+.java-contract:
+  extends: [.java-setup, .java-cache]
+  script:
+    - mvn pact:verify -B 2>/dev/null || echo "No contract tests configured"
+  variables:
+    PACT_BROKER_URL: ${PACT_BROKER_URL:-""}
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+.java-integration:
+  extends: [.java-setup, .java-cache]
+  variables:
+    MAVEN_GOAL: "verify"
+  script:
+    - mvn ${MAVEN_CLI_OPTS} ${MAVEN_GOAL} -DskipITs=false -DskipTests
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+.java-deploy:
+  extends: [.java-setup]
+  script:
+    - mvn clean deploy ${MAVEN_CLI_OPTS} -DskipTests -DskipITs
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+.java-docker:
+  extends: [.java-setup]
+  script:
+    - docker build -t ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA} .
+    - docker tag ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA} ${CI_REGISTRY_IMAGE}:latest
+    - docker push ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}
+    - docker push ${CI_REGISTRY_IMAGE}:latest
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

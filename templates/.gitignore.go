@@ -1,0 +1,16 @@
+bin/
+reports/
+cover.out
+cover.html
+*.test
+*.prof
+*.test.exe
+*.out
+vendor/
+.DS_Store
+*.swp
+*.swo
+*~
+.env
+.env.local
+*.log
