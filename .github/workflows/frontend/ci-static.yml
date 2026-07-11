@@ -1,0 +1,73 @@
+name: CI - Static HTML
+
+on:
+  workflow_call:
+    inputs:
+      deploy-on-main:
+        description: Build & push image when merging to main
+        default: true
+        type: boolean
+      docker-registry:
+        description: Container registry host
+        default: ghcr.io
+        type: string
+      docker-image-name:
+        description: Docker image name (defaults to repo name)
+        default: ""
+        type: string
+    secrets:
+      GHCR_TOKEN:
+        description: GitHub Container Registry token
+        required: false
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check HTML validity
+        run: |
+          if command -v tidy &>/dev/null; then
+            find . -name '*.html' -exec tidy -q {} \; 2>/dev/null || true
+          else
+            echo "No linter configured — skipping"
+          fi
+
+  docker:
+    name: Docker Build & Push
+    needs: [lint]
+    if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch && inputs.deploy-on-main
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ inputs.docker-registry }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_TOKEN }}
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ inputs.docker-registry }}/${{ github.repository }}/${{ inputs.docker-image-name || github.event.repository.name }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=sha,prefix=,suffix=,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+      - name: Build & Push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

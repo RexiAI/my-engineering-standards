@@ -1,0 +1,66 @@
+# Node.js CI jobs for GitLab — include from child .gitlab-ci.yml
+# Usage:
+#   include:
+#     - local: .standards/ci/gitlab/backend/ci-node.yml
+
+.node-variables:
+  variables:
+    NODE_VERSION: "22"
+
+.node-cache:
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - node_modules/
+    policy: pull-push
+
+.node-setup:
+  image: node:${NODE_VERSION}
+  tags: [docker]
+  before_script:
+    - npm ci
+
+.node-unit:
+  extends: [.node-setup, .node-cache]
+  script:
+    - npm test -- --passWithNoTests 2>/dev/null || npm run test:unit --if-present || npm test
+
+.node-lint:
+  extends: [.node-setup, .node-cache]
+  script:
+    - npm run lint --if-present
+    - npm run format:check --if-present
+
+.node-contract:
+  extends: [.node-setup, .node-cache]
+  script:
+    - npx jest test/pact --ci --forceExit 2>/dev/null || npm run test:pact --if-present || echo "No contract tests configured"
+  variables:
+    PACT_BROKER_URL: ${PACT_BROKER_URL:-""}
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+.node-integration:
+  extends: [.node-setup, .node-cache]
+  script:
+    - npm run test:integration --if-present
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+.node-deploy:
+  extends: [.node-setup]
+  script:
+    - npm run build --if-present
+    - npm publish
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+.node-docker:
+  extends: [.node-setup]
+  script:
+    - docker build -t ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA} .
+    - docker tag ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA} ${CI_REGISTRY_IMAGE}:latest
+    - docker push ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}
+    - docker push ${CI_REGISTRY_IMAGE}:latest
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

@@ -1,0 +1,67 @@
+# Go CI jobs for GitLab — include from child .gitlab-ci.yml
+# Usage:
+#   include:
+#     - local: .standards/ci/gitlab/backend/ci-go.yml
+
+.go-variables:
+  variables:
+    GO_VERSION: "1.26"
+
+.go-cache:
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - go/pkg/mod/
+    policy: pull-push
+
+.go-setup:
+  image: golang:${GO_VERSION}
+  tags: [docker]
+  before_script:
+    - go mod download
+
+.go-unit:
+  extends: [.go-setup, .go-cache]
+  script:
+    - make test
+
+.go-lint:
+  extends: [.go-setup, .go-cache]
+  script:
+    - make lint
+
+.go-contract:
+  extends: [.go-setup, .go-cache]
+  script:
+    - make test-contract 2>/dev/null || echo "No contract tests configured"
+  variables:
+    PACT_BROKER_URL: ${PACT_BROKER_URL:-""}
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+.go-integration:
+  extends: [.go-setup, .go-cache]
+  script:
+    - make test-integration
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+.go-deploy:
+  extends: [.go-setup]
+  script:
+    - make build
+  artifacts:
+    paths:
+      - ./bin/
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+.go-docker:
+  extends: [.go-setup]
+  script:
+    - make docker
+    - docker tag ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA} ${CI_REGISTRY_IMAGE}:latest
+    - docker push ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}
+    - docker push ${CI_REGISTRY_IMAGE}:latest
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

@@ -1,0 +1,45 @@
+# Pact contract testing setup for Java (Maven)
+# Copy this into your <project>/pom.xml's <build><plugins> section
+#
+# Usage:
+#   mvn pact:verify     ← runs provider-side verification
+#   mvn pact:publish    ← publishes pacts to broker
+#
+# Requires a running Pact broker (see ci/templates/pact-broker-local.yml)
+
+# Add to pom.xml:
+<!--
+<plugin>
+  <groupId>au.com.dius.pact.provider</groupId>
+  <artifactId>maven</artifactId>
+  <version>4.6.15</version>
+  <configuration>
+    <pactBrokerUrl>${PACT_BROKER_URL}</pactBrokerUrl>
+    <pactBrokerToken>${PACT_BROKER_TOKEN}</pactBrokerToken>
+    <projectVersion>${project.version}</projectVersion>
+    <tags>
+      <tag>${git.branch}</tag>
+    </tags>
+    <verificationReports>false</verificationReports>
+    <pactVerifiers>
+      <pactVerifier>
+        <name>default</name>
+        <provider>${project.artifactId}</provider>
+        <serviceUrl>http://localhost:8080</serviceUrl>
+      </pactVerifier>
+    </pactVerifiers>
+  </configuration>
+  <executions>
+    <execution>
+      <goals>
+        <goal>verify</goal>
+      </goals>
+    </execution>
+  </executions>
+</plugin>
+-->
+
+# CI integration (GitHub Actions step):
+#   - run: mvn pact:verify -B
+#     env:
+#       PACT_BROKER_URL: ${{ secrets.PACT_BROKER_URL }}

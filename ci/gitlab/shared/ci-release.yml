@@ -1,0 +1,18 @@
+# Semantic Release for GitLab — include from child .gitlab-ci.yml
+
+.release-variables:
+  variables:
+    NODE_VERSION: "22"
+
+.release-setup:
+  image: node:${NODE_VERSION}
+  tags: [docker]
+  before_script:
+    - npm ci --omit=dev 2>/dev/null || true
+
+.semantic-release:
+  extends: [.release-setup]
+  script:
+    - npx semantic-release
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

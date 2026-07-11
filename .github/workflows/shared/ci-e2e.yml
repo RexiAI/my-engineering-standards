@@ -1,0 +1,55 @@
+name: E2E Tests
+
+on:
+  workflow_call:
+    inputs:
+      compose-file:
+        description: Docker Compose file for the stack
+        default: docker-compose.e2e.yml
+        type: string
+      target-url:
+        description: Base URL of the running app
+        default: http://localhost
+        type: string
+      suite:
+        description: E2E test suite command
+        default: ""
+        type: string
+    secrets:
+      GHCR_TOKEN:
+        description: GitHub Container Registry token
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: E2E
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start services
+        run: docker compose -f ${{ inputs.compose-file }} up --wait --build
+      - name: Smoke test
+        run: |
+          curl -sf ${{ inputs.target-url }}/health > /dev/null || \
+          (echo "Service not healthy"; exit 1)
+      - name: Run E2E suite
+        run: |
+          if [ -n "${{ inputs.suite }}" ]; then
+            ${{ inputs.suite }}
+          elif [ -f "Makefile" ] && grep -q "^e2e:" Makefile; then
+            make e2e
+          elif [ -f "package.json" ]; then
+            npm ci && npm run test:e2e --if-present
+          else
+            echo "No E2E suite configured"
+          fi
+      - name: Collect logs
+        if: failure()
+        run: docker compose -f ${{ inputs.compose-file }} logs

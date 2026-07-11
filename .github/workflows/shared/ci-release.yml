@@ -1,0 +1,45 @@
+name: Semantic Release
+
+on:
+  workflow_call:
+    secrets:
+      GH_TOKEN:
+        description: GitHub token with repo access
+        required: true
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  id-token: write
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci --omit=dev 2>/dev/null || true
+      - name: Semantic Release
+        uses: cycjimmy/semantic-release-action@v4
+        with:
+          extra_plugins: |
+            @semantic-release/commit-analyzer
+            @semantic-release/release-notes-generator
+            @semantic-release/github
+            @semantic-release/git
+            @semantic-release/changelog
+            @semantic-release/exec
+            conventional-changelog-conventionalcommits
+          extends: |
+            @semantic-release/commit-analyzer
+            @semantic-release/release-notes-generator
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}

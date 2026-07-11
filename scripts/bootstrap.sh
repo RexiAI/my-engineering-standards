@@ -44,9 +44,11 @@ else
 fi
 
 # 4. Detect project type and copy language-specific configs
+LANG_DETECTED=""
 if [ -f "$REPO_ROOT/pom.xml" ]; then
     echo ""
     echo "[JAVA] Detected Maven project"
+    LANG_DETECTED="java"
     for f in checkstyle.xml spotbugs-include.xml pmd-rules.xml; do
         if [ ! -f "$REPO_ROOT/$f" ]; then
             cp "$STANDARDS_DIR/language-specific/java/$f" "$REPO_ROOT/$f"
@@ -62,9 +64,14 @@ if [ -f "$REPO_ROOT/pom.xml" ]; then
 elif ls "$REPO_ROOT"/*.go 2>/dev/null | head -1 > /dev/null 2>&1; then
     echo ""
     echo "[GO] Detected Go project"
+    LANG_DETECTED="go"
     if [ ! -f "$REPO_ROOT/.golangci.yml" ]; then
         cp "$STANDARDS_DIR/language-specific/go/golangci.yml" "$REPO_ROOT/.golangci.yml"
         echo "  [COPY] language-specific/go/golangci.yml -> .golangci.yml"
+    fi
+    if [ ! -f "$REPO_ROOT/Makefile" ]; then
+        cp "$STANDARDS_DIR/ci/templates/Makefile.go" "$REPO_ROOT/Makefile"
+        echo "  [COPY] ci/templates/Makefile.go -> Makefile"
     fi
     if ! grep -q "bin/" "$REPO_ROOT/.gitignore" 2>/dev/null; then
         cat "$STANDARDS_DIR/templates/.gitignore.go" >> "$REPO_ROOT/.gitignore"
@@ -74,6 +81,7 @@ elif ls "$REPO_ROOT"/*.go 2>/dev/null | head -1 > /dev/null 2>&1; then
 elif [ -f "$REPO_ROOT/package.json" ]; then
     echo ""
     echo "[JS/TS] Detected Node.js project"
+    LANG_DETECTED="node"
     # ESLint config
     if [ ! -f "$REPO_ROOT/.eslintrc.js" ] && [ ! -f "$REPO_ROOT/.eslintrc.json" ] && [ ! -f "$REPO_ROOT/eslint.config.js" ]; then
         cp "$STANDARDS_DIR/language-specific/javascript/eslint.config.js" "$REPO_ROOT/eslint.config.js"
@@ -91,10 +99,35 @@ elif [ -f "$REPO_ROOT/package.json" ]; then
     fi
 fi
 
+# 5. CI/CD initialization
+echo ""
+echo "--- CI/CD Setup ---"
+echo "Initialize CI/CD for this project?"
+select CI_CHOICE in "GitHub Actions" "GitLab CI" "Skip"; do
+    case $CI_CHOICE in
+        "GitHub Actions"|"GitLab CI")
+            CI_PLATFORM=$(echo "$CI_CHOICE" | tr '[:upper:]' '[:lower:]' | sed 's/ //')
+            echo ""
+            echo "Running CI/CD generator..."
+            bash "$STANDARDS_DIR/scripts/init-ci.sh" \
+                --platform "$CI_PLATFORM" \
+                --languages "$LANG_DETECTED" \
+                --registry "ghcr.io"
+            break
+            ;;
+        "Skip")
+            echo "[SKIP] CI/CD setup skipped."
+            echo "  Run later: ./.standards/scripts/init-ci.sh"
+            break
+            ;;
+    esac
+done
+
 echo ""
 echo "=== Bootstrap complete ==="
 echo "Next steps:"
 echo "  1. Review and commit the new files:"
-echo "     git add .standards AGENTS.md opencode.json .github/"
+echo "     git add .standards AGENTS.md opencode.json .github/ Makefile"
 echo "     git commit -m \"chore: add engineering standards submodule\""
 echo "  2. OpenCode will auto-discover AGENTS.md and load instructions from .standards/"
+echo "  3. Push and verify CI pipeline runs"

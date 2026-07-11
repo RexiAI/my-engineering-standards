@@ -1,0 +1,11 @@
+# Dependabot CI schedule for GitLab
+# Uses Renovate or manual dependency management — GitLab lacks native Dependabot.
+
+.dependabot-schedule:
+  image: alpine:3
+  tags: [docker]
+  script:
+    - echo "Dependency updates managed via Renovate or manual Dependabot config"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: always

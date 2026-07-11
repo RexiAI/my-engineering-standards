@@ -1,0 +1,44 @@
+# Next.js CI jobs for GitLab — include from child .gitlab-ci.yml
+
+.node-variables:
+  variables:
+    NODE_VERSION: "22"
+
+.node-cache:
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - node_modules/
+    policy: pull-push
+
+.node-setup:
+  image: node:${NODE_VERSION}
+  tags: [docker]
+  before_script:
+    - npm ci
+
+.nextjs-unit:
+  extends: [.node-setup, .node-cache]
+  script:
+    - npm test -- --passWithNoTests 2>/dev/null || npm test
+
+.nextjs-lint:
+  extends: [.node-setup, .node-cache]
+  script:
+    - npm run lint --if-present
+    - npm run format:check --if-present
+
+.nextjs-build:
+  extends: [.node-setup, .node-cache]
+  script:
+    - npm run build
+
+.nextjs-docker:
+  extends: [.node-setup]
+  script:
+    - docker build -t ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA} .
+    - docker tag ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA} ${CI_REGISTRY_IMAGE}:latest
+    - docker push ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}
+    - docker push ${CI_REGISTRY_IMAGE}:latest
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

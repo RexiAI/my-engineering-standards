@@ -1,0 +1,29 @@
+# Pact contract testing setup for Go
+# Copy this reference to your project and install pact-go:
+#   go get github.com/pact-foundation/pact-go/v2
+#
+# Required provider config (in your _test.go):
+#
+# func TestPactProvider(t *testing.T) {
+#     pact.VerifyProvider(t, types.VerifyRequest{
+#         Provider: "my-service",
+#         ProviderBaseURL: "http://localhost:8080",
+#         PactURLs: []string{
+#             os.Getenv("PACT_URL"),                                  // single pact
+#             filepath.Join("pacts", "consumer-provider.json"),       // local file
+#         },
+#         BrokerURL:   os.Getenv("PACT_BROKER_URL"),
+#         BrokerToken: os.Getenv("PACT_BROKER_TOKEN"),
+#         StateHandlers: types.StateHandlers{
+#             "user exists": func() error { return seedUser() },
+#         },
+#     })
+# }
+#
+# Run with:
+#   go test -tags=contract -run TestPactProvider -v ./...
+#
+# CI integration (GitHub Actions step):
+#   - run: go test -tags=contract -race -count=1 -run TestPact ./...
+#     env:
+#       PACT_BROKER_URL: ${{ secrets.PACT_BROKER_URL }}

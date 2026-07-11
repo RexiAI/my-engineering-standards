@@ -1,0 +1,23 @@
+# Generated CI for Java project
+# Template: ci/templates/child-ci-java.yml
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  ci:
+    uses: pucelano-95/my-engineering-standards/.github/workflows/backend/ci-java.yml@main
+    with:
+      java-version: "21"
+      deploy-on-main: true
+      docker-registry: DOCKER_REGISTRY
+    secrets:
+      MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+      MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}

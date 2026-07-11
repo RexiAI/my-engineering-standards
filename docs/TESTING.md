@@ -159,6 +159,43 @@ Avoid `AbstractBaseTestSuite` base classes. Use plain `@BeforeEach` and helper m
 - **Go**: `go test -coverprofile=reports/coverage/coverage.out`. HTML and XML (Cobertura) reports.
 - **CI**: Coverage reports published to SonarQube. Coverage must not decrease from baseline.
 
+## Test Behavior, Not Implementation
+
+Tests should verify observable behavior, not internal implementation details.
+
+### Do
+
+```java
+@Test
+void shouldReturnUserWhenFound() {
+    given(repository.findById("123")).willReturn(Optional.of(testUser()));
+
+    var response = controller.getUser("123");
+
+    assertThat(response.getStatusCode()).isEqualTo(200);
+    assertThat(response.getBody().getEmail()).isEqualTo("user@example.com");
+}
+```
+
+### Don't
+
+```java
+// Tests internal calls, not behavior
+@Test
+void shouldCallRepositoryWithCorrectId() {
+    controller.getUser("123");
+    verify(repository).findById("123");  // brittle — breaks on refactor
+}
+```
+
+### Guidelines
+
+- Mock at service boundaries (repositories, external clients), not internal methods
+- Assert on return values, not method invocations
+- Avoid `verify()` unless testing side-effect-only methods (event publishing, logging)
+- Prefer real implementations for pure domain logic (no mocks needed)
+- Use contract tests (Pact) to verify service boundary expectations (see `docs/CONTRACT_TESTING.md`)
+
 ## Mutation Testing
 
 Mutation testing validates that tests actually catch bugs by introducing small changes (mutations) to production code and verifying that at least one test fails. High line coverage alone does not guarantee useful tests — mutation coverage measures test quality.
