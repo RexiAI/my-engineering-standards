@@ -2,36 +2,15 @@
 
 ## CI/CD
 
-CI/CD is managed via pipeline-as-code. The standard pattern:
+Default: GitHub Actions (`.github/workflows/`). CI runs on a standard runner/VM — no specific cloud or VPS is prescribed.
 
-```
-bamboo-specs/         # For Atlassian Bamboo
-├── pom.xml
-└── src/main/java/
-    └── PlanSpec.java
+### Pipeline Steps
 
-.gitea/workflows/     # For Gitea / GitHub Actions
-.github/workflows/    # For GitHub Actions
-.gitlab-ci.yml        # For GitLab CI
-```
-
-### Plan Generation Helpers (Bamboo example)
-
-Use shared helper classes from the internal Bamboo library:
-
-- `JavaHelper.createSpringBootPlans()` — generates build plans for Spring Boot microservices. Includes Maven build, E2E tests, security scanning (Checkmarx), and Swagger deployment.
-- `GolangHelper.createGolangPlans()` — generates plans for Go services.
-- `GolangHelper.createGolangLibraryPlans()` — generates plans for Go libraries.
-
-### Plan Features
-
-- Maven build with service profile.
-- Docker-based E2E tests (`docker-compose up` with all dependencies).
-- Security scanning (Checkmarx).
-- OWASP dependency check.
-- SonarQube analysis and quality gate.
-- Swagger/OpenAPI spec deployment.
-- Image publishing to container registry.
+- Build: `mvn clean install -Pservice` (Java) or `make build` (Go)
+- E2E tests: `docker compose up` with all dependencies, test runner connects via Docker network
+- Security: OWASP dependency check, static analysis, secret scan
+- SonarQube/SonarCloud quality gate
+- Publish artifact/image to registry
 
 ## Docker Patterns
 
@@ -97,9 +76,9 @@ Maven repositories are configured in the parent POM. Developers should never com
 
 - **Development**: Local config files loaded from `config/` directory.
 - **Testing**: Docker compose with local service emulators (LocalStack, TestContainers, etc.).
-- **Production**: Configuration service (AWS SSM Parameter Store, HashiCorp Vault, Kubernetes ConfigMaps, etc.) at path `/config/{SERVICE_NAME}_{ENVIRONMENT}/`.
+- **Production**: Configuration from environment variables or a config service (HashiCorp Vault, AWS SSM, Kubernetes ConfigMaps, etc.).
 - **Feature flags**: Environment variables prefixed by service name.
-- **Secrets**: Key management service + secrets manager. Never in config files or environment variables.
+- **Secrets**: Prefer environment variables for small projects. Use a secrets manager for larger deployments. Never in config files or committed to version control.
 
 ## Quality Gates
 
@@ -111,5 +90,5 @@ CI pipeline must pass these checks before merging:
 5. PMD shows no new violations.
 6. OWASP Dependency Check shows no critical/high vulnerabilities.
 7. SonarQube quality gate passes (no new bugs, code smells, security hotspots).
-8. Service tests (E2E) pass.
+8. E2E tests pass.
 9. Talisman secret scan passes (pre-commit hook).

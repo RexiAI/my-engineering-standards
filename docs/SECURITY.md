@@ -39,9 +39,8 @@ Support standard OAuth2 grant types:
 ## Secrets Management
 
 - **Never** commit secrets, credentials, API keys, or tokens to Git.
-- Database passwords, JWT signing keys, and API tokens must come from a secrets manager (AWS SSM Parameter Store, HashiCorp Vault, Kubernetes Secrets).
-- Environment variables should only reference secret store paths, not contain raw values.
-- `.env` files are for local development only and must be in `.gitignore`.
+- **Small projects**: `.env` files are acceptable. Always add `.env` to `.gitignore`. No secrets manager required.
+- **Larger projects / production**: Use a secrets manager (HashiCorp Vault, AWS SSM Parameter Store, Kubernetes Secrets). Environment variables reference secret store paths rather than containing raw values.
 - Talisman pre-commit hook scans for accidental secret commits.
 
 ## Input Validation
