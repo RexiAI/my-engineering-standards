@@ -2,12 +2,14 @@
 # Copy this to your child repo root as `Makefile`
 # Then run: make init-ai
 
-.PHONY: init-ai init-standards help
+.PHONY: init-ai init-standards session-check session-end help
 
 help:
 	@echo "Available targets:"
 	@echo "  init-ai         Symlink AGENTS.md and copy opencode.json from .standards/"
 	@echo "  init-standards  Initialize .standards/ submodule"
+	@echo "  session-check   Run session start health check"
+	@echo "  session-end     Run session end check (pre-commit verification)"
 
 init-standards:
 	@if [ ! -d ".standards" ]; then \
@@ -50,6 +52,22 @@ init-ai:
 		echo "  [JS/TS] Detected Node.js project"; \
 		[ ! -f ".eslintrc.js" ] && [ ! -f "eslint.config.js" ] && cp -n .standards/language-specific/javascript/eslint.config.js . 2>/dev/null || true; \
 		[ ! -f ".prettierrc.js" ] && [ ! -f "prettier.config.js" ] && cp -n .standards/language-specific/javascript/prettier.config.js . 2>/dev/null || true; \
+	fi
+
+session-check:
+	@if [ -f "session-start-check.sh" ]; then \
+		bash session-start-check.sh; \
+	else \
+		echo "session-start-check.sh not found. Run 'make init-ai' first."; \
+		exit 1; \
+	fi
+
+session-end:
+	@if [ -f "session-end-check.sh" ]; then \
+		bash session-end-check.sh; \
+	else \
+		echo "session-end-check.sh not found. Run 'make init-ai' first."; \
+		exit 1; \
 	fi
 
 	@echo ""

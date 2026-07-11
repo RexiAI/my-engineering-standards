@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.0] — 2026-07-11
+
+### Features
+
+- **Session Hygiene** — `templates/session-start-check.sh` (fail-fast: git clean, lint, tests) and `templates/session-end-check.sh` (full suite, debug artifact scan, Talisman)
+- **bootstrap.sh** — auto-copies session hygiene scripts to child projects
+- **GIT_WORKFLOW.md** — new "Session Hygiene" section with start/end procedures
+- **Makefile.bridge** — `make session-check` / `make session-end` targets
+
 ## [1.1.0] — 2026-07-11
 
 ### Features
@@ -61,5 +70,6 @@
 - No lock files committed — child projects manage their own
 - Version file: `VERSION` (plaintext, semver)
 
+[1.2.0]: https://github.com/pucelano-95/my-engineering-standards/releases/tag/v1.2.0
 [1.1.0]: https://github.com/pucelano-95/my-engineering-standards/releases/tag/v1.1.0
 [1.0.0]: https://github.com/pucelano-95/my-engineering-standards/releases/tag/v1.0.0

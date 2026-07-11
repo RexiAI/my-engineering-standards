@@ -131,12 +131,26 @@ select CI_CHOICE in "GitHub Actions" "GitLab CI" "Skip"; do
     esac
 done
 
+# 6. Session hygiene scripts
+echo ""
+echo "--- Session Hygiene ---"
+echo ""
+for script in session-start-check.sh session-end-check.sh; do
+    if [ ! -f "$REPO_ROOT/$script" ]; then
+        cp "$STANDARDS_DIR/templates/$script" "$REPO_ROOT/$script"
+        chmod +x "$REPO_ROOT/$script"
+        echo "  [COPY] templates/$script -> $script"
+    else
+        echo "  [SKIP] $script already exists"
+    fi
+done
+
 echo ""
 echo "=== Bootstrap complete ==="
 echo "Next steps:"
 echo "  1. Review and commit the new files:"
 echo "     git add .standards AGENTS.md opencode.json okf .github/ Makefile"
-echo "     git commit -m \"chore: add engineering standards submodule\""
 echo "  2. OpenCode will auto-discover AGENTS.md and load instructions from .standards/"
-echo "  3. Push and verify CI pipeline runs"
-echo "  4. Read OKF practices: open okf/index.md (after commit, markdown render)"
+echo "  3. Run session hygiene check: ./session-start-check.sh"
+echo "  4. Push and verify CI pipeline runs"
+echo "  5. Read OKF practices: open okf/index.md (after commit, markdown render)"
