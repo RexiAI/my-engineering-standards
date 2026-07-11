@@ -99,7 +99,7 @@ Define `ApplicationError` interface with `StatusCode()` and `Error() string`. Us
 
 ### JavaScript
 
-Use custom error classes extending `Error` with `statusCode` and `errorCode` fields. Express error middleware at the app boundary returns JSON errors.
+Use NestJS global exception filter with custom exception classes extending `HttpException`. Single `@Catch()` filter at the app boundary returns structured JSON errors. Use `class-validator` DTOs for input validation via `ValidationPipe`.
 
 ## Imports Ordering
 

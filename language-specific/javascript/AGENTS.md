@@ -5,13 +5,13 @@
 - **Runtime**: Node.js 22+.
 - **Package manager**: npm.
 - **Frontend**: React 17+ with Create React App or Vite.
-- **Backend**: Express 4.x with Mongoose (MongoDB) or Sequelize/TypeORM (SQL).
+- **Backend**: NestJS with TypeORM or Prisma (SQL).
 
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `npm start` | Start dev server (React: react-scripts, Express: nodemon) |
+| `npm start` | Start dev server (React: vite, NestJS: nest start) |
 | `npm run build` | Production build |
 | `npm test` | Run test suite |
 | `npm run lint` | Run ESLint |
@@ -19,26 +19,34 @@
 
 ## Project Structure
 
-### Express Backend
+### NestJS Backend
 
 ```
 src/
-├── app.js                   # Express app setup
-├── bin/www                  # HTTP server entry
-├── lib/                     # External connection helpers (mongoose, email, etc.)
-├── models/                  # Mongoose/TypeORM models
-├── routes/
-│   ├── api/
-│   │   ├── advertisements.js
-│   │   └── auth.js
-│   └── index.js
-├── controllers/             # Route handler logic
-├── services/                # Business logic
-├── utils/                   # Constants, helper functions
-├── DB/                      # Database seed/migration scripts
-├── tests/                   # Test files
-├── public/                  # Static files
-└── locales/                 # i18n translation files
+├── main.ts                  # Entry point (NestFactory.create)
+├── app.module.ts            # Root module imports
+├── common/                  # Shared guards, filters, pipes, interceptors
+│   ├── guards/
+│   ├── filters/
+│   ├── pipes/
+│   └── interceptors/
+├── modules/                 # Feature modules
+│   ├── auth/
+│   │   ├── auth.module.ts
+│   │   ├── auth.controller.ts
+│   │   ├── auth.service.ts
+│   │   ├── dto/             # class-validator DTOs
+│   │   └── strategies/      # Passport strategies
+│   ├── users/
+│   │   ├── users.module.ts
+│   │   ├── users.controller.ts
+│   │   ├── users.service.ts
+│   │   ├── entities/        # TypeORM entities / Prisma schema
+│   │   └── dto/
+│   └── ...
+├── database/                # Migrations, seeds, data sources
+├── config/                  # Configuration modules (env, validation)
+└── test/                    # E2E test files
 ```
 
 ### React Frontend
@@ -186,39 +194,112 @@ export * as adverts from './adverts'
 export * as auth from './auth'
 ```
 
-## Express Backend Patterns
+## NestJS Backend Patterns
 
-### Error Handling
+### Module Structure
 
-```javascript
-// utils/errors.js
-class AppError extends Error {
-    constructor(message, statusCode, errorCode) {
-        super(message)
-        this.statusCode = statusCode
-        this.errorCode = errorCode
-    }
-}
+Each feature is a NestJS module. Modules register their controllers, services, and imports.
 
-// app.js - Error middleware
-app.use((err, req, res, next) => {
-    if (req.isAPIRequest()) {
-        res.status(err.statusCode || 500).json({
-            errorCode: err.errorCode || 'INTERNAL_ERROR',
-            description: err.message || 'Internal server error',
-        })
-    } else {
-        next(err)
-    }
+```typescript
+@Module({
+  imports: [TypeOrmModule.forFeature([User]), forwardRef(() => AuthModule)],
+  controllers: [UsersController],
+  providers: [UsersService],
+  exports: [UsersService],
 })
+export class UsersModule {}
 ```
 
-### API Route Versioning
+### Controllers
 
-```javascript
-const VERSION_1 = 'v1'
-router.use(`/api/${VERSION_1}/adverts`, advertisementRoutes)
-router.use(`/api/${VERSION_1}/users`, userRoutes)
+Controllers use decorators for routing, validation, and swagger.
+
+```typescript
+@Controller('v1/users')
+export class UsersController {
+  constructor(private readonly usersService: UsersService) {}
+
+  @Get(':id')
+  @HttpCode(HttpStatus.OK)
+  async findOne(@Param('id', ParseUUIDPipe) id: string) {
+    return this.usersService.findById(id)
+  }
+
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
+  async create(@Body(new ValidationPipe()) dto: CreateUserDto) {
+    return this.usersService.create(dto)
+  }
+}
+```
+
+### Services
+
+Business logic in injectable services. No HTTP concerns leak into services.
+
+```typescript
+@Injectable()
+export class UsersService {
+  constructor(
+    @InjectRepository(User)
+    private readonly repo: Repository<User>,
+  ) {}
+
+  async findById(id: string): Promise<User> {
+    const user = await this.repo.findOneBy({ id })
+    if (!user) throw new NotFoundException(`User ${id} not found`)
+    return user
+  }
+}
+```
+
+### DTO Validation
+
+Use `class-validator` + `class-transformer` decorators on DTOs.
+
+```typescript
+export class CreateUserDto {
+  @IsEmail()
+  @IsNotEmpty()
+  email: string
+
+  @IsString()
+  @MinLength(8)
+  @MaxLength(64)
+  password: string
+
+  @IsOptional()
+  @IsString()
+  displayName?: string
+}
+```
+
+### Global Exception Filter
+
+A single exception filter at the app boundary returns structured JSON errors.
+
+```typescript
+@Catch()
+export class GlobalExceptionFilter implements ExceptionFilter {
+  catch(exception: unknown, host: ArgumentsHost) {
+    const ctx = host.switchToHttp()
+    const response = ctx.getResponse<Response>()
+
+    const status = exception instanceof HttpException
+      ? exception.getStatus()
+      : HttpStatus.INTERNAL_SERVER_ERROR
+
+    const body: ExceptionResponse = {
+      statusCode: status,
+      errorCode: exception instanceof SssApplicationException
+        ? exception.getErrorCode() : 'INTERNAL_ERROR',
+      description: exception instanceof HttpException
+        ? exception.message : 'Internal server error',
+    }
+
+    response.status(status).json(body)
+  }
+}
 ```
 
 ## Testing
@@ -226,7 +307,7 @@ router.use(`/api/${VERSION_1}/users`, userRoutes)
 | Layer | Framework | Tools |
 |---|---|---|
 | Unit | Jest | React Testing Library, Jest |
-| Integration | Jest | Supertest (Express), redux-mock-store |
+| Integration | Jest | Supertest (NestJS), redux-mock-store |
 | Component | Jest | Enzyme or React Testing Library |
 | Snapshot | Jest | enzyme-to-json serializer |
 

@@ -13,3 +13,4 @@ reports/
 *~
 .env
 .env.local
+.serena/
