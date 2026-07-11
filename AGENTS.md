@@ -15,6 +15,8 @@ Before coding in any child repo, read the relevant docs from this submodule. The
 - Never commit secrets, credentials, or tokens. Use a secrets manager (AWS SSM, etc.) for configuration.
 - Write tests in three layers: unit (pure logic), integration (with infrastructure), e2e (Docker compose, real endpoints). Use mutation testing to validate test quality.
 - Use conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`.
+- Never commit or push changes unless the user explicitly instructs it. Commits and pushes require manual confirmation.
+- In plan mode, every plan must state whether the agent should auto-commit after completing the work or wait for user confirmation.
 
 ## Language Selection
 
