@@ -2,6 +2,10 @@
   "$schema": "https://opencode.ai/config.json",
   "instructions": [
     ".standards/AGENTS.md",
+    ".standards/okf/context-window-policy.md",
+    ".standards/okf/when-to-use-rag.md",
+    ".standards/okf/detect-context-rot.md",
+    ".standards/okf/mcp-server-connection.md",
     ".standards/docs/ARCHITECTURE.md",
     ".standards/docs/TESTING.md",
     ".standards/docs/DEPLOYMENT.md",

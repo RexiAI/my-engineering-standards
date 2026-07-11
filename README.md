@@ -9,6 +9,18 @@ git submodule add git@github.com:pucelano-95/my-engineering-standards.git .stand
 ./.standards/scripts/bootstrap.sh
 ```
 
+## OKF — Operational Knowledge Framework
+
+[`okf/`](okf/index.md) documents how we work with AI: practices, decisions, and runbooks for managing context windows, choosing between RAG and context stuffing, detecting context rot, and setting up MCP servers.
+
+Child repos inherit OKF via symlink (created by `bootstrap.sh`):
+
+```bash
+.standards/okf -> okf
+```
+
+OpenCode loads OKF files automatically from `.standards/okf/*.md` via `instructions` in `opencode.json`.
+
 ## Structure
 
 ```
@@ -38,6 +50,13 @@ my-engineering-standards/
 │   ├── java/AGENTS.md           # Spring Boot, Maven
 │   ├── go/AGENTS.md             # Gin, Makefile
 │   └── javascript/AGENTS.md     # NestJS, React
+├── okf/                         # Operational Knowledge Framework (AI practices)
+│   ├── index.md                 # Root index
+│   ├── log.md                   # Changelog
+│   ├── context-window-policy.md # Context management (caveman, RTK, headroom)
+│   ├── when-to-use-rag.md       # RAG vs context stuffing decision
+│   ├── detect-context-rot.md    # Context rot detection runbook
+│   └── mcp-server-connection.md # MCP server setup runbook
 ├── templates/                   # Dockerfiles, gitignores, ADR, PR
 ├── ci/                          # CI templates & scripts
 └── scripts/                     # bootstrap, init-ci

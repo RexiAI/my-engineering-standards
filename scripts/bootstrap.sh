@@ -34,7 +34,15 @@ else
     echo "[SKIP] opencode.json already exists"
 fi
 
-# 3. Copy PR template
+# 3. Symlink OKF (Operational Knowledge Framework)
+if [ ! -d "$REPO_ROOT/okf" ]; then
+    ln -sf .standards/okf "$REPO_ROOT/okf"
+    echo "[SYMLINK] .standards/okf -> okf"
+else
+    echo "[SKIP] okf/ already exists"
+fi
+
+# 4. Copy PR template
 mkdir -p "$REPO_ROOT/.github"
 if [ ! -f "$REPO_ROOT/.github/PULL_REQUEST_TEMPLATE.md" ]; then
     cp "$STANDARDS_DIR/templates/PULL_REQUEST_TEMPLATE.md" "$REPO_ROOT/.github/PULL_REQUEST_TEMPLATE.md"
@@ -127,7 +135,8 @@ echo ""
 echo "=== Bootstrap complete ==="
 echo "Next steps:"
 echo "  1. Review and commit the new files:"
-echo "     git add .standards AGENTS.md opencode.json .github/ Makefile"
+echo "     git add .standards AGENTS.md opencode.json okf .github/ Makefile"
 echo "     git commit -m \"chore: add engineering standards submodule\""
 echo "  2. OpenCode will auto-discover AGENTS.md and load instructions from .standards/"
 echo "  3. Push and verify CI pipeline runs"
+echo "  4. Read OKF practices: open okf/index.md (after commit, markdown render)"
