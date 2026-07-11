@@ -56,7 +56,7 @@ ENTRYPOINT ["java", "org.springframework.boot.loader.JarLauncher"]
 ### Go Services
 
 ```dockerfile
-FROM golang:1.20 AS build
+FROM golang:1.26 AS build
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
