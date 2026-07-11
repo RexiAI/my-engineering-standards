@@ -7,9 +7,12 @@ Default: GitHub Actions (`.github/workflows/`). CI runs on a standard runner/VM 
 ### Pipeline Steps
 
 - Build: `mvn clean install -Pservice` (Java) or `make build` (Go)
-- E2E tests: `docker compose up` with all dependencies, test runner connects via Docker network
+- Contract tests: Pact consumer/provider verification (every PR, see CI_CD.md)
+- E2E tests: `docker compose up` with all dependencies, test runner connects via Docker network (weekly schedule)
+- Resilience verification: smoke test with circuit breaker simulation (pre-release)
 - Security: OWASP dependency check, static analysis, secret scan
 - SonarQube/SonarCloud quality gate
+- Observability validation: health check, metrics endpoint verified
 - Publish artifact/image to registry
 
 ## Docker Patterns

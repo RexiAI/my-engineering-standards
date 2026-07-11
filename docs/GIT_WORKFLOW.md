@@ -118,6 +118,21 @@ git commit -m "chore: bump engineering standards"
 git submodule update --init --recursive
 ```
 
+## Architecture Decision Records (ADRs)
+
+Before implementing any significant architectural change, create an ADR. See `templates/ADR.md`.
+
+Required for:
+- Adding a new infrastructure dependency (database, cache, message queue)
+- Changing the inter-service communication protocol
+- Introducing a new technology or framework
+- Changing the data model or schema for critical entities
+- Service decomposition or consolidation
+
+ADR lifecycle: Proposed → Accepted → Deprecated → Superseded
+
+ADRs are stored in the child repo at `docs/adr/` and committed alongside the code change.
+
 ## Pre-commit Hooks
 
 Projects must use Talisman pre-commit hook for secret scanning:

@@ -139,6 +139,53 @@ public HealthDependencyList healthDependencyList(
 }
 ```
 
+## Error Handling: Result Types
+
+Prefer sealed Result types for expected failures. Reserve exceptions for infrastructure/programming errors.
+
+```java
+public sealed interface Result<T, E> {
+    record Ok<T, E>(T value) implements Result<T, E> {}
+    record Error<T, E>(E error) implements Result<T, E> {}
+}
+
+// Service returns result, not exception
+public Result<User, CreateUserError> createUser(CreateUserRequest request) {
+    if (emailRepository.exists(request.email())) {
+        return Result.error(CreateUserError.EMAIL_TAKEN);
+    }
+    return Result.ok(userRepository.save(request.toUser()));
+}
+
+// Controller maps result to HTTP
+@PostMapping("/v1/users")
+public ResponseEntity<?> createUser(@Valid @RequestBody CreateUserRequest request) {
+    return switch (userService.createUser(request)) {
+        case Result.Ok(var user) -> ResponseEntity.status(201).body(user);
+        case Result.Error(var err) -> switch (err) {
+            case EMAIL_TAKEN -> ResponseEntity.status(409)
+                .body(Map.of("error", "email taken", "code", "EMAIL_TAKEN"));
+            case INVALID_EMAIL -> ResponseEntity.status(422)
+                .body(Map.of("error", "invalid email format", "code", "INVALID_EMAIL"));
+        };
+    };
+}
+```
+
+### Resilience
+
+Every external client must be wrapped with circuit breaker + retry:
+
+```java
+@CircuitBreaker(name = "authService", fallbackMethod = "fallback")
+@Retry(name = "authService")
+public AuthResponse validateToken(String token) { ... }
+```
+
+### Idempotency
+
+All mutating endpoints must accept and honor `Idempotency-Key` header (see `docs/IDEMPOTENCY.md`).
+
 ## Event Logging Pattern
 
 Use a Spring `HandlerInterceptor` or a servlet `Filter` for cross-cutting request logging. Log request method, path, status, and duration at the filter boundary. Attach trace ID to MDC in the same filter.

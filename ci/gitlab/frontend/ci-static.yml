@@ -1,0 +1,20 @@
+# Static HTML CI jobs for GitLab — include from child .gitlab-ci.yml
+
+.static-lint:
+  image: alpine:3
+  tags: [docker]
+  script:
+    - echo "Static site — no linter configured"
+
+.static-docker:
+  image: docker:latest
+  tags: [docker]
+  services:
+    - docker:dind
+  script:
+    - docker build -t ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA} .
+    - docker tag ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA} ${CI_REGISTRY_IMAGE}:latest
+    - docker push ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}
+    - docker push ${CI_REGISTRY_IMAGE}:latest
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

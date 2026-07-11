@@ -28,6 +28,12 @@ This project structure supports Java, Go, and JavaScript/TypeScript. Before writ
 - For any test file, read `docs/TESTING.md` first for the expected test structure and patterns.
 - Read `docs/SECURITY.md` before implementing authentication, authorization, data handling, or configuration loading.
 - Read `docs/GIT_WORKFLOW.md` before creating branches, commits, or PRs.
+- Read `docs/RESILIENCE.md` before implementing retry, circuit breaker, timeout, or bulkhead logic.
+- Read `docs/IDEMPOTENCY.md` before implementing any mutating endpoint.
+- Read `docs/OBSERVABILITY.md` before implementing logging, metrics, or tracing.
+- Read `docs/SAGA_PATTERN.md` and `docs/OUTBOX_PATTERN.md` before designing cross-service workflows.
+- Read `docs/SCHEMA_EVOLUTION.md` before designing data models or APIs.
+- Read `docs/CONTRACT_TESTING.md` before writing service integration tests.
 
 
 <!-- headroom:rtk-instructions -->

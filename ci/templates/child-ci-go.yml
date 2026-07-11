@@ -1,0 +1,21 @@
+# Generated CI for Go project
+# Template: ci/templates/child-ci-go.yml
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  ci:
+    uses: pucelano-95/my-engineering-standards/.github/workflows/backend/ci-go.yml@main
+    with:
+      go-version: "1.26"
+      deploy-on-main: true
+      docker-registry: DOCKER_REGISTRY
+    secrets:
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}

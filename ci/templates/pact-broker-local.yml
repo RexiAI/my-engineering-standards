@@ -1,0 +1,31 @@
+# Local Pact Broker via Docker Compose
+# Copy to your project root as docker-compose.pact.yml
+# Start: docker compose -f docker-compose.pact.yml up -d
+# UI:    http://localhost:9292
+
+version: "3.8"
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pact
+      POSTGRES_PASSWORD: pact
+      POSTGRES_DB: pact_broker
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  broker:
+    image: pactfoundation/pact-broker:latest
+    ports:
+      - "9292:9292"
+    environment:
+      PACT_BROKER_DATABASE_USERNAME: pact
+      PACT_BROKER_DATABASE_PASSWORD: pact
+      PACT_BROKER_DATABASE_HOST: postgres
+      PACT_BROKER_DATABASE_NAME: pact_broker
+      PACT_BROKER_WEBHOOKS_ENABLED: "true"
+    depends_on:
+      - postgres
+
+volumes:
+  pgdata:

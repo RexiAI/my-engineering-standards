@@ -24,9 +24,61 @@
 
 ## Design Principles
 
-- **Prefer composition over inheritance.** Use interfaces and delegation instead of abstract base classes. Inheritance is acceptable for exception hierarchies and stable framework extension points (template method). For tests, use plain `@BeforeEach` + helper methods instead of `AbstractBaseTestSuite` base classes.
+- **Prefer composition over inheritance.** Use interfaces and delegation instead of abstract base classes. For tests, use plain `@BeforeEach` + helper methods instead of `AbstractBaseTestSuite` base classes.
 - **Keep things small.** Classes under 200 lines, methods under 20 lines, files under 500 lines. Split by responsibility, not by arbitrary size limits.
 - **Dependency rule.** Source code dependencies must point inward. Domain code never depends on infrastructure code. Controllers depend on services, services on repositories, never the reverse.
+- **Generalize, don't special-case.** One mechanism should handle all similar cases. Avoid if/else chains that check exception types — use polymorphic dispatch or Result pattern matching.
+- **Design interfaces to be deep.** A module's interface should be much simpler than its implementation. If a method just delegates with the same signature, it's a pass-through — remove it.
+- **First do no harm with dependencies.** Each external dependency adds cognitive load and attack surface. Prefer stdlib, justify each dependency. Audit quarterly (see SECURITY.md).
+
+## Error Handling Philosophy
+
+Prefer domain Result types for expected failure modes. Reserve exceptions for truly exceptional conditions (infrastructure failure, programming errors).
+
+### Result Type Pattern
+
+```java
+// Expected failures are return values, not control flow
+public sealed interface Result<T, E> {
+    record Ok<T, E>(T value) implements Result<T, E> {}
+    record Error<T, E>(E error) implements Result<T, E> {}
+}
+
+public enum CreateUserError {
+    EMAIL_TAKEN,
+    INVALID_EMAIL,
+}
+```
+
+```go
+// Go: Use Result[T, E] or (T, error) where error is a domain type
+type CreateUserResult struct {
+    User *User
+    Err  *CreateUserError
+}
+
+type CreateUserError string
+const (
+    ErrEmailTaken    CreateUserError = "EMAIL_TAKEN"
+    ErrInvalidEmail  CreateUserError = "INVALID_EMAIL"
+)
+```
+
+```ts
+// TypeScript: discriminated union
+type CreateUserResult =
+    | { ok: true; user: User }
+    | { ok: false; error: CreateUserError }
+```
+
+### When to Use Which
+
+| Scenario | Use |
+|----------|-----|
+| Caller expects this failure (validation, not found, conflict) | Result type |
+| Infrastructure failure (DB down, network timeout) | Exception → circuit breaker |
+| Programming error (null pointer, illegal argument) | Exception → fix the code |
+| Expected retry scenario (rate limit, conflict) | Result type + retry |
 
 ## Formatting
 
@@ -70,33 +122,52 @@
 
 ## Exception Handling
 
+### Philosophy
+
+Exceptions are for exceptional conditions only. Expected failures — validation errors, resource not found, duplicate key — are return values via Result types, not exceptions.
+
+Exceptions map to Result.Error values at the service boundary. The controller translates the error value into the appropriate HTTP response.
+
 ### Java
 
-Use the exception hierarchy rooted at `ApplicationException`:
+Reserve exceptions for truly exceptional conditions. Expected failures use a closed Result type:
 
+```java
+// Service returns result, not exception
+public Result<User, CreateUserError> createUser(CreateUserRequest request) {
+    if (emailExists(request.email())) return Result.error(CreateUserError.EMAIL_TAKEN);
+    return Result.ok(repository.save(request.toUser()));
+}
+
+// Controller maps result to HTTP response
+@PostMapping("/v1/users")
+public ResponseEntity<?> createUser(@Valid @RequestBody CreateUserRequest request) {
+    return switch (userService.createUser(request)) {
+        case Result.Ok(var user) -> ResponseEntity.status(201).body(user);
+        case Result.Error(var err) -> switch (err) {
+            case EMAIL_TAKEN -> ResponseEntity.status(409).body(Map.of("error", "email taken"));
+            case INVALID_EMAIL -> ResponseEntity.status(422).body(Map.of("error", "invalid email"));
+        };
+    };
+}
 ```
-ApplicationException (abstract)
-├── AuthenticationException           → 401
-├── BusinessValidationException       → 202
-├── NotFoundException                 → 404
-└── InternalServerException           → 500
-```
 
-Each exception carries:
-- `statusCode` — HTTP status.
-- `errorCode` — machine-readable string.
-- `description` — human-readable message.
-- `errorData` — optional map for additional context.
-
-The `@ControllerAdvice` (order 0) catches all exceptions and returns a uniform JSON error response.
+The `@ControllerAdvice` catches only truly exceptional conditions (infrastructure failures, programming errors) and returns uniform JSON. Not used for expected business logic failures.
 
 ### Go
 
-Define `ApplicationError` interface with `StatusCode()` and `Error() string`. Use a custom HTTP error handler middleware that converts errors to JSON responses. Keep the interface small — only error codes that callers need to distinguish.
+Define `ApplicationError` interface with `StatusCode()` and `Error() string`. Use a custom HTTP error handler middleware that converts errors to JSON responses. Prefer sentinel errors for expected failures:
+
+```go
+var (
+    ErrEmailTaken   = errors.New("email taken")
+    ErrInvalidEmail = errors.New("invalid email")
+)
+```
 
 ### JavaScript
 
-Use NestJS global exception filter with custom exception classes extending `HttpException`. Single `@Catch()` filter at the app boundary returns structured JSON errors. Use `class-validator` DTOs for input validation via `ValidationPipe`.
+Use NestJS global exception filter with custom exception classes extending `HttpException`. For expected failures, use Result types rather than throwing. Single `@Catch()` filter catches only truly exceptional conditions.
 
 ## Imports Ordering
 

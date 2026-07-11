@@ -119,28 +119,67 @@ type userRepository struct {
 }
 ```
 
-### Error Handling
+### Error Handling: Result Types
+
+Prefer sentinel errors for expected failures. Reserve panics for programming errors.
 
 ```go
-// Define custom error interface
-type ApplicationError interface {
-    StatusCode() int
-    Error() string
+// Expected failures: sentinel errors
+var (
+    ErrEmailTaken   = errors.New("email taken")
+    ErrInvalidEmail = errors.New("invalid email")
+    ErrUserNotFound = errors.New("user not found")
+)
+
+// Service returns (result, error) for expected failures
+func (s *UserService) CreateUser(ctx context.Context, req CreateUserRequest) (*User, error) {
+    exists, err := s.emailRepo.Exists(ctx, req.Email)
+    if err != nil {
+        return nil, fmt.Errorf("check email: %w", err) // infrastructure = wrap
+    }
+    if exists {
+        return nil, ErrEmailTaken // expected = sentinel
+    }
+    return s.userRepo.Save(ctx, req.ToUser())
 }
 
-// Middleware catches errors and returns JSON
+// Middleware translates errors to HTTP
 func ErrorMiddleware() gin.HandlerFunc {
     return func(c *gin.Context) {
         c.Next()
-        if len(c.Errors) > 0 {
-            err := c.Errors.Last().Err
-            if appErr, ok := err.(ApplicationError); ok {
-                c.JSON(appErr.StatusCode(), gin.H{"error": appErr.Error()})
-            } else {
-                c.JSON(500, gin.H{"error": "internal server error"})
-            }
+        if len(c.Errors) == 0 { return }
+        err := c.Errors.Last().Err
+        switch {
+        case errors.Is(err, ErrEmailTaken):
+            c.JSON(409, gin.H{"error": err.Error(), "code": "EMAIL_TAKEN"})
+        case errors.Is(err, ErrUserNotFound):
+            c.JSON(404, gin.H{"error": err.Error(), "code": "NOT_FOUND"})
+        default:
+            c.JSON(500, gin.H{"error": "internal server error"})
         }
     }
+}
+```
+
+### Resilience
+
+Every external HTTP client must include retry + circuit breaker:
+
+```go
+type ResilientClient struct {
+    client *http.Client
+    cb     *breaker.CircuitBreaker
+}
+
+func (c *ResilientClient) Do(req *http.Request) (*http.Response, error) {
+    var resp *http.Response
+    err := c.cb.Execute(func() (interface{}, error) {
+        return c.client.Do(req)
+    })
+    if err != nil {
+        return nil, err
+    }
+    return resp, nil
 }
 ```
 

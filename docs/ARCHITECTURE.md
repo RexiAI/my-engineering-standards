@@ -110,11 +110,56 @@ src/
 └── index.js                # Entry point
 ```
 
+## Module Design Checklist (Ousterhout)
+
+Every module (class, service, method) must satisfy:
+
+1. **Simple Interface**: The interface should be much simpler than its implementation
+2. **Information Hiding**: Internal complexity is encapsulated, not leaked
+3. **One Responsibility**: Change the module for one reason
+4. **Design Twice**: Before committing to a design, consider at least one alternative
+5. **Depth Over Width**: A module should do more "inside" than it exposes via its interface
+6. **No Pass-Through Methods**: If a method just delegates to another with the same signature, both are shallow — inline or restructure
+
+### Complexity Budget
+
+Maximum cognitive load per module:
+- One class: 200 lines
+- One method: 20 lines
+- One file: 500 lines
+- Max dependencies (incoming + outgoing): 15
+- Max nesting: 3 levels deep
+
+## Architecture Decision Records
+
+All architectural decisions must be recorded as ADRs (see `templates/ADR.md`). Required for:
+
+- Adding a new external dependency (database, message queue, cache)
+- Changing the data model or schema
+- Choosing between alternative technologies (SQL vs NoSQL, REST vs gRPC)
+- Adding or removing a service boundary
+- Cross-service API changes
+
+Each ADR must include: alternatives considered, decision rationale, consequences, and compliance enforcement.
+
+## Observability Integration
+
+Every service layer integrates with observability:
+
+```
+Controller → Traces inbound request, records HTTP metrics
+Service    → Traces business logic, logs method boundaries with trace ID
+Repository → Traces queries, records DB latency metrics
+External   → Traces downstream calls, records circuit breaker state
+```
+
+Service implementation must use OpenTelemetry SDKs (not vendor-specific tracers). See `docs/OBSERVABILITY.md`.
+
 ## Microservice Patterns
 
 ### API Versioning
 
-Use URL-based versioning: `/v1/`, `/v2/`. When an endpoint signature changes, create a new version. Do not modify existing versions.
+Use URL-based versioning: `/v1/`, `/v2/`. When an endpoint signature changes, create a new version. Do not modify existing versions. Verify API compatibility automatically in CI (see `docs/SCHEMA_EVOLUTION.md`).
 
 ### Inter-service Communication
 
@@ -130,15 +175,22 @@ Every service exposes:
 
 Each dependency implements a health check (e.g., `AbstractHealthDependencyService`). The health endpoint aggregates results into a JSON response with per-dependency status.
 
-### Exception Handling
+### Error Handling (Ousterhout: Define Errors Out of Existence)
 
-Use a structured exception hierarchy. Each exception carries:
-- HTTP status code
-- Error code (machine-readable string)
-- Description (human-readable)
-- Error data map (optional)
+Define errors out of existence. Prefer domain Result types over exceptions for expected failure modes:
 
-A global `@ControllerAdvice` (Java) or error middleware (Go) catches these and returns a uniform JSON error response.
+```java
+// Instead of: throw new BusinessValidationException("email taken")
+// Prefer:
+public Result<User, Error> createUser(CreateUserRequest request) {
+    if (emailExists(request.email())) return Result.error(Error.EmailTaken);
+    return Result.ok(repository.save(request.toUser()));
+}
+```
+
+Reserve exceptions for truly exceptional/unrecoverable conditions (infrastructure failure, programming errors). Expected failures (validation, not found, conflict) are return values, not control flow.
+
+A global `@ControllerAdvice` (Java) or error middleware (Go) catches truly exceptional cases and returns a uniform JSON error response. Expected failures from Result types are handled at the controller boundary and return appropriate HTTP status codes.
 
 ### Event Logging
 
@@ -146,8 +198,22 @@ Log at controller boundaries using a filter or interceptor. Capture request cont
 
 In Go, use a similar structured logging approach with zerolog and trace IDs propagated via context.
 
+See `docs/OBSERVABILITY.md` for full observability requirements (tracing, metrics, alerting).
+
 ## Dependency Injection
 
 - **Java**: Use Spring DI with constructor injection. Prefer `@Service`, `@Repository`, `@Component` stereotypes. Avoid `@Autowired` on fields.
 - **Go**: Manual DI in `dependency_injection.go`. Wire all components in a single top-level function. No DI framework.
 - **JS**: Pass dependencies explicitly via constructor or function arguments. Avoid global singletons (except well-defined ones like Redux store).
+
+## Resilience Integration
+
+Every external dependency must be protected:
+
+| Protection | Pattern | See |
+|-----------|---------|-----|
+| Transient failures | Retry with exponential backoff | RESILIENCE.md |
+| Cascading failures | Circuit breaker | RESILIENCE.md |
+| Resource exhaustion | Bulkhead, timeout | RESILIENCE.md |
+| Duplicate requests | Idempotency key | IDEMPOTENCY.md |
+| Reliable publishing | Transactional outbox | OUTBOX_PATTERN.md |

@@ -1,0 +1,26 @@
+# Pact contract testing setup for Node.js
+# Install:
+#   npm install --save-dev @pact-foundation/pact
+#
+# Provider verification script (e.g., test/pact/verify-provider.ts):
+#
+# import { Verifier } from '@pact-foundation/pact';
+#
+# describe('Pact Verification', () => {
+#   it('verifies provider', async () => {
+#     const opts = {
+#       provider: 'my-service',
+#       providerBaseUrl: 'http://localhost:3000',
+#       pactBrokerUrl: process.env.PACT_BROKER_URL,
+#       pactBrokerToken: process.env.PACT_BROKER_TOKEN,
+#       publishVerificationResult: true,
+#       providerVersion: process.env.VERSION || '1.0.0',
+#     };
+#     await new Verifier(opts).verifyProvider();
+#   });
+# });
+#
+# CI integration (GitHub Actions step):
+#   - run: npx jest test/pact --ci --forceExit
+#     env:
+#       PACT_BROKER_URL: ${{ secrets.PACT_BROKER_URL }}
