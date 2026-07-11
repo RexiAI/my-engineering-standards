@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.1.0] — 2026-07-11
+
+### Features
+
+- **OKF (Operational Knowledge Framework) v0.1** — `okf/` directory with 4 linked concept docs for AI-work practices
+- **Context Window Policy** — caveman, RTK, headroom, ponytail: how we keep sessions viable 3-5x longer
+- **RAG vs Context Stuffing decision** — default to stuffing <50KB, RAG for larger/fresher/semantic queries
+- **Detect Context Rot runbook** — 4-metric table + recovery procedure for degrading sessions
+- **MCP Server Connection runbook** — pattern + 3 worked examples (GitHub, MyInvestor, Headroom)
+- **bootstrap.sh** — now symlinks `okf/` into child repos via `.standards/okf -> okf`
+- **opencode.json.bridge** — includes 4 OKF instruction paths
+
+### Refactors
+
+- **bootstrap.sh** — renumbered steps, added OKF symlink, updated next-steps
+- **README** — added OKF structure tree + usage section
+
 ## [1.0.0] — 2026-07-11
 
 ### Features
