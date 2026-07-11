@@ -1,9 +1,9 @@
-FROM amazoncorretto:17 AS build
+FROM amazoncorretto:21 AS build
 WORKDIR /app
 COPY target/*.jar app.jar
 RUN java -Djarmode=layertools -jar app.jar extract
 
-FROM amazoncorretto:17
+FROM amazoncorretto:21
 RUN yum -y install openssl ca-certificates curl && yum clean all
 WORKDIR /app
 COPY --from=build app/dependencies/ ./

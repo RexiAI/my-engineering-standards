@@ -36,12 +36,12 @@ Use shared helper classes from the `ok-bamboo` library:
 ### Java Services
 
 ```dockerfile
-FROM amazoncorretto:17 AS build
+FROM amazoncorretto:21 AS build
 WORKDIR /app
 COPY target/*.jar app.jar
 RUN java -Djarmode=layertools -jar app.jar extract
 
-FROM amazoncorretto:17
+FROM amazoncorretto:21
 RUN yum -y install openssl ca-certificates && yum clean all
 COPY --from=build app/dependencies/ ./
 COPY --from=build app/spring-boot-loader/ ./

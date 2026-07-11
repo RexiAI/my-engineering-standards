@@ -2,7 +2,7 @@
 
 ## Build System
 
-- **Runtime**: Node.js 18+.
+- **Runtime**: Node.js 22+.
 - **Package manager**: npm.
 - **Frontend**: React 17+ with Create React App or Vite.
 - **Backend**: Express 4.x with Mongoose (MongoDB) or Sequelize/TypeORM (SQL).

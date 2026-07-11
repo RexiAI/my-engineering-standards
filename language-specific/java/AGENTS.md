@@ -3,7 +3,7 @@
 ## Build System
 
 - **Build tool**: Maven.
-- **Java version**: 17.
+- **Java version**: 21.
 - **Required Maven version**: >= 3.3.9.
 
 ## Parent POM
