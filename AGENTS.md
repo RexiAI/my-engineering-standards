@@ -35,6 +35,27 @@ This project structure supports Java, Go, and JavaScript/TypeScript. Before writ
 - Read `docs/SCHEMA_EVOLUTION.md` before designing data models or APIs.
 - Read `docs/CONTRACT_TESTING.md` before writing service integration tests.
 
+## CI/CD Quality Gates (Saga & Outbox)
+
+Automated gates enforce Saga and Outbox pattern compliance on every PR. Gates are conditional: `scripts/detect-saga-outbox.sh` sets `SAGA_DETECTED` and `OUTBOX_DETECTED` from changed files; all downstream gates skip when both are false.
+
+**Wire gates into a child repo:** `scripts/init-ci.sh --with-saga`
+
+| Gate | Script / Tool | Checks |
+|---|---|---|
+| Detection | `scripts/detect-saga-outbox.sh` | Sets `SAGA_DETECTED` / `OUTBOX_DETECTED` |
+| Saga timeouts | `scripts/check-saga-timeouts.sh` | Every handler has a timeout annotation or `WithTimeout` |
+| Saga tests | `scripts/check-saga-tests.sh` | Integration tests exist with compensation scenarios |
+| Outbox schema | `scripts/lint-outbox-schema.sh` | Required columns, partial index on `published_at IS NULL`, cleanup |
+| Outbox relay | `scripts/check-outbox-relay.sh` | Relay component and consumer dedup store exist |
+| Java ArchUnit | `ci/templates/archunit/Saga+OutboxArchRules.java` | 9 structural rules (compensation, `@Transactional`, no direct broker, dedup) |
+| Go AST lint | `ci/templates/go-saga-lint.go` | Compensation func, `WithTimeout`, no direct broker in saga files |
+| Node ESLint | `ci/templates/eslint-saga-rules/saga-compensation.js` | `sagaStep()` must declare `compensate` and `timeout` |
+
+- Read `docs/SAGA_PATTERN.md §CI Quality Gates` and `docs/OUTBOX_PATTERN.md §CI Quality Gates` before modifying gate scripts or adding saga/outbox code.
+- Integration test templates: `ci/templates/tests/` (Java, Go, Node × Saga, Outbox).
+- CI job definitions: `ci/gitlab/backend/ci-{java,go,node}.yml` (`.{lang}-saga-gates` hidden jobs).
+
 
 <!-- headroom:rtk-instructions -->
 # RTK (Rust Token Killer) - Token-Optimized Commands

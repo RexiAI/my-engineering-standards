@@ -153,6 +153,40 @@ Persist saga state so it survives restarts:
 | E2E | Complete saga runs end-to-end with message broker |
 | Chaos | Saga survives service crash mid-step (recovery from state store) |
 
+## Required Tests
+
+All five scenarios below are **required** for any service implementing this pattern.
+Copy the matching template from `ci/templates/tests/` and fill in the TODOs.
+
+| # | Scenario | Template |
+|---|----------|----------|
+| 1 | Happy path — all steps complete, state = COMPLETED | `SagaIntegrationTestTemplate.java` / `saga_integration_test.go` / `saga.integration.test.ts` |
+| 2 | Step N failure — compensation runs for steps 1..N-1 | same |
+| 3 | Step timeout — compensation triggered | same |
+| 4 | Duplicate event delivery — saga state unchanged (idempotent) | same |
+| 5 | State store persistence — saga survives app restart | same |
+
+Test files must match naming patterns: `*SagaTest*`, `*saga*_test.go`, or `*saga*.integration.test.ts`.
+The `check-saga-tests.sh` CI gate blocks PRs that introduce saga code without these files.
+
+## CI Quality Gates
+
+Automated gates run on every PR when saga code is detected (via `detect-saga-outbox.sh`).
+Zero overhead for services that do not use this pattern.
+
+| Gate | Script | Blocks PR |
+|------|--------|-----------|
+| Compensation completeness | ArchUnit (`SagaArchRules.java`) / `go-saga-lint.go` / ESLint `saga/compensation-required` | Yes |
+| Saga handlers are `@Transactional` | ArchUnit `sagaHandlerMethodsMustBeTransactional()` | Yes |
+| Orchestrators depend on `SagaStateStore` | ArchUnit `sagaOrchestratorsMustUsePersistentStateStore()` | Yes |
+| No direct broker calls from saga layer | ArchUnit `sagasMustNotCallBrokerDirectly()` / ESLint `saga/no-direct-broker-call` | Yes |
+| Timeout configured per step | `check-saga-timeouts.sh` | Yes |
+| Integration tests present | `check-saga-tests.sh` | Yes |
+
+**Setup** (child repos): run `init-ci.sh --with-saga` to copy templates and enable the `saga-gates` stage.
+For Java: add the ArchUnit dependency from `ci/templates/archunit/pom-fragment.xml` to `pom.xml`.
+For Node: wire `ci/templates/eslint-saga-rules/saga-compensation.js` in `eslint.config.js`.
+
 ## See Also
 
 - `docs/OUTBOX_PATTERN.md` — reliable event publishing for saga steps

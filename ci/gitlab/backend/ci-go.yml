@@ -30,6 +30,39 @@
   script:
     - make lint
 
+.go-saga-gates:
+  extends: [.go-setup, .go-cache]
+  script:
+    - |
+      STANDARDS="${CI_PROJECT_DIR}/.standards"
+      source "${STANDARDS}/scripts/detect-saga-outbox.sh" --gitlab-dotenv saga-env.env
+
+      if [ "${SAGA_DETECTED}" = "true" ] || [ "${OUTBOX_DETECTED}" = "true" ]; then
+        echo "=== Saga/Outbox gates: pattern detected, running checks ==="
+
+        if [ "${OUTBOX_DETECTED}" = "true" ]; then
+          bash "${STANDARDS}/scripts/lint-outbox-schema.sh"
+          bash "${STANDARDS}/scripts/check-outbox-relay.sh"
+        fi
+
+        if [ "${SAGA_DETECTED}" = "true" ]; then
+          bash "${STANDARDS}/scripts/check-saga-timeouts.sh"
+          # Go AST saga linter
+          go run "${STANDARDS}/ci/templates/go-saga-lint.go" ./...
+        fi
+
+        SAGA_DETECTED="${SAGA_DETECTED}" OUTBOX_DETECTED="${OUTBOX_DETECTED}" \
+          bash "${STANDARDS}/scripts/check-saga-tests.sh"
+      else
+        echo "=== Saga/Outbox gates: no saga/outbox patterns detected, skipping ==="
+      fi
+  artifacts:
+    reports:
+      dotenv: saga-env.env
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  allow_failure: false
+
 .go-contract:
   extends: [.go-setup, .go-cache]
   script:

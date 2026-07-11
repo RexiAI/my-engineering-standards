@@ -95,3 +95,32 @@ CI pipeline must pass these checks before merging:
 7. SonarQube quality gate passes (no new bugs, code smells, security hotspots).
 8. E2E tests pass.
 9. Talisman secret scan passes (pre-commit hook).
+
+### Conditional Gates (Saga/Outbox Pattern)
+
+Gates 10–14 activate automatically when `detect-saga-outbox.sh` finds saga or outbox code
+in the changed files. Zero overhead for services that do not use these patterns.
+Enable via `init-ci.sh --with-saga` or set `with-saga-gates: true` in the child CI template.
+
+10. **Saga compensation completeness** (if saga code present) — every `@SagaHandler` / `*SagaHandler`
+    function must have a matching compensation method (`on*Failed`, `compensate*`, `rollback*`).
+    Enforced by ArchUnit `SagaArchRules` (Java), `go-saga-lint.go` (Go), or ESLint
+    `saga/compensation-required` (Node). Reference: `docs/SAGA_PATTERN.md §CI Quality Gates`.
+
+11. **Outbox schema validation** (if outbox code present) — migration files must define the
+    outbox table with all required columns, a partial index on `published_at IS NULL`, and a
+    cleanup mechanism. Enforced by `scripts/lint-outbox-schema.sh`.
+    Reference: `docs/OUTBOX_PATTERN.md §CI Quality Gates`.
+
+12. **Saga timeout enforcement** (if saga code present) — every saga step must declare a timeout
+    (`@Timeout` / `context.WithTimeout` / `timeout` property). Enforced by
+    `scripts/check-saga-timeouts.sh`. Reference: `docs/SAGA_PATTERN.md §Saga Timeout`.
+
+13. **Saga/outbox integration tests present** (if either pattern present) — test files matching
+    `*SagaTest*` or `*OutboxTest*` must exist and contain compensation/relay test scenarios.
+    Enforced by `scripts/check-saga-tests.sh`. Templates in `ci/templates/tests/`.
+    Reference: `docs/SAGA_PATTERN.md §Required Tests`, `docs/OUTBOX_PATTERN.md §Required Tests`.
+
+14. **Consumer deduplication verified** (if outbox code present) — event consumer code must
+    reference a deduplication store (`*DedupStore`, `alreadyProcessed`, `SetNX`). Enforced by
+    `scripts/check-outbox-relay.sh`. Reference: `docs/OUTBOX_PATTERN.md §Idempotent Event Processing`.

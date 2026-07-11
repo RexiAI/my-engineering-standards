@@ -31,6 +31,47 @@
     - npm run lint --if-present
     - npm run format:check --if-present
 
+.node-saga-gates:
+  extends: [.node-setup, .node-cache]
+  script:
+    - |
+      STANDARDS="${CI_PROJECT_DIR}/.standards"
+      source "${STANDARDS}/scripts/detect-saga-outbox.sh" --gitlab-dotenv saga-env.env
+
+      if [ "${SAGA_DETECTED}" = "true" ] || [ "${OUTBOX_DETECTED}" = "true" ]; then
+        echo "=== Saga/Outbox gates: pattern detected, running checks ==="
+
+        if [ "${OUTBOX_DETECTED}" = "true" ]; then
+          bash "${STANDARDS}/scripts/lint-outbox-schema.sh"
+          bash "${STANDARDS}/scripts/check-outbox-relay.sh"
+        fi
+
+        if [ "${SAGA_DETECTED}" = "true" ]; then
+          bash "${STANDARDS}/scripts/check-saga-timeouts.sh"
+          # ESLint saga rules — runs if eslint.config.js wires the saga plugin.
+          # Works with ESLint v8 (legacy config) and v9 (flat config).
+          # If plugin not wired, eslint exits 0 with no saga-related files matched.
+          # To enable: copy ci/templates/eslint-saga-rules/ and wire in eslint.config.js.
+          if [ -f eslint.config.js ] || [ -f eslint.config.cjs ] || [ -f eslint.config.mjs ] || [ -f .eslintrc.js ] || [ -f .eslintrc.json ]; then
+            npx eslint --max-warnings=0 'src/**/*.{ts,js}' 2>&1
+          else
+            echo "WARN: No ESLint config found — skipping ESLint saga rule check."
+            echo "      Wire ci/templates/eslint-saga-rules/ in eslint.config.js to enable."
+          fi
+        fi
+
+        SAGA_DETECTED="${SAGA_DETECTED}" OUTBOX_DETECTED="${OUTBOX_DETECTED}" \
+          bash "${STANDARDS}/scripts/check-saga-tests.sh"
+      else
+        echo "=== Saga/Outbox gates: no saga/outbox patterns detected, skipping ==="
+      fi
+  artifacts:
+    reports:
+      dotenv: saga-env.env
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  allow_failure: false
+
 .node-contract:
   extends: [.node-setup, .node-cache]
   script:

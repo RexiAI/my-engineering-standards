@@ -17,6 +17,11 @@ jobs:
       java-version: "21"
       deploy-on-main: true
       docker-registry: DOCKER_REGISTRY
+      # Set to true if this service uses the Saga or Outbox pattern.
+      # Enables saga-quality-gates job: ArchUnit rules, outbox schema lint,
+      # timeout enforcement, and integration test presence checks.
+      # See docs/SAGA_PATTERN.md §CI Quality Gates, docs/OUTBOX_PATTERN.md §CI Quality Gates
+      with-saga-gates: false
     secrets:
       MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
       MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}

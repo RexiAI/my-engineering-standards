@@ -116,6 +116,40 @@ DELETE FROM outbox WHERE published_at < NOW() - INTERVAL '7 days';
 | Kafka Transactions | Exactly-once | High | Kafka-only ecosystem |
 | 2PC (XA) | Atomic | High | Legacy systems, short duration |
 
+## Required Tests
+
+All five scenarios below are **required** for any service implementing this pattern.
+Copy the matching template from `ci/templates/tests/` and fill in the TODOs.
+
+| # | Scenario | Template |
+|---|----------|----------|
+| 1 | Business write + outbox insert are atomic (rollback both on failure) | `OutboxIntegrationTestTemplate.java` / `outbox_integration_test.go` / `outbox.integration.test.ts` |
+| 2 | Relay publishes unpublished outbox events | same |
+| 3 | Relay marks events as published — no re-publish on next run | same |
+| 4 | Consumer deduplicates duplicate event delivery | same |
+| 5 | Cleanup deletes published rows older than TTL | same |
+
+Test files must match naming patterns: `*OutboxTest*`, `*outbox*_test.go`, or `*outbox*.integration.test.ts`.
+The `check-saga-tests.sh` CI gate blocks PRs that introduce outbox code without these files.
+
+## CI Quality Gates
+
+Automated gates run on every PR when outbox code is detected (via `detect-saga-outbox.sh`).
+Zero overhead for services that do not use this pattern.
+
+| Gate | Script | Blocks PR |
+|------|--------|-----------|
+| Outbox schema has all required columns | `lint-outbox-schema.sh` | Yes |
+| Partial index on `published_at IS NULL` exists | `lint-outbox-schema.sh` | Yes |
+| Cleanup mechanism defined | `lint-outbox-schema.sh` | Yes |
+| Relay component exists | `check-outbox-relay.sh` | Yes |
+| Consumer deduplication logic exists | `check-outbox-relay.sh` | Yes |
+| Integration tests present | `check-saga-tests.sh` | Yes |
+| Services must not call broker directly — must use outbox | ArchUnit `OutboxArchRules.servicesMustPublishViaOutbox()` | Yes |
+| Relay component must not live in controller layer | ArchUnit `OutboxArchRules.outboxRelayMustNotBeInControllerLayer()` | Yes |
+
+**Setup** (child repos): run `init-ci.sh --with-saga` to copy templates and enable the `saga-gates` stage.
+
 ## See Also
 
 - `docs/SAGA_PATTERN.md` — event-driven coordination between services

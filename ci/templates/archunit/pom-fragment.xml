@@ -1,0 +1,39 @@
+<!--
+    Add to the child project's pom.xml <dependencies> block.
+    Enforces Saga and Outbox architectural fitness functions at test time.
+    See: docs/SAGA_PATTERN.md §CI Quality Gates
+         docs/OUTBOX_PATTERN.md §CI Quality Gates
+-->
+<dependency>
+    <groupId>com.mystandards</groupId>
+    <artifactId>saga-archunit-rules</artifactId>
+    <version>1.0.0</version>
+    <scope>test</scope>
+</dependency>
+
+<!--
+    Wire the rules in any @AnalyzeClasses test class, e.g.:
+
+    @AnalyzeClasses(packages = "com.mycompany.myservice")
+    class SagaArchTest {
+        @ArchTest
+        static final ArchRule sagaHandlersMustHaveCompensation =
+            SagaArchRules.sagaHandlersMustHaveCompensation();
+
+        @ArchTest
+        static final ArchRule sagaOrchestratorsMustUsePersistentStateStore =
+            SagaArchRules.sagaOrchestratorsMustUsePersistentStateStore();
+
+        @ArchTest
+        static final ArchRule sagasMustNotCallBrokerDirectly =
+            SagaArchRules.sagasMustNotCallBrokerDirectly();
+
+        @ArchTest
+        static final ArchRule servicesMustPublishViaOutbox =
+            OutboxArchRules.servicesMustPublishViaOutbox();
+
+        @ArchTest
+        static final ArchRule outboxRelayMustExist =
+            OutboxArchRules.outboxRelayMustExist();
+    }
+-->

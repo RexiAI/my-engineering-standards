@@ -31,6 +31,7 @@ CI_FLAG=""
 BACKEND_FLAG=""
 FRONTEND_FLAG=""
 REGISTRY_FLAG=""
+WITH_SAGA_FLAG=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -50,9 +51,13 @@ while [[ $# -gt 0 ]]; do
       REGISTRY_FLAG="$2"
       shift 2
       ;;
+    --with-saga)
+      WITH_SAGA_FLAG="true"
+      shift
+      ;;
     *)
       err "Unknown flag: $1"
-      echo "Usage: $0 [--platform github|gitlab|both] [--backend java,go,node] [--frontend nextjs,react,angular,static] [--registry ghcr.io]"
+      echo "Usage: $0 [--platform github|gitlab|both] [--backend java,go,node] [--frontend nextjs,react,angular,static] [--registry ghcr.io] [--with-saga]"
       exit 1
       ;;
   esac
@@ -193,6 +198,7 @@ collect_secrets
 generate_github_ci() {
   local target="$PROJECT_ROOT/.github/workflows/ci.yml"
   local registry="${REGISTRY_FLAG:-ghcr.io}"
+  local saga_enabled="${WITH_SAGA_FLAG:-false}"
 
   mkdir -p "$PROJECT_ROOT/.github/workflows"
 
@@ -216,6 +222,7 @@ EOF
     uses: pucelano-95/my-engineering-standards/.github/workflows/backend/ci-${lang}.yml@main
     with:
       docker-registry: $registry
+      with-saga-gates: $saga_enabled
     secrets:
       GHCR_TOKEN: \${{ secrets.GHCR_TOKEN }}
       PACT_BROKER_URL: \${{ secrets.PACT_BROKER_URL }}
@@ -235,13 +242,18 @@ EOF
 
   ok "Generated: .github/workflows/ci.yml"
 
+  # Copy saga templates if --with-saga
+  if [ "$saga_enabled" = "true" ]; then
+    _copy_saga_templates
+  fi
+
   # Dependabot
   if [ ! -f "$PROJECT_ROOT/.github/dependabot.yml" ]; then
     local eco="npm"
     for lang in "${BACKEND[@]}"; do
       case $lang in
         java) eco="maven";;
-        go)   eco="bundler";;
+        go)   eco="gomod";;
         node) eco="npm";;
       esac
     done
@@ -273,6 +285,7 @@ EOF
 generate_gitlab() {
   local target="$PROJECT_ROOT/.gitlab-ci.yml"
   local registry="${REGISTRY_FLAG:-ghcr.io}"
+  local saga_enabled="${WITH_SAGA_FLAG:-false}"
 
   cat > "$target" << EOF
 include:
@@ -286,15 +299,28 @@ EOF
     echo "  - local: .standards/ci/gitlab/frontend/ci-${FRONTEND}.yml" >> "$target"
   fi
 
-  cat >> "$target" << EOF
-
-stages:
+  # Add saga-gates stage when --with-saga
+  local stages_block="stages:
   - test
   - lint
   - contract
   - integration
   - deploy
-  - docker
+  - docker"
+  if [ "$saga_enabled" = "true" ]; then
+    stages_block="stages:
+  - test
+  - lint
+  - saga-gates
+  - contract
+  - integration
+  - deploy
+  - docker"
+  fi
+
+  cat >> "$target" << EOF
+
+${stages_block}
 
 variables:
   CI_REGISTRY: $registry
@@ -310,6 +336,19 @@ ${lang}-unit:
 ${lang}-lint:
   extends: .${lang}-lint
   stage: lint
+EOF
+
+    # Inject saga-gates job when --with-saga
+    if [ "$saga_enabled" = "true" ]; then
+      cat >> "$target" << EOF
+
+${lang}-saga-gates:
+  extends: .${lang}-saga-gates
+  stage: saga-gates
+EOF
+    fi
+
+    cat >> "$target" << EOF
 
 ${lang}-contract:
   extends: .${lang}-contract
@@ -352,6 +391,11 @@ EOF
 
   ok "Generated: .gitlab-ci.yml"
 
+  # Copy saga templates if --with-saga
+  if [ "$saga_enabled" = "true" ]; then
+    _copy_saga_templates
+  fi
+
   # Copy Makefile if Go and no existing Makefile
   for lang in "${BACKEND[@]}"; do
     if [ "$lang" = "go" ] && [ ! -f "$PROJECT_ROOT/Makefile" ]; then
@@ -361,7 +405,76 @@ EOF
   done
 }
 
-# ── Step 5: Print summary ─────────────────────
+# ── Step 4b: Copy saga templates ─────────────────────────────────────────────
+_copy_saga_templates() {
+  info "Copying saga/outbox quality gate templates..."
+
+  # Detect primary backend language for template selection
+  local primary_lang="${BACKEND[0]:-}"
+
+  case "$primary_lang" in
+    java)
+      # Copy ArchUnit pom fragment
+      local archunit_dir="$PROJECT_ROOT/src/test/resources/archunit"
+      mkdir -p "$archunit_dir"
+      cp "$STANDARDS_DIR/ci/templates/archunit/pom-fragment.xml" \
+         "$archunit_dir/pom-fragment.xml"
+      ok "Copied: src/test/resources/archunit/pom-fragment.xml"
+      warn "Add the dependency in pom-fragment.xml to your pom.xml <dependencies> block."
+
+      # Copy Java test templates
+      local test_dir="$PROJECT_ROOT/src/test/java"
+      mkdir -p "$test_dir"
+      cp "$STANDARDS_DIR/ci/templates/tests/SagaIntegrationTestTemplate.java" \
+         "$test_dir/SagaIntegrationTestTemplate.java"
+      cp "$STANDARDS_DIR/ci/templates/tests/OutboxIntegrationTestTemplate.java" \
+         "$test_dir/OutboxIntegrationTestTemplate.java"
+      ok "Copied: Java saga/outbox integration test templates to src/test/java/"
+      ;;
+
+    go)
+      # Copy Go AST linter
+      local lint_dir="$PROJECT_ROOT/tools"
+      mkdir -p "$lint_dir"
+      cp "$STANDARDS_DIR/ci/templates/go-saga-lint.go" \
+         "$lint_dir/go-saga-lint.go"
+      ok "Copied: tools/go-saga-lint.go"
+
+      # Copy Go test templates
+      local test_dir="$PROJECT_ROOT/internal"
+      mkdir -p "$test_dir"
+      cp "$STANDARDS_DIR/ci/templates/tests/saga_integration_test.go" \
+         "$test_dir/saga_integration_test.go"
+      cp "$STANDARDS_DIR/ci/templates/tests/outbox_integration_test.go" \
+         "$test_dir/outbox_integration_test.go"
+      ok "Copied: Go saga/outbox integration test templates to internal/"
+      ;;
+
+    node)
+      # Copy ESLint saga rules plugin
+      local lint_dir="$PROJECT_ROOT/src/lint"
+      mkdir -p "$lint_dir"
+      cp -r "$STANDARDS_DIR/ci/templates/eslint-saga-rules/" \
+            "$lint_dir/eslint-saga-rules/"
+      ok "Copied: src/lint/eslint-saga-rules/"
+      warn "Wire eslint-saga-rules in your eslint.config.js. See src/lint/eslint-saga-rules/saga-compensation.js."
+
+      # Copy Node test templates
+      local test_dir="$PROJECT_ROOT/src/__tests__/integration"
+      mkdir -p "$test_dir"
+      cp "$STANDARDS_DIR/ci/templates/tests/saga.integration.test.ts" \
+         "$test_dir/saga.integration.test.ts"
+      cp "$STANDARDS_DIR/ci/templates/tests/outbox.integration.test.ts" \
+         "$test_dir/outbox.integration.test.ts"
+      ok "Copied: Node saga/outbox integration test templates to src/__tests__/integration/"
+      ;;
+  esac
+
+  ok "Saga/outbox templates copied. Fill in TODO markers before running CI."
+  info "Reference: docs/SAGA_PATTERN.md §CI Quality Gates, docs/OUTBOX_PATTERN.md §CI Quality Gates"
+}
+
+# ── Step 5: Print summary ─────────────────────────────────────────────────────
 print_summary() {
   echo ""
   echo "╔══════════════════════════════════════╗"
@@ -391,6 +504,15 @@ print_summary() {
     echo "  2. Push and check Pipelines tab"
   fi
   echo "  3. Review generated files and customize as needed"
+  if [ "${WITH_SAGA_FLAG:-}" = "true" ]; then
+    echo ""
+    echo "Saga/Outbox gate templates copied:"
+    echo "  • Fill in TODO markers in the integration test templates"
+    echo "  • Java: add pom-fragment.xml dependency to pom.xml"
+    echo "  • Node: wire eslint-saga-rules plugin in eslint.config.js"
+    echo "  • Reference: docs/SAGA_PATTERN.md §CI Quality Gates"
+    echo "               docs/OUTBOX_PATTERN.md §CI Quality Gates"
+  fi
   echo ""
 }
 

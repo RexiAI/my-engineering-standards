@@ -27,6 +27,46 @@
   script:
     - mvn ${MAVEN_CLI_OPTS} ${MAVEN_GOAL}
 
+.java-saga-gates:
+  extends: [.java-setup, .java-cache]
+  script:
+    - |
+      STANDARDS="${CI_PROJECT_DIR}/.standards"
+      source "${STANDARDS}/scripts/detect-saga-outbox.sh" --gitlab-dotenv saga-env.env
+
+      if [ "${SAGA_DETECTED}" = "true" ] || [ "${OUTBOX_DETECTED}" = "true" ]; then
+        echo "=== Saga/Outbox gates: pattern detected, running checks ==="
+
+        if [ "${OUTBOX_DETECTED}" = "true" ]; then
+          bash "${STANDARDS}/scripts/lint-outbox-schema.sh"
+          bash "${STANDARDS}/scripts/check-outbox-relay.sh"
+        fi
+
+        if [ "${SAGA_DETECTED}" = "true" ]; then
+          bash "${STANDARDS}/scripts/check-saga-timeouts.sh"
+        fi
+
+        SAGA_DETECTED="${SAGA_DETECTED}" OUTBOX_DETECTED="${OUTBOX_DETECTED}" \
+          bash "${STANDARDS}/scripts/check-saga-tests.sh"
+
+        # ArchUnit rules — run if saga-archunit-rules dep is in pom.xml.
+        # Exits non-zero on ArchUnit violations (CI gate fails) or if no matching tests found.
+        # Add dependency from ci/templates/archunit/pom-fragment.xml to enable.
+        if mvn ${MAVEN_CLI_OPTS} test -pl . \
+            -Dtest="*ArchTest,*SagaArchTest,*OutboxArchTest" \
+            --fail-at-end -q 2>&1 | grep -q 'No tests were found'; then
+          echo "WARN: No ArchUnit tests found. Add SagaArchRules/OutboxArchRules — see ci/templates/archunit/"
+        fi
+      else
+        echo "=== Saga/Outbox gates: no saga/outbox patterns detected, skipping ==="
+      fi
+  artifacts:
+    reports:
+      dotenv: saga-env.env
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  allow_failure: false
+
 .java-contract:
   extends: [.java-setup, .java-cache]
   script:

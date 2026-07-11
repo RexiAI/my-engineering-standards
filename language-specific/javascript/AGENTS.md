@@ -632,3 +632,23 @@ Run all tests: `npm test` (or `npm run test -- --coverage` for coverage).
 
 Run linting: `npm run lint`
 Run formatter: `npm run format`
+
+## Saga & Outbox CI Gates
+
+Shell and ESLint gates run in CI when `SAGA_DETECTED=true` or `OUTBOX_DETECTED=true`. Merge blocked on violation.
+
+**ESLint plugin:** `ci/templates/eslint-saga-rules/saga-compensation.js`
+- Rule `saga/step-timeout-required`: every `sagaStep()` call must include both `compensate` and `timeout` properties.
+- CJS format. ESLint v8: add to `.eslintrc` plugins array. ESLint v9 flat config: `require()` the file or rename to `.cjs`.
+
+**Shell gates run when `SAGA_DETECTED=true`:**
+- `check-saga-timeouts.sh` — every `sagaStep()` file must include `timeout:` property (not just the word in a comment).
+- `check-saga-tests.sh` — integration test files with compensation scenarios required.
+
+**Shell gates run when `OUTBOX_DETECTED=true`:**
+- `lint-outbox-schema.sh` — outbox migration (in `migrations/`, `database/migrations/`, or `prisma/migrations/`) must have required columns (`aggregate_type`, `aggregate_id`, `published_at`, etc.), a partial index on `published_at IS NULL`, and a cleanup mechanism.
+- `check-outbox-relay.sh` — relay component and consumer dedup logic must exist.
+
+**Test templates:** `ci/templates/tests/saga.integration.test.ts`, `ci/templates/tests/outbox.integration.test.ts`.
+
+Read `docs/SAGA_PATTERN.md §CI Quality Gates` and `docs/OUTBOX_PATTERN.md §CI Quality Gates` before writing saga or outbox code.

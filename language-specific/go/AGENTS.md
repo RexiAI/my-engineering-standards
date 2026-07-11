@@ -194,3 +194,22 @@ r.GET("/health", func(c *gin.Context) {
     c.JSON(200, deps)
 })
 ```
+
+## Saga & Outbox CI Gates
+
+`ci/templates/go-saga-lint.go` runs via `go run` in CI when `SAGA_DETECTED=true`. Merge blocked on violation.
+
+**AST checks enforced:**
+- Every `*SagaHandler` function must have a sibling compensation function: `*Compensate`, `Rollback*`, `rollback*`, `On*Failed`, or `on*Failed`.
+- Saga handler files must use `context.WithTimeout` or `context.WithDeadline` (not just passed through — must be called).
+- Saga files must not call broker APIs directly: no `kafka.NewProducer`, `nats.Publish`, `amqp.Channel`, etc. Publish via an interface.
+
+**Shell gates also run** (from `scripts/`):
+- `check-saga-timeouts.sh` — per-file `context.WithTimeout` check.
+- `check-saga-tests.sh` — integration test files with compensation scenarios required.
+- `lint-outbox-schema.sh` — outbox migration in `db/migrations/` must have required columns, partial index, and cleanup.
+- `check-outbox-relay.sh` — relay component and consumer dedup logic must exist.
+
+**Test templates:** `ci/templates/tests/saga_integration_test.go`, `ci/templates/tests/outbox_integration_test.go`.
+
+Read `docs/SAGA_PATTERN.md §CI Quality Gates` and `docs/OUTBOX_PATTERN.md §CI Quality Gates` before writing saga or outbox code.

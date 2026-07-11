@@ -250,3 +250,26 @@ Available client types:
 - `SERVICE_AUTHENTICATED` — sync with trace ID + service-user access token.
 - `BASIC_ASYNC` — async with static trace ID.
 - `ASYNC_SERVICE_AUTHENTICATED` — async with static trace ID + access token.
+
+## Saga & Outbox CI Gates
+
+ArchUnit rules run automatically in CI when `SAGA_DETECTED=true`. Merge blocked on violation.
+
+**Setup:** merge `ci/templates/archunit/pom-fragment.xml` into the child project POM to wire the ArchUnit test runner.
+
+**`SagaArchRules.java` enforces:**
+- Every `@SagaHandler` class has a compensation method (`*Compensate`, `compensate*`, `rollback*`, `undo*`).
+- `@SagaHandler` classes are annotated `@Transactional`.
+- Saga classes do not call broker APIs directly (no `KafkaProducer`, `RabbitTemplate`, `JmsTemplate`, etc.) — publish via an event gateway interface.
+- Compensation methods are named idempotently (`*Compensate` / `compensate*` / `rollback*` / `undo*`).
+- `@SagaHandler` classes declare a timeout (`@Timeout` or resilience4j `TimeLimiterConfig`).
+
+**`OutboxArchRules.java` enforces:**
+- All event publishing goes through `OutboxPublisher` (no direct broker calls from services).
+- Outbox writes are `@Transactional` and co-located with the business write.
+- Outbox consumers (`..outbox.consumer..` or `Outbox*`-dependent classes) have a deduplication store dependency.
+- The relay component implements `OutboxRelay`.
+
+**Test templates:** `ci/templates/tests/SagaIntegrationTestTemplate.java`, `ci/templates/tests/OutboxIntegrationTestTemplate.java`.
+
+Read `docs/SAGA_PATTERN.md §CI Quality Gates` and `docs/OUTBOX_PATTERN.md §CI Quality Gates` before writing saga or outbox code.

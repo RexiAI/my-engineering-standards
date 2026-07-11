@@ -17,5 +17,10 @@ jobs:
       go-version: "1.26"
       deploy-on-main: true
       docker-registry: DOCKER_REGISTRY
+      # Set to true if this service uses the Saga or Outbox pattern.
+      # Enables saga-quality-gates job: Go AST linter, outbox schema lint,
+      # timeout enforcement, and integration test presence checks.
+      # See docs/SAGA_PATTERN.md §CI Quality Gates, docs/OUTBOX_PATTERN.md §CI Quality Gates
+      with-saga-gates: false
     secrets:
       GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}

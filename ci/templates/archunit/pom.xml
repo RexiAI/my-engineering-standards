@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+        saga-archunit-rules — Maven artifact providing ArchUnit fitness functions
+        for the Saga and Outbox patterns defined in docs/SAGA_PATTERN.md and
+        docs/OUTBOX_PATTERN.md.
+
+        Child repos add this as a test-scoped dependency:
+            <dependency>
+                <groupId>com.mystandards</groupId>
+                <artifactId>saga-archunit-rules</artifactId>
+                <version>${saga-archunit-rules.version}</version>
+                <scope>test</scope>
+            </dependency>
+
+        Then import SagaArchRules or OutboxArchRules in any @AnalyzeClasses test.
+    -->
+
+    <groupId>com.mystandards</groupId>
+    <artifactId>saga-archunit-rules</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>saga-archunit-rules</name>
+    <description>ArchUnit fitness functions for Saga and Outbox pattern enforcement</description>
+
+    <properties>
+        <java.version>21</java.version>
+        <maven.compiler.source>${java.version}</maven.compiler.source>
+        <maven.compiler.target>${java.version}</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <archunit.version>1.3.0</archunit.version>
+        <junit.version>5.10.2</junit.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <version>${archunit.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>${junit.version}</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <release>${java.version}</release>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>3.3.0</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals><goal>jar</goal></goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
