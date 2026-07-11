@@ -5,7 +5,7 @@
 | Element | Convention | Examples |
 |---|---|---|
 | Repository names | kebab-case | `authentication-service`, `nodepop-advanced` |
-| Java packages | `com.openbank.<service>.<layer>` | `com.openbank.authservice.controller` |
+| Java packages | `com.<company>.<service>.<layer>` | `com.company.authservice.controller` |
 | Go packages | `common_` prefix for shared code | `common_errors`, `common_services` |
 | Classes / Types | PascalCase | `AuthenticationService`, `IdentityClaim` |
 | Methods / Functions | camelCase | `getUserById()`, `hashPassword()` |

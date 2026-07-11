@@ -42,7 +42,7 @@ Layers may only depend on the layer directly below. Controllers never access rep
 
 ```
 src/
-├── main/java/com/openbank/<service>/
+├── main/java/com/<company>/<service>/
 │   ├── Application.java
 │   ├── config/          # @Configuration, @PropertySource, bean wiring
 │   ├── controller/      # @RestController, request/response DTOs

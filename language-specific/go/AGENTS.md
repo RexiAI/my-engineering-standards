@@ -72,7 +72,7 @@ import (
     "github.com/rs/zerolog"             // Structured logging
     "github.com/stretchr/testify"       // Test assertions
     "github.com/golang/mock"            // Mock generation
-    "git.ods.ok-cloud.net/SEC-SUB/common-service/v2"  // Shared library
+    "github.com/company/common-service/v2"  // Shared library
 )
 ```
 

@@ -51,7 +51,7 @@ E2E tests run the full service in a Docker container alongside all dependencies 
 ### Structure
 
 ```
-src/service-tests/java/com/openbank/servicetests/
+src/service-tests/java/com/company/servicetests/
 ├── AbstractBaseTestSuite.java
 ├── health/HealthTest.java
 ├── admin/configuration/ConfigurationTest.java

@@ -13,8 +13,8 @@ Every Java project inherits from the organization's parent POM:
 ### For Services (Spring Boot applications)
 ```xml
 <parent>
-  <groupId>com.openbank</groupId>
-  <artifactId>sss-parent-pom-service</artifactId>
+  <groupId>com.company</groupId>
+  <artifactId>parent-pom-service</artifactId>
   <version>${revision}</version>
 </parent>
 ```
@@ -22,8 +22,8 @@ Every Java project inherits from the organization's parent POM:
 ### For Libraries
 ```xml
 <parent>
-  <groupId>com.openbank</groupId>
-  <artifactId>sss-parent-pom-module</artifactId>
+  <groupId>com.company</groupId>
+  <artifactId>parent-pom-module</artifactId>
   <version>${revision}</version>
 </parent>
 ```
@@ -56,9 +56,9 @@ Managed by the parent POM. Common starters and libraries:
 
 ```xml
 <dependencies>
-  <dependency>com.openbank:sss-application-starter</dependency>
-  <dependency>com.openbank.sss:sss-commons</dependency>
-  <dependency>com.openbank.sss:sss-feign-starter</dependency>
+  <dependency>com.company:sss-application-starter</dependency>
+  <dependency>com.company.sss:sss-commons</dependency>
+  <dependency>com.company.sss:sss-feign-starter</dependency>
   <dependency>org.springframework.boot:spring-boot-starter-web</dependency>
   <dependency>org.springframework.boot:spring-boot-starter-actuator</dependency>
   <dependency>org.springframework.boot:spring-boot-starter-data-jpa</dependency>

@@ -15,7 +15,7 @@ bamboo-specs/
 
 ### Plan Generation Helpers
 
-Use shared helper classes from the `ok-bamboo` library:
+Use shared helper classes from the internal Bamboo library:
 
 - `SSSJavaHelper.createSpringBootPlans()` — generates build plans for Spring Boot microservices. Includes Maven build, service tests, security scanning (Checkmarx), and Swagger deployment.
 - `GolangHelper.createGolangPlans()` — generates plans for Go services.
@@ -88,9 +88,7 @@ Each project has a `dockerfiles/common-services.yml` defining the service test i
 
 ## Artifact Management
 
-All Maven artifacts are published to a private Nexus instance:
-- Releases: `https://nexus.ods.ok-cloud.net/repository/ok-artifacts/`
-- Snapshots: `https://nexus.ods.ok-cloud.net/repository/ok-artifacts-snapshot/`
+All Maven artifacts are published to a private Nexus instance (configured in the parent POM).
 
 Maven repositories are configured in the parent POM. Developers should never commit repository passwords.
 

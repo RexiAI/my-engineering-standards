@@ -1,6 +1,6 @@
 linters-settings:
   gci:
-    local-prefixes: git.ods.ok-cloud.net
+    local-prefixes: github.com/company
   govet:
     check-shadowing: true
   golint:
@@ -13,7 +13,7 @@ linters-settings:
   lll:
     line-length: 140
   goimports:
-    local-prefixes: git.ods.ok-cloud.net
+    local-prefixes: github.com/company
 
 linters:
   enable-all: true
