@@ -51,7 +51,7 @@ E2E tests run the full service in a Docker container alongside all dependencies 
 ### Structure
 
 ```
-src/service-tests/java/com/company/servicetests/
+src/e2e/java/com/company/e2etests/
 ├── AbstractBaseTestSuite.java
 ├── health/HealthTest.java
 ├── admin/configuration/ConfigurationTest.java

@@ -60,8 +60,8 @@ src/
 │   └── constant/        # Enums and constants
 ├── test/java/
 ├── integration-tests/java/
-├── service-tests-framework/java/
-└── service-tests/java/
+├── e2e-framework/java/
+└── e2e/java/
 ```
 
 ### Go

@@ -44,7 +44,7 @@ Every Java project inherits from the organization's parent POM:
 | `mvn clean install -Pservice` | Full build with unit tests, static analysis, formatting check |
 | `mvn test -Pservice` | Run unit tests only |
 | `mvn verify -Pservice` | Run unit + integration tests |
-| `mvn clean install -Pservice-tests` | Run Docker-based service (E2E) tests |
+| `mvn clean install -Pe2e-tests` | Run Docker-based E2E tests |
 | `mvn spotless:check` | Check code formatting |
 | `mvn spotless:apply` | Fix code formatting |
 | `mvn pmd:pmd pmd:cpd` | Run PMD + copy-paste detection |

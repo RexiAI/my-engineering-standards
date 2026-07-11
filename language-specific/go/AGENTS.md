@@ -18,7 +18,7 @@
 | `make generate-mocks` | Regenerate mocks via `gomockhandler` |
 | `make generate-docs` | Generate Swagger docs |
 | `make docker-run-scan` | Run ZAP security scan |
-| `make run-service-tests` | Run Docker-based service tests |
+| `make run-e2e-tests` | Run Docker-based E2E tests |
 
 ## Project Structure
 

@@ -79,7 +79,7 @@ chore: bump sss-commons to 0.7.1
 
 ## How to verify
 [Steps to test or verify the change]
-[Link to related service tests if applicable]
+[Link to related E2E tests if applicable]
 
 ## Dependencies
 [List any PRs, submodule updates, or configuration changes needed]

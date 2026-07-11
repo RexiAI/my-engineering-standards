@@ -17,14 +17,14 @@ bamboo-specs/
 
 Use shared helper classes from the internal Bamboo library:
 
-- `SSSJavaHelper.createSpringBootPlans()` — generates build plans for Spring Boot microservices. Includes Maven build, service tests, security scanning (Checkmarx), and Swagger deployment.
+- `SSSJavaHelper.createSpringBootPlans()` — generates build plans for Spring Boot microservices. Includes Maven build, E2E tests, security scanning (Checkmarx), and Swagger deployment.
 - `GolangHelper.createGolangPlans()` — generates plans for Go services.
 - `GolangHelper.createGolangLibraryPlans()` — generates plans for Go libraries.
 
 ### Plan Features
 
 - Maven build with service profile.
-- Docker-based service tests (`docker-compose up` with all dependencies).
+- Docker-based E2E tests (`docker-compose up` with all dependencies).
 - Security scanning (Checkmarx).
 - OWASP dependency check.
 - SonarQube analysis and quality gate.
@@ -72,9 +72,9 @@ HEALTHCHECK --interval=30s --timeout=3s CMD wget --no-verbose --tries=1 --spider
 ENTRYPOINT ["/service"]
 ```
 
-### Docker Compose for Service Tests
+### Docker Compose for E2E Tests
 
-Each project has a `dockerfiles/common-services.yml` defining the service test infrastructure:
+Each project has a `dockerfiles/common-services.yml` defining the E2E test infrastructure:
 
 - `localstack` — AWS service emulation (SQS, SNS, DynamoDB, KMS, SSM).
 - `redis` — Redis with TLS.
@@ -84,7 +84,7 @@ Each project has a `dockerfiles/common-services.yml` defining the service test i
 - `rproxy` — Nginx reverse proxy mapping AWS endpoints to local mock services.
 - `setup-service-resources` — Populate configuration and SSM parameters.
 - `setup-service-data` — Seed test data.
-- `service-tests` — The test runner (links to all above).
+- `e2e-tests` — The test runner (links to all above).
 
 ## Artifact Management
 
