@@ -6,7 +6,7 @@ All projects must have tests. The testing strategy has three layers:
 |---|---|---|---|---|
 | Unit | Single class/function in isolation | JUnit 5 + Mockito / Go testing + testify / Jest | Fast | Every commit |
 | Integration | With infrastructure (DB, Redis, SQS) | TestContainers + Spring Boot / Docker compose | Medium | Every PR |
-| Service (E2E) | Full service Dockerized + stubs | RESTEasy / WireMock / ExtentReports / Docker compose | Slow | CI pipeline |
+| E2E | Full service Dockerized + stubs | RESTEasy / WireMock / ExtentReports / Docker compose | Slow | CI pipeline |
 
 ## Unit Tests
 
@@ -44,9 +44,9 @@ Integration tests validate the service against real infrastructure ran via TestC
 
 Use `testcontainers-go` with Docker compose for infrastructure. Test files end with `_test.go` and use build tags when needed (`//go:build integration`).
 
-## Service Tests (E2E)
+## E2E Tests
 
-Service tests run the full service in a Docker container alongside all dependencies (PostgreSQL, Redis, LocalStack, WireMock mocks). They verify real HTTP endpoints.
+E2E tests run the full service in a Docker container alongside all dependencies (PostgreSQL, Redis, LocalStack, WireMock mocks). They verify real HTTP endpoints against the running service.
 
 ### Structure
 
@@ -64,7 +64,7 @@ The test suite:
 3. Provides helpers: `service()` (HTTP client to service under test), `checkThat()` (Hamcrest assertions).
 4. Generates structured reports via ExtentReports.
 
-### Service Test Client Pattern
+### E2E Test Client Pattern
 
 ```java
 @ServiceProvider extends BaseServiceProvider {
@@ -82,6 +82,15 @@ BaseApi {
 - **Java**: JaCoCo with minimum coverage targets configured in parent POM. Coverage reports generated during `prepare-package` phase.
 - **Go**: `go test -coverprofile=reports/coverage/coverage.out`. HTML and XML (Cobertura) reports.
 - **CI**: Coverage reports published to SonarQube. Coverage must not decrease from baseline.
+
+## Mutation Testing
+
+Mutation testing validates that tests actually catch bugs by introducing small changes (mutations) to production code and verifying that at least one test fails. High line coverage alone does not guarantee useful tests — mutation coverage measures test quality.
+
+- **Java**: PiTest (`pitest-maven` plugin, profile-activated). Run with `mvn verify -Pmutation`. Target mutation coverage >= 80%. Configured in parent POM.
+- **Go**: `go-mutesting` or manual mutation analysis on critical paths.
+- **JS/TS**: Stryker Mutator for JavaScript/TypeScript projects. Run with `npx stryker run`.
+- Run mutation tests periodically (not every commit — too slow). Run before major releases and when adding tests to ensure they are effective.
 
 ## Static Analysis
 
