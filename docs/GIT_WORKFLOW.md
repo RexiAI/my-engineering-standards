@@ -41,7 +41,7 @@ Examples:
 ```
 feat(auth): add OAuth2 JWT bearer grant type
 fix(session): handle null session on token refresh
-chore: bump sss-commons to 0.7.1
+chore: bump company-commons to 0.7.1
 ```
 
 ## Pull Request Workflow

@@ -17,7 +17,7 @@ bamboo-specs/
 
 Use shared helper classes from the internal Bamboo library:
 
-- `SSSJavaHelper.createSpringBootPlans()` — generates build plans for Spring Boot microservices. Includes Maven build, E2E tests, security scanning (Checkmarx), and Swagger deployment.
+- `JavaHelper.createSpringBootPlans()` — generates build plans for Spring Boot microservices. Includes Maven build, E2E tests, security scanning (Checkmarx), and Swagger deployment.
 - `GolangHelper.createGolangPlans()` — generates plans for Go services.
 - `GolangHelper.createGolangLibraryPlans()` — generates plans for Go libraries.
 

@@ -56,9 +56,9 @@ Managed by the parent POM. Common starters and libraries:
 
 ```xml
 <dependencies>
-  <dependency>com.company:sss-application-starter</dependency>
-  <dependency>com.company.sss:sss-commons</dependency>
-  <dependency>com.company.sss:sss-feign-starter</dependency>
+  <dependency>com.company:application-starter</dependency>
+  <dependency>com.company:company-commons</dependency>
+  <dependency>com.company:feign-starter</dependency>
   <dependency>org.springframework.boot:spring-boot-starter-web</dependency>
   <dependency>org.springframework.boot:spring-boot-starter-actuator</dependency>
   <dependency>org.springframework.boot:spring-boot-starter-data-jpa</dependency>
@@ -86,10 +86,10 @@ All versions are managed by the parent POM. Do not specify versions in child POM
 ### Main Application Class
 
 ```java
-@SssServiceApplication(exclude = {DataSourceAutoConfiguration.class})
+@ServiceApplication(exclude = {DataSourceAutoConfiguration.class})
 public class Application {
     public static void main(final String[] args) {
-        SssApplication.run(Application.class, args);
+        Application.run(Application.class, args);
     }
 }
 ```

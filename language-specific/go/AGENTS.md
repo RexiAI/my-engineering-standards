@@ -3,7 +3,7 @@
 ## Build System
 
 - **Go version**: 1.26.
-- **Build tool**: Makefile, delegating to shared `sss-parent/golang/Makefiles/`.
+- **Build tool**: Makefile, delegating to shared makefiles in `build/makefiles/`.
 
 ## Commands
 

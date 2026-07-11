@@ -67,10 +67,10 @@
 
 ### Java
 
-Use the exception hierarchy rooted at `SSSApplicationException`:
+Use the exception hierarchy rooted at `ApplicationException`:
 
 ```
-SSSApplicationException (abstract)
+ApplicationException (abstract)
 ├── AuthenticationFailedException     → 401
 ├── AuthorizationFailedException      → 403
 ├── BusinessValidationException       → 202
@@ -81,7 +81,7 @@ SSSApplicationException (abstract)
 ├── UnAuthorizedRequestException      → 401
 ├── UnprocessableEntityException      → 422
 ├── ThirdPartyServiceException        → depends
-└── SSSDefaultException               → custom statusCode
+└── DefaultException                  → custom statusCode
 ```
 
 Each exception carries:

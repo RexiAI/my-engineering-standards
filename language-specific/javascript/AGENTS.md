@@ -291,7 +291,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     const body: ExceptionResponse = {
       statusCode: status,
-      errorCode: exception instanceof SssApplicationException
+      errorCode: exception instanceof ApplicationException
         ? exception.getErrorCode() : 'INTERNAL_ERROR',
       description: exception instanceof HttpException
         ? exception.message : 'Internal server error',
