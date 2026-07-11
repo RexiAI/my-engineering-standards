@@ -22,6 +22,12 @@
 - **Shared code** goes in `common_*` packages (Go) or `shared/` (JS).
 - **Test files** mirror the source package structure.
 
+## Design Principles
+
+- **Prefer composition over inheritance.** Use interfaces and delegation instead of abstract base classes. Inheritance is acceptable for exception hierarchies and stable framework extension points (template method). For tests, use plain `@BeforeEach` + helper methods instead of `AbstractBaseTestSuite` base classes.
+- **Keep things small.** Classes under 200 lines, methods under 20 lines, files under 500 lines. Split by responsibility, not by arbitrary size limits.
+- **Dependency rule.** Source code dependencies must point inward. Domain code never depends on infrastructure code. Controllers depend on services, services on repositories, never the reverse.
+
 ## Formatting
 
 ### Java

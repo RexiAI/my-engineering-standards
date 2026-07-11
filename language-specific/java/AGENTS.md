@@ -96,14 +96,23 @@ public class Application {
 
 ### Common Container (Request-scoped)
 
+Prefer a plain class that gets injected, not a template base class:
+
 ```java
 @Component
 @RequestScope
-public class CommonContainer extends BaseCommonContainer {
-    @Override
-    public String getProgressId() { ... }
+public class CommonContainer {
+    private final AuthTokenContainer authToken;
+    private final RequestInfoContainer requestInfo;
+
+    public CommonContainer(AuthTokenContainer authToken, RequestInfoContainer requestInfo) {
+        this.authToken = authToken;
+        this.requestInfo = requestInfo;
+    }
+
+    public String getAccessToken() { return authToken.getToken(); }
+    public IdentityClaims getIdentity() { return authToken.getIdentity(); }
 }
-```
 
 ### Configuration (Resource bundles)
 
@@ -151,32 +160,37 @@ event-logger:
 
 ## Repository Patterns
 
-### Redis Repository
+### Interface + Implementation (composition)
+
+Define an interface first, implement it directly. Avoid abstract repository base classes when the logic is simple:
 
 ```java
+public interface UserSessionRepository {
+    Optional<UserSession> findBySessionId(String sessionId);
+    void save(UserSession session);
+    void delete(String sessionId);
+}
+
 @Component
-public class UserSessionRepository extends AbstractRedisRepository<UserSession, String> {
+public class RedisUserSessionRepository implements UserSessionRepository {
+    private final RedisTemplate<String, byte[]> redis;
+    private final CryptoService crypto;
+
+    public RedisUserSessionRepository(RedisTemplate<String, byte[]> redis, CryptoService crypto) {
+        this.redis = redis;
+        this.crypto = crypto;
+    }
+
     @Override
-    protected RedisData mapToRedis(UserSession domain) { ... }
+    public Optional<UserSession> findBySessionId(String sessionId) { ... }
     @Override
-    protected UserSession mapToDomain(RedisData data) { ... }
+    public void save(UserSession session) { ... }
     @Override
-    protected String getKey(UserSession domain) { return domain.getSessionId(); }
+    public void delete(String sessionId) { ... }
 }
 ```
 
-### DynamoDB Repository
-
-```java
-@Component
-public class UserCredentialsRepository extends AbstractDynamoRepository<UserCredentials, String> {
-    @Override
-    protected UserCredentialsDynamoDto toDynamoDto(UserCredentials domain) { ... }
-    @Override
-    protected UserCredentials toDomain(UserCredentialsDynamoDto dto) { ... }
-    ...
-}
-```
+A shared abstract base class (template method) is acceptable when multiple implementations share significant boilerplate, but start with plain interfaces + composition.
 
 ## Feign Client Pattern
 

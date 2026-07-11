@@ -44,22 +44,21 @@ src/
 
 ## Dependency Injection
 
-Manual DI in `dependency_injection.go`. No DI framework.
+Manual DI in `dependency_injection.go`. No DI framework. Split into per-module factory functions as the app grows to avoid a god object:
 
 ```go
 func BuildDependencies(ctx context.Context, cfg *config.Config) (*Dependencies, error) {
-    awsConfig := loadAWSConfig(ctx)
-    dynamoClient := dynamodb.NewFromConfig(awsConfig)
-    redisClient := connectRedis(ctx, cfg)
+    repos := buildRepos(ctx, cfg)       // repo/repo.go
+    services := buildServices(repos, cfg) // service/service.go
+    controllers := buildControllers(services) // controller/controller.go
+    return &Dependencies{Services: services, Controllers: controllers}, nil
+}
 
-    userRepo := repository.NewUserRepository(dynamoClient, cfg)
-    sessionRepo := repository.NewSessionRepository(redisClient, cfg)
-    authService := service.NewAuthService(userRepo, sessionRepo, cfg)
-    authController := controller.NewAuthController(authService)
-
-    return &Dependencies{
-        Controllers: []Controller{authController},
-    }, nil
+func buildRepos(ctx context.Context, cfg *config.Config) *Repos {
+    return &Repos{
+        User: repository.NewUserRepository(dynamoClient, cfg),
+        Session: repository.NewSessionRepository(redisClient, cfg),
+    }
 }
 ```
 
