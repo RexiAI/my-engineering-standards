@@ -142,9 +142,9 @@ A global `@ControllerAdvice` (Java) or error middleware (Go) catches these and r
 
 ### Event Logging
 
-Annotate controller methods with `@LogEvent` (Java). The aspect captures request context, publishes to configured log clients, and includes correlation IDs in MDC for log tracing.
+Annotate controller methods with `@LogEvent` (Java). The aspect captures request context, publishes to configured log clients, and includes trace IDs in MDC for log tracing.
 
-In Go, use a similar structured logging approach with zerolog and correlation IDs propagated via context.
+In Go, use a similar structured logging approach with zerolog and trace IDs propagated via context.
 
 ## Dependency Injection
 

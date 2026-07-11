@@ -31,7 +31,7 @@ src/
 ├── services/                  # Business logic
 ├── repositories/              # Data access (DynamoDB, Redis, PostgreSQL)
 ├── models/                    # Domain types / DTOs
-├── middlewares/                # Gin middlewares (auth, correlation ID)
+├── middlewares/                # Gin middlewares (auth, trace ID)
 ├── resources/                 # HTTP clients to upstream services
 ├── consumers/                 # SQS message consumers
 ├── publishers/                # SNS message publishers
@@ -86,9 +86,9 @@ log.Info().Str("userId", userId).Msg("Checking authorization")
 log.Error().Err(err).Str("resource", resource).Msg("Authorization failed")
 ```
 
-### Correlation ID
+### Trace ID
 
-Propagate through context. Extract from incoming HTTP headers, forward to downstream services.
+Propagate via `context.Context`. Extract from incoming `traceparent` header (W3C Trace Context), forward to downstream services.
 
 ### REST Client (common-service)
 

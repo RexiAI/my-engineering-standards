@@ -11,7 +11,7 @@ Before coding in any child repo, read the relevant docs from this submodule. The
 - Use dependency injection; avoid service locator or static state.
 - Handle errors at the boundary (controller advice / middleware), return structured error responses.
 - Every service must expose health endpoints (`/health`) that check all external dependencies.
-- Log at boundaries of every service method. Use structured logging with correlation IDs.
+- Log at boundaries of every service method. Use structured logging with trace IDs.
 - Never commit secrets, credentials, or tokens. Use a secrets manager (AWS SSM, etc.) for configuration.
 - Write tests in three layers: unit (pure logic), integration (with infrastructure), e2e (Docker compose, real endpoints). Use mutation testing to validate test quality.
 - Use conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`.

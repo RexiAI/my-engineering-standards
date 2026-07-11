@@ -9,7 +9,7 @@
 | Go packages | `common_` prefix for shared code | `common_errors`, `common_services` |
 | Classes / Types | PascalCase | `AuthenticationService`, `IdentityClaim` |
 | Methods / Functions | camelCase | `getUserById()`, `hashPassword()` |
-| Variables | camelCase | `userName`, `correlationId` |
+| Variables | camelCase | `userName`, `traceId` |
 | Constants / Enums | UPPER_SNAKE_CASE | `CHANNEL_WEB`, `STATUS_SUCCESS` |
 | Database columns | snake_case | `user_name`, `created_at` |
 | JSON fields | camelCase | `"userName":`, `"createdAt":` |
@@ -49,18 +49,18 @@
 - Use SLF4J with `@Slf4j` Lombok annotation.
 - Structured logging through `EventLogger` framework: `initEvent()` → `addEventMessage()` → `flushSuccess()`/`flushFailure()`.
 - Annotate controller methods with `@LogEvent` for automatic event logging.
-- Correlation ID in MDC (`OPEN_BANK_CORRELATION_ID`). Propagate to downstream services via HTTP header.
+- Trace ID in MDC. Propagate via `traceparent` header (W3C Trace Context).
 - Log messages are capped at 1024 characters.
 - Never log PII, secrets, or tokens.
 
 ### Go
 - Use zerolog for structured logging: `log.Info().Str("key", "value").Msg("message")`.
-- Correlation ID propagated via `context.Context`.
+- Trace ID propagated via `context.Context`.
 - Log at service method boundaries. Log input parameters and results.
 
 ### JavaScript
 - Use structured logging library (pino, winston).
-- Include correlation ID in every log entry.
+- Include trace ID in every log entry.
 - Avoid `console.log` in production code.
 
 ## Exception Handling

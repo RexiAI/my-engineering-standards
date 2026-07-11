@@ -198,7 +198,7 @@ AuthorizationClient client = feignClientFactory.createClient(
 ```
 
 Available client types:
-- `DEFAULT` — sync with correlation ID propagation.
-- `SERVICE_AUTHENTICATED` — sync with correlation ID + service-user access token.
-- `BASIC_ASYNC` — async with static correlation ID.
-- `ASYNC_SERVICE_AUTHENTICATED` — async with static correlation ID + access token.
+- `DEFAULT` — sync with trace ID propagation.
+- `SERVICE_AUTHENTICATED` — sync with trace ID + service-user access token.
+- `BASIC_ASYNC` — async with static trace ID.
+- `ASYNC_SERVICE_AUTHENTICATED` — async with static trace ID + access token.
