@@ -3,63 +3,57 @@ linters-settings:
     local-prefixes: github.com/company
   govet:
     check-shadowing: true
-  golint:
-    min-confidence: 0.8
   goconst:
     min-len: 3
     min-occurrences: 3
   misspell:
     locale: US
-  lll:
-    line-length: 140
-  goimports:
-    local-prefixes: github.com/company
 
 linters:
-  enable-all: true
-  disable:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+    - asciicheck
+    - bodyclose
+    - containedctx
+    - contextcheck
+    - decorder
     - dupl
-    - funlen
-    - gochecknoinits
-    - gochecknoglobals
-    - godox
-    - gomnd
-    - lll
-    - testpackage
-    - wsl
-    - nlreturn
-    - paralleltest
-    - tparallel
-    - cyclop
+    - durationcheck
+    - errchkjson
+    - errname
+    - errorlint
     - exhaustive
-    - forbidigo
-    - forcetypeassert
+    - exportloopref
+    - goconst
+    - gocritic
+    - gofmt
     - gci
-    - gocognit
-    - gocyclo
-    - goerr113
-    - gofumpt
-    - gomoddirectives
-    - gomodguard
-    - grouper
-    - ifshort
-    - ireturn
-    - maintidx
+    - goimports
+    - gosec
+    - misspell
     - nakedret
-    - nestif
-    - nilnil
+    - nilerr
     - noctx
-    - nonamedreturns
-    - nosnakecase
-    - promlinter
+    - nolintlint
+    - prealloc
+    - predeclared
     - reassign
+    - revive
     - rowserrcheck
+    - spancheck
     - sqlclosecheck
-    - tagliatelle
+    - stylecheck
     - tenv
     - thelper
-    - varnamelen
-    - wrapcheck
+    - unconvert
+    - unparam
+    - whitespace
 
 issues:
   exclude-rules:
@@ -67,12 +61,3 @@ issues:
       linters:
         - bodyclose
         - noctx
-        - scopelint
-    - path: src/constants/
-      linters:
-        - deadcode
-        - varcheck
-    - path: src/models/
-      linters:
-        - structcheck
-        - unused
