@@ -64,7 +64,7 @@ Managed by the parent POM. Common starters and libraries:
   <dependency>org.springframework.boot:spring-boot-starter-data-jpa</dependency>
   <dependency>org.springframework.boot:spring-boot-starter-data-redis</dependency>
   <dependency>org.springframework.boot:spring-boot-starter-validation</dependency>
-  <dependency>org.springframework.boot:spring-boot-starter-undertow</dependency>  <!-- instead of Tomcat -->
+  <dependency>org.springframework.boot:spring-boot-starter</dependency>  <!-- Exclude Tomcat; add Undertow or Jetty as needed -->
 </dependencies>
 ```
 
@@ -113,6 +113,7 @@ public class CommonContainer {
     public String getAccessToken() { return authToken.getToken(); }
     public IdentityClaims getIdentity() { return authToken.getIdentity(); }
 }
+```
 
 ### Configuration (Resource bundles)
 
@@ -140,23 +141,9 @@ public HealthDependencyList healthDependencyList(
 
 ## Event Logging Pattern
 
-Annotate controller methods with `@LogEvent`:
+Use a Spring `HandlerInterceptor` or a servlet `Filter` for cross-cutting request logging. Log request method, path, status, and duration at the filter boundary. Attach trace ID to MDC in the same filter.
 
-```java
-@LogEvent(event = EventType.USER_LOGIN)
-@PostMapping("/v1/login")
-public ResponseEntity<LoginResponse> login(@RequestBody @Valid LoginRequest request) { ... }
-```
-
-Configure event logger clients in `application.yml`:
-
-```yaml
-event-logger:
-  async: true
-  clients: LOG_INFO, LOG_RESULT
-  event-driver:
-    bus: ${EVENT_DRIVER_BUS_NAME}
-```
+For event-specific auditing, use the structured logging library's (SLF4J) MDC context to add domain-specific fields per request. Avoid an AOP-based annotation framework — a single filter is simpler and covers all endpoints uniformly.
 
 ## Repository Patterns
 

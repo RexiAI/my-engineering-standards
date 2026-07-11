@@ -53,8 +53,7 @@
 
 ### Java
 - Use SLF4J with `@Slf4j` Lombok annotation.
-- Structured logging through `EventLogger` framework: `initEvent()` → `addEventMessage()` → `flushSuccess()`/`flushFailure()`.
-- Annotate controller methods with `@LogEvent` for automatic event logging.
+- Log at method boundaries: input parameters and results. Use a `HandlerInterceptor` or filter for cross-cutting request logging instead of an AOP-based event framework.
 - Trace ID in MDC. Propagate via `traceparent` header (W3C Trace Context).
 - Log messages are capped at 1024 characters.
 - Never log PII, secrets, or tokens.
@@ -77,17 +76,10 @@ Use the exception hierarchy rooted at `ApplicationException`:
 
 ```
 ApplicationException (abstract)
-├── AuthenticationFailedException     → 401
-├── AuthorizationFailedException      → 403
+├── AuthenticationException           → 401
 ├── BusinessValidationException       → 202
-├── ConcurrentModificationException   → 409
-├── InternalServerErrorException      → 500
-├── PreConditionFailedException       → 412
-├── RequestValidationException        → 400
-├── UnAuthorizedRequestException      → 401
-├── UnprocessableEntityException      → 422
-├── ThirdPartyServiceException        → depends
-└── DefaultException                  → custom statusCode
+├── NotFoundException                 → 404
+└── InternalServerException           → 500
 ```
 
 Each exception carries:
@@ -95,13 +87,12 @@ Each exception carries:
 - `errorCode` — machine-readable string.
 - `description` — human-readable message.
 - `errorData` — optional map for additional context.
-- `businessLogEvent` — for audit logging.
 
-The `@ControllerAdvice` (order 0) catches all exceptions and returns a uniform JSON `ExceptionResponse`.
+The `@ControllerAdvice` (order 0) catches all exceptions and returns a uniform JSON error response.
 
 ### Go
 
-Define `ApplicationError` interface with `StatusCode()` and `Error() string`. Use a custom HTTP error handler middleware that converts errors to JSON responses.
+Define `ApplicationError` interface with `StatusCode()` and `Error() string`. Use a custom HTTP error handler middleware that converts errors to JSON responses. Keep the interface small — only error codes that callers need to distinguish.
 
 ### JavaScript
 

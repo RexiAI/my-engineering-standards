@@ -12,10 +12,8 @@
 
 ### Inter-service Authentication
 
-- Services communicate using service-user JWT tokens.
-- `ServiceUserAuthenticator` (Java) or `common_token_providers` (Go) handles automatic token management.
-- Service tokens are obtained from the authentication service on startup and cached.
-- Token is injected into outgoing HTTP requests via Feign interceptor or OkHttp interceptor.
+- Services communicate using service-to-service JWT tokens.
+- Inter-service token management handles automatic token retrieval, caching, and refresh. Tokens are obtained from the auth service on startup and injected into outgoing requests via an HTTP interceptor.
 
 ### OAuth2
 
@@ -33,16 +31,16 @@ Support standard OAuth2 grant types:
 
 ## Data Encryption
 
-- **At rest**: AWS KMS for key management. Service-specific data encryption keys wrapped by KMS.
-- **In transit**: TLS 1.2+ for all HTTP traffic. Redis over TLS (stunnel).
-- **Field-level encryption**: Sensitive fields encrypted with AES-256/GCM using KMS-derived keys before storage.
-- **Hashing**: User identifiers hashed with document-type-specific pepper (via KMS).
+- **At rest**: Key management service (AWS KMS, HashiCorp Vault, Azure Key Vault) for key management. Service-specific data encryption keys wrapped by the master key.
+- **In transit**: TLS 1.2+ for all HTTP traffic.
+- **Field-level encryption**: Sensitive fields encrypted with AES-256/GCM using derived keys before storage.
+- **Hashing**: User identifiers hashed with a domain-specific salt.
 
 ## Secrets Management
 
 - **Never** commit secrets, credentials, API keys, or tokens to Git.
-- `PRIVATE-TOKEN` headers, database passwords, and JWT signing keys must come from AWS SSM Parameter Store.
-- Environment variables should only reference parameter store paths, not contain raw values.
+- Database passwords, JWT signing keys, and API tokens must come from a secrets manager (AWS SSM Parameter Store, HashiCorp Vault, Kubernetes Secrets).
+- Environment variables should only reference secret store paths, not contain raw values.
 - `.env` files are for local development only and must be in `.gitignore`.
 - Talisman pre-commit hook scans for accidental secret commits.
 

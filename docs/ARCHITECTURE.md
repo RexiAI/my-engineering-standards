@@ -51,8 +51,8 @@ src/
 │   ├── model/           # Domain models / entities
 │   ├── mapper/          # MapStruct mappers (DTO ↔ domain)
 │   ├── resource/        # Feign/Retrofit HTTP clients to upstream services
-│   ├── consumer/        # SQS/JMS message consumers
-│   ├── publisher/       # SNS/SQS message publishers
+│   ├── consumer/        # Async message consumers (SQS, RabbitMQ, etc.)
+│   ├── publisher/       # Event/message bus publishers
 │   ├── event/           # Event/Audit logger clients
 │   ├── interceptor/     # Spring HandlerInterceptors, request-scoped containers
 │   ├── resolver/        # Custom HandlerMethodArgumentResolvers
@@ -70,15 +70,15 @@ src/
 src/
 ├── main.go                     # Entry point
 ├── dependency_injection.go     # Manual wiring of all components
-├── event_consumption.go        # SQS consumer event loop
+├── event_consumption.go        # Async consumer event loop
 ├── controllers/                # HTTP handlers (Gin handlers)
 ├── services/                   # Business logic
-├── repositories/               # DynamoDB, Redis, PostgreSQL access
+├── repositories/               # Data access (DB, cache, key-value store)
 ├── models/                     # Domain types
 ├── middlewares/                 # Gin middlewares
-├── resources/                  # HTTP clients to upstream services (Resty)
-├── consumers/                  # SQS consumer handlers
-├── publishers/                 # SNS publisher helpers
+├── resources/                  # HTTP clients to upstream services
+├── consumers/                  # Async message consumer handlers
+├── publishers/                 # Event bus publisher helpers
 ├── helpers/                    # Crypto, auth token, Redis helpers
 ├── routes/                     # Route definitions
 ├── configs/                    # Env parsing, YAML config loaders
@@ -118,15 +118,15 @@ Use URL-based versioning: `/v1/`, `/v2/`. When an endpoint signature changes, cr
 
 ### Inter-service Communication
 
-- **Synchronous**: Use REST clients (Feign for Java, Resty for Go, Axios for JS). Each upstream service gets a dedicated client class/interface.
-- **Asynchronous**: Use SQS for message consumption, SNS for event publishing.
-- **Authentication between services**: Use service-user JWT tokens obtained via `ServiceUserAuthenticator` (self-authentication against auth service).
+- **Synchronous**: Use REST clients (Feign for Java, Go `net/http`, Axios for JS). Each upstream service gets a dedicated client class/interface.
+- **Asynchronous**: Use message queues for event consumption (SQS, RabbitMQ) and event buses for publishing (SNS, EventBridge, Kafka).
+- **Authentication between services**: Use service-to-service JWT tokens obtained via a self-authentication mechanism against the auth service.
 
 ### Health Endpoints
 
 Every service exposes:
 - `GET /`: Simple ping ("OK")
-- `GET /health`: Deep health check verifying all external dependencies (database, Redis, KMS, SQS, etc.)
+- `GET /health`: Deep health check verifying all external dependencies (database, cache, messaging, key management, etc.)
 
 Each dependency implements a health check (e.g., `AbstractHealthDependencyService`). The health endpoint aggregates results into a JSON response with per-dependency status.
 
@@ -142,7 +142,7 @@ A global `@ControllerAdvice` (Java) or error middleware (Go) catches these and r
 
 ### Event Logging
 
-Annotate controller methods with `@LogEvent` (Java). The aspect captures request context, publishes to configured log clients, and includes trace IDs in MDC for log tracing.
+Log at controller boundaries using a filter or interceptor. Capture request context, publish to configured log targets, and include trace IDs in MDC for log tracing.
 
 In Go, use a similar structured logging approach with zerolog and trace IDs propagated via context.
 

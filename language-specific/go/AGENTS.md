@@ -26,15 +26,15 @@
 src/
 ├── main.go                    # Entry point
 ├── dependency_injection.go    # Wire all components
-├── event_consumption.go       # SQS consumer event loop
+├── event_consumption.go       # Async consumer event loop
 ├── controllers/               # HTTP handlers (Gin)
 ├── services/                  # Business logic
-├── repositories/              # Data access (DynamoDB, Redis, PostgreSQL)
+├── repositories/              # Data access (SQL, NoSQL, Redis)
 ├── models/                    # Domain types / DTOs
 ├── middlewares/                # Gin middlewares (auth, trace ID)
 ├── resources/                 # HTTP clients to upstream services
-├── consumers/                 # SQS message consumers
-├── publishers/                # SNS message publishers
+├── consumers/                 # Async message consumers
+├── publishers/                # Event bus publishers
 ├── helpers/                   # Crypto, token, Redis helpers
 ├── routes/                    # Route registration
 ├── configs/                   # Config parsing (env, YAML)
@@ -89,15 +89,20 @@ log.Error().Err(err).Str("resource", resource).Msg("Authorization failed")
 
 Propagate via `context.Context`. Extract from incoming `traceparent` header (W3C Trace Context), forward to downstream services.
 
-### REST Client (common-service)
+### REST Client (stdlib)
+
+Prefer Go's `net/http` standard library for simple cases. The stdlib is sufficient for most REST clients:
 
 ```go
-client := common_http_client.NewRestyClient()
-resp, err := client.R().
-    SetHeader("Authorization", "Bearer "+token).
-    SetResult(&targetResponse).
-    Post(url)
+req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+req.Header.Set("Authorization", "Bearer "+token)
+resp, err := http.DefaultClient.Do(req)
+if err != nil { return nil, err }
+defer resp.Body.Close()
+body, _ := io.ReadAll(resp.Body)
 ```
+
+For HTTP clients that need retries, metrics, or circuit breakers, wrap the stdlib client with a thin helper layer. Avoid framework-specific HTTP clients unless they are shared across the entire codebase via a common library.
 
 ### Repository
 
@@ -144,8 +149,8 @@ func ErrorMiddleware() gin.HandlerFunc {
 ```go
 r.GET("/health", func(c *gin.Context) {
     deps := map[string]string{
-        "redis":     checkRedis(),
-        "dynamodb":  checkDynamoDB(),
+        "cache":     checkRedis(),
+        "database":  checkDatabase(),
     }
     c.JSON(200, deps)
 })

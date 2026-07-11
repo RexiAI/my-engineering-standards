@@ -2,18 +2,20 @@
 
 ## CI/CD
 
-All CI/CD is managed via **Atlassian Bamboo** using Bamboo Specs (configuration-as-code in Java).
-
-### Bamboo Specs Structure
+CI/CD is managed via pipeline-as-code. The standard pattern:
 
 ```
-bamboo-specs/
+bamboo-specs/         # For Atlassian Bamboo
 ├── pom.xml
 └── src/main/java/
     └── PlanSpec.java
+
+.gitea/workflows/     # For Gitea / GitHub Actions
+.github/workflows/    # For GitHub Actions
+.gitlab-ci.yml        # For GitLab CI
 ```
 
-### Plan Generation Helpers
+### Plan Generation Helpers (Bamboo example)
 
 Use shared helper classes from the internal Bamboo library:
 
@@ -74,15 +76,14 @@ ENTRYPOINT ["/service"]
 
 ### Docker Compose for E2E Tests
 
-Each project has a `dockerfiles/common-services.yml` defining the E2E test infrastructure:
+Each project has a `docker-compose.yml` defining the E2E test infrastructure:
 
 - `localstack` — AWS service emulation (SQS, SNS, DynamoDB, KMS, SSM).
-- `redis` — Redis with TLS.
-- `elb-mock` — ELB health check mocking (Mountebank).
+- `redis` — Redis cache.
 - `mock-service` — WireMock for stubbing upstream services.
-- `rdbms` — PostgreSQL with Flyway migrations.
-- `rproxy` — Nginx reverse proxy mapping AWS endpoints to local mock services.
-- `setup-service-resources` — Populate configuration and SSM parameters.
+- `rdbms` — PostgreSQL with migration tooling.
+- `reverse-proxy` — Nginx reverse proxy mapping cloud endpoints to local mock services.
+- `setup-service-resources` — Populate configuration and secrets.
 - `setup-service-data` — Seed test data.
 - `e2e-tests` — The test runner (links to all above).
 
@@ -94,11 +95,11 @@ Maven repositories are configured in the parent POM. Developers should never com
 
 ## Environment Configuration
 
-- **Development**: Local YAML config files loaded from `config/` directory.
-- **Testing**: Docker compose with local emulators (LocalStack).
-- **Production**: AWS SSM Parameter Store at path `/config/{SERVICE_NAME}_{ENVIRONMENT}/`.
+- **Development**: Local config files loaded from `config/` directory.
+- **Testing**: Docker compose with local service emulators (LocalStack, TestContainers, etc.).
+- **Production**: Configuration service (AWS SSM Parameter Store, HashiCorp Vault, Kubernetes ConfigMaps, etc.) at path `/config/{SERVICE_NAME}_{ENVIRONMENT}/`.
 - **Feature flags**: Environment variables prefixed by service name.
-- **Secrets**: AWS KMS + Parameter Store. Never in config files or environment variables.
+- **Secrets**: Key management service + secrets manager. Never in config files or environment variables.
 
 ## Quality Gates
 
