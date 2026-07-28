@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.4.0] — 2026-07-28
+
+### Added
+
+- **Self-CI workflow** — `.github/workflows/self-ci.yml` (root-level, so GitHub Actions actually discovers it — the 13 existing workflows are all `workflow_call`-only reusables and never ran on this repo itself). Runs `bash -n` on every shell script, `make validate-all`, `make lint`, advisory `shellcheck`, and a scoped YAML syntax check on push/PR.
+- **`templates/Dockerfile.next`** — Next.js standalone-output Dockerfile; the JS AGENTS.md documented ~150 lines of Next.js conventions with no corresponding Dockerfile.
+
+### Fixed
+
+- **Config drift** — `language-specific/javascript/eslint.config.js` rewritten as a real ESLint 9 flat config (was legacy `.eslintrc` schema under a flat-config filename); `language-specific/go/golangci.yml` migrated to v2 schema for Go 1.26 (dropped removed/deprecated linters); `templates/Dockerfile.spring` fixed for its actual Amazon Corretto/AL2023 base (`dnf` not `yum`, `useradd` not Debian `adduser`, `launch.JarLauncher` for Boot 3.2+, `/actuator/health`).
+- **Doc contradictions reconciled against real CI** (not guessed) across `docs/MESSAGE_DELIVERY.md`, `docs/OUTBOX_PATTERN.md`, `docs/TESTING.md`, `docs/CI_CD.md`, `docs/DEPLOYMENT.md`, `docs/SECURITY.md`: retry defaults, dedup TTL rationale, E2E cadence, Java lint tool, coverage-gate strictness, artifact publishing target, security tooling table.
+- **`templates/` bugs** — `Makefile.bridge`'s success message was tab-indented under the wrong target; its Go branch copied `golangci.yml` under the wrong filename; `init-ai` now copies the session hygiene scripts itself so `session-check`'s own error message is accurate; `session-end-check.sh`'s debug-artifact check now `warn()`s instead of unconditionally `pass()`-ing; `session-start-check.sh` no longer swallows npm lint failures; `PULL_REQUEST_TEMPLATE.md` checklist updated for saga/outbox gates, ADRs, and session-end-check.
+- **Saga/outbox gate script precision** — `check-outbox-relay.sh` no longer counts test-file dedup mentions as production dedup; `check-saga-timeouts.sh`'s Go branch scoped from repo-wide to same-file-or-same-directory per handler; `lint-outbox-schema.sh` now isolates the outbox `CREATE TABLE` block before matching required columns instead of matching anywhere in the file; `check-saga-tests.sh`'s compensation-detection regex dropped overly generic alternatives that matched almost any failure-related text.
+- **`VERSION`/`CHANGELOG.md` catch-up** and `AGENTS.md`'s stale `Saga+OutboxArchRules.java` reference (the two real files are named separately); `Makefile`'s malformed `help` output and missing `release` in `.PHONY`.
+
 ## [1.3.1] — 2026-07-28
 
 ### Fixes
@@ -95,6 +110,7 @@
 - No lock files committed — child projects manage their own
 - Version file: `VERSION` (plaintext, semver)
 
+[1.4.0]: https://github.com/pucelano-95/my-engineering-standards/releases/tag/v1.4.0
 [1.3.1]: https://github.com/pucelano-95/my-engineering-standards/releases/tag/v1.3.1
 [1.3.0]: https://github.com/pucelano-95/my-engineering-standards/releases/tag/v1.3.0
 [1.2.0]: https://github.com/pucelano-95/my-engineering-standards/releases/tag/v1.2.0
