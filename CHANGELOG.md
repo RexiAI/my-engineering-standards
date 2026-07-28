@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1] — 2026-07-28
+
+### Fixed
+
+- **CRLF regression from v1.4.0** — the v1.3.1 "CRLF checkout" fix renormalized this repo while `core.autocrlf=true` was still set globally and `.gitattributes` covered only `*.sh`/`Makefile*`/`*.go`. Every other tracked file (`docs/`, `okf/`, all 13 reusable workflows, ArchUnit `.java`, integration test templates, `prettier.config.js` — which itself declares `endOfLine: 'lf'` — etc.) got committed as CRLF: 84/113 files, verified by inspecting raw committed blobs (v1.3.0 was 0/113). `.gitattributes` now reads `* text=auto eol=lf` first, `*.bat text eol=crlf` added; repo renormalized. Consumers who copied any of those 84 files out of `.standards` between v1.4.0 and this release should re-copy or strip `\r`.
+- **Self-CI could not have caught this** — `bash -n` only touches `*.sh`, and PyYAML tolerates CRLF. Added a blob-level CRLF guard job to `self-ci.yml` that inspects `git cat-file blob` directly (bypasses local `core.autocrlf` smudging) so this class of regression fails CI going forward.
+
 ## [1.4.0] — 2026-07-28
 
 ### Added

@@ -23,6 +23,27 @@ jobs:
       - name: Install PyYAML
         run: pip install pyyaml
 
+      # v1.4.0 committed CRLF into 84 files (renormalization run with
+      # core.autocrlf=true and an incomplete .gitattributes). bash -n and
+      # PyYAML both tolerate CRLF, so neither job below would have caught
+      # it. Check committed blobs directly, bypassing any local
+      # core.autocrlf smudging.
+      - name: Check for CRLF in committed blobs
+        run: |
+          errors=0
+          while IFS= read -r f; do
+            sha=$(git ls-files -s -- "$f" | awk '{print $2}')
+            [ -z "$sha" ] && continue
+            if git cat-file blob "$sha" | grep -qU $'\r$'; then
+              echo "  [CRLF] $f"
+              errors=$((errors + 1))
+            fi
+          done < <(git ls-files)
+          if [ "$errors" -ne 0 ]; then
+            echo "$errors file(s) have CRLF line endings in the committed blob!"
+            exit 1
+          fi
+
       - name: Check shell scripts parse (bash -n)
         run: |
           errors=0

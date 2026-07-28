@@ -1,3 +1,9 @@
+# Normalize line endings for everyone regardless of core.autocrlf.
+# Avoids phantom "modified" files and flaky formatter results caused by
+# CRLF/LF mismatches between checkouts. v1.4.0 committed CRLF into 84 files
+# because this file only covered *.sh/Makefile*/*.go — see CHANGELOG v1.4.1.
+* text=auto eol=lf
 *.sh text eol=lf
 Makefile* text eol=lf
 *.go text eol=lf
+*.bat text eol=crlf
