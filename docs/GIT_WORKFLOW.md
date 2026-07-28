@@ -100,7 +100,7 @@ chore: bump company-commons to 0.7.1
 ### Adding the Standards Submodule
 
 ```bash
-git submodule add git@github.com:pucelano-95/my-engineering-standards.git .standards
+git submodule add git@github.com:RexiAI/my-engineering-standards.git .standards
 git commit -m "chore: add engineering standards submodule"
 ```
 

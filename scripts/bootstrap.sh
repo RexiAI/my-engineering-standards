@@ -14,7 +14,7 @@ echo ""
 # Validate .standards/ exists
 if [ ! -d "$STANDARDS_DIR" ]; then
     echo "ERROR: .standards/ not found."
-    echo "Run this first: git submodule add git@github.com:pucelano-95/my-engineering-standards.git .standards"
+    echo "Run this first: git submodule add git@github.com:RexiAI/my-engineering-standards.git .standards"
     exit 1
 fi
 

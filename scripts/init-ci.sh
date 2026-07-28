@@ -238,7 +238,7 @@ EOF
   for lang in "${BACKEND[@]}"; do
     cat >> "$target" << EOF
   backend-ci-${lang}:
-    uses: pucelano-95/my-engineering-standards/.github/workflows/backend/ci-${lang}.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/backend/ci-${lang}.yml@main
     with:
       docker-registry: $registry
     secrets:
@@ -250,7 +250,7 @@ EOF
   if [ -n "$FRONTEND" ]; then
     cat >> "$target" << EOF
   frontend-ci:
-    uses: pucelano-95/my-engineering-standards/.github/workflows/frontend/ci-${FRONTEND}.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/frontend/ci-${FRONTEND}.yml@main
     with:
       docker-registry: $registry
     secrets:

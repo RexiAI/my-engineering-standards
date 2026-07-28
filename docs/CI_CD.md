@@ -114,7 +114,7 @@ The child's `ci.yml` calls orthogonal reusable workflows — one per layer:
 jobs:
   # ── Backend CI ──
   backend-ci:
-    uses: pucelano-95/my-engineering-standards/.github/workflows/backend/ci-go.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/backend/ci-go.yml@main
     with:
       go-version: "1.26"
       docker-registry: ghcr.io
@@ -123,7 +123,7 @@ jobs:
 
   # ── Frontend CI ──
   frontend-ci:
-    uses: pucelano-95/my-engineering-standards/.github/workflows/frontend/ci-nextjs.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/frontend/ci-nextjs.yml@main
     with:
       node-version: "22"
     secrets:
@@ -133,14 +133,14 @@ jobs:
   release:
     needs: [backend-ci, frontend-ci]
     if: github.ref_name == github.event.repository.default_branch
-    uses: pucelano-95/my-engineering-standards/.github/workflows/shared/ci-release.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/shared/ci-release.yml@main
     secrets:
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
   # ── Shared: E2E (weekly schedule) ──
   e2e:
     if: github.event_name == 'schedule'
-    uses: pucelano-95/my-engineering-standards/.github/workflows/shared/ci-e2e-weekly.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/shared/ci-e2e-weekly.yml@main
     with:
       target-url: https://staging.example.com
 ```
@@ -181,7 +181,7 @@ frontend-build:
 cd your-project
 
 # 1. Add submodule
-git submodule add git@github.com:pucelano-95/my-engineering-standards.git .standards
+git submodule add git@github.com:RexiAI/my-engineering-standards.git .standards
 
 # 2. Run bootstrap (detects language, copies configs, prompts for CI)
 ./.standards/scripts/bootstrap.sh
@@ -263,7 +263,7 @@ on:
 
 jobs:
   e2e:
-    uses: pucelano-95/my-engineering-standards/.github/workflows/shared/ci-e2e-weekly.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/shared/ci-e2e-weekly.yml@main
     with:
       target-url: https://staging.example.com
       smoke-endpoints: /health,/api/v1/users/me,/api/v1/products

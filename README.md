@@ -5,7 +5,7 @@ Shared engineering standards for all projects, designed as a Git submodule (`.st
 ## Usage
 
 ```bash
-git submodule add git@github.com:pucelano-95/my-engineering-standards.git .standards
+git submodule add git@github.com:RexiAI/my-engineering-standards.git .standards
 ./.standards/scripts/bootstrap.sh
 ```
 

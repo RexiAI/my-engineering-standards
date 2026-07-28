@@ -14,7 +14,7 @@ help:
 init-standards:
 	@if [ ! -d ".standards" ]; then \
 		echo "Adding standards submodule..."; \
-		git submodule add git@github.com:pucelano-95/my-engineering-standards.git .standards; \
+		git submodule add git@github.com:RexiAI/my-engineering-standards.git .standards; \
 	else \
 		echo ".standards/ already exists. Run 'make init-ai' to set up the bridge."; \
 	fi
