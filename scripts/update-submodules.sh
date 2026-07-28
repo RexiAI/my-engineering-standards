@@ -29,12 +29,14 @@ get_repos() {
         return
     fi
 
-    echo "ERROR: No repos specified and no repo-list.txt found."
-    echo "Create repo-list.txt with one repo path per line, or pass repo paths as arguments."
-    exit 1
+    echo "ERROR: No repos specified and no repo-list.txt found." >&2
+    echo "Create repo-list.txt with one repo path per line, or pass repo paths as arguments." >&2
+    return 2
 }
 
-REPOS=($(get_repos "$@"))
+if ! REPOS=($(get_repos "$@")); then
+    exit 1
+fi
 
 if [ ${#REPOS[@]} -eq 0 ]; then
     echo "No repos found."
@@ -56,12 +58,12 @@ for repo in "${REPOS[@]}"; do
 
         if [ ! -f ".gitmodules" ] || ! grep -q "standards" ".gitmodules" 2>/dev/null; then
             echo "  No .standards submodule configured, skipping."
-            continue
+            exit 0
         fi
 
         if git submodule status .standards | grep -q "^-"; then
             echo "  Submodule not initialized. Run: git submodule update --init .standards"
-            continue
+            exit 0
         fi
 
         CURRENT=$(git submodule status .standards | cut -c2- | cut -d' ' -f1 | cut -c1-8)

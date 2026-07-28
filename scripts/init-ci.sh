@@ -93,18 +93,23 @@ detect_backend() {
 
   if [ ${#BACKEND[@]} -eq 0 ]; then
     warn "No backend files detected (pom.xml / go.mod)"
-    echo ""
-    echo "Select backend language (or None):"
-    select L in "Java" "Go" "None" "Cancel"; do
-      case $L in
-        Java)   BACKEND=("java"); break;;
-        Go)     BACKEND=("go"); break;;
-        None)   break;;
-        Cancel) exit 1;;
-      esac
-    done
+    if [ ! -t 0 ]; then
+      warn "Non-interactive stdin — defaulting to no backend. Pass --backend to set one."
+    else
+      echo ""
+      echo "Select backend language (or None):"
+      select L in "Java" "Go" "None" "Cancel"; do
+        case $L in
+          Java)   BACKEND=("java"); break;;
+          Go)     BACKEND=("go"); break;;
+          None)   break;;
+          Cancel) exit 1;;
+        esac
+      done
+    fi
   fi
   [ ${#BACKEND[@]} -gt 0 ] && info "Backend: ${BACKEND[*]}"
+  true
 }
 
 # ── Step 1b: Detect / use frontend type ───────
@@ -121,20 +126,25 @@ detect_frontend() {
   fi
 
   if [ -z "$FRONTEND" ]; then
-    echo ""
-    echo "Select frontend type (or None):"
-    select F in "Next.js" "React (Vite)" "Angular" "Static HTML" "None" "Cancel"; do
-      case $F in
-        "Next.js")       FRONTEND="nextjs"; break;;
-        "React (Vite)")  FRONTEND="react"; break;;
-        "Angular")       FRONTEND="angular"; break;;
-        "Static HTML")   FRONTEND="static"; break;;
-        "None")          break;;
-        "Cancel")        exit 1;;
-      esac
-    done
+    if [ ! -t 0 ]; then
+      warn "No frontend detected, non-interactive stdin — defaulting to none. Pass --frontend to set one."
+    else
+      echo ""
+      echo "Select frontend type (or None):"
+      select F in "Next.js" "React (Vite)" "Angular" "Static HTML" "None" "Cancel"; do
+        case $F in
+          "Next.js")       FRONTEND="nextjs"; break;;
+          "React (Vite)")  FRONTEND="react"; break;;
+          "Angular")       FRONTEND="angular"; break;;
+          "Static HTML")   FRONTEND="static"; break;;
+          "None")          break;;
+          "Cancel")        exit 1;;
+        esac
+      done
+    fi
   fi
   [ -n "$FRONTEND" ] && info "Frontend: $FRONTEND"
+  true
 }
 
 if [ -n "$BACKEND_FLAG" ]; then
@@ -171,13 +181,19 @@ fi
 
 # ── Step 3: Ask for secrets ───────────────────
 collect_secrets() {
+  GHCR_TOKEN=""; MAVEN_USERNAME=""; MAVEN_PASSWORD=""; NPM_TOKEN=""; SONAR_TOKEN=""; PACT_BROKER_URL=""
+
+  if [ ! -t 0 ]; then
+    info "Non-interactive stdin — skipping secrets prompt (add secrets manually later)."
+    return
+  fi
+
   echo ""
   info "Optional: Add CI secrets now? These go into the generated files as placeholders."
   echo "1) Yes, add secrets placeholders"
   echo "2) Skip (add secrets manually later)"
   read -r SECRETS_CHOICE
 
-  GHCR_TOKEN=""; MAVEN_USERNAME=""; MAVEN_PASSWORD=""; NPM_TOKEN=""; SONAR_TOKEN=""; PACT_BROKER_URL=""
   if [ "$SECRETS_CHOICE" = "1" ]; then
     read -rp "  GHCR_TOKEN: " GHCR_TOKEN
     if [[ " ${BACKEND[*]} " =~ "java" ]]; then

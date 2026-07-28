@@ -26,9 +26,9 @@ NC='\033[0m'
 VIOLATIONS=0
 SOURCE_DIR="${1:-.}"
 
-fail() { echo -e "${RED}FAIL${NC} $1"; VIOLATIONS=$((VIOLATIONS + 1)); }
-pass() { echo -e "${GREEN}PASS${NC} $1"; }
-warn() { echo -e "${YELLOW}WARN${NC} $1"; }
+fail() { echo -e "${RED}FAIL${NC} $*"; VIOLATIONS=$((VIOLATIONS + 1)); }
+pass() { echo -e "${GREEN}PASS${NC} $*"; }
+warn() { echo -e "${YELLOW}WARN${NC} $*"; }
 
 GREP_EXCLUDES='--exclude-dir=node_modules --exclude-dir=target --exclude-dir=vendor --exclude-dir=.git --exclude-dir=dist'
 

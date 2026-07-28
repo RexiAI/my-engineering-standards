@@ -110,6 +110,9 @@ fi
 # 5. CI/CD initialization
 echo ""
 echo "--- CI/CD Setup ---"
+if [ ! -t 0 ]; then
+    echo "Non-interactive stdin — skipping CI/CD setup. Run later: ./.standards/scripts/init-ci.sh"
+else
 echo "Initialize CI/CD for this project?"
 select CI_CHOICE in "GitHub Actions" "GitLab CI" "Skip"; do
     case $CI_CHOICE in
@@ -140,6 +143,7 @@ select CI_CHOICE in "GitHub Actions" "GitLab CI" "Skip"; do
             ;;
     esac
 done
+fi
 
 # 6. Session hygiene scripts
 echo ""

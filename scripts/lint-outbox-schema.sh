@@ -30,9 +30,9 @@ NC='\033[0m'
 
 VIOLATIONS=0
 
-fail() { echo -e "${RED}FAIL${NC} $1"; VIOLATIONS=$((VIOLATIONS + 1)); }
-pass() { echo -e "${GREEN}PASS${NC} $1"; }
-warn() { echo -e "${YELLOW}WARN${NC} $1"; }
+fail() { echo -e "${RED}FAIL${NC} $*"; VIOLATIONS=$((VIOLATIONS + 1)); }
+pass() { echo -e "${GREEN}PASS${NC} $*"; }
+warn() { echo -e "${YELLOW}WARN${NC} $*"; }
 
 # ── Locate migration files ─────────────────────────────────────────────────────
 SEARCH_DIRS=(
