@@ -88,22 +88,30 @@ echo ""
 # Java:  dedupStore.alreadyProcessed / dedupStore.markProcessed / Redis SETNX
 # Go:    dedupStore.AlreadyProcessed / dedupStore.MarkProcessed / redis.SetNX
 # Node:  dedupStore.alreadyProcessed / dedupStore.markProcessed / redis.setNX
+#
+# Must be found in PRODUCTION code — test files legitimately reference dedup
+# calls (mocks/assertions) without that proving production code implements it.
+DEDUP_TEST_EXCLUDES="$GREP_EXCLUDES \
+  --exclude-dir=src/test --exclude-dir=test --exclude-dir=tests \
+  --exclude-dir=__tests__ \
+  --exclude=*Test.java --exclude=*_test.go --exclude=*.test.ts --exclude=*.test.js \
+  --exclude=*.spec.ts --exclude=*.spec.js"
 
 DEDUP_FOUND=false
 
 # Java
 JAVA_DEDUP=$(grep -r 'alreadyProcessed\|markProcessed\|SETNX\|setIfAbsent\|DedupStore\|DeduplicationStore' \
-  --include="*.java" $GREP_EXCLUDES "$SOURCE_DIR" 2>/dev/null || true)
+  --include="*.java" $DEDUP_TEST_EXCLUDES "$SOURCE_DIR" 2>/dev/null || true)
 [ -n "$JAVA_DEDUP" ] && DEDUP_FOUND=true
 
 # Go
 GO_DEDUP=$(grep -r 'AlreadyProcessed\|MarkProcessed\|SetNX\|DedupStore\|DeduplicationStore' \
-  --include="*.go" $GREP_EXCLUDES "$SOURCE_DIR" 2>/dev/null || true)
+  --include="*.go" $DEDUP_TEST_EXCLUDES "$SOURCE_DIR" 2>/dev/null || true)
 [ -n "$GO_DEDUP" ] && DEDUP_FOUND=true
 
 # Node/TS
 NODE_DEDUP=$(grep -r 'alreadyProcessed\|markProcessed\|setNX\|dedupStore\|deduplicationStore\|DedupStore' \
-  --include="*.ts" --include="*.js" $GREP_EXCLUDES "$SOURCE_DIR" 2>/dev/null || true)
+  --include="*.ts" --include="*.js" $DEDUP_TEST_EXCLUDES "$SOURCE_DIR" 2>/dev/null || true)
 [ -n "$NODE_DEDUP" ] && DEDUP_FOUND=true
 
 if $DEDUP_FOUND; then

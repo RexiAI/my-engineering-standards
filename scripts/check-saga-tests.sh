@@ -69,10 +69,13 @@ if [ "${SAGA_DETECTED:-false}" = "true" ]; then
     echo "Found saga test file(s):"
     echo "$SAGA_TEST_FILES" | sed 's/^/  /'
 
-    # Check for compensation/failure scenario — must contain compensation-specific terms
-    # (not just generic "failure" words that appear in any test)
+    # Check for compensation/failure scenario — must contain a compensation-specific
+    # term. Bare generic terms like "on.*Failed" or "step.*fail"/"fail.*step" were
+    # dropped: they match almost any test file that mentions failure at all
+    # (e.g. a TODO comment about a failing step), without proving compensation
+    # is actually being tested.
     COMPENSATION_TEST=$(grep -l \
-      'compensat\|Compensat\|onPaymentFailed\|onInventoryFailed\|on.*Failed\|rollback.*saga\|saga.*rollback\|compensation.*triggered\|step.*fail\|fail.*step' \
+      'compensat\|Compensat\|onPaymentFailed\|onInventoryFailed\|rollback\|Rollback' \
       $SAGA_TEST_FILES 2>/dev/null || true)
 
     if [ -n "$COMPENSATION_TEST" ]; then

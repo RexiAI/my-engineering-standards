@@ -1,0 +1,72 @@
+name: Self CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install PyYAML
+        run: pip install pyyaml
+
+      - name: Check shell scripts parse (bash -n)
+        run: |
+          errors=0
+          while IFS= read -r -d '' f; do
+            if bash -n "$f"; then
+              echo "  [OK] $f"
+            else
+              echo "  [FAIL] $f"
+              errors=$((errors + 1))
+            fi
+          done < <(find . -name '*.sh' -not -path './.git/*' -print0)
+          if [ "$errors" -ne 0 ]; then
+            echo "$errors script(s) failed to parse!"
+            exit 1
+          fi
+
+      - name: make validate-all
+        run: make validate-all
+
+      - name: make lint
+        run: make lint
+
+      - name: Install shellcheck
+        run: sudo apt-get update -y && sudo apt-get install -y shellcheck
+
+      - name: shellcheck scripts and templates
+        continue-on-error: true
+        run: |
+          shellcheck scripts/*.sh templates/*.sh
+
+      # Note: this intentionally mirrors `make lint`'s YAML scope (.github + ci),
+      # not full-repo. Expanding scope belongs in the Makefile, not here.
+      - name: Validate YAML syntax (.github, ci)
+        run: |
+          errors=0
+          while IFS= read -r -d '' f; do
+            if python3 -c "import yaml; yaml.safe_load(open('$f'))"; then
+              echo "  [OK] $f"
+            else
+              echo "  [FAIL] $f"
+              errors=$((errors + 1))
+            fi
+          done < <(find .github ci -name '*.yml' -print0 2>/dev/null || true)
+          if [ "$errors" -ne 0 ]; then
+            echo "$errors YAML file(s) failed to parse!"
+            exit 1
+          fi

@@ -82,6 +82,10 @@ echo "Found outbox migration(s): $OUTBOX_FILES"
 echo ""
 
 # ── Check 1: Required columns ──────────────────────────────────────────────────
+# Isolate just the outbox CREATE TABLE statement block (from the matching
+# "CREATE TABLE ... outbox ..." line to its closing "');'" line) so column
+# names are only matched within that table's own definition, not anywhere
+# else in the migration file (e.g. an unrelated table's columns).
 REQUIRED_COLUMNS=(
   "event_id"
   "event_type"
@@ -92,11 +96,17 @@ REQUIRED_COLUMNS=(
   "published_at"
 )
 
+extract_outbox_block() {
+  awk 'BEGIN{IGNORECASE=1; inblock=0}
+       !inblock && /create[ \t]+table/ && /outbox/ {inblock=1}
+       inblock {print; if ($0 ~ /\);[ \t]*$/) {inblock=0}}' "$1"
+}
+
 for col in "${REQUIRED_COLUMNS[@]}"; do
   found=false
   for f in $OUTBOX_FILES; do
     # Exclude SQL comment lines (-- ...) to avoid matching column names mentioned in comments
-    if grep -i "$col" "$f" | grep -qv '^\s*--'; then
+    if extract_outbox_block "$f" | grep -i "$col" | grep -qv '^\s*--'; then
       found=true
       break
     fi

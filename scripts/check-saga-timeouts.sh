@@ -100,15 +100,27 @@ if $HAS_GO; then
     echo "Go: found SagaHandler in:"
     echo "$SAGA_HANDLER_GO" | sed 's/^/  /'
 
-    # Exclude comment lines — grep -r output is "file:content"; filter where content is a comment
-    CONTEXT_TIMEOUT=$(grep -r 'context\.WithTimeout\|context\.WithDeadline' \
-      --include="*.go" $GREP_EXCLUDES "$SOURCE_DIR" 2>/dev/null | \
-      grep -v '_test\.go' | grep -v ':[[:space:]]*//' || true)
+    # Scoped check: each SagaHandler file must have timeout logic in that SAME
+    # file, or in another file in the SAME DIRECTORY (cheap approximation of
+    # "same package" — no import resolution). Mirrors the Java branch's
+    # same-file requirement without a repo-wide escape hatch, since Go has no
+    # equivalent of a global resilience4j config.
+    MISSING_TIMEOUT_GO=""
+    while IFS= read -r handler_file; do
+      [ -z "$handler_file" ] && continue
+      dir=$(dirname "$handler_file")
+      DIR_TIMEOUT=$(grep -l 'context\.WithTimeout\|context\.WithDeadline' \
+        "$dir"/*.go 2>/dev/null | grep -v '_test\.go' || true)
+      if [ -z "$DIR_TIMEOUT" ]; then
+        MISSING_TIMEOUT_GO="${MISSING_TIMEOUT_GO}  ${handler_file}\n"
+      fi
+    done <<< "$SAGA_HANDLER_GO"
 
-    if [ -n "$CONTEXT_TIMEOUT" ]; then
-      pass "Go: context.WithTimeout found in saga handler code"
+    if [ -z "$MISSING_TIMEOUT_GO" ]; then
+      pass "Go: context.WithTimeout found in same file/directory as saga handler code"
     else
-      fail "Go: *SagaHandler functions found but no context.WithTimeout detected. " \
+      fail "Go: *SagaHandler files with no context.WithTimeout/WithDeadline in the same " \
+           "file or directory:"$'\n'"${MISSING_TIMEOUT_GO}" \
            "Saga handlers must use context.WithTimeout to enforce step timeouts. " \
            "See docs/SAGA_PATTERN.md §Saga Timeout."
     fi
