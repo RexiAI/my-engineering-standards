@@ -71,7 +71,7 @@ Each project has a `docker-compose.yml` defining the E2E test infrastructure:
 
 ## Artifact Management
 
-All Maven artifacts are published to a private Nexus instance (configured in the parent POM).
+All Maven artifacts are published to GitHub Packages (Maven repository, `server-id: github` in `.github/workflows/backend/ci-java.yml`), authenticated via `MAVEN_USERNAME`/`MAVEN_PASSWORD` secrets. Docker images are pushed to GHCR. See docs/CI_CD.md for the exact `deploy`/`docker` job definitions.
 
 Maven repositories are configured in the parent POM. Developers should never commit repository passwords.
 
@@ -93,8 +93,10 @@ CI pipeline must pass these checks before merging:
 5. PMD shows no new violations.
 6. OWASP Dependency Check shows no critical/high vulnerabilities.
 7. SonarQube quality gate passes (no new bugs, code smells, security hotspots).
-8. E2E tests pass.
+8. Contract tests pass (Pact consumer/provider verification, runs on every PR — see docs/CI_CD.md).
 9. Talisman secret scan passes (pre-commit hook).
+
+Full E2E tests run on a weekly schedule against staging (`ci-e2e-weekly.yml`), not as a pre-merge gate — see docs/CI_CD.md §Weekly E2E Pipeline. A failing weekly E2E run does not block PR merges; it pages the on-call rotation for triage.
 
 ### Conditional Gates (Saga/Outbox Pattern)
 

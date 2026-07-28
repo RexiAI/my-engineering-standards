@@ -54,7 +54,7 @@ spring:
   kafka:
     consumer:
       max-retries: 3
-      retry-backoff-ms: 1000
+      retry-backoff-ms: 100
     listener:
       dead-letter-topic: orders-dlt
       concurrency: 3
@@ -90,11 +90,13 @@ public void replayDlq(@RequestParam String topic) {
 
 ### Retry Configuration
 
+See docs/RESILIENCE.md §Retry with Exponential Backoff for the canonical retry defaults. Kafka consumer retries use the same baseline as client-call retries (this is consumer-level retry, not a client HTTP call, but the numbers are kept consistent to avoid confusion):
+
 ```
-maxRetries: 5
-initialBackoff: 500ms
+maxAttempts: 3
+baseDelay: 100ms
 backoffMultiplier: 2
-maxBackoff: 30s
+maxDelay: 10s
 ```
 
 ## Message Schema

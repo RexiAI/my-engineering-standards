@@ -7,6 +7,7 @@ RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 pass() { echo -e "  ${GREEN}OK${NC}: $1"; }
 fail() { echo -e "  ${RED}FAIL${NC}: $1"; exit 1; }
 skip() { echo -e "  ${YELLOW}SKIP${NC}: $1"; }
+warn() { echo -e "  ${YELLOW}WARN${NC}: $1"; }
 
 echo "=== Session End Health Check ==="
 
@@ -51,13 +52,20 @@ fi
 
 # 3. No debug code
 echo "3. Checking for debug artifacts..."
+# Portable POSIX ERE (no PCRE \d/lookaheads used, so semantics unchanged).
 DEBUG_PATTERNS='console\.log|print\(|fmt\.Print|System\.out|System\.err|TODO|FIXME|debugger'
+DEBUG_FOUND=0
 for f in $(git diff --cached --name-only --diff-filter=ACM 2>/dev/null || true); do
-    if [ -f "$f" ] && grep -qP "$DEBUG_PATTERNS" "$f" 2>/dev/null; then
+    if [ -f "$f" ] && grep -qE "$DEBUG_PATTERNS" "$f" 2>/dev/null; then
         echo "  WARNING: Debug/todo markers in $f"
+        DEBUG_FOUND=1
     fi
 done
-pass "No obvious debug artifacts"
+if [ "$DEBUG_FOUND" -eq 1 ]; then
+    warn "Debug/todo markers found in staged files (see warnings above)"
+else
+    pass "No obvious debug artifacts"
+fi
 
 # 4. Talisman secret scan (if available)
 echo "4. Secret scan..."

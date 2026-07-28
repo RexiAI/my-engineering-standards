@@ -57,10 +57,12 @@ Support standard OAuth2 grant types:
 |---|---|---|
 | OWASP Dependency Check | Maven/Gradle dependency CVEs | CI (profile-activated) |
 | SpotBugs + FindSecBugs | Java bytecode for security bugs | Every build |
-| Nancy | Go dependency CVEs | CI |
 | Talisman | Git history for secrets | Pre-commit |
-| Checkmarx | Source code SAST | CI (Bamboo plan) |
-| ZAP | Running service DAST | CI (scheduled) |
+| CodeQL | Source code SAST | CI (`.github/workflows/shared/ci-security.yml`, every push) |
+| Trivy | Filesystem dependency/CVE scan | CI (`.github/workflows/shared/ci-security.yml`, every push) |
+| ZAP | Running service DAST | Go services only, via `make docker-run-scan` (see `language-specific/go/AGENTS.md`) |
+
+Checkmarx, Bamboo, and Nancy are not used anywhere in this repo's CI — removed from this table (previously stale references).
 
 ## Dependency Management
 

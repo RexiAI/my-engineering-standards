@@ -7,6 +7,7 @@ RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 pass() { echo -e "  ${GREEN}OK${NC}: $1"; }
 fail() { echo -e "  ${RED}FAIL${NC}: $1"; exit 1; }
 skip() { echo -e "  ${YELLOW}SKIP${NC}: $1"; }
+warn() { echo -e "  ${YELLOW}WARN${NC}: $1"; }
 
 echo "=== Session Start Health Check ==="
 
@@ -30,8 +31,11 @@ elif [ -f Makefile ] && grep -q "^lint:" Makefile 2>/dev/null; then
     make lint || fail "Lint errors"
     pass "Lint"
 elif [ -f package.json ]; then
-    npm run lint 2>/dev/null || true
-    pass "Lint (best effort)"
+    if npm run lint 2>/dev/null; then
+        pass "Lint"
+    else
+        warn "Lint failed or not configured (advisory-only for npm)"
+    fi
 else
     skip "No lint command found"
 fi

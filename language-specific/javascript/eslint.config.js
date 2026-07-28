@@ -1,70 +1,80 @@
-module.exports = {
-  env: {
-    browser: true,
-    es2021: true,
-    node: true,
-    jest: true,
-    commonjs: true,
-  },
-  extends: [
-    'eslint:recommended',
-    'plugin:react/recommended',
-    'plugin:react-hooks/recommended',
-    'plugin:import/errors',
-    'plugin:import/warnings',
-    'prettier',
-  ],
-  parserOptions: {
-    ecmaVersion: 'latest',
-    sourceType: 'module',
-    ecmaFeatures: { jsx: true },
-  },
-  plugins: ['react', 'react-hooks', 'import'],
-  settings: {
-    react: { version: 'detect' },
-    'import/resolver': {
-      node: { extensions: ['.js', '.jsx', '.ts', '.tsx'] },
-    },
-  },
-  rules: {
-    'no-console': 'warn',
-    'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
-    'no-undef': 'error',
-    'prefer-const': 'error',
-    'no-var': 'error',
-    'eqeqeq': ['error', 'always'],
-    'curly': ['error', 'all'],
+// ESLint 9 flat config. CJS on purpose (see prettier.config.js) — child repos
+// copying this file may not be "type": "module".
+const js = require('@eslint/js')
+const tseslint = require('typescript-eslint')
+const react = require('eslint-plugin-react')
+const reactHooks = require('eslint-plugin-react-hooks')
+const importPlugin = require('eslint-plugin-import')
+const prettier = require('eslint-config-prettier')
 
-    'react/prop-types': 'warn',
-    'react/react-in-jsx-scope': 'off',
-    'react/jsx-uses-react': 'off',
-    'react-hooks/rules-of-hooks': 'error',
-    'react-hooks/exhaustive-deps': 'warn',
-
-    'import/order': [
-      'warn',
-      {
-        groups: ['builtin', 'external', 'internal', 'parent', 'sibling', 'index'],
-        'newlines-between': 'always',
-        alphabetize: { order: 'asc', caseInsensitive: true },
+module.exports = [
+  js.configs.recommended,
+  {
+    files: ['**/*.{js,jsx,ts,tsx}'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      parserOptions: { ecmaFeatures: { jsx: true } },
+      globals: {
+        window: 'readonly',
+        document: 'readonly',
+        process: 'readonly',
+        module: 'readonly',
+        require: 'readonly',
+        describe: 'readonly',
+        it: 'readonly',
+        test: 'readonly',
+        expect: 'readonly',
       },
-    ],
-    'import/no-duplicates': 'error',
-  },
-  overrides: [
-    {
-      files: ['*.ts', '*.tsx'],
-      extends: [
-        'plugin:@typescript-eslint/recommended',
-        'plugin:@typescript-eslint/eslint-recommended',
+    },
+    plugins: {
+      react,
+      'react-hooks': reactHooks,
+      import: importPlugin,
+    },
+    settings: {
+      react: { version: 'detect' },
+      'import/resolver': {
+        node: { extensions: ['.js', '.jsx', '.ts', '.tsx'] },
+      },
+    },
+    rules: {
+      'no-console': 'warn',
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      'no-undef': 'error',
+      'prefer-const': 'error',
+      'no-var': 'error',
+      eqeqeq: ['error', 'always'],
+      curly: ['error', 'all'],
+
+      ...react.configs.recommended.rules,
+      ...reactHooks.configs.recommended.rules,
+      'react/prop-types': 'warn',
+      'react/react-in-jsx-scope': 'off',
+      'react/jsx-uses-react': 'off',
+
+      'import/order': [
+        'warn',
+        {
+          groups: ['builtin', 'external', 'internal', 'parent', 'sibling', 'index'],
+          'newlines-between': 'always',
+          alphabetize: { order: 'asc', caseInsensitive: true },
+        },
       ],
-      parser: '@typescript-eslint/parser',
-      plugins: ['@typescript-eslint'],
-      rules: {
-        '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
-        '@typescript-eslint/no-explicit-any': 'warn',
-        '@typescript-eslint/explicit-function-return-type': 'off',
-      },
+      'import/no-duplicates': 'error',
     },
-  ],
-}
+  },
+  ...tseslint.configs.recommended.map((config) => ({
+    ...config,
+    files: ['**/*.{ts,tsx}'],
+  })),
+  {
+    files: ['**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/explicit-function-return-type': 'off',
+    },
+  },
+  prettier,
+]

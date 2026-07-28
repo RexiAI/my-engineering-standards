@@ -1,4 +1,4 @@
-.PHONY: help validate validate-docs validate-refs validate-all lint format stats
+.PHONY: help validate validate-docs validate-refs validate-all lint format stats release
 
 DOCS := AGENTS.md README.md \
   docs/ARCHITECTURE.md docs/CI_CD.md docs/CODING_CONVENTIONS.md \
@@ -27,8 +27,8 @@ help:
 	@echo "  validate-all   Run all validation targets"
 	@echo "  lint           Lint YAML/JSON/TOML files"
 	@echo "  format         Format with prettier"
-	@echo "  	stats          Show file sizes
-	release        Create & push tag from VERSION file"
+	@echo "  stats          Show file sizes"
+	@echo "  release        Create & push tag from VERSION file"
 	@echo ""
 
 validate:

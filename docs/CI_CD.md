@@ -29,12 +29,14 @@ The CI pipeline adapts to the trigger. Each stage is independently executable.
 | Step | Command | When |
 |------|---------|------|
 | `unit-test` | `mvn test -B` | Every push |
-| `lint` | `mvn checkstyle:check` | Every push |
+| `lint` | `mvn spotless:check` | Every push |
 | `contract-test` | `mvn pact:verify` | PR only (Pact) |
 | `integration-test` | `mvn verify -B -DskipITs=false` | PR only |
 | `sonar` | `mvn sonar:sonar` | Optional, PR only |
 | `deploy` | `mvn clean deploy -DskipTests` | Merge to main |
 | `docker` | Docker build & push to GHCR | Merge to main |
+
+Checkstyle config exists at `language-specific/java/checkstyle.xml` but is optional/manual — it is not a CI-enforced gate. Spotless (`spotless:check`) is the enforced Java formatter/lint check. See docs/TESTING.md §Static Analysis for the full tool table.
 
 ### Node.js (NestJS — backend)
 

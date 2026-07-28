@@ -1,13 +1,6 @@
-linters-settings:
-  gci:
-    local-prefixes: github.com/company
-  govet:
-    check-shadowing: true
-  goconst:
-    min-len: 3
-    min-occurrences: 3
-  misspell:
-    locale: US
+# NOTE: not referenced by language-specific/go/AGENTS.md's command table (no
+# `make lint` entry documents golangci-lint). Verify wiring before assuming this runs anywhere.
+version: 2
 
 linters:
   enable:
@@ -29,7 +22,6 @@ linters:
     - errname
     - errorlint
     - exhaustive
-    - exportloopref
     - goconst
     - gocritic
     - gofmt
@@ -49,11 +41,19 @@ linters:
     - spancheck
     - sqlclosecheck
     - stylecheck
-    - tenv
+    - usetesting
     - thelper
     - unconvert
     - unparam
     - whitespace
+  settings:
+    gci:
+      local-prefixes: github.com/company
+    goconst:
+      min-len: 3
+      min-occurrences: 3
+    misspell:
+      locale: US
 
 issues:
   exclude-rules:

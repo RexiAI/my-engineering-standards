@@ -1,4 +1,5 @@
 {
+  "_note": "not copied by scripts/bootstrap.sh or referenced by language-specific/javascript/AGENTS.md; verify before removing",
   "compilerOptions": {
     "target": "ES2020",
     "module": "ESNext",

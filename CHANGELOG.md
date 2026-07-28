@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.3.1] — 2026-07-28
+
+### Fixes
+
+- **CRLF checkout** — added `.gitattributes` (`*.sh`, `Makefile*`, `*.go` → LF), unset `core.autocrlf`, renormalized repo; all shell scripts were failing `bash -n` due to CRLF line endings
+- **Saga gate GitHub/GitLab mismatch** — removed dead `with-saga-gates` input from `init-ci.sh` and `child-ci-*.yml` templates (GitHub Actions has no saga gate job; feature is GitLab-only); fixed `DEPLOYMENT.md`'s false claim; fixed duplicate `backend-ci:` YAML key bug
+- **bootstrap.sh → init-ci.sh call** — fixed wrong `--languages` flag and mangled `CI_PLATFORM` string (`githubactions`) that matched no case arm
+- **Missing GitLab jobs** — added missing `.java-lint` job (`mvn spotless:check`); fixed `init-ci.sh` `--frontend static` to only emit lint/docker jobs (unit/build are undefined for static)
+- **Gate script arg-dropping** — `fail()`/`pass()`/`warn()` in the 4 gate scripts (`check-saga-timeouts.sh`, `check-saga-tests.sh`, `lint-outbox-schema.sh`, `check-outbox-relay.sh`) used `$1`, dropping every arg after the first; remediation guidance never printed. Switched to `$*`
+- **check-saga-tests.sh false-PASS** — recovery/persistence check ran outside the `SAGA_TEST_FILES` guard, so an empty file list made `grep -r` default to `.` and false-PASS off an unrelated repo-wide scan; moved inside the guard and changed `grep -r` → `-l` to match its siblings
+- **update-submodules.sh subshell bug** — `continue` inside a `( cd $repo; ... )` subshell is a no-op under bash, so repos without a `.standards` submodule (or with one uninitialized) fell through to submodule update/commit; changed to `exit 0`. Also fixed `get_repos`' error message and `exit 1` being swallowed by `$( )` command substitution
+- **Non-interactive stdin hangs** — `init-ci.sh`/`bootstrap.sh`'s `collect_secrets()` and the backend/frontend `select` prompts blocked forever on closed/non-tty stdin; guarded all three on `[ -t 0 ]`, defaulting to skip/none. Also fixed `init-ci.sh`'s `[ -n "$FRONTEND" ] && info ...` returning 1 (under `set -e`) on the normal "no frontend" case
+
+## [1.3.0] — 2026-07-12
+
+### Features
+
+- **Saga/Outbox CI quality gates** — `scripts/detect-saga-outbox.sh` (sets `SAGA_DETECTED`/`OUTBOX_DETECTED` from changed files) plus 4 gate scripts: `check-saga-timeouts.sh`, `check-saga-tests.sh`, `lint-outbox-schema.sh`, `check-outbox-relay.sh`
+- **ArchUnit rules** — `ci/templates/archunit/SagaArchRules.java` + `ci/templates/archunit/OutboxArchRules.java` (9 structural rules: compensation, `@Transactional`, no direct broker, dedup)
+- **Go AST lint** — `ci/templates/go-saga-lint.go` (checks compensation func, `WithTimeout`, no direct broker in saga files)
+- **Node ESLint plugin** — `ci/templates/eslint-saga-rules/saga-compensation.js` (`sagaStep()` must declare `compensate` and `timeout`)
+- **Integration test templates** — Java/Go/Node × Saga/Outbox under `ci/templates/tests/`
+- **init-ci.sh --with-saga** — wires the gates into `ci-java.yml`/`ci-go.yml`/`ci-node.yml` and the child-ci templates
+- Updated `docs/SAGA_PATTERN.md`, `docs/OUTBOX_PATTERN.md`, `docs/DEPLOYMENT.md` with CI Quality Gates sections; updated root and language-specific `AGENTS.md` with gate rules
+
 ## [1.2.0] — 2026-07-11
 
 ### Features
@@ -70,6 +95,8 @@
 - No lock files committed — child projects manage their own
 - Version file: `VERSION` (plaintext, semver)
 
+[1.3.1]: https://github.com/pucelano-95/my-engineering-standards/releases/tag/v1.3.1
+[1.3.0]: https://github.com/pucelano-95/my-engineering-standards/releases/tag/v1.3.0
 [1.2.0]: https://github.com/pucelano-95/my-engineering-standards/releases/tag/v1.2.0
 [1.1.0]: https://github.com/pucelano-95/my-engineering-standards/releases/tag/v1.1.0
 [1.0.0]: https://github.com/pucelano-95/my-engineering-standards/releases/tag/v1.0.0

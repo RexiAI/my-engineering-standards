@@ -47,12 +47,32 @@ init-ai:
 		cp -n .standards/language-specific/java/*.xml . 2>/dev/null || true; \
 	elif ls *.go 2>/dev/null | head -1 > /dev/null 2>&1; then \
 		echo "  [GO] Detected Go project"; \
-		[ ! -f ".golangci.yml" ] && cp -n .standards/language-specific/go/golangci.yml . 2>/dev/null || true; \
+		if [ ! -f ".golangci.yml" ]; then cp .standards/language-specific/go/golangci.yml .golangci.yml 2>/dev/null || true; fi; \
 	elif [ -f "package.json" ]; then \
 		echo "  [JS/TS] Detected Node.js project"; \
 		[ ! -f ".eslintrc.js" ] && [ ! -f "eslint.config.js" ] && cp -n .standards/language-specific/javascript/eslint.config.js . 2>/dev/null || true; \
 		[ ! -f ".prettierrc.js" ] && [ ! -f "prettier.config.js" ] && cp -n .standards/language-specific/javascript/prettier.config.js . 2>/dev/null || true; \
 	fi
+
+	# Copy session hygiene scripts if not already present
+	@if [ ! -f "session-start-check.sh" ]; then \
+		cp .standards/templates/session-start-check.sh session-start-check.sh; \
+		chmod +x session-start-check.sh; \
+		echo "  [COPY] templates/session-start-check.sh -> session-start-check.sh"; \
+	else \
+		echo "  [SKIP] session-start-check.sh already exists"; \
+	fi
+	@if [ ! -f "session-end-check.sh" ]; then \
+		cp .standards/templates/session-end-check.sh session-end-check.sh; \
+		chmod +x session-end-check.sh; \
+		echo "  [COPY] templates/session-end-check.sh -> session-end-check.sh"; \
+	else \
+		echo "  [SKIP] session-end-check.sh already exists"; \
+	fi
+
+	@echo ""
+	@echo "Done! AGENTS.md is now linked to .standards/."
+	@echo "OpenCode will auto-discover AGENTS.md and load instructions from .standards/"
 
 session-check:
 	@if [ -f "session-start-check.sh" ]; then \
@@ -69,7 +89,3 @@ session-end:
 		echo "session-end-check.sh not found. Run 'make init-ai' first."; \
 		exit 1; \
 	fi
-
-	@echo ""
-	@echo "Done! AGENTS.md is now linked to .standards/."
-	@echo "OpenCode will auto-discover AGENTS.md and load instructions from .standards/"

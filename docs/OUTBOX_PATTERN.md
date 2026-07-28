@@ -92,6 +92,8 @@ processEvent(event);
 dedupStore.markProcessed(event.eventId(), Duration.ofDays(7));
 ```
 
+Outbox consumer dedup TTL (7 days) is intentionally longer than the general idempotency-key TTL in docs/IDEMPOTENCY.md (24h): the relay retries from a durable outbox table and can redeliver an event days later after a crash, backlog, or relay outage, whereas idempotency keys in IDEMPOTENCY.md cover client-facing request retries that are expected to resolve within a much shorter window. This is intentional, not a discrepancy — see docs/IDEMPOTENCY.md for the general-purpose idempotency-key TTL.
+
 ## Ordering Guarantees
 
 | Approach | Ordering | Throughput | Complexity |

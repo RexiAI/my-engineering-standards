@@ -18,3 +18,6 @@
 - [ ] No new OWASP vulnerabilities
 - [ ] Documentation updated (if applicable)
 - [ ] Submodule pointers updated (if applicable)
+- [ ] Saga/Outbox CI gates pass (if applicable)
+- [ ] ADR added/updated for architectural changes (if applicable)
+- [ ] session-end-check.sh run clean before requesting review

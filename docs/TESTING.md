@@ -6,7 +6,7 @@ All projects must have tests. The testing strategy has three layers:
 | ----------- | ------------------------------------ | ---------------------------------------------------- | ------ | ------------- |
 | Unit        | Single class/function in isolation   | JUnit 5 + Mockito / Go testing + testify / Jest      | Fast   | Every commit  |
 | Integration | With infrastructure (DB, Redis, SQS) | In-memory (H2, embedded-redis, WireMock)             | Fast   | Every commit  |
-| E2E         | Full service Dockerized + stubs      | RESTEasy / WireMock / ExtentReports / Docker compose | Slow   | CI pipeline   |
+| E2E         | Full service Dockerized + stubs      | RESTEasy / WireMock / ExtentReports / Docker compose | Slow   | Weekly (scheduled)  |
 
 ## Unit Tests
 
@@ -94,7 +94,7 @@ const redis = new RedisMock()
 
 ## E2E Tests
 
-E2E tests run the full service in a Docker container alongside all dependencies (PostgreSQL, Redis, LocalStack, WireMock mocks). They verify real HTTP endpoints against the running service.
+E2E tests run the full service in a Docker container alongside all dependencies (PostgreSQL, Redis, LocalStack, WireMock mocks). They verify real HTTP endpoints against the running service. Full E2E runs on a weekly schedule against staging, not on every PR — contract tests (Pact) cover cross-service compatibility on every PR instead. See docs/CI_CD.md §Weekly E2E Pipeline for the exact trigger.
 
 ### E2E Test Client (composition over inheritance)
 
@@ -157,7 +157,7 @@ Avoid `AbstractBaseTestSuite` base classes. Use plain `@BeforeEach` and helper m
 
 - **Java**: JaCoCo with minimum coverage targets configured in parent POM. Coverage reports generated during `prepare-package` phase.
 - **Go**: `go test -coverprofile=reports/coverage/coverage.out`. HTML and XML (Cobertura) reports.
-- **CI**: Coverage reports published to SonarQube. Coverage must not decrease from baseline.
+- **CI**: Coverage reports published to SonarQube when enabled. This is an advisory, PR-only signal — not a blocking CI gate (see docs/CI_CD.md, `sonar` job is opt-in via `sonar-enabled` and does not block `deploy`). Treat "coverage should not decrease from baseline" as a review guideline, not an enforced gate.
 
 ## Test Behavior, Not Implementation
 
