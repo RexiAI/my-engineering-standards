@@ -27,6 +27,11 @@
   script:
     - mvn ${MAVEN_CLI_OPTS} ${MAVEN_GOAL}
 
+.java-lint:
+  extends: [.java-setup, .java-cache]
+  script:
+    - mvn ${MAVEN_CLI_OPTS} spotless:check
+
 .java-saga-gates:
   extends: [.java-setup, .java-cache]
   script:

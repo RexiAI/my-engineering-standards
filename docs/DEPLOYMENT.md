@@ -100,7 +100,7 @@ CI pipeline must pass these checks before merging:
 
 Gates 10–14 activate automatically when `detect-saga-outbox.sh` finds saga or outbox code
 in the changed files. Zero overhead for services that do not use these patterns.
-Enable via `init-ci.sh --with-saga` or set `with-saga-gates: true` in the child CI template.
+Enable via `init-ci.sh --with-saga` (GitLab only — GitHub Actions has no saga/outbox gate job yet).
 
 10. **Saga compensation completeness** (if saga code present) — every `@SagaHandler` / `*SagaHandler`
     function must have a matching compensation method (`on*Failed`, `compensate*`, `rollback*`).

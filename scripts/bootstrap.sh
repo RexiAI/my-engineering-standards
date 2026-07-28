@@ -114,13 +114,23 @@ echo "Initialize CI/CD for this project?"
 select CI_CHOICE in "GitHub Actions" "GitLab CI" "Skip"; do
     case $CI_CHOICE in
         "GitHub Actions"|"GitLab CI")
-            CI_PLATFORM=$(echo "$CI_CHOICE" | tr '[:upper:]' '[:lower:]' | sed 's/ //')
+            if [ "$CI_CHOICE" = "GitHub Actions" ]; then
+                CI_PLATFORM="github"
+            else
+                CI_PLATFORM="gitlab"
+            fi
             echo ""
             echo "Running CI/CD generator..."
-            bash "$STANDARDS_DIR/scripts/init-ci.sh" \
-                --platform "$CI_PLATFORM" \
-                --languages "$LANG_DETECTED" \
-                --registry "ghcr.io"
+            if [ -n "$LANG_DETECTED" ]; then
+                bash "$STANDARDS_DIR/scripts/init-ci.sh" \
+                    --platform "$CI_PLATFORM" \
+                    --backend "$LANG_DETECTED" \
+                    --registry "ghcr.io"
+            else
+                bash "$STANDARDS_DIR/scripts/init-ci.sh" \
+                    --platform "$CI_PLATFORM" \
+                    --registry "ghcr.io"
+            fi
             break
             ;;
         "Skip")

@@ -215,14 +215,16 @@ on:
 jobs:
 EOF
 
-  local sep=""
+  if [ "$saga_enabled" = "true" ]; then
+    echo "  NOTE: saga/outbox CI gates are GitLab-only right now; GitHub Actions workflow has no gate job." >&2
+  fi
+
   for lang in "${BACKEND[@]}"; do
     cat >> "$target" << EOF
-  backend-ci:
+  backend-ci-${lang}:
     uses: pucelano-95/my-engineering-standards/.github/workflows/backend/ci-${lang}.yml@main
     with:
       docker-registry: $registry
-      with-saga-gates: $saga_enabled
     secrets:
       GHCR_TOKEN: \${{ secrets.GHCR_TOKEN }}
       PACT_BROKER_URL: \${{ secrets.PACT_BROKER_URL }}
@@ -369,7 +371,19 @@ EOF
   done
 
   if [ -n "$FRONTEND" ]; then
-    cat >> "$target" << EOF
+    if [ "$FRONTEND" = "static" ]; then
+      cat >> "$target" << EOF
+
+frontend-lint:
+  extends: .static-lint
+  stage: lint
+
+frontend-docker:
+  extends: .static-docker
+  stage: docker
+EOF
+    else
+      cat >> "$target" << EOF
 
 frontend-unit:
   extends: .${FRONTEND}-unit
@@ -387,6 +401,7 @@ frontend-docker:
   extends: .${FRONTEND}-docker
   stage: docker
 EOF
+    fi
   fi
 
   ok "Generated: .gitlab-ci.yml"
