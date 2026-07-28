@@ -30,6 +30,7 @@
 - **Generalize, don't special-case.** One mechanism should handle all similar cases. Avoid if/else chains that check exception types — use polymorphic dispatch or Result pattern matching.
 - **Design interfaces to be deep.** A module's interface should be much simpler than its implementation. If a method just delegates with the same signature, it's a pass-through — remove it.
 - **First do no harm with dependencies.** Each external dependency adds cognitive load and attack surface. Prefer stdlib, justify each dependency. Audit quarterly (see SECURITY.md).
+- **Comment the why, not the what.** Code shows what a line does; a comment earns its place by explaining why it's not the obvious version — the incident it fixes, the second-order effect it avoids, the constraint that isn't visible in the diff. A one-line workaround with a multi-line comment explaining the trap it dodges is normal and correct; a comment restating the code below it is noise. If a line looks wrong at a glance but is intentional, that's exactly the line that needs the comment.
 
 ## Error Handling Philosophy
 
@@ -111,7 +112,7 @@ type CreateUserResult =
 - Never log PII, secrets, or tokens.
 
 ### Go
-- Use zerolog for structured logging: `log.Info().Str("key", "value").Msg("message")`.
+- Use the stdlib `log/slog` package for structured logging: `slog.Info("message", "key", "value")`. This supersedes any previous zerolog guidance — `slog` has been in the stdlib since Go 1.21, so it's the "prefer stdlib" default from §Design Principles rather than an added dependency. `zerolog` remains an acceptable choice for a project that already standardized on it; don't migrate a working project just to match this doc.
 - Trace ID propagated via `context.Context`.
 - Log at service method boundaries. Log input parameters and results.
 

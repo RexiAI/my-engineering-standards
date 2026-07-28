@@ -2,62 +2,62 @@
 
 ## Build System
 
-- **Go version**: 1.26.
-- **Build tool**: Makefile, delegating to shared makefiles in `build/makefiles/`.
+- **Go version**: resolved from `go.mod`'s `go` line (and `toolchain` line if pinning a specific patch) — never hardcode a version in CI config or a Dockerfile separately from the module file. See docs/CI_CD.md §Toolchain Versions.
+- **Build tool**: Makefile. `make ci-fast` (vet + lint + test, no external services) → `make ci` (adds build + anything needing only local tooling) → `make ci-full` (adds Docker-dependent E2E) is the standard ladder — each rung's infrastructure requirement should be documented next to its target. The same targets are what CI and git hooks both call; never duplicate a command list in YAML that a Makefile target already expresses.
 
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `make setup` | Install dependencies, init submodules |
-| `make build-deps` | Download Go module dependencies |
+| `make ci-fast` | `vet`, `lint`, `test` — no external services required |
+| `make ci` | Everything `ci-fast` does, plus build |
+| `make ci-full` | Everything `ci` does, plus Docker-dependent E2E |
 | `make build` | Build binary to `bin/` |
-| `make test` | Run unit tests |
+| `make test` | `go test -race -shuffle=on -count=1 ./...` — race detector, randomized test order (catches inter-test coupling), disabled test cache (`-count=1`) so a stale pass can't hide a real failure |
 | `make test-cover-html` | Run tests + HTML coverage report |
 | `make test-cover-junit` | Run tests + JUnit XML coverage report |
-| `make generate-mocks` | Regenerate mocks via `gomockhandler` |
+| `make hooks-install` | `git config core.hooksPath .githooks` — one-time per clone, see docs/GIT_WORKFLOW.md §Git Hooks |
+| `make generate-mocks` | Regenerate mocks, only if the project has adopted `gomockhandler` (optional — see docs/TESTING.md §Unit Tests) |
 | `make generate-docs` | Generate Swagger docs |
-| `make docker-run-scan` | Run ZAP security scan |
+| `make docker-run-scan` | Run ZAP security scan (`production`-tier, see docs/CONFORMANCE_TIERS.md) |
 | `make run-e2e-tests` | Run Docker-based E2E tests |
 
 ## Project Structure
 
 ```
-src/
-├── main.go                    # Entry point
-├── dependency_injection.go    # Wire all components
-├── event_consumption.go       # Async consumer event loop
-├── controllers/               # HTTP handlers (Gin)
-├── services/                  # Business logic
-├── repositories/              # Data access (SQL, NoSQL, Redis)
-├── models/                    # Domain types / DTOs
-├── middlewares/                # Gin middlewares (auth, trace ID)
-├── resources/                 # HTTP clients to upstream services
-├── consumers/                 # Async message consumers
-├── publishers/                # Event bus publishers
-├── helpers/                   # Crypto, token, Redis helpers
+cmd/
+└── server/
+    └── main.go                # Entry point, route registration, dependency wiring
+internal/
+├── dependency_injection.go    # Wire all components (or split into per-module factory
+│                               # functions as the app grows, to avoid a god object)
 ├── routes/                    # Route registration
-├── configs/                   # Config parsing (env, YAML)
-├── constants/                 # Enums and string constants
-└── validators/                # Custom validation logic
+├── services/                  # Business logic
+├── store/                     # Data access (SQL, NoSQL, Redis) — see §Repository below
+├── models/                    # Domain types / DTOs
+├── middleware/                # Gin/http middlewares (auth, request ID)
+├── engine/                    # Domain-specific computation (pricing, classification, etc.)
+└── config/                    # Config parsing (env, YAML)
 ```
+
+`internal/` gives compiler-enforced encapsulation that a plain `src/` tree can't — anything under `internal/` is unimportable from outside the module, so the boundary is checked by the Go toolchain, not just by convention. `cmd/<binary-name>/main.go` is the standard layout for a Go module that produces one or more binaries; use `cmd/<name>/` per binary if the module produces more than one.
 
 ## Dependency Injection
 
-Manual DI in `dependency_injection.go`. No DI framework. Split into per-module factory functions as the app grows to avoid a god object:
+Manual DI in `internal/dependency_injection.go` (or wired directly in `cmd/server/main.go` for a small service — extract into its own file once wiring grows past a screenful). No DI framework. Split into per-module factory functions as the app grows to avoid a god object:
 
 ```go
 func BuildDependencies(ctx context.Context, cfg *config.Config) (*Dependencies, error) {
-    repos := buildRepos(ctx, cfg)       // repo/repo.go
-    services := buildServices(repos, cfg) // service/service.go
-    controllers := buildControllers(services) // controller/controller.go
-    return &Dependencies{Services: services, Controllers: controllers}, nil
+    store := buildStore(ctx, cfg)          // store/store.go
+    services := buildServices(store, cfg)  // service/service.go
+    routes := buildRoutes(services)        // routes/routes.go
+    return &Dependencies{Services: services, Routes: routes}, nil
 }
 
-func buildRepos(ctx context.Context, cfg *config.Config) *Repos {
-    return &Repos{
-        User: repository.NewUserRepository(dynamoClient, cfg),
-        Session: repository.NewSessionRepository(redisClient, cfg),
+func buildStore(ctx context.Context, cfg *config.Config) *Store {
+    return &Store{
+        Users:    store.NewUserStore(db, cfg),
+        Sessions: store.NewSessionStore(redisClient, cfg),
     }
 }
 ```
@@ -68,22 +68,23 @@ func buildRepos(ctx context.Context, cfg *config.Config) *Repos {
 import (
     "github.com/gin-gonic/gin"          // Web framework
     "github.com/aws/aws-sdk-go-v2"      // AWS SDK
-    "github.com/rs/zerolog"             // Structured logging
-    "github.com/stretchr/testify"       // Test assertions
-    "github.com/golang/mock"            // Mock generation
+    "log/slog"                          // Structured logging (stdlib, see docs/CODING_CONVENTIONS.md §Logging)
     "github.com/company/common-service/v2"  // Shared library
 )
 ```
+
+`testify` and `github.com/golang/mock`/`gomockhandler` are optional additions, not defaults — see docs/TESTING.md §Unit Tests. Add either only when the stdlib `testing` package is genuinely insufficient for the project's test complexity.
 
 ## Patterns
 
 ### Logging
 
 ```go
-log := zerolog.Ctx(ctx)
-log.Info().Str("userId", userId).Msg("Checking authorization")
-log.Error().Err(err).Str("resource", resource).Msg("Authorization failed")
+slog.Info("checking authorization", "userId", userId)
+slog.Error("authorization failed", "error", err, "resource", resource)
 ```
+
+For a request-scoped logger with common fields attached, build one from `context.Context` via `slog.With(...)` and pass it down, or attach fields per call site — either is fine; don't build a bespoke wrapper around `slog` unless the project needs something `slog.Handler` genuinely can't express.
 
 ### Trace ID
 

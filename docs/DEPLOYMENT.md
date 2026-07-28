@@ -40,12 +40,13 @@ ENTRYPOINT ["java", "org.springframework.boot.loader.JarLauncher"]
 ### Go Services
 
 ```dockerfile
-FROM golang:1.26 AS build
+ARG GO_VERSION=1.26
+FROM golang:${GO_VERSION} AS build
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o /app/service ./src/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -o /app/service ./cmd/server
 
 FROM alpine:3.18
 RUN apk --no-cache add ca-certificates tzdata
@@ -55,6 +56,8 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 ENTRYPOINT ["/service"]
 ```
+
+Never hardcode a language runtime version in more than one place. `GO_VERSION` here should be passed via `--build-arg GO_VERSION=$(go list -m -f '{{.GoVersion}}')` (or read `go.mod`/`toolchain` directly) so the image always matches the module's declared version — see docs/CI_CD.md §Toolchain Versions.
 
 ### Docker Compose for E2E Tests
 
@@ -96,7 +99,23 @@ CI pipeline must pass these checks before merging:
 8. Contract tests pass (Pact consumer/provider verification, runs on every PR — see docs/CI_CD.md).
 9. Talisman secret scan passes (pre-commit hook).
 
-Full E2E tests run on a weekly schedule against staging (`ci-e2e-weekly.yml`), not as a pre-merge gate — see docs/CI_CD.md §Weekly E2E Pipeline. A failing weekly E2E run does not block PR merges; it pages the on-call rotation for triage.
+Full E2E tests run on a weekly schedule against staging (`ci-e2e-weekly.yml`), not as a pre-merge gate — see docs/CI_CD.md §Weekly E2E Pipeline. A failing weekly E2E run does not block PR merges; it pages the on-call rotation for triage. `mvp`-tier projects (docs/CONFORMANCE_TIERS.md) without a staging environment run E2E on every push instead — see docs/TESTING.md §E2E Tests.
+
+## Quality Gate Verdicts: Tri-State, Not Binary
+
+A review or CI gate script's exit code should distinguish "blocking" from "worth a human look" rather than collapsing everything into pass/fail:
+
+| Exit code | Verdict | Meaning |
+|---|---|---|
+| `0` | **APPROVED** | All checks pass. Safe to ship. |
+| `1` | **CONDITIONAL** | Non-blocking issues found (e.g. a file over the soft LOC guideline, a dependency added without an obvious justification). Review before merging, don't auto-block. |
+| `2` | **REJECTED** | Blocking failures (failing tests, a security scan hit, a broken build). Fix before shipping. |
+
+A binary pass/fail forces every advisory signal to be either silently dropped or treated as a hard blocker — neither is right. `CONDITIONAL` gives advisory findings a place to live that isn't "ignored."
+
+## Stale Compiled Artifacts in Containers
+
+For any compiled-language service running in a container during local dev: restarting the container does not rebuild the binary. If the build step isn't part of the restart path, the container comes back up running the *old* code with no error — the deploy silently didn't happen. State this explicitly wherever the rebuild step lives (a Makefile target, a runbook entry): `docker compose build api && docker compose up -d api`, not just `docker compose restart api`.
 
 ### Conditional Gates (Saga/Outbox Pattern)
 

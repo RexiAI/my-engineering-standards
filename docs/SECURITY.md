@@ -51,7 +51,17 @@ Support standard OAuth2 grant types:
 - String length, format, and range checks on all request parameters.
 - Never trust or propagate user-supplied data without validation.
 
+## Upstream Error Responses Must Not Reach the Client
+
+A third-party API's raw error response is not automatically safe to forward. Provider APIs (payment processors, LLM providers, any upstream service authenticated with a credential of yours) can include partial key material, account identifiers, or internal details in their error bodies — a 401 from an upstream provider might echo back a masked or partial version of the credential you sent it. This is a distinct leak path from log redaction (docs/OBSERVABILITY.md's "mask secrets in logs" rule): the risk here is forwarding the error body itself to *your own client's browser/app*, not writing it to your own logs.
+
+- Always log the full upstream error server-side (with normal secret-masking rules applied to your own logs).
+- Return a generic, static error message to the caller — never `return c.JSON(502, gin.H{"error": upstreamErr.Error()})` or equivalent passthrough.
+- This applies to any upstream call made with a credential the client doesn't already have: payment gateways, LLM providers, third-party auth, internal services called with a shared secret.
+
 ## Vulnerability Scanning
+
+*ZAP is `production`-tier — see docs/CONFORMANCE_TIERS.md. The rest of this table applies at `mvp`.*
 
 | Tool | What it scans | When |
 |---|---|---|

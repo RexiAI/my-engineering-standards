@@ -17,6 +17,7 @@ Before coding in any child repo, read the relevant docs from this submodule. The
 - Use conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`.
 - Never commit or push changes unless the user explicitly instructs it. Commits and pushes require manual confirmation.
 - In plan mode, every plan must state whether the agent should auto-commit after completing the work or wait for user confirmation.
+- Verify agent-delivered work against the live system before calling it done — a diff that compiles and a diff that works are different claims. For an API change, that means actually calling the endpoint (curl, a test client, whatever's fastest) and checking the response, not just reading the code and reasoning that it should work. Field-name mismatches, wrong status codes, and auth-header mistakes are exactly the class of bug that "looks right" in a diff and fails on the first real request.
 
 ## Language Selection
 

@@ -4,8 +4,12 @@ on:
   workflow_call:
     inputs:
       node-version:
-        description: Node.js version
+        description: Node.js version. Ignored if node-version-file is set. Kept for backward compat with consumers that don't have an .nvmrc yet.
         default: "22"
+        type: string
+      node-version-file:
+        description: Path to the file declaring the Node version (e.g. .nvmrc). Takes priority over node-version when set — new consumers should set this instead of pinning a version here.
+        default: ""
         type: string
       deploy-on-main:
         description: Publish package + push image when merging to main
@@ -46,7 +50,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ inputs.node-version }}
+          node-version: ${{ inputs.node-version-file == '' && inputs.node-version || '' }}
+          node-version-file: ${{ inputs.node-version-file }}
           cache: npm
       - run: npm ci
       - run: npm test -- --passWithNoTests 2>/dev/null || npm run test:unit --if-present || npm test
@@ -58,7 +63,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ inputs.node-version }}
+          node-version: ${{ inputs.node-version-file == '' && inputs.node-version || '' }}
+          node-version-file: ${{ inputs.node-version-file }}
           cache: npm
       - run: npm ci
       - run: npm run lint --if-present
@@ -73,7 +79,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ inputs.node-version }}
+          node-version: ${{ inputs.node-version-file == '' && inputs.node-version || '' }}
+          node-version-file: ${{ inputs.node-version-file }}
           cache: npm
       - run: npm ci
       - run: npx jest test/pact --ci --forceExit 2>/dev/null || npm run test:pact --if-present || echo "No contract tests configured"
@@ -89,7 +96,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ inputs.node-version }}
+          node-version: ${{ inputs.node-version-file == '' && inputs.node-version || '' }}
+          node-version-file: ${{ inputs.node-version-file }}
           cache: npm
       - run: npm ci
       - run: npm run test:integration --if-present
@@ -103,7 +111,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ inputs.node-version }}
+          node-version: ${{ inputs.node-version-file == '' && inputs.node-version || '' }}
+          node-version-file: ${{ inputs.node-version-file }}
           registry-url: https://npm.pkg.github.com
           cache: npm
       - run: npm ci

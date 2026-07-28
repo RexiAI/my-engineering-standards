@@ -1,5 +1,4 @@
-# NOTE: not referenced by language-specific/go/AGENTS.md's command table (no
-# `make lint` entry documents golangci-lint). Verify wiring before assuming this runs anywhere.
+# Wired via `make lint` -> golangci-lint run ./... (see docs/CI_CD.md, language-specific/go/AGENTS.md §Commands).
 version: 2
 
 linters:
@@ -22,6 +21,8 @@ linters:
     - errname
     - errorlint
     - exhaustive
+    - gochecknoglobals
+    - gochecknoinits
     - goconst
     - gocritic
     - gofmt
@@ -54,10 +55,34 @@ linters:
       min-occurrences: 3
     misspell:
       locale: US
+    gosec:
+      # Widen, don't narrow: report low-confidence findings too. The usual
+      # tuning direction for gosec is to raise this to cut noise; the
+      # opposite call is deliberate here — a missed low-confidence hit costs
+      # more than an extra false positive to triage.
+      confidence: low
 
 issues:
+  # Defaults (50 / 3) silently hide work and turn "fix lint" into an
+  # unbounded loop where the count never seems to go down. No ceiling.
+  max-issues-per-linter: 0
+  max-same-issues: 0
   exclude-rules:
     - path: _test\.go
       linters:
         - bodyclose
         - noctx
+        - errcheck
+        - gosec
+        - gochecknoglobals
+        - gochecknoinits
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    gofumpt:
+      extra-rules: true
+    goimports:
+      local-prefixes: github.com/company

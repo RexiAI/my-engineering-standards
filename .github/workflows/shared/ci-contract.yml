@@ -33,19 +33,19 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: corretto
-          java-version: "21"
+          java-version-file: .java-version
           cache: maven
       - name: Setup Go
         if: inputs.language == 'go'
         uses: actions/setup-go@v5
         with:
-          go-version: "1.26"
+          go-version-file: go.mod
           cache: true
       - name: Setup Node
         if: inputs.language == 'node'
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version-file: .nvmrc
           cache: npm
       - name: Java — Run Pact verification
         if: inputs.language == 'java'

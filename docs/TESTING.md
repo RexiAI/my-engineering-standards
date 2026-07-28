@@ -4,7 +4,7 @@ All projects must have tests. The testing strategy has three layers:
 
 | Layer       | Scope                                | Framework                                            | Speed  | Run frequency |
 | ----------- | ------------------------------------ | ---------------------------------------------------- | ------ | ------------- |
-| Unit        | Single class/function in isolation   | JUnit 5 + Mockito / Go testing + testify / Jest      | Fast   | Every commit  |
+| Unit        | Single class/function in isolation   | JUnit 5 + Mockito / Go stdlib testing / Jest         | Fast   | Every commit  |
 | Integration | With infrastructure (DB, Redis, SQS) | In-memory (H2, embedded-redis, WireMock)             | Fast   | Every commit  |
 | E2E         | Full service Dockerized + stubs      | RESTEasy / WireMock / ExtentReports / Docker compose | Slow   | Weekly (scheduled)  |
 
@@ -13,7 +13,7 @@ All projects must have tests. The testing strategy has three layers:
 - Test files mirror source package structure. One test class per production class.
 - Name tests describing the scenario and expected outcome: `shouldReturnErrorWhenUserNotFound`.
 - **Java**: Use JUnit 5 (`@ExtendWith(MockitoExtension.class)`), Mockito for mocks, AssertJ for assertions. Avoid loading Spring context in unit tests.
-- **Go**: Use `testing` package with `testify/suite`. Generate mocks via `github.com/golang/mock` with `gomockhandler.json`.
+- **Go**: Use the stdlib `testing` package as the default — it's sufficient for the large majority of tests and adds no dependency. `testify` (assertions) and `github.com/golang/mock`/`gomockhandler` (mock generation) are optional additions for projects with enough table-driven complexity or interface surface to justify them; do not add either as a default. This supersedes the previous blanket "use testify/gomock" guidance, which contradicted docs/CODING_CONVENTIONS.md §Dependencies ("prefer stdlib, justify each dependency").
 - **JS/TS**: Use Jest. Prefer React Testing Library for component tests. Use Snapshot Testing sparingly (only for stable components).
 
 ### Test Data (Builder Pattern)
@@ -94,7 +94,25 @@ const redis = new RedisMock()
 
 ## E2E Tests
 
-E2E tests run the full service in a Docker container alongside all dependencies (PostgreSQL, Redis, LocalStack, WireMock mocks). They verify real HTTP endpoints against the running service. Full E2E runs on a weekly schedule against staging, not on every PR — contract tests (Pact) cover cross-service compatibility on every PR instead. See docs/CI_CD.md §Weekly E2E Pipeline for the exact trigger.
+E2E tests run the full service in a Docker container alongside all dependencies (PostgreSQL, Redis, LocalStack, WireMock mocks). They verify real HTTP endpoints against the running service.
+
+*Conformance tier for cadence*: `mvp` projects with no staging environment and no cross-service contracts (see docs/CONFORMANCE_TIERS.md) can run E2E on every push/PR instead of weekly — there's no separate contract-test layer to cover PR-time verification, so E2E is doing double duty. `production`+ projects with contract tests covering cross-service compatibility should keep E2E on the weekly schedule against staging and let contract tests cover every PR. See docs/CI_CD.md §Weekly E2E Pipeline for the exact trigger.
+
+### One script, run by both CI and local dev
+
+Whatever orchestrates E2E — starting a database, building the binary, starting the server, running the test suite, tearing down — should be a single script that both CI and `make e2e` (or equivalent) invoke, not two copies that can silently diverge. The only difference between the CI and local invocation should be expressible as one environment variable (e.g. "CI already provides a database via a services: block, don't spawn your own container").
+
+### Readiness polling, never a fixed sleep
+
+Wait for a dependency to actually be ready — poll `pg_isready`, poll `/health`, poll the port — with a bounded retry count and an explicit failure message. A fixed `sleep N` either wastes time when the dependency is fast or produces a flaky failure when it's slow; a poll loop does neither.
+
+### Exit-status-preserving cleanup
+
+An E2E script's cleanup trap should capture the real exit status *before* doing any cleanup, dump the service logs only if that status is non-zero (a passing run doesn't need its logs printed), and re-exit with the captured status — not whatever the last cleanup command happened to return. Register the trap before starting anything that needs cleaning up, not after.
+
+### Bounded, justified flake retry
+
+If a test runner's retry setting (e.g. Playwright's `retries:`) is non-zero, the number and the reason belong in a comment next to the setting — "absorbs CPU-contention flakiness under parallel workers; a real, reproducible failure still needs two consecutive fails" is a justification, "flaky tests" is not. Retry count should be as low as still catches the class of flake it's meant for — start at 1, not 3.
 
 ### E2E Test Client (composition over inheritance)
 
@@ -198,6 +216,8 @@ void shouldCallRepositoryWithCorrectId() {
 
 ## Mutation Testing
 
+*Conformance tier: `production`. See docs/CONFORMANCE_TIERS.md.*
+
 Mutation testing validates that tests actually catch bugs by introducing small changes (mutations) to production code and verifying that at least one test fails. High line coverage alone does not guarantee useful tests — mutation coverage measures test quality.
 
 - **Java**: PiTest (`pitest-maven` plugin, profile-activated). Run with `mvn verify -Pmutation`. Target mutation coverage >= 80%. Configured in parent POM.
@@ -219,3 +239,7 @@ Mutation testing validates that tests actually catch bugs by introducing small c
 | OWASP Dependency Check        | Dependency vulnerability scan | CI (profile-activated) |
 | SonarQube                     | Overall code quality          | CI                     |
 | Talisman                      | Secret pre-commit hook        | Pre-commit             |
+
+## CI Failure Diagnostics for Agent Consumers
+
+A CI job's failure needs to be readable by whatever is fixing it. A human can open the Actions log; an AI agent driving CI fixes via an API (e.g. the GitHub MCP tools) typically can read PR comments but not raw Actions logs. When a job that isn't trivially diagnosable from its own status (e.g. E2E) fails on a PR, post a diagnostic comment — the tail of the relevant log, byte-bounded (`tail -c 6000`, not line-bounded — safe against one pathologically long line), wrapped in a collapsed `<details>` block so it doesn't dominate the PR thread. Use the workflow's own `GITHUB_TOKEN`/`github.token`, never a PAT, for the comment.

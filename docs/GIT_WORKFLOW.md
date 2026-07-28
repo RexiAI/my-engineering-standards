@@ -133,6 +133,74 @@ ADR lifecycle: Proposed → Accepted → Deprecated → Superseded
 
 ADRs are stored in the child repo at `docs/adr/` and committed alongside the code change.
 
+## Pre-commit Hooks
+
+Projects must use Talisman pre-commit hook for secret scanning:
+
+```bash
+curl https://thoughtworks.github.io/talisman/install.sh | sh
+```
+
+The `.talismanrc` file at the project root configures allowed patterns and exclusion rules.
+
+## Git Hooks: Local Enforcement
+
+### Install hooks as version-controlled files, not `.git/hooks/`
+
+Point Git at a repo-tracked hooks directory instead of the untracked, unreviewable `.git/hooks/`:
+
+```make
+# One-time per clone: wire up local git hooks (.githooks/).
+hooks-install:
+	git config core.hooksPath .githooks
+```
+
+This needs no framework (no husky, no pre-commit.com) — `core.hooksPath` is a native Git feature. Hooks under `.githooks/` are reviewed in PRs like any other code.
+
+### Split by cost: pre-commit is fast, pre-push is thorough
+
+- **pre-commit**: a stated time budget (document it in the file header, e.g. "fast checks only (~5s budget)"), staged-files-only where possible (`git diff --cached --name-only --diff-filter=ACM`, which correctly excludes deletions/renames), skip entirely when no relevant files changed.
+- **pre-push**: the full local gate — the same `make ci`/`make test` a human or CI would run, plus anything expensive (E2E) gated by whether the diff actually touches E2E-relevant paths.
+
+### Pre-push: gate on what's being pushed, not the working tree
+
+A naive pre-push hook tests the current working directory, which can differ from what's actually being pushed (uncommitted changes, files the push doesn't include) — producing a false green. Instead, check out the pushed SHA into a detached, ephemeral worktree and run the gate there:
+
+```bash
+WT_DIR=$(mktemp -d /tmp/myproject-prepush.XXXXXX)
+git worktree add --detach --quiet "$WT_DIR" "$local_sha"
+# ... run make ci / make e2e against $WT_DIR ...
+git worktree remove --force "$WT_DIR"
+```
+
+Register the cleanup as a trap *before* creating the worktree, and use `"${ARR[@]:-}"` expansion for any array under `set -u` so an empty array doesn't trigger an unbound-variable error on early exit.
+
+### Parse the real pre-push protocol correctly
+
+Git invokes pre-push with lines of `local_ref local_sha remote_ref remote_sha` on stdin — three things commonly get this wrong:
+
+```bash
+declare -A SEEN
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ "$local_sha" = "0000000000000000000000000000000000000000" ] && continue  # ref deletion, nothing to test
+  [ -n "${SEEN[$local_sha]:-}" ] && continue                                # dedup: same SHA pushed via multiple refs
+  SEEN[$local_sha]=1
+  # a new ref has no upstream history to diff against — default to running everything, not skipping it
+done
+```
+
+### Gate expensive suites on the actual diff, not unconditionally
+
+If a full suite (E2E, a slow integration layer) is too slow to run on every push, gate it on whether the diff between the remote and local SHA touches paths that could break it — and include the CI config and build file themselves in that path pattern, so changing the gate re-runs the gate:
+
+```bash
+E2E_PATH_PATTERN='^(\.github/workflows/ci\.yml|scripts/e2e-.*\.sh|cmd/server/|Makefile)'
+```
+
+### Escape hatch: an env var, not `--no-verify`
+
+Support skipping hooks via a named environment variable (`SKIP_HOOKS=1 git push`) rather than steering people toward `--no-verify`. An env var is greppable in shell history and CI logs; `--no-verify` silently disables *every* hook class (commit-msg, pre-commit, pre-push) at once, which is usually not what was intended.
+
 ## Session Hygiene
 
 ### Before Starting Work
@@ -181,13 +249,3 @@ cp .standards/templates/session-start-check.sh session-start-check.sh
 cp .standards/templates/session-end-check.sh session-end-check.sh
 chmod +x session-start-check.sh session-end-check.sh
 ```
-
-## Pre-commit Hooks
-
-Projects must use Talisman pre-commit hook for secret scanning:
-
-```bash
-curl https://thoughtworks.github.io/talisman/install.sh | sh
-```
-
-The `.talismanrc` file at the project root configures allowed patterns and exclusion rules.
