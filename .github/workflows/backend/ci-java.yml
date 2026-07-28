@@ -4,8 +4,12 @@ on:
   workflow_call:
     inputs:
       java-version:
-        description: Java version
+        description: Java version. Ignored if java-version-file is set. Kept for backward compat with consumers that don't have a .java-version yet.
         default: "21"
+        type: string
+      java-version-file:
+        description: Path to a file containing just the Java version (e.g. .java-version). setup-java has no native version-file input, so resolve-version reads it and feeds the result to every job. New consumers should set this instead of pinning a version here.
+        default: ""
         type: string
       maven-verify-goal:
         description: Maven goal for full verification
@@ -57,15 +61,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  resolve-version:
+    name: Resolve Java Version
+    runs-on: ubuntu-latest
+    outputs:
+      java-version: ${{ steps.resolve.outputs.java-version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: resolve
+        run: |
+          if [ -n "${{ inputs.java-version-file }}" ] && [ -f "${{ inputs.java-version-file }}" ]; then
+            echo "java-version=$(tr -d '[:space:]' < '${{ inputs.java-version-file }}')" >> "$GITHUB_OUTPUT"
+          else
+            echo "java-version=${{ inputs.java-version }}" >> "$GITHUB_OUTPUT"
+          fi
+
   unit-test:
     name: Unit Tests
+    needs: [resolve-version]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with:
           distribution: corretto
-          java-version: ${{ inputs.java-version }}
+          java-version: ${{ needs.resolve-version.outputs.java-version }}
           cache: maven
           server-id: github
           server-username: MAVEN_USERNAME
@@ -74,20 +94,21 @@ jobs:
 
   lint:
     name: Lint & Format Check
+    needs: [resolve-version]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with:
           distribution: corretto
-          java-version: ${{ inputs.java-version }}
+          java-version: ${{ needs.resolve-version.outputs.java-version }}
           cache: maven
       - run: mvn compile checkstyle:check -B
         continue-on-error: true
 
   contract-test:
     name: Contract Tests
-    needs: [unit-test, lint]
+    needs: [resolve-version, unit-test, lint]
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -95,7 +116,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: corretto
-          java-version: ${{ inputs.java-version }}
+          java-version: ${{ needs.resolve-version.outputs.java-version }}
           cache: maven
       - run: mvn pact:verify -B 2>/dev/null || echo "No contract tests configured"
         env:
@@ -103,7 +124,7 @@ jobs:
 
   integration-test:
     name: Integration Tests
-    needs: [contract-test]
+    needs: [resolve-version, contract-test]
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -111,13 +132,13 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: corretto
-          java-version: ${{ inputs.java-version }}
+          java-version: ${{ needs.resolve-version.outputs.java-version }}
           cache: maven
       - run: mvn ${{ inputs.maven-verify-goal }} -B -DskipITs=false -DskipTests
 
   sonar:
     name: SonarQube Analysis
-    needs: [unit-test, integration-test]
+    needs: [resolve-version, unit-test, integration-test]
     if: github.event_name == 'pull_request' && inputs.sonar-enabled && secrets.SONAR_TOKEN != ''
     runs-on: ubuntu-latest
     steps:
@@ -127,7 +148,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: corretto
-          java-version: ${{ inputs.java-version }}
+          java-version: ${{ needs.resolve-version.outputs.java-version }}
           cache: maven
       - run: mvn sonar:sonar -B -Dsonar.host.url=${{ inputs.sonar-host-url }}
         env:
@@ -135,7 +156,7 @@ jobs:
 
   deploy:
     name: Deploy to GitHub Packages
-    needs: [unit-test, lint, contract-test, integration-test]
+    needs: [resolve-version, unit-test, lint, contract-test, integration-test]
     if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch && inputs.deploy-on-main
     runs-on: ubuntu-latest
     steps:
@@ -143,7 +164,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: corretto
-          java-version: ${{ inputs.java-version }}
+          java-version: ${{ needs.resolve-version.outputs.java-version }}
           cache: maven
           server-id: github
           server-username: MAVEN_USERNAME

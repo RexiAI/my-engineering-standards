@@ -1,9 +1,12 @@
-FROM golang:1.26 AS build
+# ARG GO_VERSION lets CI or a local build pass --build-arg GO_VERSION=$(go list -m -f '{{.GoVersion}}')
+# so the image always matches go.mod instead of drifting from a hardcoded tag here.
+ARG GO_VERSION=1.26
+FROM golang:${GO_VERSION} AS build
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o /app/service ./src/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -o /app/service ./cmd/server
 
 FROM alpine:3.18
 RUN apk --no-cache add ca-certificates tzdata curl

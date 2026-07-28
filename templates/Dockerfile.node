@@ -1,12 +1,15 @@
 # NestJS backend only — for Next.js frontends see templates/Dockerfile.next
-FROM node:22-alpine AS build
+# ARG NODE_VERSION lets CI or a local build pass --build-arg NODE_VERSION=$(cat .nvmrc)
+# so the image always matches .nvmrc instead of drifting from a hardcoded tag here.
+ARG NODE_VERSION=22
+FROM node:${NODE_VERSION}-alpine AS build
 WORKDIR /app
 COPY package*.json tsconfig*.json nest-cli.json ./
 RUN npm ci
 COPY . .
 RUN npm run build && npm prune --production
 
-FROM node:22-alpine
+FROM node:${NODE_VERSION}-alpine
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 WORKDIR /app
 COPY --from=build /app/dist ./dist

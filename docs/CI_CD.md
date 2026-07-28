@@ -116,7 +116,7 @@ jobs:
   backend-ci:
     uses: RexiAI/my-engineering-standards/.github/workflows/backend/ci-go.yml@main
     with:
-      go-version: "1.26"
+      go-version-file: go.mod
       docker-registry: ghcr.io
     secrets:
       GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
@@ -125,7 +125,7 @@ jobs:
   frontend-ci:
     uses: RexiAI/my-engineering-standards/.github/workflows/frontend/ci-nextjs.yml@main
     with:
-      node-version: "22"
+      node-version-file: .nvmrc
     secrets:
       GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
 
@@ -144,6 +144,38 @@ jobs:
     with:
       target-url: https://staging.example.com
 ```
+
+## Toolchain Versions
+
+**Never hardcode a language runtime version in more than one place.** The version manifest a language's own tooling already reads (`go.mod`, `.nvmrc`, `.java-version`, `.python-version`) is the single source of truth. CI, Dockerfiles, and reusable workflow inputs all resolve from it — none of them declare a version independently.
+
+| Lang | Manifest | GitHub input | Setup action |
+|---|---|---|---|
+| Go | `go.mod` (`go` line, plus `toolchain` if pinning a specific patch) | `go-version-file: go.mod` | `actions/setup-go` reads it natively |
+| Node | `.nvmrc` | `node-version-file: .nvmrc` | `actions/setup-node` reads it natively |
+| Python | `.python-version` | `python-version-file: .python-version` | `actions/setup-python` reads it natively |
+| Java | `.java-version` (plain text, e.g. `21`) | `java-version-file: .java-version` | `actions/setup-java` has **no** native version-file input — `ci-java.yml`'s `resolve-version` job reads the file itself and feeds the resolved value to every other job via job outputs |
+
+`backend/ci-{go,node,java}.yml` and `frontend/ci-{nextjs,react,angular}.yml` all default their `<lang>-version` input to the value that was hardcoded before v1.5.0 (`"1.26"`/`"22"`/`"21"`) for consumers who haven't adopted a manifest file yet. If a consumer sets `<lang>-version-file`, that always takes priority. New consumers should always set the version-file input and skip `<lang>-version` entirely — see the composed `ci.yml` example above.
+
+Dockerfile templates (`templates/Dockerfile.{go,node,next}`) take the same version as a `ARG GO_VERSION=1.26` / `ARG NODE_VERSION=22` build-time default, overridable with `--build-arg` from the same manifest (`--build-arg GO_VERSION=$(go list -m -f '{{.GoVersion}}')`, `--build-arg NODE_VERSION=$(cat .nvmrc)`).
+
+`GOTOOLCHAIN=auto` (Go's own default since 1.21) means a Go 1.22 CI runner will silently download and run whatever version `go.mod`'s `go` or `toolchain` line declares — bumping the manifest is enough, no runner image change needed. `pyenv`/`nvm`/`asdf` behave the same way for their languages when their respective version-file is present.
+
+**Reproducibility vs. freshness are separate problems.** Pin in the manifest for reproducibility — never `GOTOOLCHAIN=latest`, never `FROM golang:latest`, both make `git bisect` and rebuilds non-deterministic. `.github/workflows/shared/ci-toolchain-bump.yml` handles freshness: a weekly reusable workflow that queries each ecosystem's official release feed (go.dev, nodejs.org, actions/python-versions), rewrites the manifest file if a newer version exists, and opens a PR so CI validates the bump before merge — the same pattern Dependabot uses for libraries, applied to the runtime itself. Wire it into a consumer with:
+
+```yaml
+# .github/workflows/toolchain-bump.yml
+on:
+  schedule:
+    - cron: '0 6 * * 1'   # weekly, Monday 06:00 UTC
+  workflow_dispatch: {}
+jobs:
+  bump:
+    uses: RexiAI/my-engineering-standards/.github/workflows/shared/ci-toolchain-bump.yml@main
+```
+
+It skips any manifest that doesn't exist in the consumer repo — safe to add even if you only use one of Go/Node/Python.
 
 ### GitLab CI: Child includes Parent (composable)
 
@@ -250,6 +282,8 @@ Steps:
 
 ## Weekly E2E Pipeline
 
+*Conformance tier: `production`. See docs/CONFORMANCE_TIERS.md — projects with no staging environment don't need this job; it has nothing to run against.*
+
 Full end-to-end tests run **every Sunday at 2am UTC**.
 
 Your project configures endpoints:
@@ -270,6 +304,8 @@ jobs:
 ```
 
 ## Contract Testing with Pact
+
+*Conformance tier: `multi-service`. See docs/CONFORMANCE_TIERS.md — contract tests verify a boundary between two independently-deployed services. A single-service project has no boundary to verify; `make test-contract` should be left undefined rather than wired to a no-op.*
 
 Contract tests run on every PR, replacing heavy E2E. They verify that service
 providers still match consumer expectations without deploying the full stack.

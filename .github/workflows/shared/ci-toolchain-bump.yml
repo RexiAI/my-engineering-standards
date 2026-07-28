@@ -1,0 +1,107 @@
+name: Toolchain Bump
+
+# Weekly freshness check for language runtime manifests (go.mod, .nvmrc,
+# .python-version). Reproducibility is pinning the manifest (see
+# docs/CI_CD.md §Toolchain Versions) — this workflow is the other half:
+# freshness via automation, the same way Dependabot handles libraries but
+# applied to the runtime itself. Zero-config: manifests that don't exist
+# in the consumer repo are skipped, not errored.
+#
+# Consumer usage (in the consumer's own .github/workflows/toolchain-bump.yml):
+#
+#   on:
+#     schedule:
+#       - cron: '0 6 * * 1'   # weekly, Monday 06:00 UTC
+#     workflow_dispatch: {}
+#   jobs:
+#     bump:
+#       uses: RexiAI/my-engineering-standards/.github/workflows/shared/ci-toolchain-bump.yml@main
+
+on:
+  workflow_call:
+    inputs:
+      base-branch:
+        description: Branch to open the bump PR against
+        default: ""
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    name: Check for newer toolchain versions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.base-branch }}
+
+      - name: Go — check go.mod
+        id: go
+        run: |
+          [ -f go.mod ] || { echo "changed=false" >> "$GITHUB_OUTPUT"; exit 0; }
+          current=$(grep -E '^go [0-9]+\.[0-9]+' go.mod | awk '{print $2}')
+          latest=$(curl -sf 'https://go.dev/dl/?mode=json' | python3 -c "import json,sys; data=json.load(sys.stdin); stable=[r['version'][2:] for r in data if r.get('stable')]; print(sorted(stable, key=lambda v: [int(x) for x in v.split('.')])[-1] if stable else '')")
+          echo "current=$current latest=$latest"
+          if [ -n "$latest" ] && [ "$current" != "$latest" ]; then
+            sed -i -E "s/^go [0-9]+\.[0-9]+.*/go ${latest%.*}/" go.mod
+            if grep -qE '^toolchain go' go.mod; then
+              sed -i -E "s/^toolchain go[0-9.]+/toolchain go${latest}/" go.mod
+            fi
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "summary=Go ${current} -> ${latest%.*} (toolchain go${latest})" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Node — check .nvmrc
+        id: node
+        run: |
+          [ -f .nvmrc ] || { echo "changed=false" >> "$GITHUB_OUTPUT"; exit 0; }
+          current=$(tr -d '[:space:]v' < .nvmrc)
+          latest=$(curl -sf 'https://nodejs.org/dist/index.json' | python3 -c "import json,sys; data=json.load(sys.stdin); lts=[r['version'][1:].split('.')[0] for r in data if r.get('lts')]; print(lts[0] if lts else '')")
+          echo "current=$current latest=$latest"
+          if [ -n "$latest" ] && [ "$current" != "$latest" ]; then
+            echo "$latest" > .nvmrc
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "summary=Node ${current} -> ${latest} (latest LTS)" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Python — check .python-version
+        id: python
+        run: |
+          [ -f .python-version ] || { echo "changed=false" >> "$GITHUB_OUTPUT"; exit 0; }
+          current=$(tr -d '[:space:]' < .python-version)
+          latest=$(curl -sf 'https://raw.githubusercontent.com/actions/python-versions/main/versions-manifest.json' | python3 -c "import json,sys; data=json.load(sys.stdin); stable=[r['version'] for r in data if r.get('stable')]; print(stable[0] if stable else '')")
+          echo "current=$current latest=$latest"
+          if [ -n "$latest" ] && [ "$current" != "$latest" ]; then
+            echo "$latest" > .python-version
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "summary=Python ${current} -> ${latest}" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open PR if any manifest changed
+        if: steps.go.outputs.changed == 'true' || steps.node.outputs.changed == 'true' || steps.python.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "chore: bump toolchain versions"
+          title: "chore: bump toolchain versions"
+          body: |
+            Automated weekly toolchain freshness check.
+
+            - ${{ steps.go.outputs.summary }}
+            - ${{ steps.node.outputs.summary }}
+            - ${{ steps.python.outputs.summary }}
+
+            Reproducibility is unaffected — the manifest is still the single
+            pinned source of truth (docs/CI_CD.md §Toolchain Versions), this
+            just moves the pin forward. CI on this PR validates the bump
+            before merge, same as any other change.
+          branch: chore/toolchain-bump
+          delete-branch: true

@@ -4,8 +4,12 @@ on:
   workflow_call:
     inputs:
       go-version:
-        description: Go version
-        default: "1.26"
+        description: Go version. Leave empty (default) to resolve from go-version-file instead.
+        default: ""
+        type: string
+      go-version-file:
+        description: Path to the file declaring the Go version. Ignored if go-version is set. Every Go module has a go.mod, so this is safe to default on.
+        default: "go.mod"
         type: string
       deploy-on-main:
         description: Build & push image when merging to main
@@ -44,6 +48,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ inputs.go-version }}
+          go-version-file: ${{ inputs.go-version-file }}
           cache: true
       - run: make test
 
@@ -55,6 +60,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ inputs.go-version }}
+          go-version-file: ${{ inputs.go-version-file }}
           cache: true
       - run: make lint
 
@@ -68,6 +74,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ inputs.go-version }}
+          go-version-file: ${{ inputs.go-version-file }}
           cache: true
       - run: make test-contract 2>/dev/null || echo "No contract tests configured"
         env:
@@ -83,6 +90,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ inputs.go-version }}
+          go-version-file: ${{ inputs.go-version-file }}
           cache: true
       - run: make test-integration
 
@@ -96,6 +104,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ inputs.go-version }}
+          go-version-file: ${{ inputs.go-version-file }}
           cache: true
       - run: make build
       - uses: actions/upload-artifact@v4
