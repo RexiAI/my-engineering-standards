@@ -15,14 +15,39 @@ stage 0. You review once, after stage 1. Everything after that runs to a draft P
 | 0 | Informal spec | — (you) | Write `specs/NNN-slug/00-informal.md` in your own words |
 | 1 | Specifier | `spec-specifier` | Nothing yet — review the output |
 | — | **Human gate** | — | Read `10-tasks.md` + `20-acceptance/`. Fix or approve. |
+| 1.5 | UX | `spec-ux` | Nothing — produces `15-ux.md`, the frontend design contract |
 | 2 | Coder | `spec-coder` | Nothing — runs to green tests |
 | 3 | Refactorer | `spec-refactorer` | Nothing — runs to clean structure |
 | 4 | Verifier | `spec-verifier` | Nothing — independently re-checks stages 2-3 |
 | 5 | Architect | `spec-architect` | Nothing — runs to mutation-clean, only if Verifier passed |
 | — | Output | — | Review the draft PR |
 
-Two commands drive it: `/spec` runs stage 1 and stops. `/build` runs stages 2-5 and
-opens the PR.
+Two commands drive it: `/spec` runs stage 1 and stops. `/build` runs stages 1.5-5
+and opens the PR.
+
+## Why a UX stage
+
+Frontend taste decided after the code is written is a guess dressed up as a design
+— every component upstream already committed to a shape. The UX stage (`spec-ux`,
+using the locally-installed `hallmark` skill) decides macrostructure, tokens, and
+motion **before** the Coder touches a component, and writes the decision down as
+`15-ux.md` so the Coder implements against a contract instead of improvising. It
+produces a design spec only — no components, no CSS, no commit — because
+implementation stays the Coder's job; splitting "what it should look like" from
+"how it's built" keeps the same single-responsibility shape as the rest of the
+pipeline. It is also the pipeline's one sanctioned reader of `00-informal.md` on the
+build side: design needs the loose audience/tone context the code-side agents are
+deliberately denied. Runs at every conformance tier — it's cheap and the contract is
+useful even at `mvp`.
+
+## Advisory design review
+
+The Verifier's stage-4 check is deliberately mechanical — exit codes and greps, not
+opinion — because a weak, subjective Verifier is worse than none (see below). So the
+anti-slop check it runs against `15-ux.md` (via `hallmark audit`) is advisory only:
+it appends a punch list to `25-verification.md` for the human PR reviewer, but it
+never flips the PASS/FAIL verdict. Only the objective checks (traceability, tests,
+complexity) can fail the pipeline.
 
 ## Why a separate Verifier stage
 
@@ -51,6 +76,7 @@ specs/NNN-slug/
   10-tasks.md           specifier: numbered tasks, acceptance criteria
   20-acceptance/
     AC-NNN-name.md      specifier: Given/When/Then scenarios, one file per task
+  15-ux.md              ux: locked frontend design contract (hallmark-derived)
   25-verification.md    verifier: independent re-check results, PASS/FAIL verdict
   30-report.md          architect: mutation score, complexity, gate results
 ```
@@ -100,6 +126,12 @@ only from `10-tasks.md` and `20-acceptance/`.
 | `spec-refactorer` | `specs/**` (all) | No knowledge of requirements — judges structure only |
 | `spec-verifier` | `specs/*/00-informal.md` | Verifies against tasks + scenarios, same discipline as the Coder |
 | `spec-architect` | `specs/*/00-informal.md` | Kills mutants from tests + scenarios only |
+
+`spec-ux` is the one documented exception: it reads `00-informal.md` on purpose,
+because design decisions need the audience/use-case/tone context the code-side
+agents are deliberately denied. Its own output (`15-ux.md`) crosses back over the
+barrier cleanly — the Coder may read it without being able to infer anything about
+the original prose it was derived from beyond what `15-ux.md` states explicitly.
 
 **This is a documented convention in each agent's frontmatter (`permission.read`
 deny patterns), not a proven hard wall.** Live-fire testing against this exact
@@ -155,6 +187,7 @@ instead of being all-or-nothing:
 | Stage | `mvp` | `production` | `multi-service` |
 |---|---|---|---|
 | Specifier | yes | yes | yes |
+| UX design (`15-ux.md`) | yes | yes | yes |
 | Coder | yes | yes | yes |
 | Refactorer — complexity + duplication | yes | yes | yes |
 | Refactorer — property tests | skip | yes | yes |
@@ -186,6 +219,7 @@ If you want per-stage differentiation, set it in your own `opencode.json`:
 {
   "agent": {
     "spec-specifier":  { "model": "your-provider/strong-model" },
+    "spec-ux":         { "model": "your-provider/strong-model" },
     "spec-verifier":   { "model": "your-provider/strong-model" },
     "spec-architect":  { "model": "your-provider/strong-model" },
     "spec-coder":      { "model": "your-provider/fast-model" },

@@ -47,6 +47,11 @@ the failure mode this constraint exists to prevent.
 
 Move to the next task only when the current task's full test suite is green.
 
+If `specs/NNN-slug/15-ux.md` exists, it is the frontend design contract from the UX
+stage — implement UI to its macrostructure, tokens, archetypes, and constraints. It
+does not lift the `00-informal.md` barrier; you still reason only from
+`10-tasks.md`, `20-acceptance/`, and `15-ux.md`.
+
 # Constraints
 
 - Do not touch `specs/**` — that's the Specifier's and Architect's territory.

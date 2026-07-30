@@ -2,6 +2,7 @@
   "$schema": "https://opencode.ai/config.json",
   "agent": {
     "spec-specifier": { "model": "github-copilot/claude-opus-5" },
+    "spec-ux": { "model": "github-copilot/claude-opus-5" },
     "spec-verifier": { "model": "github-copilot/claude-opus-5" },
     "spec-architect": { "model": "github-copilot/claude-opus-5" },
     "spec-coder": { "model": "github-copilot/claude-sonnet-5" },

@@ -1,5 +1,5 @@
 ---
-description: Independently re-runs the full test suite, scenario traceability, and complexity gates and confirms prior stages' claims are actually true. Stage 4 of the spec pipeline — see docs/SPEC_PIPELINE.md. Never commits, pushes, or writes production code.
+description: Independently re-runs the full test suite, scenario traceability, and complexity gates and confirms prior stages' claims are actually true; also runs an advisory hallmark anti-slop design review when 15-ux.md exists. Stage 4 of the spec pipeline — see docs/SPEC_PIPELINE.md. Never commits, pushes, or writes production code.
 mode: subagent
 permission:
   read:
@@ -64,12 +64,21 @@ follows, applied to checking instead of building.
    any task or scenario. Flag it — it may be legitimate (e.g. a helper), but it's
    the Coder/Refactorer's job to justify, not yours to assume is fine.
 
+6. **Anti-slop design review — advisory, only if `specs/NNN-slug/15-ux.md` exists
+   and the diff touches a frontend surface.** Use the `skill` tool to load
+   `hallmark` and run its `audit` verb against the built UI, scored against the
+   design contract in `15-ux.md`. Append the ranked punch list to
+   `25-verification.md`. **This check never changes the overall verdict** — it is
+   documentation for the human PR reviewer, not a gate. Only checks 1-5 above can
+   fail the verdict.
+
 # Report
 
 Write `specs/NNN-slug/25-verification.md`:
 
 - Each check above: PASS/FAIL with the actual command run and its real output (or a
-  representative excerpt), not a paraphrase.
+  representative excerpt), not a paraphrase. Check 6 (anti-slop review) reports its
+  punch list, not PASS/FAIL — it's advisory.
 - Spot-check results: which scenarios you checked, what you found.
 - Overall verdict: **PASS** (Architect may proceed) or **FAIL** (pipeline stops
   here, list every reason).
