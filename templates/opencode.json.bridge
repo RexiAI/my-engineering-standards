@@ -12,6 +12,7 @@
     ".standards/docs/SECURITY.md",
     ".standards/docs/CODING_CONVENTIONS.md",
     ".standards/docs/GIT_WORKFLOW.md",
+    ".standards/docs/SPEC_PIPELINE.md",
     ".standards/language-specific/java/",
     ".standards/language-specific/go/",
     ".standards/language-specific/javascript/"

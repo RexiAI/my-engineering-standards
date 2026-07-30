@@ -8,7 +8,7 @@ DOCS := AGENTS.md README.md \
   docs/IDEMPOTENCY.md docs/MESSAGE_DELIVERY.md docs/OBSERVABILITY.md \
   docs/OUTBOX_PATTERN.md docs/RESILIENCE.md docs/SAGA_PATTERN.md \
   docs/SCALABILITY.md docs/SCHEMA_EVOLUTION.md docs/SECURITY.md \
-  docs/STREAM_PROCESSING.md docs/TESTING.md
+  docs/STREAM_PROCESSING.md docs/TESTING.md docs/SPEC_PIPELINE.md
 
 LANG_AGENTS := language-specific/java/AGENTS.md \
   language-specific/go/AGENTS.md \
@@ -58,7 +58,7 @@ validate-docs:
 validate-refs:
 	@echo "Checking all docs/ cross-refs exist..."
 	@errors=0; \
-	for src in $$(find . -name '*.md' -not -path './.git/*'); do \
+	for src in $$(find . -name '*.md' -not -path './.git/*' -not -path '*/node_modules/*'); do \
 		for ref in $$(grep -oP 'docs/[A-Z_]+\.md' "$$src" 2>/dev/null || true); do \
 			if [ ! -f "$$ref" ]; then \
 				echo "  [BROKEN] $$src -> $$ref"; errors=$$((errors + 1)); \

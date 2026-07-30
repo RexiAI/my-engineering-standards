@@ -1,12 +1,20 @@
 # Testing Standards
 
-All projects must have tests. The testing strategy has three layers:
+All projects must have tests. The testing strategy has four layers:
 
 | Layer       | Scope                                | Framework                                            | Speed  | Run frequency |
 | ----------- | ------------------------------------ | ---------------------------------------------------- | ------ | ------------- |
 | Unit        | Single class/function in isolation   | JUnit 5 + Mockito / Go stdlib testing / Jest         | Fast   | Every commit  |
+| Acceptance  | One task's behavior, end to end within the unit boundary | Same frameworks as Unit, named to a scenario ID (see docs/SPEC_PIPELINE.md) | Fast   | Every commit  |
 | Integration | With infrastructure (DB, Redis, SQS) | In-memory (H2, embedded-redis, WireMock)             | Fast   | Every commit  |
 | E2E         | Full service Dockerized + stubs      | RESTEasy / WireMock / ExtentReports / Docker compose | Slow   | Weekly (scheduled)  |
+
+Acceptance tests are produced by the spec pipeline's Coder stage from
+`specs/*/20-acceptance/*.md` scenarios — see `docs/SPEC_PIPELINE.md` for the full
+flow. They are ordinary tests in the same framework as unit tests, distinguished
+only by naming (the scenario ID) and by preceding implementation rather than
+following it.
+
 
 ## Unit Tests
 
@@ -214,15 +222,32 @@ void shouldCallRepositoryWithCorrectId() {
 - Prefer real implementations for pure domain logic (no mocks needed)
 - Use contract tests (Pact) to verify service boundary expectations (see `docs/CONTRACT_TESTING.md`)
 
+## Property Testing
+
+*Conformance tier: `production`. See docs/CONFORMANCE_TIERS.md.*
+
+Property tests assert an invariant holds across many generated inputs, instead of
+one hand-picked example. Use them for invariants that unit tests already cover with
+specific values but that benefit from broader input coverage — "the result is never
+negative", "applying an operation twice is idempotent" — not for arbitrary
+properties disconnected from the spec's acceptance criteria.
+
+- **Java**: jqwik.
+- **Go**: stdlib `testing/quick` — no new dependency, consistent with this repo's
+  "prefer stdlib, justify each dependency" rule. Generates simple types (ints,
+  strings, slices) well; reach for `pgregory.net/rapid` only if a project's domain
+  types need custom generators `testing/quick` can't express.
+- **JS/TS**: fast-check.
+
 ## Mutation Testing
 
 *Conformance tier: `production`. See docs/CONFORMANCE_TIERS.md.*
 
 Mutation testing validates that tests actually catch bugs by introducing small changes (mutations) to production code and verifying that at least one test fails. High line coverage alone does not guarantee useful tests — mutation coverage measures test quality.
 
-- **Java**: PiTest (`pitest-maven` plugin, profile-activated). Run with `mvn verify -Pmutation`. Target mutation coverage >= 80%. Configured in parent POM.
-- **Go**: `go-mutesting` or manual mutation analysis on critical paths.
-- **JS/TS**: Stryker Mutator for JavaScript/TypeScript projects. Run with `npx stryker run`.
+- **Java**: PiTest (`pitest-maven` plugin, profile-activated). Run with `mvn verify -Pmutation`. Target mutation coverage >= 80%. No shared parent POM exists in this repo to pin this centrally — copy `ci/templates/pitest-profile.xml` into each project.
+- **Go**: Gremlins (`gremlins unleash`), actively maintained and coverage-aware. See `ci/templates/mutation.mk`. `go-mutesting` was considered and rejected — fewer mutators, unmaintained.
+- **JS/TS**: Stryker Mutator for JavaScript/TypeScript projects. Run with `npx stryker run`. See `ci/templates/stryker.conf.json`.
 - Run mutation tests periodically (not every commit — too slow). Run before major releases and when adding tests to ensure they are effective.
 
 ## Static Analysis

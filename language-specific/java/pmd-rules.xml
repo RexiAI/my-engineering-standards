@@ -8,6 +8,7 @@
   <rule ref="category/java/bestpractices.xml">
     <exclude name="GuardLogStatement"/>
     <exclude name="AvoidReassigningParameters"/>
+    <exclude name="UnusedAssignment"/>
   </rule>
 
   <rule ref="category/java/codestyle.xml">
@@ -19,7 +20,6 @@
     <exclude name="ShortVariable"/>
     <exclude name="ShortClassName"/>
     <exclude name="CommentDefaultAccessModifier"/>
-    <exclude name="DefaultPackage"/>
     <exclude name="LinguisticNaming"/>
     <exclude name="FieldNamingConventions"/>
     <exclude name="ClassNamingConventions"/>
@@ -35,11 +35,27 @@
     <exclude name="TooManyMethods"/>
     <exclude name="ExcessiveImports"/>
     <exclude name="LoosePackageCoupling"/>
+    <exclude name="CyclomaticComplexity"/>
+    <exclude name="CognitiveComplexity"/>
   </rule>
 
+  <!-- Overridden with a lower threshold than PMD's default (see docs/CODING_CONVENTIONS.md,
+       docs/SPEC_PIPELINE.md §Tooling by language — Refactorer stage targets <=6). -->
+  <rule ref="category/java/design.xml/CyclomaticComplexity">
+    <properties>
+      <property name="methodReportLevel" value="6"/>
+      <property name="classReportLevel" value="50"/>
+    </properties>
+  </rule>
+  <rule ref="category/java/design.xml/CognitiveComplexity">
+    <properties>
+      <property name="reportLevel" value="6"/>
+    </properties>
+  </rule>
+
+
   <rule ref="category/java/errorprone.xml">
-    <exclude name="DataflowAnomalyAnalysis"/>
-    <exclude name="BeanMembersShouldSerialize"/>
+    <exclude name="NonSerializableClass"/>
     <exclude name="MissingSerialVersionUID"/>
     <exclude name="AvoidFieldNameMatchingMethodName"/>
     <exclude name="AvoidLiteralsInIfCondition"/>

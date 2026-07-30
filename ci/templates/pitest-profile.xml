@@ -1,0 +1,61 @@
+<!--
+    Add to the child project's pom.xml as a build profile. Activated only via
+    -Pmutation, never on the default build (mutation runs are slow — see
+    docs/TESTING.md §Mutation Testing).
+
+    Usage: mvn verify -Pmutation
+    Target: mutation coverage >= 80% (docs/CONFORMANCE_TIERS.md: production tier)
+
+    There is no shared parent POM in this repo to pin this centrally — copy this
+    profile into each Java project that declares tier >= production.
+-->
+<profile>
+    <id>mutation</id>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.pitest</groupId>
+                <artifactId>pitest-maven</artifactId>
+                <version>1.17.4</version>
+                <dependencies>
+                    <!-- Required for JUnit 5 — pitest-maven does not detect JUnit 5
+                         tests without it (JUnit 4 works without this dependency). -->
+                    <dependency>
+                        <groupId>org.pitest</groupId>
+                        <artifactId>pitest-junit5-plugin</artifactId>
+                        <version>1.2.1</version>
+                    </dependency>
+                </dependencies>
+                <configuration>
+                    <mutationThreshold>80</mutationThreshold>
+                    <targetClasses>
+                        <param>${project.groupId}.${project.artifactId}.*</param>
+                    </targetClasses>
+                    <targetTests>
+                        <param>${project.groupId}.${project.artifactId}.*</param>
+                    </targetTests>
+                    <excludedTestClasses>
+                        <!-- Property tests and integration tests are slow and don't
+                             need mutation coverage of their own generators/fixtures. -->
+                        <param>*PropertyTest</param>
+                        <param>*IntegrationTest</param>
+                    </excludedTestClasses>
+                    <outputFormats>
+                        <param>HTML</param>
+                        <param>XML</param>
+                    </outputFormats>
+                    <timestampedReports>false</timestampedReports>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>pitest-mutation-coverage</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>mutationCoverage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</profile>

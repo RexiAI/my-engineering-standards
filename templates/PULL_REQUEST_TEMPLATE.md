@@ -19,5 +19,6 @@
 - [ ] Documentation updated (if applicable)
 - [ ] Submodule pointers updated (if applicable)
 - [ ] Saga/Outbox CI gates pass (if applicable)
+- [ ] Scenario traceability + mutation score pass (if produced via spec pipeline — see docs/SPEC_PIPELINE.md)
 - [ ] ADR added/updated for architectural changes (if applicable)
 - [ ] session-end-check.sh run clean before requesting review

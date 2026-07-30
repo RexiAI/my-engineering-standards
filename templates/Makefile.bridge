@@ -41,6 +41,29 @@ init-ai:
 		echo "  [SKIP] opencode.json already exists"; \
 	fi
 
+	# Symlink OKF (Operational Knowledge Framework)
+	@if [ ! -d "okf" ]; then \
+		ln -sf .standards/okf okf; \
+		echo "  [SYMLINK] .standards/okf -> okf"; \
+	else \
+		echo "  [SKIP] okf/ already exists"; \
+	fi
+
+	# Symlink spec pipeline agents + commands (see docs/SPEC_PIPELINE.md)
+	@mkdir -p .opencode
+	@if [ ! -e ".opencode/agent" ]; then \
+		ln -sf ../.standards/agent .opencode/agent; \
+		echo "  [SYMLINK] .standards/agent -> .opencode/agent"; \
+	else \
+		echo "  [SKIP] .opencode/agent already exists"; \
+	fi
+	@if [ ! -e ".opencode/command" ]; then \
+		ln -sf ../.standards/command .opencode/command; \
+		echo "  [SYMLINK] .standards/command -> .opencode/command"; \
+	else \
+		echo "  [SKIP] .opencode/command already exists"; \
+	fi
+
 	# Copy language-specific configs if project type is detected
 	@if [ -f "pom.xml" ]; then \
 		echo "  [JAVA] Detected Maven project"; \

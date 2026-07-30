@@ -13,9 +13,9 @@ Before coding in any child repo, read the relevant docs from this submodule. The
 - Every service must expose health endpoints (`/health`) that check all external dependencies.
 - Log at boundaries of every service method. Use structured logging with trace IDs.
 - Never commit secrets, credentials, or tokens. For small projects `.env` files are fine (always in `.gitignore`). For production, use a secrets manager.
-- Write tests in three layers: unit (pure logic), integration (with infrastructure), e2e (Docker compose, real endpoints). Use mutation testing to validate test quality.
+- Write tests in layers: unit, acceptance, integration, e2e — see `docs/TESTING.md`. Use mutation testing to validate test quality (`production` tier, see `docs/CONFORMANCE_TIERS.md`).
 - Use conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`.
-- Never commit or push changes unless the user explicitly instructs it. Commits and pushes require manual confirmation.
+- Never commit or push changes unless the user explicitly instructs it. Commits and pushes require manual confirmation. **Exception**: the spec pipeline's Architect stage (`agent/architect.md`) may commit, push, and open a draft PR unattended, but only on a `spec/NNN-slug` branch and only after every configured quality gate is green — see `docs/SPEC_PIPELINE.md §Commit and push carve-out`. No other agent or workflow gets this exception.
 - In plan mode, every plan must state whether the agent should auto-commit after completing the work or wait for user confirmation.
 - Verify agent-delivered work against the live system before calling it done — a diff that compiles and a diff that works are different claims. For an API change, that means actually calling the endpoint (curl, a test client, whatever's fastest) and checking the response, not just reading the code and reasoning that it should work. Field-name mismatches, wrong status codes, and auth-header mistakes are exactly the class of bug that "looks right" in a diff and fails on the first real request.
 
@@ -35,6 +35,7 @@ This project structure supports Java, Go, and JavaScript/TypeScript. Before writ
 - Read `docs/SAGA_PATTERN.md` and `docs/OUTBOX_PATTERN.md` before designing cross-service workflows.
 - Read `docs/SCHEMA_EVOLUTION.md` before designing data models or APIs.
 - Read `docs/CONTRACT_TESTING.md` before writing service integration tests.
+- Read `docs/SPEC_PIPELINE.md` before running `/spec` or `/build`, or before writing an informal spec under `specs/`.
 
 ## CI/CD Quality Gates (Saga & Outbox)
 

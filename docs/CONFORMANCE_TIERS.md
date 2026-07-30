@@ -29,7 +29,8 @@ Rules not listed here are `mvp` — the floor, not an exception.
 | Rule | Tier | Where |
 |---|---|---|
 | Pact contract testing on every PR | `multi-service` | docs/CONTRACT_TESTING.md, docs/CI_CD.md §Contract Testing with Pact |
-| Mutation testing (PiTest / go-mutesting / Stryker) | `production` | docs/TESTING.md §Mutation Testing |
+| Mutation testing (PiTest / Gremlins / Stryker) | `production` | docs/TESTING.md §Mutation Testing |
+| Property testing (jqwik / testing/quick / fast-check) | `production` | docs/TESTING.md §Property Testing |
 | ZAP DAST scan | `production` | docs/SECURITY.md §Vulnerability Scanning |
 | Weekly E2E against a staging environment | `production` | docs/CI_CD.md §Weekly E2E Pipeline, docs/DEPLOYMENT.md |
 | SonarQube/SonarCloud quality gate | `production` | docs/CI_CD.md, docs/DEPLOYMENT.md §Quality Gates |

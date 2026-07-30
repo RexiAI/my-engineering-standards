@@ -46,6 +46,8 @@ module.exports = [
       'no-var': 'error',
       eqeqeq: ['error', 'always'],
       curly: ['error', 'all'],
+      // Refactorer stage target: <=6, see docs/SPEC_PIPELINE.md §Tooling by language.
+      complexity: ['error', 6],
 
       ...react.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,

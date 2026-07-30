@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.6.0] — 2026-07-29
+
+### Added
+
+- **Spec Pipeline** (`docs/SPEC_PIPELINE.md`) — a five-stage pipeline (Specifier, Coder, Refactorer, Architect, plus you writing stage 0) that turns an informal spec into a mutation-tested, gated draft PR, based on Robert C. Martin's agent-pipeline description. Adapted to this repo's languages: no Cucumber/Gherkin runner (structured markdown scenarios with `AC-NNN-NN` IDs instead — zero new dependencies, consistent with this repo's "prefer stdlib, justify each dependency" rule), no scenario-mutation harness (a traceability gate script instead — no such tooling exists for Java/Go/JS/TS). Runs fewer stages at lower conformance tiers instead of being all-or-nothing.
+- **`agent/{pipeline,specifier,coder,refactorer,architect}.md`** — the pipeline's agents. The Coder and Architect cannot read `specs/*/00-informal.md`, and the Refactorer cannot read any of `specs/**`, enforced via `permission.read` deny rules (tool-level, not a prompt instruction) — the pipeline's core discipline that a Coder must reason from formalized tasks and scenarios, not fill ambiguity from your original loose prose.
+- **`command/{spec,build}.md`** — `/spec` runs the Specifier and stops for human review (the pipeline's one designed interruption); `/build` runs Coder → Refactorer → Architect to a draft PR.
+- **`scripts/check-scenario-traceability.sh`** — every acceptance scenario ID must be cited by a test, every test's cited ID must resolve to a real scenario. Catches an orphaned or never-implemented scenario without needing a scenario-mutation harness.
+- **`ci/templates/pitest-profile.xml`**, **`ci/templates/stryker.conf.json`**, **`ci/templates/mutation.mk`** — mutation testing configs `docs/TESTING.md` had referenced since 1.0.0 but never actually shipped (it claimed PiTest was "configured in parent POM" — no parent POM exists in this repo). Go mutation testing now targets Gremlins, not `go-mutesting` — actively maintained and coverage-aware where `go-mutesting` is neither.
+- **`docs/TESTING.md §Property Testing`** — jqwik (Java), stdlib `testing/quick` (Go, zero new dependency), fast-check (JS/TS). Tiered `production`, consumed by the Refactorer stage.
+- **Cyclomatic complexity gate, ≤6** — PMD `CyclomaticComplexity`/`CognitiveComplexity` (Java), golangci `cyclop`/`gocognit` (Go), ESLint `complexity` (JS/TS), exempted for test files where table-driven tests legitimately run higher. Stated in `docs/CODING_CONVENTIONS.md`, consumed by the Refactorer stage.
+- **Commit/push carve-out for pipeline agents** (`AGENTS.md`) — the Architect stage may commit, push, and open a draft PR unattended, narrowly scoped to a `spec/NNN-slug` branch and only after every configured gate is green. No other agent gets this exception.
+- Testing's three-layer table becomes four: an **Acceptance** layer sits between Unit and Integration — the tests the Coder stage produces from acceptance scenarios, in the project's existing test framework, no new runtime.
+
+### Changed
+
+- `scripts/bootstrap.sh` now symlinks `.opencode/agent` and `.opencode/command` to this repo's `agent/` and `command/`, alongside the existing `AGENTS.md` and `okf/` symlinks — the pipeline ships to every child repo on submodule update, no per-repo setup.
+- `templates/Makefile.bridge`'s `init-ai` target — the manual, non-`bootstrap.sh` setup path — updated to match: now also symlinks `okf/`, `.opencode/agent`, and `.opencode/command`. Found via `docs/SPEC_PIPELINE.md` live-fire testing that the two setup paths had drifted; both now deliver the same result.
+- `templates/opencode.json.bridge` adds `docs/SPEC_PIPELINE.md` to `instructions`.
+- `docs/CONFORMANCE_TIERS.md` gains a Property Testing row; the Mutation Testing row's tool list updated from `go-mutesting` to `Gremlins`.
+- `templates/PULL_REQUEST_TEMPLATE.md` gains a checklist row for scenario traceability + mutation score, conditioned on the change having gone through the spec pipeline.
+
+### Fixed
+
+- **`typecheck` removed from `language-specific/go/golangci.yml`'s enabled linters** — invalid in golangci-lint v2 ("not a linter, cannot be enabled"), found via this release's live-fire testing (`docs/SPEC_PIPELINE.md` requires running the pipeline against a real repo, not just validating the diff). A larger pre-existing issue was also found and left for separate follow-up: `gofmt`/`gci`/`goimports` under `linters.enable` and the `gosimple`/`stylecheck` merge into `staticcheck` are both stale v2 migration gaps in the same file — see the comment left at the top of `golangci.yml`.
+- **`ci/templates/stryker.conf.json` stripped of `//` comments** — `.json` is not JSONC; a real `npx stryker run` against the file as shipped failed with `SyntaxError: Unexpected token '/'` before running a single mutant. Usage/target guidance was already duplicated in `docs/TESTING.md`, so nothing was lost by removing the header block. Found and confirmed via live-fire testing (real `@stryker-mutator/core` install, not a syntax read).
+- **`ci/templates/pitest-profile.xml` missing `pitest-junit5-plugin` dependency** — a real `mvn verify -Pmutation` against the file as shipped failed with `"Pitest could not run any tests"` (PIT does not detect JUnit 5 tests without this plugin; JUnit 4 works without it). Added the dependency (`org.pitest:pitest-junit5-plugin:1.2.1`) under the `pitest-maven` plugin's `<dependencies>`. Re-verified: real mutants generated, killed, and threshold correctly enforced (build fails below 80%, passes at/above it).
+- **`language-specific/java/pmd-rules.xml` — three dead exclude patterns** — `DefaultPackage` (duplicate of the already-excluded `CommentDefaultAccessModifier`, removed), `BeanMembersShouldSerialize` → renamed `NonSerializableClass`, `DataflowAnomalyAnalysis` → renamed `UnusedAssignment` (moved category: `bestpractices`, not `errorprone`). All three were silently no-ops under real PMD 7.9.0 (`[WARN] Exclude pattern ... did not match any rule`) — found by running the shared ruleset with the actual `pmd` CLI, not by reading the XML.
+
 ## [1.5.0] — 2026-07-28
 
 ### Added

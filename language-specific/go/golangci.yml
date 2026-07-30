@@ -1,4 +1,15 @@
 # Wired via `make lint` -> golangci-lint run ./... (see docs/CI_CD.md, language-specific/go/AGENTS.md §Commands).
+#
+# KNOWN ISSUE (found via docs/SPEC_PIPELINE.md live-fire testing, not yet fixed):
+# this file has not been fully migrated to golangci-lint v2 linter names. Verified
+# broken as of golangci-lint 2.12.2:
+#   - gofmt/gci/goimports under linters.enable — v2 moved these to formatters-only,
+#     `gofmt` in linters.enable errors ("gofmt is a formatter"); gci/goimports
+#     status unverified past that point.
+#   - gosimple/stylecheck — merged into staticcheck in v2, "unknown linters" error.
+# `typecheck` (also invalid in v2, "not a linter") has been removed below as part
+# of adding the cyclop/gocognit complexity gate. The rest is a separate, larger
+# migration — track and fix independently of docs/SPEC_PIPELINE.md.
 version: 2
 
 linters:
@@ -8,12 +19,12 @@ linters:
     - govet
     - ineffassign
     - staticcheck
-    - typecheck
     - unused
     - asciicheck
     - bodyclose
     - containedctx
     - contextcheck
+    - cyclop
     - decorder
     - dupl
     - durationcheck
@@ -24,6 +35,7 @@ linters:
     - gochecknoglobals
     - gochecknoinits
     - goconst
+    - gocognit
     - gocritic
     - gofmt
     - gci
@@ -53,6 +65,11 @@ linters:
     goconst:
       min-len: 3
       min-occurrences: 3
+    # Refactorer stage target: <=6, see docs/SPEC_PIPELINE.md §Tooling by language.
+    cyclop:
+      max-complexity: 6
+    gocognit:
+      min-complexity: 6
     misspell:
       locale: US
     gosec:
@@ -76,6 +93,8 @@ issues:
         - gosec
         - gochecknoglobals
         - gochecknoinits
+        - cyclop
+        - gocognit
 
 formatters:
   enable:

@@ -42,6 +42,21 @@ else
     echo "[SKIP] okf/ already exists"
 fi
 
+# 3b. Symlink spec pipeline agents + commands (see docs/SPEC_PIPELINE.md)
+mkdir -p "$REPO_ROOT/.opencode"
+if [ ! -e "$REPO_ROOT/.opencode/agent" ]; then
+    ln -sf ../.standards/agent "$REPO_ROOT/.opencode/agent"
+    echo "[SYMLINK] .standards/agent -> .opencode/agent"
+else
+    echo "[SKIP] .opencode/agent already exists"
+fi
+if [ ! -e "$REPO_ROOT/.opencode/command" ]; then
+    ln -sf ../.standards/command "$REPO_ROOT/.opencode/command"
+    echo "[SYMLINK] .standards/command -> .opencode/command"
+else
+    echo "[SKIP] .opencode/command already exists"
+fi
+
 # 4. Copy PR template
 mkdir -p "$REPO_ROOT/.github"
 if [ ! -f "$REPO_ROOT/.github/PULL_REQUEST_TEMPLATE.md" ]; then
