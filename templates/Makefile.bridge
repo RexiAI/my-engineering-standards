@@ -7,6 +7,9 @@
 help:
 	@echo "Available targets:"
 	@echo "  init-ai         Symlink AGENTS.md and copy opencode.json from .standards/"
+	@echo "                  Add COPY_AGENTS=1 to copy spec-pipeline agents/commands as"
+	@echo "                  real files instead of symlinking (e.g. to set a per-agent"
+	@echo "                  model override without editing files inside .standards/)."
 	@echo "  init-standards  Initialize .standards/ submodule"
 	@echo "  session-check   Run session start health check"
 	@echo "  session-end     Run session end check (pre-commit verification)"
@@ -49,20 +52,40 @@ init-ai:
 		echo "  [SKIP] okf/ already exists"; \
 	fi
 
-	# Symlink spec pipeline agents + commands (see docs/SPEC_PIPELINE.md)
+	# Symlink (default) or copy (COPY_AGENTS=1) spec pipeline agents + commands
+	# (see docs/SPEC_PIPELINE.md)
 	@mkdir -p .opencode
-	@if [ ! -e ".opencode/agent" ]; then \
-		ln -sf ../.standards/agent .opencode/agent; \
-		echo "  [SYMLINK] .standards/agent -> .opencode/agent"; \
+ifeq ($(COPY_AGENTS),1)
+	@if [ -L ".opencode/agents" ]; then \
+		echo "  [SKIP] .opencode/agents is a symlink — remove it first if you want a real copy"; \
+	elif [ -e ".opencode/agents" ]; then \
+		echo "  [SKIP] .opencode/agents already exists as a real directory — not overwriting"; \
 	else \
-		echo "  [SKIP] .opencode/agent already exists"; \
+		cp -r .standards/agents .opencode/agents; \
+		echo "  [COPY] .standards/agents -> .opencode/agents (you own these now)"; \
 	fi
-	@if [ ! -e ".opencode/command" ]; then \
-		ln -sf ../.standards/command .opencode/command; \
-		echo "  [SYMLINK] .standards/command -> .opencode/command"; \
+	@if [ -L ".opencode/commands" ]; then \
+		echo "  [SKIP] .opencode/commands is a symlink — remove it first if you want a real copy"; \
+	elif [ -e ".opencode/commands" ]; then \
+		echo "  [SKIP] .opencode/commands already exists as a real directory — not overwriting"; \
 	else \
-		echo "  [SKIP] .opencode/command already exists"; \
+		cp -r .standards/commands .opencode/commands; \
+		echo "  [COPY] .standards/commands -> .opencode/commands (you own these now)"; \
 	fi
+else
+	@if [ ! -e ".opencode/agents" ]; then \
+		ln -sf ../.standards/agents .opencode/agents; \
+		echo "  [SYMLINK] .standards/agents -> .opencode/agents"; \
+	else \
+		echo "  [SKIP] .opencode/agents already exists"; \
+	fi
+	@if [ ! -e ".opencode/commands" ]; then \
+		ln -sf ../.standards/commands .opencode/commands; \
+		echo "  [SYMLINK] .standards/commands -> .opencode/commands"; \
+	else \
+		echo "  [SKIP] .opencode/commands already exists"; \
+	fi
+endif
 
 	# Copy language-specific configs if project type is detected
 	@if [ -f "pom.xml" ]; then \

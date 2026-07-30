@@ -1,7 +1,6 @@
 ---
 description: Writes acceptance tests from scenarios, then unit tests, then the minimum implementation to pass both. Stage 2 of the spec pipeline — see docs/SPEC_PIPELINE.md. Never reads the informal spec.
 mode: subagent
-model: github-copilot/claude-sonnet-5
 permission:
   read:
     "specs/*/00-informal.md": deny

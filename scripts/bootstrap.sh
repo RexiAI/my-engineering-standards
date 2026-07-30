@@ -3,6 +3,18 @@ set -euo pipefail
 
 # bootstrap.sh - One-time setup to bridge engineering standards into a child repo
 # Usage: Run from the root of the child repo: ./.standards/scripts/bootstrap.sh
+#        Add --copy-agents to copy spec-pipeline agents/commands as real files
+#        instead of symlinking, e.g. to set a per-agent model override without
+#        editing files inside the .standards/ submodule. You own the copies
+#        after this — re-run with --copy-agents again after a submodule update
+#        to pull in changes; this does not merge them for you.
+
+COPY_AGENTS=false
+for arg in "$@"; do
+    case "$arg" in
+        --copy-agents) COPY_AGENTS=true ;;
+    esac
+done
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 STANDARDS_DIR="$REPO_ROOT/.standards"
@@ -42,19 +54,39 @@ else
     echo "[SKIP] okf/ already exists"
 fi
 
-# 3b. Symlink spec pipeline agents + commands (see docs/SPEC_PIPELINE.md)
+# 3b. Symlink (default) or copy (--copy-agents) spec pipeline agents + commands
+# (see docs/SPEC_PIPELINE.md)
 mkdir -p "$REPO_ROOT/.opencode"
-if [ ! -e "$REPO_ROOT/.opencode/agent" ]; then
-    ln -sf ../.standards/agent "$REPO_ROOT/.opencode/agent"
-    echo "[SYMLINK] .standards/agent -> .opencode/agent"
+if [ "$COPY_AGENTS" = true ]; then
+    if [ -L "$REPO_ROOT/.opencode/agents" ]; then
+        echo "[SKIP] .opencode/agents is a symlink — remove it first if you want a real copy"
+    elif [ -e "$REPO_ROOT/.opencode/agents" ]; then
+        echo "[SKIP] .opencode/agents already exists as a real directory — not overwriting"
+    else
+        cp -r "$STANDARDS_DIR/agents" "$REPO_ROOT/.opencode/agents"
+        echo "[COPY] .standards/agents -> .opencode/agents (you own these now)"
+    fi
+    if [ -L "$REPO_ROOT/.opencode/commands" ]; then
+        echo "[SKIP] .opencode/commands is a symlink — remove it first if you want a real copy"
+    elif [ -e "$REPO_ROOT/.opencode/commands" ]; then
+        echo "[SKIP] .opencode/commands already exists as a real directory — not overwriting"
+    else
+        cp -r "$STANDARDS_DIR/commands" "$REPO_ROOT/.opencode/commands"
+        echo "[COPY] .standards/commands -> .opencode/commands (you own these now)"
+    fi
 else
-    echo "[SKIP] .opencode/agent already exists"
-fi
-if [ ! -e "$REPO_ROOT/.opencode/command" ]; then
-    ln -sf ../.standards/command "$REPO_ROOT/.opencode/command"
-    echo "[SYMLINK] .standards/command -> .opencode/command"
-else
-    echo "[SKIP] .opencode/command already exists"
+    if [ ! -e "$REPO_ROOT/.opencode/agents" ]; then
+        ln -sf ../.standards/agents "$REPO_ROOT/.opencode/agents"
+        echo "[SYMLINK] .standards/agents -> .opencode/agents"
+    else
+        echo "[SKIP] .opencode/agents already exists"
+    fi
+    if [ ! -e "$REPO_ROOT/.opencode/commands" ]; then
+        ln -sf ../.standards/commands "$REPO_ROOT/.opencode/commands"
+        echo "[SYMLINK] .standards/commands -> .opencode/commands"
+    else
+        echo "[SKIP] .opencode/commands already exists"
+    fi
 fi
 
 # 4. Copy PR template

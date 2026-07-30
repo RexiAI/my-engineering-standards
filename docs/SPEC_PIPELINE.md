@@ -1,25 +1,47 @@
 # Spec Pipeline
 
-A five-stage pipeline that turns an informal spec you write into a mutation-tested,
+A six-stage pipeline that turns an informal spec you write into a mutation-tested,
 gated pull request. Based on Robert C. Martin's agent-pipeline description
 (Specifier → Coder → Refactorer → Architect), adapted to this repo's languages and
-tooling. You write stage 0. You review once, after stage 1. Everything after that
-runs to a draft PR.
+tooling, with an added independent QA stage (Verifier) between Refactorer and
+Architect — Uncle Bob's original has no dedicated agent whose only job is to
+re-verify prior stages' claims before the pipeline commits anything. You write
+stage 0. You review once, after stage 1. Everything after that runs to a draft PR.
 
 ## Stages
 
 | # | Stage | Agent | You do |
 |---|---|---|---|
 | 0 | Informal spec | — (you) | Write `specs/NNN-slug/00-informal.md` in your own words |
-| 1 | Specifier | `specifier` | Nothing yet — review the output |
+| 1 | Specifier | `spec-specifier` | Nothing yet — review the output |
 | — | **Human gate** | — | Read `10-tasks.md` + `20-acceptance/`. Fix or approve. |
-| 2 | Coder | `coder` | Nothing — runs to green tests |
-| 3 | Refactorer | `refactorer` | Nothing — runs to clean structure |
-| 4 | Architect | `architect` | Nothing — runs to mutation-clean |
+| 2 | Coder | `spec-coder` | Nothing — runs to green tests |
+| 3 | Refactorer | `spec-refactorer` | Nothing — runs to clean structure |
+| 4 | Verifier | `spec-verifier` | Nothing — independently re-checks stages 2-3 |
+| 5 | Architect | `spec-architect` | Nothing — runs to mutation-clean, only if Verifier passed |
 | — | Output | — | Review the draft PR |
 
-Two commands drive it: `/spec` runs stage 1 and stops. `/build` runs stages 2-4 and
+Two commands drive it: `/spec` runs stage 1 and stops. `/build` runs stages 2-5 and
 opens the PR.
+
+## Why a separate Verifier stage
+
+Coder and Refactorer report their own work as green. Without an independent check,
+"green" is just their self-report — nothing re-runs their claims before Architect
+commits and pushes. The Verifier's only job is to distrust every prior claim and
+re-execute it: re-run the real test suite, re-run the real linter, re-run the
+traceability script, and spot-check that at least a couple of tests actually assert
+what their scenario says, not just that a test with the right name exists and
+passes. It writes no production code and fixes nothing itself — if something's
+wrong, it stops the pipeline and reports why, the same way a human QA reviewer would
+kick a PR back rather than fix it in someone else's branch.
+
+This mirrors what actually caught real bugs in this pipeline's own development:
+config files that looked correct on read but failed the moment they were actually
+executed (a JSON-with-comments parse failure, a missing Maven plugin dependency,
+stale linter rule names). The Verifier exists to make that kind of check part of
+every pipeline run, not something that only happens when a human manually re-tests
+after the fact.
 
 ## Artifact layout
 
@@ -29,6 +51,7 @@ specs/NNN-slug/
   10-tasks.md           specifier: numbered tasks, acceptance criteria
   20-acceptance/
     AC-NNN-name.md      specifier: Given/When/Then scenarios, one file per task
+  25-verification.md    verifier: independent re-check results, PASS/FAIL verdict
   30-report.md          architect: mutation score, complexity, gate results
 ```
 
@@ -73,9 +96,10 @@ only from `10-tasks.md` and `20-acceptance/`.
 
 | Agent | Should not use | Rationale |
 |---|---|---|
-| `coder` | `specs/*/00-informal.md` | Must reason from tasks + scenarios only |
-| `refactorer` | `specs/**` (all) | No knowledge of requirements — judges structure only |
-| `architect` | `specs/*/00-informal.md` | Kills mutants from tests + scenarios only |
+| `spec-coder` | `specs/*/00-informal.md` | Must reason from tasks + scenarios only |
+| `spec-refactorer` | `specs/**` (all) | No knowledge of requirements — judges structure only |
+| `spec-verifier` | `specs/*/00-informal.md` | Verifies against tasks + scenarios, same discipline as the Coder |
+| `spec-architect` | `specs/*/00-informal.md` | Kills mutants from tests + scenarios only |
 
 **This is a documented convention in each agent's frontmatter (`permission.read`
 deny patterns), not a proven hard wall.** Live-fire testing against this exact
@@ -91,21 +115,22 @@ least one case proves it does not, reliably.
 
 Practical consequence: do not treat this barrier as a security boundary. Treat it
 as a strongly-worded convention that most models follow most of the time, backed
-by a stage-4 gate that catches the failure mode this barrier exists to prevent —
-see below. If opencode's permission enforcement for `read`/`edit` is confirmed
-stronger in a later version, tighten this section accordingly.
+by a stage-4 (Verifier) gate that catches the failure mode this barrier exists to
+prevent — see below. If opencode's permission enforcement for `read`/`edit` is
+confirmed stronger in a later version, tighten this section accordingly.
 
 ## Compensating control: catch it, don't just prevent it
 
 Because the read barrier can't be proven to hold under adversarial pressure, the
-pipeline does not rely on prevention alone. `scripts/check-scenario-traceability.sh`
-(§Why no scenario mutation, below) is a behavioral check: it doesn't ask whether an
-agent *could* have read the informal spec, it verifies whether the *output* looks
-like it came from the formalized tasks and scenarios — every implemented behavior
-traces to a scenario ID, nothing appears that isn't accounted for in
-`20-acceptance/`. An agent that peeked at `00-informal.md` and implemented
-something not in any scenario still fails this gate. This is weaker than a real
-access boundary, but it's the honest state of what's actually verified here.
+pipeline does not rely on prevention alone. The Verifier stage runs
+`scripts/check-scenario-traceability.sh` (§Why no scenario mutation, below) — a
+behavioral check that doesn't ask whether an agent *could* have read the informal
+spec, it verifies whether the *output* looks like it came from the formalized tasks
+and scenarios — every implemented behavior traces to a scenario ID, nothing appears
+that isn't accounted for in `20-acceptance/`. An agent that peeked at
+`00-informal.md` and implemented something not in any scenario still fails this
+gate. This is weaker than a real access boundary, but it's the honest state of what's
+actually verified here.
 
 ## Commit and push carve-out
 
@@ -115,7 +140,8 @@ a narrow, stated exception:
 - Pipeline agents may commit, push, and open a **draft** PR, but only:
   - on a branch named `spec/NNN-slug`, never `main`/`master`
   - one conventional commit per task from `10-tasks.md`
-  - only after the Architect reports every configured gate green
+  - only after the Verifier reports PASS and the Architect reports every
+    configured gate green
 - Any gate failure halts the pipeline. Nothing is committed. `30-report.md`
   explains what failed.
 - The PR body links `10-tasks.md` and `30-report.md`. CI gates are the reviewer of
@@ -132,11 +158,57 @@ instead of being all-or-nothing:
 | Coder | yes | yes | yes |
 | Refactorer — complexity + duplication | yes | yes | yes |
 | Refactorer — property tests | skip | yes | yes |
-| Architect — scenario traceability | yes | yes | yes |
+| Verifier — traceability, tests, complexity re-check | yes | yes | yes |
 | Architect — mutation testing | skip | yes | yes |
 
-An `mvp` project runs a 3-stage pipeline and conforms fully to it — see
-`docs/CONFORMANCE_TIERS.md` for what "conforms fully to a subset" means.
+An `mvp` project runs a 4-stage pipeline (Specifier, Coder, Refactorer, Verifier)
+and conforms fully to it — see `docs/CONFORMANCE_TIERS.md` for what "conforms fully
+to a subset" means. Architect still runs at `mvp` to commit/push/open the PR; it
+simply skips the mutation-testing gate.
+
+## Model configuration
+
+Shipped agents (`agents/spec-*.md`) intentionally ship **without** a `model:` key.
+Per opencode's documented config precedence, `.opencode/agents/` (where these land
+via the submodule symlink) is loaded *after* your project's `opencode.json` — so if
+a shipped agent file pinned a model, your `opencode.json` could not override it. Only
+by leaving `model:` unset does `agent.<name>.model` in your own `opencode.json` take
+effect. Verified directly against `opencode debug config` (not assumed from the
+docs): a `.md` with no `model:` resolves to whatever `opencode.json` sets; a `.md`
+that does pin `model:` silently wins over `opencode.json` every time.
+
+With nothing configured, each subagent inherits the model of whichever primary
+agent invoked it — no vendor coupling, works with any provider you already use.
+
+If you want per-stage differentiation, set it in your own `opencode.json`:
+
+```json
+{
+  "agent": {
+    "spec-specifier":  { "model": "your-provider/strong-model" },
+    "spec-verifier":   { "model": "your-provider/strong-model" },
+    "spec-architect":  { "model": "your-provider/strong-model" },
+    "spec-coder":      { "model": "your-provider/fast-model" },
+    "spec-refactorer": { "model": "your-provider/fast-model" },
+    "spec-pipeline":   { "model": "your-provider/fast-model" }
+  }
+}
+```
+
+The reasoning behind that split (this repo's own local pins, in
+`opencode.json` at the repo root, not shipped): Specifier, Verifier, and Architect
+do the pipeline's highest-judgment work — detecting ambiguity, adversarially
+checking prior stages' claims, and reasoning about surviving mutants — and Architect
+alone holds commit/push authority. Coder, Refactorer, and the orchestrator do more
+bounded, well-specified work. A weak Verifier is worse than none: it manufactures
+false confidence instead of catching real gaps, which is the reason this stage
+exists at all (see `§Why a separate Verifier stage` above).
+
+If you need to customize an agent's prompt or permissions, not just its model, run
+`./scripts/bootstrap.sh --copy-agents` (or `make init-ai COPY_AGENTS=1`) to get real,
+editable files in `.opencode/agents/` and `.opencode/commands/` instead of a
+symlink. You own the copies after that — re-run with the same flag after a
+submodule update to pull in changes; it will not overwrite or merge your edits.
 
 ## Tooling by language
 

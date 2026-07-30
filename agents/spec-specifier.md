@@ -1,7 +1,6 @@
 ---
 description: Turns an informal spec into numbered tasks and Given/When/Then acceptance scenarios. Stage 1 of the spec pipeline — see docs/SPEC_PIPELINE.md. Invoked via /spec.
 mode: subagent
-model: github-copilot/claude-sonnet-5
 permission:
   edit:
     "specs/**": allow

@@ -1,7 +1,6 @@
 ---
 description: Reduces cyclomatic complexity, removes duplication, and adds property tests. Stage 3 of the spec pipeline — see docs/SPEC_PIPELINE.md. Has no knowledge of the requirements, judges structure only.
 mode: subagent
-model: github-copilot/claude-sonnet-5
 permission:
   read:
     "specs/**": deny

@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.7.0] — 2026-07-30
+
+### Added
+
+- **`agents/spec-verifier.md`** — new stage 4 of the spec pipeline, between Refactorer and Architect. Independent QA: re-runs the real test suite, real linter/complexity gate, and `scripts/check-scenario-traceability.sh` itself rather than trusting Coder/Refactorer's self-reported "green," and spot-checks that at least two acceptance tests' assertions actually match their scenario. Writes only `specs/NNN-slug/25-verification.md`; fixes nothing, never commits or pushes (`git commit*`/`git push*` denied in its permissions). Architect now requires the Verifier's PASS verdict before running mutation testing or any commit.
+- **`opencode.json`** — this repo's own agent model pins (opus-5 for Specifier/Verifier/Architect, sonnet-5 for Coder/Refactorer/Pipeline). Not shipped to consumers; a worked example of the override pattern documented in `docs/SPEC_PIPELINE.md §Model configuration`.
+- **`scripts/bootstrap.sh --copy-agents`**, **`templates/Makefile.bridge`'s `COPY_AGENTS=1 make init-ai`** — copies `agents/`/`commands/` as real, editable files instead of symlinking, for consumers who want to customize an agent's prompt/permissions (not just its model via `opencode.json`). Refuses to clobber an existing symlink or real directory; verified idempotent and correctly branching in a real sandbox run (both flag and no-flag paths, fresh and re-run).
+
+### Changed
+
+- `agents/spec-architect.md` — now stage 5 (was 4). Scenario traceability gate moved to the Verifier; Architect's own gates are mutation testing + a final full-suite re-run of its own new mutant-killing tests.
+- `agents/spec-pipeline.md`, `commands/build.md` — orchestration updated to `spec-coder → spec-refactorer → spec-verifier → spec-architect`; `/build` stops if the Verifier's verdict is FAIL rather than running Architect anyway.
+- `agent/` renamed to `agents/`, `command/` renamed to `commands/` (matches opencode's documented plural spelling; singular was soft-deprecated backwards-compat). All five original agents renamed with a `spec-` prefix (`spec-pipeline`, `spec-specifier`, `spec-coder`, `spec-refactorer`, `spec-architect`) to eliminate name collisions with unrelated global/project agents — this is what actually caused the v1.6.0 model-collision bug (an unpinned `architect` subagent silently inherited a stale model id from an unrelated pre-existing global `architect.md`; namespacing prevents the whole class instead of just this instance).
+- **`model:` removed from all six shipped agents.** Verified via `opencode debug config` in a throwaway sandbox that an agent `.md` omitting `model:` lets a consumer's own `opencode.json` (`agent.<name>.model`) apply; a `.md` that pins `model:` silently wins over `opencode.json` instead (`.opencode/agents/` is loaded after `opencode.json` in precedence, so a pinned `.md` value cannot be overridden by project config — only `OPENCODE_CONFIG_CONTENT`/`OPENCODE_CONFIG_DIR` could). Shipping unpinned means subagents inherit the consumer's own primary model with zero vendor coupling, by default. This repo pins its own per-stage models locally in `opencode.json` (not shipped to consumers): `spec-specifier`, `spec-verifier`, `spec-architect` → `github-copilot/claude-opus-5` (ambiguity detection, adversarial QA, mutation reasoning + git authority); `spec-coder`, `spec-refactorer`, `spec-pipeline` → `github-copilot/claude-sonnet-5`.
+- `docs/SPEC_PIPELINE.md` gains a **Model configuration** section documenting the above, including the explicit warning that pinning `model:` in a shipped agent file (rather than this repo's own local `opencode.json`) breaks consumer overrides.
+- `docs/SPEC_PIPELINE.md` — stage table, artifact layout (`25-verification.md`), information-barrier table, conformance-tier table, and commit carve-out all updated for the five-agent (six-stage-counting-stage-0) pipeline. Added `§Why a separate Verifier stage`, explaining the gap this closes: no agent's sole job was independently re-checking a prior stage's claims — that verification was happening only because a human (this session) manually re-ran every tool by hand.
+
+### Fixed
+
+- **Dogfood symlinks (`.opencode/agent`, `.opencode/command`) left dangling by the rename** — pointed at the old `agent`/`command` directory names after `git mv agent agents` / `git mv command commands`; `opencode debug config` showed the model resolving but `permission`/`prompt` fields silently empty (broken symlink target, not a real merge failure). Caught only by actually running `opencode debug config` against the real resolved config, not by re-reading the renamed files. Recreated as `.opencode/agents -> ../agents`, `.opencode/commands -> ../commands`; re-verified full permission/prompt/model resolution afterward.
+
 ## [1.6.0] — 2026-07-29
 
 ### Added
