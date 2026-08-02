@@ -1,3 +1,10 @@
+# [1.11.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.10.0...v1.11.0) (2026-08-02)
+
+
+### Features
+
+* **deploy:** production deployment via Kamal, Dokku, or SSH + Compose ([#9](https://github.com/RexiAI/my-engineering-standards/issues/9)) ([51b1a0b](https://github.com/RexiAI/my-engineering-standards/commit/51b1a0bc624d935420a6724338cfada9e978e4b6))
+
 # [1.10.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.9.0...v1.10.0) (2026-08-02)
 
 
