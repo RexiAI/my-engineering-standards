@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.9.0] — 2026-08-02
+
+### Added
+
+- **`skills/hallmark/`** — Hallmark anti-AI-slop design skill v1.2.0 vendored (108 files). Full design system for greenfield pages, audits, redesigns, and DNA extraction from URLs or screenshots. Features: 21 macrostructures, 20 catalog themes, 4 genres, 66-gate slop test, 50-archetype component cookbook, 14 nav archetypes, 8 footer archetypes, variable font + motion + upgrade-technique library.
+- **`skills/hallmark/references/code-quality.md`** — new reference (merged from `redesign-existing-projects`). Covers semantic HTML (div soup, skip-to-content), CSS hygiene (inline styles, hardcoded pixels, z-index scale, `transition-all`), JS quality (import hallucinations, dead code), and `<head>` completeness (meta tags). Loaded by `hallmark audit` on existing-project targets only.
+- **`skills/hallmark/references/strategic-omissions.md`** — new reference. Covers back navigation, active nav indicator, form validation, dead `#` links, legal links, cookie consent, custom 404, empty states, loading states. Loaded by `hallmark audit` on existing-project targets only.
+- **`skills/hallmark/references/upgrade-techniques.md`** — new reference. 14 high-impact upgrade techniques across typography (variable font animation, outlined-to-fill, text mask reveals), layout (broken grid, whitespace maximisation, parallax card stacks, split-screen scroll), motion (Lenis smooth scroll, staggered entry, spring physics, scroll-driven reveals), and surface (true glassmorphism, spotlight borders, grain/noise overlays). Each technique includes when-to-use, when-NOT-to-use, implementation sketch, and `prefers-reduced-motion` fallback. Loaded during default Design flow and `hallmark redesign`.
+
+### Changed
+
+- `skills/hallmark/references/anti-patterns.md` — +200 lines of new named tells, merged from `redesign-existing-projects`: surface/depth tells (oversaturated accent, mixed warm/cool grays, generic box-shadow, lighting inconsistency, random dark-section inversion, empty flat sections); layout tells (`height: 100vh`, flexbox-% math, forced-equal-height cards, uniform border-radius, no overlap/depth, symmetrical vertical padding, dashboard always-left-sidebar, buttons not bottom-aligned in card groups, feature lists at different vertical positions, inconsistent vertical rhythm, optical vs mathematical alignment); typography tells (only 400/700 weights, all-caps subheaders everywhere, orphaned words, missing letter-spacing adjustments); component tells (rocketship/shield icon clichés, pill "New"/"Beta" badges, accordion FAQ as default, 3-card carousel testimonials, avatar circles only, sun/moon toggle cliché, modals for everything); iconography tells (inconsistent stroke widths, missing favicon); content tells (AI copywriting clichés, fake round numbers).
+- `skills/hallmark/references/slop-test.md` — 58 → 66 gates. New gates 58–65: dark-section inversion (58), dead `#` links (59), `height: 100vh` (60), buttons not bottom-aligned in card groups (61), div soup (62), missing alt text on meaningful images (63), orphaned words without `text-wrap: balance` (64), oversaturated accent chroma (65).
+- `skills/hallmark/references/verbs/audit.md` — added 7-step fix priority ordering (font → colour → hover states → layout → components → states → typography polish); added conditional load instructions for `code-quality.md` and `strategic-omissions.md` on existing-project audits.
+- `skills/hallmark/references/verbs/redesign.md` — added `upgrade-techniques.md` load + 1–3 technique selection step for single-page redesigns.
+- `skills/hallmark/SKILL.md` — version 1.1.0 → 1.2.0; gate count references 58 → 66; load inventory updated with three new conditional-load entries.
+- `README.md` — `skills/` tree updated to include hallmark entry.
+
+### Removed
+
+- **`~/.agents/skills/redesign-existing-projects/`** — retired standalone skill. All unique content merged into `skills/hallmark/` (see above). No functionality lost.
+
 ## [1.8.0] — 2026-08-02
 
 ### Added
