@@ -1,5 +1,18 @@
 # Git Workflow Standards
 
+## Strategy: Trunk-Based Development
+
+This repo and all child repos use **trunk-based development**:
+
+- One long-lived branch: `main`.
+- All work happens on short-lived feature branches (target lifetime: < 2 days).
+- Feature branches merge to `main` via **squash-merge pull request only**.
+- **Direct commits or pushes to `main` (or `master`) are forbidden — for humans and agents, with no exceptions.**
+- No long-lived release branches. Tags on `main` mark releases.
+
+Enforce this at the repo level: see `templates/branch-protection.md` for recommended
+GitHub and GitLab branch-protection settings.
+
 ## Branch Naming
 
 Use structured branch names following this pattern:
@@ -15,6 +28,7 @@ Types:
 - `docs/` — documentation changes.
 - `refactor/` — code restructuring without behavior change.
 - `test/` — adding or fixing tests.
+- `spec/NNN-slug` — spec pipeline branches (see `docs/SPEC_PIPELINE.md`).
 
 Examples:
 - `feature/user-password-recovery`
@@ -44,11 +58,53 @@ fix(session): handle null session on token refresh
 chore: bump company-commons to 0.7.1
 ```
 
+**Commit types determine the next release version** (see §Versioning below). Use
+them accurately — `feat:` when adding user-visible behaviour, `fix:` when correcting
+it, `chore:`/`docs:`/`test:`/`refactor:` when no release is warranted.
+
+## Versioning (Semver)
+
+All projects follow [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
+
+### Rules
+
+| Commit type | Version bump | Example |
+|---|---|---|
+| `fix:` | Patch (`0.0.X`) | `fix: handle null pointer in login` |
+| `feat:` | Minor (`0.X.0`) | `feat: add password reset flow` |
+| `feat!:` or `BREAKING CHANGE:` footer | Major (`X.0.0`) | `feat(api)!: change response format` |
+| `chore:`, `docs:`, `test:`, `refactor:`, `ci:` | No release | maintenance only |
+
+### Source of truth: git tags only
+
+- **No `VERSION` file.** Git tags are the sole version record.
+- Tag format: `vMAJOR.MINOR.PATCH` (e.g. `v1.4.2`).
+- Tags are created automatically by CI (Semantic Release) **after** a PR merges to `main`.
+- **Never create version tags manually.** Never tag a feature branch.
+
+### Who creates tags
+
+CI creates tags — not humans, not agents. Flow:
+
+```
+PR merged to main
+       │
+       ▼
+CI runs Semantic Release
+       │
+       ├─ reads commit messages since last tag
+       ├─ computes next version per the table above
+       ├─ creates annotated git tag vX.Y.Z on main
+       └─ publishes GitHub/GitLab release with changelog
+```
+
+See `docs/CI_CD.md §Release Process` and `ci/templates/releaserc.json`.
+
 ## Pull Request Workflow
 
 ### Before Opening a PR
 
-1. Branch from `main` (or the target base branch).
+1. Branch from `main`.
 2. Implement changes in your branch with conventional commits.
 3. Run the full test suite: unit tests, integration tests.
 4. Run lint/format checkers (Spotless, ESLint, golangci-lint).
@@ -59,7 +115,7 @@ chore: bump company-commons to 0.7.1
 - Title follows conventional commit format.
 - Description explains: what changed, why, how to verify.
 - All CI checks pass (build, tests, code quality gates, security scan).
-- At least one reviewer approves.
+- At least one reviewer approves (`production`+ tier; `mvp` solo projects may self-approve — see `docs/CONFORMANCE_TIERS.md`).
 - No unresolved discussion threads.
 
 ### PR Title Format
@@ -92,7 +148,7 @@ chore: bump company-commons to 0.7.1
 3. Author addresses feedback with additional commits.
 4. For significant changes, re-request review after addressing feedback.
 5. Reviewer approves.
-6. Author merges (squash merge preferred for feature branches).
+6. Author **squash-merges** (squash merge required for all feature branches — disable merge-commit and rebase-merge options in repo settings).
 7. Source branch is deleted after merge.
 
 ## Submodule Management

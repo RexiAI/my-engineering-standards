@@ -39,14 +39,14 @@ Rules not listed here are `mvp` — the floor, not an exception.
 | Full observability (9 required metrics, Grafana dashboards, SLOs, on-call paging) | `production` | docs/OBSERVABILITY.md |
 | Circuit breaker + retry on every external client | `production` | docs/RESILIENCE.md — an `mvp` project should still time out (bare `http.Client{Timeout: ...}` is the `mvp` floor), but the breaker/backoff apparatus is `production` |
 | Secrets manager (Vault/KMS/SSM) instead of `.env` | `production` | docs/SECURITY.md §Secrets Management — already tiered in the existing text ("small projects: `.env` files are fine") |
-| Branch protection + mandatory reviewer approval | `production` | docs/GIT_WORKFLOW.md — an `mvp` solo project still uses branches and PRs (never push straight to `main`, see AGENTS.md), but "at least one reviewer approves" assumes a second person exists |
+| Mandatory reviewer approval (≥1 other person) | `production` | docs/GIT_WORKFLOW.md — an `mvp` solo project still uses branches and PRs and may self-approve, but "at least one reviewer approves" assumes a second person exists |
 
 ## What stays at `mvp` regardless of tier
 
 These are never gated behind a higher tier — they're cheap enough, or risky enough, that "we'll add it later" is the wrong call at any size:
 
 - Never commit secrets, credentials, or tokens (`.env` + `.gitignore` is the `mvp`-tier control, not an excuse to skip the control)
-- Conventional commits, branch-per-change, PR before merge
+- Conventional commits, branch-per-change, **PR before merge — all tiers, no exceptions** (see `docs/GIT_WORKFLOW.md §Strategy: Trunk-Based Development` and `templates/branch-protection.md`)
 - Unit tests for business logic
 - Basic input validation at the boundary
 - A `/health` endpoint

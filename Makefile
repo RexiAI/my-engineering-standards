@@ -1,4 +1,4 @@
-.PHONY: help validate validate-docs validate-refs validate-all lint format stats release
+.PHONY: help validate validate-docs validate-refs validate-all lint format stats
 
 DOCS := AGENTS.md README.md \
   docs/ARCHITECTURE.md docs/CI_CD.md docs/CODING_CONVENTIONS.md \
@@ -29,7 +29,9 @@ help:
 	@echo "  lint           Lint YAML/JSON/TOML files"
 	@echo "  format         Format with prettier"
 	@echo "  stats          Show file sizes"
-	@echo "  release        Create & push tag from VERSION file"
+	@echo ""
+	@echo "Releases: handled by Semantic Release CI after merge to main."
+	@echo "  See docs/CI_CD.md §Release Process and ci/templates/releaserc.json."
 	@echo ""
 
 validate:
@@ -97,9 +99,4 @@ stats:
 	@echo "  CI configs:  $$(find .github ci -name '*.yml' 2>/dev/null | xargs wc -l 2>/dev/null | tail -1 | awk '{print $$1}') lines across $$(find .github ci -name '*.yml' 2>/dev/null | wc -l) files"
 	@echo "  Total:       $$(find . -name '*.md' -not -path './.git/*' -exec cat {} + | wc -l) lines markdown"
 
-release:
-	@version=$$(cat VERSION 2>/dev/null); \
-	if [ -z "$$version" ]; then echo "VERSION file missing or empty"; exit 1; fi; \
-	if git rev-parse "v$$version" >/dev/null 2>&1; then echo "Tag v$$version already exists"; exit 1; fi; \
-	git tag -a "v$$version" -m "Release v$$version" && \
-	echo "Tagged v$$version. Push with: git push origin v$$version"
+
