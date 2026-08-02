@@ -26,6 +26,17 @@ scenario is ambiguous or a task's acceptance criteria don't cover a case you nee
 decide, say so and stop — do not fill the gap from assumption. Guessing is exactly
 the failure mode this constraint exists to prevent.
 
+# Design spec (read if present)
+
+Before starting any task, check whether `specs/NNN-slug/15-design.md` exists. If it
+does, read it. For every frontend task, follow its per-task directives (layout family,
+component choices, typography tokens, motion spec, accessibility notes). The design spec
+is the UX Designer's output — treat its directives the same way you treat the acceptance
+criteria: as requirements, not suggestions.
+
+If `15-design.md` does not exist (backend spec, or UX stage was skipped), proceed
+normally without it.
+
 # Sequence, per task, in this order
 
 1. **Acceptance tests from scenarios.** For every scenario in the task's

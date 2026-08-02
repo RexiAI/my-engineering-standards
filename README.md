@@ -46,6 +46,17 @@ my-engineering-standards/
 │   ├── SECURITY.md              # Auth, encryption, scanning
 │   ├── STREAM_PROCESSING.md     # Kafka, windows, exactly-once
 │   └── TESTING.md               # Three-layer testing strategy
+├── agents/
+│   ├── spec-pipeline.md         # Orchestrator (/spec, /build commands)
+│   ├── spec-specifier.md        # Stage 1: tasks + acceptance scenarios
+│   ├── spec-ux.md               # Stage 1.5: design spec for frontend specs
+│   ├── spec-coder.md            # Stage 2: tests + implementation
+│   ├── spec-refactorer.md       # Stage 3: structure + complexity
+│   ├── spec-verifier.md         # Stage 4: independent re-check
+│   └── spec-architect.md        # Stage 5: mutation testing + PR
+├── skills/
+│   └── design-taste-frontend/   # Anti-slop frontend design skill (vendored)
+│       └── SKILL.md
 ├── language-specific/
 │   ├── java/AGENTS.md           # Spring Boot, Maven
 │   ├── go/AGENTS.md             # Gin, Makefile

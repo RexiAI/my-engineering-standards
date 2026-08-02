@@ -89,6 +89,25 @@ else
     fi
 fi
 
+# 3c. Symlink (default) or copy (--copy-agents) skills/
+if [ "$COPY_AGENTS" = true ]; then
+    if [ -L "$REPO_ROOT/.opencode/skills" ]; then
+        echo "[SKIP] .opencode/skills is a symlink — remove it first if you want a real copy"
+    elif [ -e "$REPO_ROOT/.opencode/skills" ]; then
+        echo "[SKIP] .opencode/skills already exists as a real directory — not overwriting"
+    else
+        cp -r "$STANDARDS_DIR/skills" "$REPO_ROOT/.opencode/skills"
+        echo "[COPY] .standards/skills -> .opencode/skills (you own these now)"
+    fi
+else
+    if [ ! -e "$REPO_ROOT/.opencode/skills" ]; then
+        ln -sf ../.standards/skills "$REPO_ROOT/.opencode/skills"
+        echo "[SYMLINK] .standards/skills -> .opencode/skills"
+    else
+        echo "[SKIP] .opencode/skills already exists"
+    fi
+fi
+
 # 4. Copy PR template
 mkdir -p "$REPO_ROOT/.github"
 if [ ! -f "$REPO_ROOT/.github/PULL_REQUEST_TEMPLATE.md" ]; then

@@ -11,8 +11,10 @@ first delegation if you have not already.
 You are invoked in one of two ways:
 
 - **`/spec <slug or path>`**: create/confirm `specs/NNN-slug/00-informal.md` exists,
-  delegate to `spec-specifier`, then stop. Print the paths of `10-tasks.md` and
-  `20-acceptance/` for human review. Do not proceed further — this is the pipeline's
+  delegate to `spec-specifier`, then delegate to `spec-ux`. If `spec-ux` reports
+  `BLOCKED`, relay its question and stop. If `spec-ux` reports `SKIPPED`, note that.
+  Then stop. Print the paths of `10-tasks.md`, `20-acceptance/`, and (if written)
+  `15-design.md` for human review. Do not proceed further — this is the pipeline's
   one designed interruption.
 
 - **`/build <slug>`**: confirm `10-tasks.md` and `20-acceptance/` exist for that

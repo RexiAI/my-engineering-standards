@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.8.0] — 2026-08-02
+
+### Added
+
+- **`agents/spec-ux.md`** — new stage 1.5 of the spec pipeline, between Specifier and the human gate. UX Designer: loads the `design-taste-frontend` skill, runs brief inference, sets three dial values (`DESIGN_VARIANCE`, `MOTION_INTENSITY`, `VISUAL_DENSITY`), and writes per-task layout/component/typography/motion/a11y directives to `specs/NNN-slug/15-design.md`. Skips automatically when the spec has no frontend surface (backend, CLI, API). Blocks with a single clarifying question when frontend surface is ambiguous. Never commits or pushes.
+- **`skills/design-taste-frontend/SKILL.md`** — anti-slop frontend design skill vendored from local installation. Covers brief inference, dial configuration, design system selection, typography/color/layout rules, motion specs, accessibility guardrails, AI-tell bans, redesign protocol, and a 60-item pre-flight checklist. Vendored (not symlinked from `~/.opencode/skills/`) so the skill is versioned, distributed with the submodule, and consistent across all developer machines and CI environments.
+
+### Changed
+
+- `agents/spec-pipeline.md` — `/spec` flow now runs Specifier → `spec-ux` (conditional) → human gate. BLOCKED relayed as-is; SKIPPED noted. `15-design.md` path printed alongside `10-tasks.md` and `20-acceptance/` at the gate.
+- `agents/spec-coder.md` — reads `15-design.md` when present and follows its per-task directives as requirements (same weight as acceptance criteria). Info barrier unchanged: `00-informal.md` still denied.
+- `docs/SPEC_PIPELINE.md` — stage table, artifact layout (`15-design.md`), information-barrier table (`spec-ux` row), conformance-tier table, and model config example updated for the new stage. Model-split rationale updated: UX Designer added to the strong-model tier alongside Specifier/Verifier/Architect.
+- `scripts/bootstrap.sh` — step 3c added: symlinks `skills/` → `.opencode/skills/` by default, or copies with `--copy-agents`, same guard pattern as agents/commands.
+- `opencode.json` — `spec-ux` pinned to `github-copilot/claude-opus-5` (aesthetic judgment work, same tier as Specifier).
+- `README.md` — structure tree updated: `agents/` section expanded with all seven agents; `skills/` section added.
+
 ## [1.7.0] — 2026-07-30
 
 ### Added

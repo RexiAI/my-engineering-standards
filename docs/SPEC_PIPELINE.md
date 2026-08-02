@@ -14,7 +14,8 @@ stage 0. You review once, after stage 1. Everything after that runs to a draft P
 |---|---|---|---|
 | 0 | Informal spec | — (you) | Write `specs/NNN-slug/00-informal.md` in your own words |
 | 1 | Specifier | `spec-specifier` | Nothing yet — review the output |
-| — | **Human gate** | — | Read `10-tasks.md` + `20-acceptance/`. Fix or approve. |
+| 1.5 | UX Designer | `spec-ux` | Nothing — skips automatically if no frontend surface |
+| — | **Human gate** | — | Read `10-tasks.md` + `20-acceptance/` + `15-design.md` (if present). Fix or approve. |
 | 2 | Coder | `spec-coder` | Nothing — runs to green tests |
 | 3 | Refactorer | `spec-refactorer` | Nothing — runs to clean structure |
 | 4 | Verifier | `spec-verifier` | Nothing — independently re-checks stages 2-3 |
@@ -49,6 +50,7 @@ after the fact.
 specs/NNN-slug/
   00-informal.md        you write this, and only this
   10-tasks.md           specifier: numbered tasks, acceptance criteria
+  15-design.md          ux designer: design read, dial values, per-task directives (frontend specs only)
   20-acceptance/
     AC-NNN-name.md      specifier: Given/When/Then scenarios, one file per task
   25-verification.md    verifier: independent re-check results, PASS/FAIL verdict
@@ -96,7 +98,8 @@ only from `10-tasks.md` and `20-acceptance/`.
 
 | Agent | Should not use | Rationale |
 |---|---|---|
-| `spec-coder` | `specs/*/00-informal.md` | Must reason from tasks + scenarios only |
+| `spec-ux` | nothing denied | Pre-gate stage — reads `00-informal.md` same as the Specifier; writes `15-design.md` only |
+| `spec-coder` | `specs/*/00-informal.md` | Must reason from tasks + scenarios + `15-design.md` only |
 | `spec-refactorer` | `specs/**` (all) | No knowledge of requirements — judges structure only |
 | `spec-verifier` | `specs/*/00-informal.md` | Verifies against tasks + scenarios, same discipline as the Coder |
 | `spec-architect` | `specs/*/00-informal.md` | Kills mutants from tests + scenarios only |
@@ -155,6 +158,7 @@ instead of being all-or-nothing:
 | Stage | `mvp` | `production` | `multi-service` |
 |---|---|---|---|
 | Specifier | yes | yes | yes |
+| UX Designer (frontend specs only) | yes | yes | yes |
 | Coder | yes | yes | yes |
 | Refactorer — complexity + duplication | yes | yes | yes |
 | Refactorer — property tests | skip | yes | yes |
@@ -186,6 +190,7 @@ If you want per-stage differentiation, set it in your own `opencode.json`:
 {
   "agent": {
     "spec-specifier":  { "model": "your-provider/strong-model" },
+    "spec-ux":         { "model": "your-provider/strong-model" },
     "spec-verifier":   { "model": "your-provider/strong-model" },
     "spec-architect":  { "model": "your-provider/strong-model" },
     "spec-coder":      { "model": "your-provider/fast-model" },
@@ -196,11 +201,11 @@ If you want per-stage differentiation, set it in your own `opencode.json`:
 ```
 
 The reasoning behind that split (this repo's own local pins, in
-`opencode.json` at the repo root, not shipped): Specifier, Verifier, and Architect
-do the pipeline's highest-judgment work — detecting ambiguity, adversarially
-checking prior stages' claims, and reasoning about surviving mutants — and Architect
-alone holds commit/push authority. Coder, Refactorer, and the orchestrator do more
-bounded, well-specified work. A weak Verifier is worse than none: it manufactures
+`opencode.json` at the repo root, not shipped): Specifier, UX Designer, Verifier, and
+Architect do the pipeline's highest-judgment work — detecting ambiguity, inferring
+design direction from a brief, adversarially checking prior stages' claims, and
+reasoning about surviving mutants — and Architect alone holds commit/push authority.
+Coder, Refactorer, and the orchestrator do more bounded, well-specified work. A weak Verifier is worse than none: it manufactures
 false confidence instead of catching real gaps, which is the reason this stage
 exists at all (see `§Why a separate Verifier stage` above).
 
