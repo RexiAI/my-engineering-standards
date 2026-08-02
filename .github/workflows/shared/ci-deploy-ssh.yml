@@ -1,0 +1,160 @@
+name: Deploy to Production (SSH + Docker Compose)
+
+description: Deploy Docker images to a raw VM/EC2 via SSH and docker compose
+
+on:
+  workflow_call:
+    inputs:
+      service-name:
+        description: Name of the service to deploy
+        required: true
+        default: "my-service"
+      docker-registry:
+        description: Container registry host
+        required: false
+        default: "ghcr.io"
+      image-tag:
+        description: Image tag to deploy (defaults to latest)
+        required: false
+        default: "latest"
+      app-dir:
+        description: Directory on host to deploy to (defaults to /opt/<service>)
+        required: false
+        default: ""
+    secrets:
+      SSH_HOST:
+        description: Production server hostname/IP
+        required: false
+      SSH_USER:
+        description: SSH username for production server
+        required: false
+      SSH_PRIVATE_KEY:
+        description: SSH private key for production server
+        required: false
+        env: SSH_PRIVATE_KEY
+      SSH_PORT:
+        description: SSH port for production server
+        required: false
+        default: "22"
+        env: SSH_PORT
+      GHCR_TOKEN:
+        description: GitHub Container Registry token
+        required: false
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: deploy-${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  check-secrets:
+    name: Check deployment prerequisites
+    runs-on: ubuntu-latest
+    outputs:
+      deploy-ready: ${{ steps.check.outputs.deploy_ready }}
+    steps:
+      - name: Check if deployment secrets are available
+        id: check
+        run: |
+          echo "Checking deployment prerequisites..."
+          missing=""
+          [ -z "${{ secrets.SSH_HOST }}" ] && missing="$missing SSH_HOST"
+          [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ] && missing="$missing SSH_PRIVATE_KEY"
+          if [ -n "$missing" ]; then
+            echo "::warning::Production deploy skipped — missing secrets:$missing"
+            echo "::warning::Set SSH_HOST, SSH_USER, SSH_PRIVATE_KEY in CI/CD secrets to enable."
+            echo "deploy_ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "All required secrets are available"
+            echo "deploy_ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy:
+    name: Deploy to Production
+    needs: check-secrets
+    if: needs.check-secrets.outputs.deploy-ready == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://${{ secrets.SSH_HOST }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Load SSH private key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          echo "SSH key loaded to ~/.ssh/id_rsa"
+
+      - name: Verify SSH connection
+        run: |
+          echo "Testing SSH connection to ${{ secrets.SSH_HOST }}..."
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+            -p "${{ secrets.SSH_PORT || '22' }}" \
+            -i ~/.ssh/id_rsa \
+            "${{ secrets.SSH_USER || 'root' }}@${{ secrets.SSH_HOST }}" \
+            "echo 'SSH connection successful to \$HOSTNAME'"
+
+      - name: Copy compose + nginx config to host
+        run: |
+          APP_DIR="${{ inputs.app-dir || format('/opt/{0}', inputs.service-name) }}"
+          SSH_CMD="ssh -o StrictHostKeyChecking=no -p ${{ secrets.SSH_PORT || '22' }} -i ~/.ssh/id_rsa"
+          REMOTE="${{ secrets.SSH_USER || 'root' }}@${{ secrets.SSH_HOST }}"
+
+          echo "Ensuring remote dir $APP_DIR exists..."
+          $SSH_CMD "$REMOTE" "mkdir -p '$APP_DIR'"
+
+          echo "Copying docker-compose.prod.yml..."
+          scp -o StrictHostKeyChecking=no -P "${{ secrets.SSH_PORT || '22' }}" \
+            -i ~/.ssh/id_rsa \
+            docker-compose.prod.yml \
+            "$REMOTE:$APP_DIR/docker-compose.prod.yml"
+
+          echo "Copying nginx.conf (if present)..."
+          if [ -f nginx.conf ]; then
+            scp -o StrictHostKeyChecking=no -P "${{ secrets.SSH_PORT || '22' }}" \
+              -i ~/.ssh/id_rsa \
+              nginx.conf \
+              "$REMOTE:$APP_DIR/nginx.conf"
+          fi
+
+      - name: Deploy service with Docker Compose
+        run: |
+          echo "=== Starting deployment ==="
+          APP_DIR="${{ inputs.app-dir || format('/opt/{0}', inputs.service-name) }}"
+          REMOTE="${{ secrets.SSH_USER || 'root' }}@${{ secrets.SSH_HOST }}"
+          IMAGE="${{ inputs.docker-registry }}/${{ github.repository }}/${{ inputs.service-name }}:${{ inputs.image-tag }}"
+          echo "Service: ${{ inputs.service-name }}"
+          echo "Image: $IMAGE"
+          echo "Dir: $APP_DIR"
+          echo "Host: ${{ secrets.SSH_HOST }}"
+
+          ssh -o StrictHostKeyChecking=no -p "${{ secrets.SSH_PORT || '22' }}" -i ~/.ssh/id_rsa \
+            "$REMOTE" \
+            "cd '$APP_DIR' && \
+             export IMAGE='$IMAGE' && \
+             docker compose -f docker-compose.prod.yml pull && \
+             docker compose -f docker-compose.prod.yml up -d --force-recreate"
+
+          echo "=== Deployment completed successfully ==="
+
+  skip-deploy:
+    name: Skip deployment (not configured)
+    needs: check-secrets
+    if: needs.check-secrets.outputs.deploy-ready != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report skipped deployment
+        run: |
+          echo "::warning::Production deployment is not configured."
+          echo "Add SSH_HOST, SSH_PRIVATE_KEY secrets to enable production deploys."
+          echo "One-time setup on host:"
+          echo "  scp templates/setup-host.sh host:/tmp/ && ssh host 'bash /tmp/setup-host.sh --backend ssh --domain example.com'"
+          echo "See docs/DEPLOYMENT.md §Backend: Raw SSH + Docker Compose for details."

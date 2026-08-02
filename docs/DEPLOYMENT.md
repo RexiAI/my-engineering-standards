@@ -145,3 +145,374 @@ Enable via `init-ci.sh --with-saga` (GitLab only — GitHub Actions has no saga/
 14. **Consumer deduplication verified** (if outbox code present) — event consumer code must
     reference a deduplication store (`*DedupStore`, `alreadyProcessed`, `SetNX`). Enforced by
     `scripts/check-outbox-relay.sh`. Reference: `docs/OUTBOX_PATTERN.md §Idempotent Event Processing`.
+
+## Production Deployment
+
+### Choosing a Backend
+
+All backends deploy the Docker image your CI pipeline already builds and pushes to
+GHCR on merge to `main`. The only difference is **where** the container runs and
+**which tool** orchestrates it.
+
+| Aspect | Kamal | Dokku | Raw SSH + Compose |
+|---|---|---|---|
+| Runtime | Docker on VPS | Dokku PaaS on VPS | Docker on VM/EC2 |
+| Deploy command | `kamal deploy` | `dokku git:from-image` | `docker compose up -d` |
+| Config in repo | `.kamal/config.rb` | none (host state) | `docker-compose.prod.yml` + `nginx.conf` |
+| Reverse proxy | Traefik (auto) | Nginx (built-in) | Nginx (template) |
+| TLS | Let's Encrypt (auto) | letsencrypt plugin | certbot |
+| Zero-downtime | ✅ built-in | ✅ built-in | Manual (rolling) |
+| Rollback | `kamal rollback` | `dokku releases:rollback` | Manual |
+| Multi-service | Native | One app per service | Compose |
+| Fits | Teams that want one tool, minimal config | Teams that want a Heroku-like PaaS | Teams on AWS/EC2, want full control |
+
+Choose with `init-deploy.sh --deploy-tool <kamal|dokku|ssh>` or
+`init-ci.sh --deploy-tool <kamal|dokku|ssh>`. Default is `kamal`.
+
+### Backend: Kamal + VPS
+
+#### Overview
+
+[Kamal](https://github.com/basecamp/kamal) (by Basecamp) builds on Docker Compose and adds
+zero-downtime deploys, Traefik reverse proxy with automatic Let's Encrypt TLS, SSH-based
+rolling updates, and host-level health checks.
+
+**Cost**: ~$5–12/mo for a single VPS (Hetzner AX11, DigitalOcean Basic, etc.).
+**Complexity**: Zero Kubernetes. Just Docker + Kamal on Ubuntu.
+
+#### Prerequisites
+
+1. A VPS running Ubuntu 22.04+ (or Debian 12+) with SSH access.
+2. A domain name with DNS pointing to the VPS.
+3. Docker installed on the VPS (Kamal installs and manages Docker automatically on first run).
+
+#### Initial Setup
+
+```bash
+.standards/scripts/init-deploy.sh \
+  --platform github \
+  --deploy-tool kamal \
+  --host <VPS_IP> \
+  --service-name my-api \
+  --app-domain api.example.com
+```
+
+This creates:
+- `.kamal/config.rb` — Kamal deployment config
+- `.kamal/.env.example` — Environment variables template
+- `.deploy/secrets/` — SSH key storage directory
+- Updates `.github/workflows/ci.yml` with a `deploy` job (if it doesn't exist)
+
+Add the SSH private key + `SSH_HOST`, `SSH_USER`, `SSH_PORT` to CI secrets, then
+bootstrap the VPS and first-deploy:
+
+```bash
+# On the VPS: install Docker (Kamal manages Traefik itself)
+scp .standards/templates/setup-host.sh root@<VPS_IP>:/tmp/
+ssh root@<VPS_IP> "bash /tmp/setup-host.sh --backend kamal"
+
+# From your repo: first deploy
+cd your-project
+cp .kamal/.env.example .kamal/.env
+source .kamal/.env
+kamal setup
+```
+
+#### CI/CD Pipeline Composition
+
+```yaml
+jobs:
+  backend-ci:
+    uses: RexiAI/my-engineering-standards/.github/workflows/backend/ci-go.yml@main
+    with:
+      docker-registry: ghcr.io
+    secrets:
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+
+  deploy:
+    needs: [backend-ci]
+    if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
+    uses: RexiAI/my-engineering-standards/.github/workflows/shared/ci-deploy-kamal.yml@main
+    with:
+      service-name: my-api
+      docker-registry: ghcr.io
+    secrets:
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      SSH_PORT: ${{ secrets.SSH_PORT }}
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+```
+
+For GitLab CI:
+
+```yaml
+include:
+  - local: .standards/ci/gitlab/gitlab-ci.yml
+  - local: .standards/ci/gitlab/backend/ci-go.yml
+  - local: .standards/ci/templates/child-ci-deploy-kamal.yml
+
+deploy-prod:
+  extends: .kamal-deploy
+  stage: deploy
+  variables:
+    SERVICE_NAME: "my-api"
+```
+
+#### Service Type Configuration
+
+| Type | Service name env | Health endpoint | Port |
+|---|---|---|---|
+| Java (Spring Boot) | `SERVICE_NAME` | `/actuator/health` | `8080` |
+| Go | `SERVICE_NAME` | `/health` | `8080` |
+| Node.js (NestJS) | `SERVICE_NAME` | `/health` | `3000` |
+| Next.js | `FRONTEND_SERVICE_NAME` | `/` | `3000` |
+
+Override defaults in `.kamal/config.rb`:
+
+```ruby
+set :health_check, url: "http://my-service:8080/actuator/health",
+                    interval: 30, timeout: 5, max_checks: 30
+```
+
+#### Secrets Management
+
+- **CI secrets** (SSH key, host) → set as CI/CD variables/secrets
+- **App secrets** (DATABASE_URL, API keys) → set as `KAMAL_ENV_*` variables in CI/CD
+  or via `.kamal/secrets/` on the server
+- **Never commit secrets** to the repo
+
+```yaml
+env:
+  KAMAL_ENV_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+  KAMAL_ENV_API_KEY: ${{ secrets.API_KEY }}
+```
+
+#### Rollback
+
+```bash
+kamal deploy list
+kamal rollback
+```
+
+### Backend: Dokku + VPS
+
+#### Overview
+
+[Dokku](https://dokku.com) is a self-hosted PaaS (like Heroku) that runs on a single VPS.
+It manages Nginx routing, Let's Encrypt TLS, and process supervision. Deploy via
+`dokku git:from-image` from a pre-built Docker image (consistent with the GHCR push flow).
+
+**Cost**: ~$5–12/mo for a single VPS.
+**Fits**: Teams that want a Heroku-like workflow without paying for Heroku.
+
+#### Initial Setup
+
+```bash
+.standards/scripts/init-deploy.sh \
+  --platform github \
+  --deploy-tool dokku \
+  --host <VPS_IP> \
+  --user root \
+  --service-name my-api \
+  --app-domain api.example.com
+```
+
+This creates:
+- `.deploy/dokku.env.example` — environment template
+- `.deploy/secrets/` — SSH key storage directory
+- Updates `.github/workflows/ci.yml` with a `deploy` job (if it doesn't exist)
+
+Bootstrap the VPS with Dokku:
+
+```bash
+scp .standards/templates/setup-host.sh root@<VPS_IP>:/tmp/
+ssh root@<VPS_IP> "bash /tmp/setup-host.sh --backend dokku --domain api.example.com"
+```
+
+One-time app setup:
+
+```bash
+ssh root@<VPS_IP> "dokku apps:create my-api"
+ssh root@<VPS_IP> "dokku letsencrypt:enable my-api"
+```
+
+#### CI/CD Pipeline Composition
+
+```yaml
+jobs:
+  backend-ci:
+    uses: RexiAI/my-engineering-standards/.github/workflows/backend/ci-go.yml@main
+    with:
+      docker-registry: ghcr.io
+    secrets:
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+
+  deploy:
+    needs: [backend-ci]
+    if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
+    uses: RexiAI/my-engineering-standards/.github/workflows/shared/ci-deploy-dokku.yml@main
+    with:
+      service-name: my-api
+      dokku-app-name: my-api
+      docker-registry: ghcr.io
+    secrets:
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+```
+
+> **Note**: `SSH_USER` defaults to `dokku` for this backend. Dokku routes deploys over the
+> `dokku` user, so configure the SSH key for that user on the host.
+
+For GitLab CI:
+
+```yaml
+include:
+  - local: .standards/ci/gitlab/gitlab-ci.yml
+  - local: .standards/ci/gitlab/backend/ci-go.yml
+  - local: .standards/ci/templates/child-ci-deploy-dokku.yml
+
+deploy-prod:
+  extends: .dokku-deploy
+  stage: deploy
+  variables:
+    SERVICE_NAME: "my-api"
+```
+
+#### Secrets
+
+| Secret | Example | Required |
+|---|---|---|
+| `SSH_HOST` | `123.45.67.89` | Yes |
+| `SSH_USER` | `dokku` | No (defaults to `dokku`) |
+| `SSH_PRIVATE_KEY` | — | Yes |
+| `DOKKU_APP_NAME` | `my-api` | No (defaults to `service-name`) |
+| `GHCR_TOKEN` | — | Yes (host pulls from GHCR) |
+
+#### Rollback
+
+```bash
+ssh dokku@<HOST> "dokku releases:list my-api"
+ssh dokku@<HOST> "dokku releases:rollback my-api <release>"
+```
+
+### Backend: Raw SSH + Docker Compose
+
+#### Overview
+
+Deploy to any raw VM — including AWS EC2 — by SSHing in and running
+`docker compose up`. You control the reverse proxy (nginx template) and TLS (certbot).
+No PaaS, no deploy framework — just Docker.
+
+**Cost**: ~$3.60–12/mo (EC2 t4g.nano or any VPS).
+**Fits**: Teams already on AWS/EC2, or that want full control over the host.
+
+#### Initial Setup
+
+```bash
+.standards/scripts/init-deploy.sh \
+  --platform github \
+  --deploy-tool ssh \
+  --host <VM_IP> \
+  --service-name my-api \
+  --app-domain api.example.com
+```
+
+This creates:
+- `docker-compose.prod.yml` — production compose (references `${IMAGE}` injected by CI)
+- `nginx.conf` — reverse proxy + TLS template (replace `example.com`)
+- `setup-host.sh` — one-time VPS bootstrap
+- `.deploy/env.example` — environment template
+- Updates `.github/workflows/ci.yml` with a `deploy` job (if it doesn't exist)
+
+Bootstrap the host (installs Docker + nginx + certbot, sets renewal cron):
+
+```bash
+scp setup-host.sh root@<VM_IP>:/tmp/
+ssh root@<VM_IP> "bash /tmp/setup-host.sh --backend ssh --domain api.example.com"
+```
+
+Install the nginx site and obtain the TLS cert once:
+
+```bash
+scp nginx.conf root@<VM_IP>:/etc/nginx/sites-available/api.example.com.conf
+ssh root@<VM_IP> \
+  "ln -sf /etc/nginx/sites-available/api.example.com.conf /etc/nginx/sites-enabled/ && nginx -t && systemctl reload nginx && certbot --nginx -d api.example.com"
+```
+
+#### CI/CD Pipeline Composition
+
+```yaml
+jobs:
+  backend-ci:
+    uses: RexiAI/my-engineering-standards/.github/workflows/backend/ci-go.yml@main
+    with:
+      docker-registry: ghcr.io
+    secrets:
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+
+  deploy:
+    needs: [backend-ci]
+    if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
+    uses: RexiAI/my-engineering-standards/.github/workflows/shared/ci-deploy-ssh.yml@main
+    with:
+      service-name: my-api
+      docker-registry: ghcr.io
+    secrets:
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+```
+
+For GitLab CI:
+
+```yaml
+include:
+  - local: .standards/ci/gitlab/gitlab-ci.yml
+  - local: .standards/ci/gitlab/backend/ci-go.yml
+  - local: .standards/ci/templates/child-ci-deploy-ssh.yml
+
+deploy-prod:
+  extends: .ssh-deploy
+  stage: deploy
+  variables:
+    SERVICE_NAME: "my-api"
+```
+
+#### Secrets
+
+| Secret | Example | Required |
+|---|---|---|
+| `SSH_HOST` | `123.45.67.89` or EC2 public IP | Yes |
+| `SSH_USER` | `ubuntu` / `ec2-user` | No (defaults to `root`) |
+| `SSH_PRIVATE_KEY` | — | Yes |
+| `APP_DIR` | `/opt/my-api` | No (defaults to `/opt/<service>`) |
+
+#### Rollback
+
+Manual — SSH in and point the compose file at a previous image:
+
+```bash
+ssh root@<VM_IP> "cd /opt/my-api && export IMAGE=ghcr.io/org/my-api:<prev-sha> && docker compose -f docker-compose.prod.yml up -d --force-recreate"
+```
+
+### Guard Clause: Safe Skipping
+
+All three backends share the same guard clause. If deployment secrets are not
+configured, the CI deploy job **skips gracefully** (exits 0). This means:
+
+- ✅ CI pipeline stays green
+- ✅ PRs merge successfully
+- ✅ Image builds and pushes to GHCR work normally
+- ❌ Production deploy does not happen (expected — no infra configured)
+
+This lets you set up CI/CD first, push images, and configure production deployment
+as a separate step — no coordination needed.
+
+### VPS Provider Recommendations
+
+| Provider | 1 vCPU + 1GB | Notes |
+|---|---|---|
+| Hetzner Cloud AX11 | €4.58/mo | Best value for EU |
+| DigitalOcean Basic | $4/mo | Simple, reliable |
+| Vultr | $5/mo | Global regions |
+| AWS EC2 t4g.nano | $3.60/mo | ARM, free tier eligible |

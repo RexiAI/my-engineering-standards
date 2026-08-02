@@ -32,6 +32,8 @@ BACKEND_FLAG=""
 FRONTEND_FLAG=""
 REGISTRY_FLAG=""
 WITH_SAGA_FLAG=""
+WITH_DEPLOY_FLAG=""
+DEPLOY_TOOL="kamal"
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -55,13 +57,27 @@ while [[ $# -gt 0 ]]; do
       WITH_SAGA_FLAG="true"
       shift
       ;;
+    --with-deploy)
+      WITH_DEPLOY_FLAG="true"
+      shift
+      ;;
+    --deploy-tool)
+      DEPLOY_TOOL="$2"
+      WITH_DEPLOY_FLAG="true"
+      shift 2
+      ;;
     *)
       err "Unknown flag: $1"
-      echo "Usage: $0 [--platform github|gitlab|both] [--backend java,go,node] [--frontend nextjs,react,angular,static] [--registry ghcr.io] [--with-saga]"
+      echo "Usage: $0 [--platform github|gitlab|both] [--backend java,go,node] [--frontend nextjs,react,angular,static] [--registry ghcr.io] [--with-saga] [--with-deploy] [--deploy-tool kamal|dokku|ssh]"
       exit 1
       ;;
   esac
 done
+
+case "$DEPLOY_TOOL" in
+  kamal|dokku|ssh) ;;
+  *) err "Invalid --deploy-tool '$DEPLOY_TOOL' (expected kamal|dokku|ssh)"; exit 1 ;;
+esac
 
 # ── Detect project root ───────────────────────
 PROJECT_ROOT=""
@@ -254,11 +270,51 @@ EOF
     with:
       docker-registry: $registry
     secrets:
+       GHCR_TOKEN: \${{ secrets.GHCR_TOKEN }}
+EOF
+   fi
+
+  # Add deploy job for production if --with-deploy
+  if [ "$WITH_DEPLOY_FLAG" = "true" ]; then
+    cat >> "$target" << EOF
+
+  deploy:
+    needs: [$(
+      # Build needs array dynamically
+      needs_list=""
+      for lang in "${BACKEND[@]}"; do
+        if [ -n "$needs_list" ]; then
+          needs_list="${needs_list}, backend-ci-${lang}"
+        else
+          needs_list="backend-ci-${lang}"
+        fi
+      done
+      if [ -n "$FRONTEND" ]; then
+        if [ -n "$needs_list" ]; then
+          needs_list="${needs_list}, frontend-ci"
+        else
+          needs_list="frontend-ci"
+        fi
+      fi
+      echo "$needs_list"
+    )]
+    if: \${{ github.event_name == 'push' && github.ref_name == github.event.repository.default_branch }}
+    uses: RexiAI/my-engineering-standards/.github/workflows/shared/ci-deploy-${DEPLOY_TOOL}.yml@main
+    with:
+      service-name: ""
+      docker-registry: \$registry
+    secrets:
+      SSH_HOST: \${{ secrets.SSH_HOST }}
+      SSH_USER: \${{ secrets.SSH_USER }}
+      SSH_PRIVATE_KEY: \${{ secrets.SSH_PRIVATE_KEY }}
+      SSH_PORT: \${{ secrets.SSH_PORT }}
       GHCR_TOKEN: \${{ secrets.GHCR_TOKEN }}
 EOF
+    ok "Added deploy job to ci.yml (configure SSH_HOST, SSH_USER, SSH_PRIVATE_KEY secrets)"
+    info "Deploy tool: ${DEPLOY_TOOL}. Run ./.standards/scripts/init-deploy.sh --deploy-tool ${DEPLOY_TOOL} to set up deploy config"
   fi
 
-  ok "Generated: .github/workflows/ci.yml"
+   ok "Generated: .github/workflows/ci.yml"
 
   # Copy saga templates if --with-saga
   if [ "$saga_enabled" = "true" ]; then
@@ -420,12 +476,24 @@ EOF
     fi
   fi
 
-  ok "Generated: .gitlab-ci.yml"
+  # Add production deploy job when --with-deploy
+  if [ "$WITH_DEPLOY_FLAG" = "true" ]; then
+    cat >> "$target" << EOF
 
-  # Copy saga templates if --with-saga
-  if [ "$saga_enabled" = "true" ]; then
-    _copy_saga_templates
+include:
+  - local: .standards/ci/templates/child-ci-deploy-${DEPLOY_TOOL}.yml
+
+deploy-prod:
+  extends: .${DEPLOY_TOOL}-deploy
+  stage: deploy
+  variables:
+    SERVICE_NAME: ""
+EOF
+    ok "Added deploy-prod job to .gitlab-ci.yml (configure SSH_HOST, SSH_USER, SSH_PRIVATE_KEY CI/CD variables)"
+    info "Deploy tool: ${DEPLOY_TOOL}. Run ./.standards/scripts/init-deploy.sh --deploy-tool ${DEPLOY_TOOL} to set up deploy config"
   fi
+
+   ok "Generated: .gitlab-ci.yml"
 
   # Copy Makefile if Go and no existing Makefile
   for lang in "${BACKEND[@]}"; do
@@ -543,6 +611,14 @@ print_summary() {
     echo "  • Node: wire eslint-saga-rules plugin in eslint.config.js"
     echo "  • Reference: docs/SAGA_PATTERN.md §CI Quality Gates"
     echo "               docs/OUTBOX_PATTERN.md §CI Quality Gates"
+  fi
+  if [ "${WITH_DEPLOY_FLAG:-}" = "true" ]; then
+    echo ""
+    echo "Deployment configuration:"
+    echo "  • Deploy job added to CI pipeline (tool: ${DEPLOY_TOOL})"
+    echo "  • Run ./.standards/scripts/init-deploy.sh --deploy-tool ${DEPLOY_TOOL} to set up deploy config"
+    echo "  • Set secrets: SSH_HOST, SSH_USER, SSH_PRIVATE_KEY, SSH_PORT"
+    echo "  • Reference: docs/DEPLOYMENT.md §Production Deployment"
   fi
   echo ""
 }

@@ -14,7 +14,7 @@ LANG_AGENTS := language-specific/java/AGENTS.md \
   language-specific/go/AGENTS.md \
   language-specific/javascript/AGENTS.md
 
-TEMPLATES := templates/ADR.md
+TEMPLATES := templates/ADR.md templates/Kamalfile templates/docker-compose.prod.yml templates/nginx.conf
 
 ALL_FILES := $(DOCS) $(LANG_AGENTS) $(TEMPLATES)
 
