@@ -1,0 +1,134 @@
+name: Deploy to Production (Dokku)
+
+description: Deploy Docker images to a Dokku host via git:from-image
+
+on:
+  workflow_call:
+    inputs:
+      service-name:
+        description: Name of the service to deploy
+        required: true
+        default: "my-service"
+      dokku-app-name:
+        description: Dokku app name (defaults to service-name)
+        required: false
+        default: ""
+      docker-registry:
+        description: Container registry host
+        required: false
+        default: "ghcr.io"
+      image-tag:
+        description: Image tag to deploy (defaults to latest)
+        required: false
+        default: "latest"
+    secrets:
+      SSH_HOST:
+        description: Production server hostname/IP
+        required: false
+      SSH_USER:
+        description: SSH username for production server (usually dokku)
+        required: false
+      SSH_PRIVATE_KEY:
+        description: SSH private key for production server
+        required: false
+        env: SSH_PRIVATE_KEY
+      SSH_PORT:
+        description: SSH port for production server
+        required: false
+        default: "22"
+        env: SSH_PORT
+      GHCR_TOKEN:
+        description: GitHub Container Registry token (for host-side docker login)
+        required: false
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: deploy-${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  check-secrets:
+    name: Check deployment prerequisites
+    runs-on: ubuntu-latest
+    outputs:
+      deploy-ready: ${{ steps.check.outputs.deploy_ready }}
+    steps:
+      - name: Check if deployment secrets are available
+        id: check
+        run: |
+          echo "Checking deployment prerequisites..."
+          missing=""
+          [ -z "${{ secrets.SSH_HOST }}" ] && missing="$missing SSH_HOST"
+          [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ] && missing="$missing SSH_PRIVATE_KEY"
+          if [ -n "$missing" ]; then
+            echo "::warning::Production deploy skipped — missing secrets:$missing"
+            echo "::warning::Set SSH_HOST, SSH_USER, SSH_PRIVATE_KEY in CI/CD secrets to enable."
+            echo "deploy_ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "All required secrets are available"
+            echo "deploy_ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy:
+    name: Deploy to Production
+    needs: check-secrets
+    if: needs.check-secrets.outputs.deploy-ready == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://${{ secrets.SSH_HOST }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Load SSH private key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          echo "SSH key loaded to ~/.ssh/id_rsa"
+
+      - name: Verify SSH connection
+        run: |
+          echo "Testing SSH connection to ${{ secrets.SSH_HOST }}..."
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+            -p "${{ secrets.SSH_PORT || '22' }}" \
+            -i ~/.ssh/id_rsa \
+            "${{ secrets.SSH_USER || 'dokku' }}@${{ secrets.SSH_HOST }}" \
+            "echo 'SSH connection successful to \$HOSTNAME'"
+
+      - name: Deploy service to Dokku
+        run: |
+          echo "=== Starting deployment ==="
+          APP="${{ inputs.dokku-app-name || inputs.service-name }}"
+          IMAGE="${{ inputs.docker-registry }}/${{ github.repository }}/${{ inputs.service-name }}:${{ inputs.image-tag }}"
+          echo "App: $APP"
+          echo "Image: $IMAGE"
+          echo "Host: ${{ secrets.SSH_HOST }}"
+
+          ssh -o StrictHostKeyChecking=no -p "${{ secrets.SSH_PORT || '22' }}" \
+            -i ~/.ssh/id_rsa \
+            "${{ secrets.SSH_USER || 'dokku' }}@${{ secrets.SSH_HOST }}" \
+            "dokku git:from-image '$APP' '$IMAGE'"
+
+          echo "=== Deployment completed successfully ==="
+
+  skip-deploy:
+    name: Skip deployment (not configured)
+    needs: check-secrets
+    if: needs.check-secrets.outputs.deploy-ready != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report skipped deployment
+        run: |
+          echo "::warning::Production deployment is not configured."
+          echo "Add SSH_HOST, SSH_PRIVATE_KEY secrets to enable production deploys."
+          echo "One-time setup on Dokku host:"
+          echo "  dokku apps:create ${{ inputs.service-name }}"
+          echo "  dokku letsencrypt:enable ${{ inputs.service-name }}"
+          echo "See docs/DEPLOYMENT.md §Backend: Dokku + VPS for details."

@@ -1,0 +1,107 @@
+# SSH + Docker Compose deploy jobs for GitLab — include from child .gitlab-ci.yml
+# Usage:
+#   include:
+#     - local: .standards/ci/templates/child-ci-deploy-ssh.yml
+#
+# Then define jobs in the child .gitlab-ci.yml:
+#   deploy:
+#     extends: .ssh-deploy
+#     stage: deploy
+#
+# Guard clause: if SSH deployment secrets are not set, the job exits 0
+# (skips) so the pipeline stays green — it does not fail. Deploys only
+# happen once SSH_HOST/SSH_PRIVATE_KEY are configured.
+
+.ssh-deploy:
+  image: alpine:3.18
+  tags: [docker]
+  before_script:
+    - apk --no-cache add openssh-client bash docker-cli-compose
+    - |
+      if [ -n "${SSH_PRIVATE_KEY:-}" ]; then
+        mkdir -p ~/.ssh
+        echo "${SSH_PRIVATE_KEY}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        echo "SSH_PRIVATE_KEY loaded from CI/CD variable"
+      else
+        echo "WARNING: SSH_PRIVATE_KEY not set. Deploy will be skipped."
+      fi
+  script:
+    - |
+      # ── Guard clause: skip deploy if production secrets are absent ──
+      missing=""
+      for var in SSH_HOST SSH_PRIVATE_KEY; do
+        [ -z "${!var:-}" ] && missing="$missing $var"
+      done
+      if [ -n "$missing" ]; then
+        echo "::warning::Production deploy skipped — missing secrets:$missing"
+        echo "Set SSH_HOST, SSH_PRIVATE_KEY in CI/CD variables to enable."
+        echo "See docs/DEPLOYMENT.md §Backend: Raw SSH + Docker Compose."
+        exit 0
+      fi
+
+      SUSER="${SSH_USER:-root}"
+      SPORT="${SSH_PORT:-22}"
+      APP_DIR="${APP_DIR:-/opt/${SERVICE_NAME:-$(basename "$CI_PROJECT_PATH")}}"
+      IMAGE="${DEPLOY_IMAGE:-${CI_REGISTRY_IMAGE}:latest}"
+
+      echo "Ensuring remote dir ${APP_DIR} exists..."
+      ssh -o StrictHostKeyChecking=no -p "${SPORT}" -i ~/.ssh/id_rsa \
+        "${SUSER}@${SSH_HOST}" "mkdir -p '${APP_DIR}'"
+
+      echo "Copying docker-compose.prod.yml..."
+      scp -o StrictHostKeyChecking=no -P "${SPORT}" -i ~/.ssh/id_rsa \
+        docker-compose.prod.yml \
+        "${SUSER}@${SSH_HOST}:${APP_DIR}/docker-compose.prod.yml"
+
+      echo "Deploying service from ${IMAGE} to ${APP_DIR} on ${SSH_HOST}"
+      ssh -o StrictHostKeyChecking=no -p "${SPORT}" -i ~/.ssh/id_rsa \
+        "${SUSER}@${SSH_HOST}" \
+        "cd '${APP_DIR}' && export IMAGE='${IMAGE}' && \
+         docker compose -f docker-compose.prod.yml pull && \
+         docker compose -f docker-compose.prod.yml up -d --force-recreate"
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# Frontend variant for monorepos that deploy a separate web app.
+.ssh-deploy-frontend:
+  image: alpine:3.18
+  tags: [docker]
+  before_script:
+    - apk --no-cache add openssh-client bash docker-cli-compose
+    - |
+      if [ -n "${SSH_PRIVATE_KEY:-}" ]; then
+        mkdir -p ~/.ssh
+        echo "${SSH_PRIVATE_KEY}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+      else
+        echo "WARNING: SSH_PRIVATE_KEY not set. Deploy will be skipped."
+      fi
+  script:
+    - |
+      missing=""
+      for var in SSH_HOST SSH_PRIVATE_KEY; do
+        [ -z "${!var:-}" ] && missing="$missing $var"
+      done
+      if [ -n "$missing" ]; then
+        echo "::warning::Production frontend deploy missing - missing secrets:$missing"
+        exit 0
+      fi
+
+      SUSER="${SSH_USER:-root}"
+      SPORT="${SSH_PORT:-22}"
+      APP_DIR="${FRONTEND_APP_DIR:-/opt/${FRONTEND_SERVICE_NAME:-web}}"
+      IMAGE="${DEPLOY_FRONTEND_IMAGE:-${CI_REGISTRY_IMAGE}:latest}"
+
+      ssh -o StrictHostKeyChecking=no -p "${SPORT}" -i ~/.ssh/id_rsa \
+        "${SUSER}@${SSH_HOST}" "mkdir -p '${APP_DIR}'"
+      scp -o StrictHostKeyChecking=no -P "${SPORT}" -i ~/.ssh/id_rsa \
+        docker-compose.prod.yml \
+        "${SUSER}@${SSH_HOST}:${APP_DIR}/docker-compose.prod.yml"
+      ssh -o StrictHostKeyChecking=no -p "${SPORT}" -i ~/.ssh/id_rsa \
+        "${SUSER}@${SSH_HOST}" \
+        "cd '${APP_DIR}' && export IMAGE='${IMAGE}' && \
+         docker compose -f docker-compose.prod.yml pull && \
+         docker compose -f docker-compose.prod.yml up -d --force-recreate"
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

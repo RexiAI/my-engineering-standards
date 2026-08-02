@@ -1,0 +1,30 @@
+# Production Docker Compose — copy to repo root as docker-compose.prod.yml.
+# Used by the raw SSH + Docker Compose deploy backend (ci-deploy-ssh.yml).
+#
+# The IMAGE env var is injected by the deploy pipeline at deploy time, e.g.:
+#   export IMAGE=ghcr.io/org/my-service:latest
+# Non-secret env comes from the `environment:` block. Add `env_file` or
+# `environment:` entries for your service. Never commit secrets here.
+
+services:
+  app:
+    image: ${IMAGE:?IMAGE env var required}
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Non-secret runtime config. Use a .env file or CI secrets for secrets.
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      SERVICE_NAME: ${SERVICE_NAME:-app}
+    # Uncomment for services with persistent state:
+    # volumes:
+    #   - app-data:/var/lib/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+
+# volumes:
+#   app-data:

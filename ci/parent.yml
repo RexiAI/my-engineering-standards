@@ -31,11 +31,24 @@ DOCKER_REGISTRY: "ghcr.io"
 # - NPM_TOKEN:         npm/GitHub Packages token
 # - SONAR_TOKEN:       SonarQube (optional)
 # - PACT_BROKER_URL:   Contract tests (optional)
-# - SSH_HOST:          Production VPS hostname/IP (Kamal deploy)
-# - SSH_USER:          SSH username for VPS (default: root)
-# - SSH_PRIVATE_KEY:   SSH private key for VPS access
-# - SSH_PORT:          SSH port (default: 22)
-# - APP_DOMAIN:        Domain name for HTTPS via Traefik/Kamal
+#
+# Deploy backends (choose one per repo via init-deploy.sh --deploy-tool):
+#   Shared (all backends):
+#   - SSH_HOST:          Production hostname/IP
+#   - SSH_PRIVATE_KEY:   SSH private key for host access
+#   - SSH_PORT:          SSH port (default: 22)
+#
+#   Kamal (ci-deploy-kamal.yml):
+#   - SSH_USER:          SSH user (default: root)
+#   - APP_DOMAIN:        Domain for HTTPS via Traefik
+#
+#   Dokku (ci-deploy-dokku.yml):
+#   - SSH_USER:          SSH user (default: dokku)
+#   - DOKKU_APP_NAME:    Dokku app name (default: service-name)
+#
+#   Raw SSH + Compose (ci-deploy-ssh.yml):
+#   - SSH_USER:          SSH user (default: root)
+#   - APP_DIR:           Deploy dir on host (default: /opt/<service>)
 
 ## Usage
 # GitHub (composable — child repo calls multiple `uses:` jobs):

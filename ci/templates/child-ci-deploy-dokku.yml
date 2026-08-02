@@ -1,0 +1,88 @@
+# Dokku deploy jobs for GitLab — include from child .gitlab-ci.yml
+# Usage:
+#   include:
+#     - local: .standards/ci/templates/child-ci-deploy-dokku.yml
+#
+# Then define jobs in the child .gitlab-ci.yml:
+#   deploy:
+#     extends: .dokku-deploy
+#     stage: deploy
+#
+# Guard clause: if SSH deployment secrets are not set, the job exits 0
+# (skips) so the pipeline stays green — it does not fail. Deploys only
+# happen once SSH_HOST/SSH_PRIVATE_KEY are configured.
+
+.dokku-deploy:
+  image: alpine:3.18
+  tags: [docker]
+  before_script:
+    - apk --no-cache add openssh-client bash
+    - |
+      if [ -n "${SSH_PRIVATE_KEY:-}" ]; then
+        mkdir -p ~/.ssh
+        echo "${SSH_PRIVATE_KEY}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        echo "SSH_PRIVATE_KEY loaded from CI/CD variable"
+      else
+        echo "WARNING: SSH_PRIVATE_KEY not set. Deploy will be skipped."
+      fi
+  script:
+    - |
+      # ── Guard clause: skip deploy if production secrets are absent ──
+      missing=""
+      for var in SSH_HOST SSH_PRIVATE_KEY; do
+        [ -z "${!var:-}" ] && missing="$missing $var"
+      done
+      if [ -n "$missing" ]; then
+        echo "::warning::Production deploy skipped — missing secrets:$missing"
+        echo "Set SSH_HOST, SSH_PRIVATE_KEY in CI/CD variables to enable."
+        echo "See docs/DEPLOYMENT.md §Backend: Dokku + VPS."
+        exit 0
+      fi
+
+      SUSER="${SSH_USER:-dokku}"
+      SPORT="${SSH_PORT:-22}"
+      APP="${DOKKU_APP_NAME:-${SERVICE_NAME:-$(basename "$CI_PROJECT_PATH")}}"
+      IMAGE="${DOKKU_IMAGE:-${CI_REGISTRY_IMAGE}:latest}"
+
+      echo "Deploying app ${APP} from image ${IMAGE} to ${SSH_HOST}"
+      ssh -o StrictHostKeyChecking=no -p "${SPORT}" -i ~/.ssh/id_rsa \
+        "${SUSER}@${SSH_HOST}" "dokku git:from-image '${APP}' '${IMAGE}'"
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# Frontend variant for monorepos that deploy a separate web app.
+.dokku-deploy-frontend:
+  image: alpine:3.18
+  tags: [docker]
+  before_script:
+    - apk --no-cache add openssh-client bash
+    - |
+      if [ -n "${SSH_PRIVATE_KEY:-}" ]; then
+        mkdir -p ~/.ssh
+        echo "${SSH_PRIVATE_KEY}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+      else
+        echo "WARNING: SSH_PRIVATE_KEY not set. Deploy will be skipped."
+      fi
+  script:
+    - |
+      missing=""
+      for var in SSH_HOST SSH_PRIVATE_KEY; do
+        [ -z "${!var:-}" ] && missing="$missing $var"
+      done
+      if [ -n "$missing" ]; then
+        echo "::warning::Production frontend deploy missing - missing secrets:$missing"
+        exit 0
+      fi
+
+      APP="${DOKKU_FRONTEND_APP:-${FRONTEND_SERVICE_NAME:-${SERVICE_NAME:-web}}}"
+      IMAGE="${DOKKU_FRONTEND_IMAGE:-${CI_REGISTRY_IMAGE}:latest}"
+      SUSER="${SSH_USER:-dokku}"
+      SPORT="${SSH_PORT:-22}"
+
+      echo "Deploying frontend app ${APP} to ${SSH_HOST}"
+      ssh -o StrictHostKeyChecking=no -p "${SPORT}" -i ~/.ssh/id_rsa \
+        "${SUSER}@${SSH_HOST}" "dokku git:from-image '${APP}' '${IMAGE}'"
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

@@ -1,7 +1,7 @@
 # Kamal deploy jobs for GitLab — include from child .gitlab-ci.yml
 # Usage:
 #   include:
-#     - local: .standards/ci/templates/child-ci-deploy.yml
+#     - local: .standards/ci/templates/child-ci-deploy-kamal.yml
 #
 # Then define jobs in the child .gitlab-ci.yml:
 #   deploy:
