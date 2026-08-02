@@ -1,3 +1,10 @@
+# [1.10.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.9.0...v1.10.0) (2026-08-02)
+
+
+### Features
+
+* adopt trunk-based dev, semver via CI, PR-only workflow ([#7](https://github.com/RexiAI/my-engineering-standards/issues/7)) ([2441043](https://github.com/RexiAI/my-engineering-standards/commit/2441043d8328d30db36f982fed65cfb0b84aea7b))
+
 # Changelog
 
 ## [1.9.0] — 2026-08-02
