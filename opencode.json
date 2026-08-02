@@ -1,12 +1,12 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "agent": {
-    "spec-specifier": { "model": "github-copilot/claude-opus-5" },
-    "spec-ux": { "model": "github-copilot/claude-opus-5" },
-    "spec-verifier": { "model": "github-copilot/claude-opus-5" },
-    "spec-architect": { "model": "github-copilot/claude-opus-5" },
-    "spec-coder": { "model": "github-copilot/claude-sonnet-5" },
-    "spec-refactorer": { "model": "github-copilot/claude-sonnet-5" },
-    "spec-pipeline": { "model": "github-copilot/claude-sonnet-5" }
+    "spec-specifier": { "model": "opencode-go/kimi-k3" },
+    "spec-ux": { "model": "opencode-go/kimi-k3" },
+    "spec-verifier": { "model": "opencode-go/kimi-k3" },
+    "spec-architect": { "model": "opencode-go/kimi-k3" },
+    "spec-coder": { "model": "opencode-go/minimax-m3" },
+    "spec-refactorer": { "model": "opencode-go/minimax-m3" },
+    "spec-pipeline": { "model": "opencode-go/minimax-m3" }
   }
 }

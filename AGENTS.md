@@ -39,6 +39,26 @@ This project structure supports Java, Go, and JavaScript/TypeScript. Before writ
 - Read `docs/CONTRACT_TESTING.md` before writing service integration tests.
 - Read `docs/SPEC_PIPELINE.md` before running `/spec` or `/build`, or before writing an informal spec under `specs/`.
 
+## OpenCode Go Model Configuration
+
+This repo's spec pipeline agents are configured to use OpenCode Go subscription models via `opencode.json`:
+
+| Agent | Primary Model | Fallback Chain (via `@smart-coders-hq/opencode-model-fallback` plugin) |
+|---|---|---|
+| spec-specifier | `opencode-go/kimi-k3` | `glm-5.2` → `kimi-k2.7-code` |
+| spec-ux | `opencode-go/kimi-k3` | `glm-5.2` → `kimi-k2.7-code` |
+| spec-verifier | `opencode-go/kimi-k3` | `glm-5.2` → `kimi-k2.7-code` |
+| spec-architect | `opencode-go/kimi-k3` | `glm-5.2` → `kimi-k2.7-code` |
+| spec-coder | `opencode-go/minimax-m3` | `kimi-k2.7-code` → `glm-5.1` |
+| spec-refactorer | `opencode-go/minimax-m3` | `kimi-k2.7-code` → `glm-5.1` |
+| spec-pipeline | `opencode-go/minimax-m3` | `kimi-k2.7-code` → `glm-5.1` |
+
+**Plugin triggers**: `rate_limit`, `quota_exceeded`, `5xx`, `timeout`, `overloaded`. Cooldown: 5 min; retry original after 15 min; max depth: 3.
+
+**Provider fallback**: OpenCode Go falls back to Zen balance if "Use balance" is enabled in console. Otherwise requests error → plugin catches and switches model.
+
+To replicate on another machine: configure the same per-agent entries in `~/.config/opencode/model-fallback.json` (see plugin docs).
+
 ## CI/CD Quality Gates (Saga & Outbox)
 
 Automated gates enforce Saga and Outbox pattern compliance on every PR. Gates are conditional: `scripts/detect-saga-outbox.sh` sets `SAGA_DETECTED` and `OUTBOX_DETECTED` from changed files; all downstream gates skip when both are false.
