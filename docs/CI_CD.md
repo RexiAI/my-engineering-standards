@@ -343,10 +343,37 @@ See `ci/templates/pact-*.yml` for full examples and local Pact Broker setup.
 
 ## Release Process
 
-Uses Semantic Release with conventional commits:
+Releases are fully automated via [Semantic Release](https://semantic-release.gitbook.io/semantic-release/).
+**No manual tagging. No `VERSION` file.** The version is derived from conventional commit messages
+since the last release, and the git tag is the sole source of truth.
 
-| Commit Type | Release | Example |
-|------------|---------|---------|
-| `fix:` | Patch | `fix: handle null pointer in login` |
-| `feat:` | Minor | `feat: add password reset flow` |
-| `BREAKING CHANGE:` | Major | `feat(api): change response format\n\nBREAKING CHANGE: paginated responses` |
+### Trigger
+
+Semantic Release runs automatically after every successful merge to `main`. The release job in
+`ci-release.yml` is conditioned on `github.ref_name == github.event.repository.default_branch`
+(GitHub) or `$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH` (GitLab).
+
+### Version bump rules
+
+| Commit type | Version bump | Example |
+|---|---|---|
+| `fix:` | Patch (`0.0.X`) | `fix: handle null pointer in login` |
+| `feat:` | Minor (`0.X.0`) | `feat: add password reset flow` |
+| `feat!:` or `BREAKING CHANGE:` footer | Major (`X.0.0`) | `feat(api)!: change response format` |
+| `chore:`, `docs:`, `test:`, `refactor:`, `ci:` | No release | maintenance — no tag created |
+
+### What Semantic Release does
+
+1. Reads commits since the last `vX.Y.Z` tag on `main`.
+2. Computes the next version from commit types above.
+3. Creates an annotated git tag `vX.Y.Z` on `main`.
+4. Publishes a GitHub/GitLab release with auto-generated changelog.
+5. Commits updated `CHANGELOG.md` back to `main` (via `@semantic-release/git`).
+
+### Configuration
+
+Copy `ci/templates/releaserc.json` to `.releaserc.json` in the child repo.
+Required secrets: `GH_TOKEN` (GitHub) or a project access token with `write_repository` scope (GitLab).
+
+See `templates/branch-protection.md` for required branch-protection settings that prevent
+direct pushes to `main` (a prerequisite for the PR-only trunk workflow).
