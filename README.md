@@ -55,8 +55,11 @@ my-engineering-standards/
 │   ├── spec-verifier.md         # Stage 4: independent re-check
 │   └── spec-architect.md        # Stage 5: mutation testing + PR
 ├── skills/
-│   └── design-taste-frontend/   # Anti-slop frontend design skill (vendored)
-│       └── SKILL.md
+│   ├── design-taste-frontend/   # Anti-slop frontend design skill (vendored)
+│   │   └── SKILL.md
+│   └── hallmark/                # Anti-AI-slop design system (v1.2.0)
+│       ├── SKILL.md             # 66-gate slop test, 21 macrostructures, 20 themes
+│       └── references/          # genre files, components, verbs, upgrade techniques
 ├── language-specific/
 │   ├── java/AGENTS.md           # Spring Boot, Maven
 │   ├── go/AGENTS.md             # Gin, Makefile
