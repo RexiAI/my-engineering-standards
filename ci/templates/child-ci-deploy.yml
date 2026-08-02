@@ -1,0 +1,95 @@
+# Kamal deploy jobs for GitLab — include from child .gitlab-ci.yml
+# Usage:
+#   include:
+#     - local: .standards/ci/templates/child-ci-deploy.yml
+#
+# Then define jobs in the child .gitlab-ci.yml:
+#   deploy:
+#     extends: .kamal-deploy
+#     stage: deploy
+#
+# Guard clause: if SSH deployment secrets are not set, the job exits 0
+# (skips) so the pipeline stays green — it does not fail. Deploys only
+# happen once SSH_HOST/SSH_USER/SSH_PRIVATE_KEY are configured.
+
+.deploy-variables:
+  variables:
+    KAMAL_VERSION: "1.9.0"
+
+.deploy-setup:
+  image: ruby:3.3
+  tags: [docker]
+  before_script:
+    - gem install kamal -v ${KAMAL_VERSION}
+    - |
+      # Use CI-provided SSH keys if present; otherwise apply deploy.key in repo
+      if [ -n "${SSH_PRIVATE_KEY:-}" ]; then
+        mkdir -p ~/.ssh
+        echo "${SSH_PRIVATE_KEY}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        echo "SSH_PRIVATE_KEY loaded from CI/CD variable"
+      else
+        echo "WARNING: SSH_PRIVATE_KEY not set. Deploy will be skipped."
+      fi
+
+.kamal-deploy:
+  extends: [.deploy-setup]
+  script:
+    - |
+      # ── Guard clause: skip deploy if production secrets are absent ──
+      missing=""
+      for var in SSH_HOST SSH_USER SSH_PRIVATE_KEY; do
+        [ -z "${!var:-}" ] && missing="$missing $var"
+      done
+      if [ -n "$missing" ]; then
+        echo "::warning::Production deploy skipped — missing secrets:$missing"
+        echo "Set SSH_HOST, SSH_USER, SSH_PRIVATE_KEY in CI/CD variables to enable."
+        echo "See docs/DEPLOYMENT.md §Kamal + VPS."
+        exit 0
+      fi
+
+      # Default host/user/port
+      SHOST="${SSH_HOST}"
+      SUSER="${SSH_USER:-root}"
+      SPORT="${SSH_PORT:-22}"
+
+      # Ensure Kamal config exists
+      if [ ! -d .kamal ]; then
+        echo "ERROR: .kamal/ directory not found. Run ./.standards/scripts/init-deploy.sh first."
+        exit 1
+      fi
+
+      # Source service/image from config or env
+      export SSH_HOST="${SHOST}"
+      export SSH_USER="${SUSER}"
+      export SSH_PORT="${SPORT}"
+      export SERVICE_NAME="${SERVICE_NAME:-$(basename "$CI_PROJECT_PATH")}"
+
+      echo "Deploying service ${SERVICE_NAME} to ${SHOST} (user ${SUSER})"
+      kamal deploy --verbose
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# Frontend variant for monorepos that deploy a separate web app.
+.kamal-deploy-frontend:
+  extends: [.deploy-setup]
+  script:
+    - |
+      missing=""
+      for var in SSH_HOST SSH_USER SSH_PRIVATE_KEY; do
+        [ -z "${!var:-}" ] && missing="$missing $var"
+      done
+      if [ -n "$missing" ]; then
+        echo "::warning::Production frontend deploy missing - missing secrets:$missing"
+        exit 0
+      fi
+
+      export SERVICE_NAME="${FRONTEND_SERVICE_NAME:-${SERVICE_NAME:-web}}"
+      export SSH_HOST="${SSH_HOST}"
+      export SSH_USER="${SSH_USER:-root}"
+      export SSH_PORT="${SSH_PORT:-22}"
+
+      echo "Deploying frontend ${SERVICE_NAME} to ${SSH_HOST}"
+      kamal deploy --verbose
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

@@ -30,6 +30,12 @@ DOCKER_REGISTRY: "ghcr.io"
 # - MAVEN_PASSWORD:    GitHub Packages token
 # - NPM_TOKEN:         npm/GitHub Packages token
 # - SONAR_TOKEN:       SonarQube (optional)
+# - PACT_BROKER_URL:   Contract tests (optional)
+# - SSH_HOST:          Production VPS hostname/IP (Kamal deploy)
+# - SSH_USER:          SSH username for VPS (default: root)
+# - SSH_PRIVATE_KEY:   SSH private key for VPS access
+# - SSH_PORT:          SSH port (default: 22)
+# - APP_DOMAIN:        Domain name for HTTPS via Traefik/Kamal
 
 ## Usage
 # GitHub (composable — child repo calls multiple `uses:` jobs):

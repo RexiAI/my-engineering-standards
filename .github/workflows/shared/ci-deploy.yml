@@ -1,0 +1,145 @@
+name: Deploy to Production
+
+description: Deploy Docker images to production infrastructure using Kamal
+
+on:
+  workflow_call:
+    inputs:
+      service-name:
+        description: Name of the service to deploy
+        required: true
+        default: "my-service"
+      docker-registry:
+        description: Container registry host
+        required: false
+        default: "ghcr.io"
+      kamal-version:
+        description: Kamal version (for cache key)
+        required: false
+        default: "1.9.0"
+    secrets:
+      SSH_HOST:
+        description: Production server hostname/IP
+        required: false
+      SSH_USER:
+        description: SSH username for production server
+        required: false
+      SSH_PRIVATE_KEY:
+        description: SSH private key for production server
+        required: false
+        env: SSH_PRIVATE_KEY
+      SSH_PORT:
+        description: SSH port for production server
+        required: false
+        default: "22"
+        env: SSH_PORT
+      GHCR_TOKEN:
+        description: GitHub Container Registry token
+        required: false
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: deploy-${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  check-secrets:
+    name: Check deployment prerequisites
+    runs-on: ubuntu-latest
+    outputs:
+      deploy-ready: ${{ steps.check.outputs.deploy_ready }}
+    steps:
+      - name: Check if deployment secrets are available
+        id: check
+        run: |
+          echo "Checking deployment prerequisites..."
+          missing=""
+          [ -z "${{ secrets.SSH_HOST }}" ] && missing="$missing SSH_HOST"
+          [ -z "${{ secrets.SSH_USER }}" ] && missing="$missing SSH_USER"
+          [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ] && missing="$missing SSH_PRIVATE_KEY"
+          if [ -n "$missing" ]; then
+            echo "::warning::Production deploy skipped — missing secrets:$missing"
+            echo "::warning::Set SSH_HOST, SSH_USER, SSH_PRIVATE_KEY in CI/CD secrets to enable."
+            echo "deploy_ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "All required secrets are available"
+            echo "deploy_ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy:
+    name: Deploy to Production
+    needs: check-secrets
+    if: needs.check-secrets.outputs.deploy-ready == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://${{ secrets.SSH_HOST }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Ruby (for Kamal)
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: false
+
+      - name: Install Kamal
+        run: gem install kamal -v ${{ inputs.kamal-version }}
+
+      - name: Load SSH private key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          echo "SSH key loaded to ~/.ssh/id_rsa"
+
+      - name: Verify SSH connection
+        run: |
+          echo "Testing SSH connection to ${{ secrets.SSH_HOST }}..."
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+            -p "${{ secrets.SSH_PORT || '22' }}" \
+            -i ~/.ssh/id_rsa \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "echo 'SSH connection successful to \$HOSTNAME'"
+
+      - name: Verify .kamal config exists
+        run: |
+          if [ ! -f .kamal/config.rb ]; then
+            echo "ERROR: .kamal/config.rb not found."
+            echo "Run ./.standards/scripts/init-deploy.sh to generate deployment config."
+            exit 1
+          fi
+          echo ".kamal/ contents:"
+          ls -la .kamal/
+
+      - name: Deploy service with Kamal
+        run: |
+          echo "=== Starting deployment ==="
+          echo "Service: ${{ inputs.service-name }}"
+          echo "Host: ${{ secrets.SSH_HOST }}"
+          echo "Port: ${{ secrets.SSH_PORT || '22' }}"
+          export SERVICE_NAME="${{ inputs.service-name }}"
+          export SSH_HOST="${{ secrets.SSH_HOST }}"
+          export SSH_USER="${{ secrets.SSH_USER }}"
+          export SSH_PORT="${{ secrets.SSH_PORT || '22' }}"
+          kamal deploy --verbose
+          echo "=== Deployment completed successfully ==="
+
+  skip-deploy:
+    name: Skip deployment (not configured)
+    needs: check-secrets
+    if: needs.check-secrets.outputs.deploy-ready != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report skipped deployment
+        run: |
+          echo "::warning::Production deployment is not configured."
+          echo "Add SSH_HOST, SSH_USER, SSH_PRIVATE_KEY secrets to enable production deploys."
+          echo "Run ./.standards/scripts/init-deploy.sh to set up Kamal config."
+          echo "See docs/DEPLOYMENT.md §Kamal + VPS for details."

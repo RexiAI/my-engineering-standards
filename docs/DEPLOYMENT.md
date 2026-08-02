@@ -145,3 +145,230 @@ Enable via `init-ci.sh --with-saga` (GitLab only — GitHub Actions has no saga/
 14. **Consumer deduplication verified** (if outbox code present) — event consumer code must
     reference a deduplication store (`*DedupStore`, `alreadyProcessed`, `SetNX`). Enforced by
     `scripts/check-outbox-relay.sh`. Reference: `docs/OUTBOX_PATTERN.md §Idempotent Event Processing`.
+
+## Production Deployment: Kamal + VPS
+
+### Overview
+
+For small teams seeking a simple, cloud-agnostic deployment path: deploy Docker images to a VPS
+using [Kamal](https://github.com/basecamp/kamal) (by Basecamp). Kamal builds on Docker Compose
+and adds zero-downtime deploys, Traefik reverse proxy with automatic Let's Encrypt TLS, SSH-based
+rolling updates, and host-level health checks.
+
+**Cost**: ~$5–12/mo for a single VPS (Hetzner AX11, DigitalOcean Basic, etc.).
+**Complexity**: Zero Kubernetes. Just Docker + Kamal on Ubuntu.
+
+### Prerequisites
+
+1. A VPS running Ubuntu 22.04+ (or Debian 12+) with SSH access.
+2. A domain name with DNS pointing to the VPS.
+3. Docker installed on the VPS (Kamal installs and manages Docker automatically on first run).
+
+### Initial Setup
+
+#### 1. Bootstrap deploy configuration in your repo
+
+From your project root (which has `.standards/` as a submodule):
+
+```bash
+.standards/scripts/init-deploy.sh \
+  --platform github \
+  --host <VPS_IP> \
+  --service-name my-api \
+  --app-domain api.example.com
+```
+
+For a monorepo with both backend and frontend:
+
+```bash
+.standards/scripts/init-deploy.sh \
+  --platform github \
+  --host <VPS_IP> \
+  --backend go \
+  --frontend nextjs \
+  --service-name my-api \
+  --app-domain app.example.com
+```
+
+This creates:
+- `.kamal/config.rb` — Kamal deployment config
+- `.kamal/.env.example` — Environment variables template
+- `.kamal/secrets/` — SSH key storage directory
+- Updates `.github/workflows/ci.yml` with a `deploy` job (if it doesn't exist)
+
+#### 2. Add SSH key to CI/CD secrets
+
+Generate an SSH key pair (without a passphrase):
+
+```bash
+ssh-keygen -t ed25519 -C "deploy@your-vps" -f ~/.ssh/deploy-vps -N ""
+```
+
+Add the **private key** content to your repo's CI/CD secrets:
+
+| Provider | Secret Name | Value |
+|---|---|---|
+| GitHub Actions | `SSH_PRIVATE_KEY` | Contents of `~/.ssh/deploy-vps` |
+| GitLab CI | `SSH_PRIVATE_KEY` | Same |
+
+Also add these secrets:
+
+| Secret | Example | Required |
+|---|---|---|
+| `SSH_HOST` | `123.45.67.89` | Yes |
+| `SSH_USER` | `root` | Yes |
+| `SSH_PORT` | `22` (default) | Optional |
+| `APP_DOMAIN` | `api.example.com` | Yes |
+| `GHCR_TOKEN` | GitHub token with `write:packages` | Yes |
+
+#### 3. Bootstrap the VPS
+
+SSH into your VPS as root and install Docker:
+
+```bash
+# On the VPS
+apt-get update && apt-get install -y docker.io
+dockerd &
+```
+
+Add your deploy SSH key to the VPS:
+
+```bash
+# On the VPS
+mkdir -p ~/.ssh
+echo "ssh-ed25519 AAAA... deploy@your-vps" >> ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys
+```
+
+#### 4. First deploy
+
+```bash
+cd your-project
+cp .kamal/.env.example .kamal/.env
+# Edit .kamal/.env with your values
+source .kamal/.env
+kamal setup
+```
+
+### CI/CD Pipeline Composition
+
+After `init-ci.sh --with-deploy` or `init-deploy.sh` runs, your child repo's
+`.github/workflows/ci.yml` will have a deploy job chained after the CI build:
+
+```yaml
+jobs:
+  backend-ci:
+    uses: RexiAI/my-engineering-standards/.github/workflows/backend/ci-go.yml@main
+    with:
+      docker-registry: ghcr.io
+    secrets:
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+
+  deploy:
+    needs: [backend-ci]
+    if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
+    uses: RexiAI/my-engineering-standards/.github/workflows/shared/ci-deploy.yml@main
+    with:
+      service-name: my-api
+      docker-registry: ghcr.io
+    secrets:
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      SSH_PORT: ${{ secrets.SSH_PORT }}
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+```
+
+For GitLab CI, your `.gitlab-ci.yml` includes the deploy template:
+
+```yaml
+include:
+  - local: .standards/ci/gitlab/gitlab-ci.yml
+  - local: .standards/ci/gitlab/backend/ci-go.yml
+  - local: .standards/ci/templates/child-ci-deploy.yml
+
+deploy-prod:
+  extends: .kamal-deploy
+  stage: deploy
+  variables:
+    SERVICE_NAME: "my-api"
+```
+
+### Guard Clause: Safe Skipping
+
+If deployment secrets are not configured, the CI deploy job **skips gracefully** (exits 0).
+This means:
+
+- ✅ CI pipeline stays green
+- ✅ PRs merge successfully
+- ✅ Image builds and pushes to GHCR work normally
+- ❌ Production deploy does not happen (expected — no infra configured)
+
+This lets you set up CI/CD first, push images, and configure production deployment
+as a separate step — no coordination needed.
+
+### Service Type Configuration
+
+| Type | Service name env | Health endpoint | Port |
+|---|---|---|---|
+| Java (Spring Boot) | `SERVICE_NAME` | `/actuator/health` | `8080` |
+| Go | `SERVICE_NAME` | `/health` | `8080` |
+| Node.js (NestJS) | `SERVICE_NAME` | `/health` | `3000` |
+| Next.js | `FRONTEND_SERVICE_NAME` | `/` | `3000` |
+
+Override defaults in `.kamal/config.rb` via env vars:
+
+```ruby
+# .kamal/config.rb
+set :health_check, url: "http://my-service:8080/actuator/health",
+                    interval: 30, timeout: 5, max_checks: 30
+```
+
+### Secrets Management
+
+- **CI secrets** (SSH key, host) → set as CI/CD variables/secrets
+- **App secrets** (DATABASE_URL, API keys) → set as `KAMAL_ENV_*` variables in CI/CD
+  or via `.kamal/secrets/` on the server
+- **Never commit secrets** to the repo
+
+```yaml
+# Example: forwarding app secrets from CI environment
+env:
+  KAMAL_ENV_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+  KAMAL_ENV_API_KEY: ${{ secrets.API_KEY }}
+```
+
+### Zero-Downtime Deploys
+
+Kamal performs rolling deploys:
+1. New container starts alongside the old one
+2. Health check passes
+3. Traffic switches (via Traefik)
+4. Old container is removed
+
+### Rollback
+
+```bash
+# List deployments
+kamal deploy list
+
+# Rollback to previous
+kamal rollback
+```
+
+### VPS Provider Recommendations
+
+| Provider | 1 vCPU + 1GB | Notes |
+|---|---|---|
+| Hetzner Cloud AX11 | €4.58/mo | Best value for EU |
+| DigitalOcean Basic | $4/mo | Simple, reliable |
+| Vultr | $5/mo | Global regions |
+| AWS EC2 t4g.nano | $3.60/mo | ARM, free tier eligible |
+
+Install Docker on VPS:
+
+```bash
+curl -fsSL https://get.docker.com -o get-docker.sh
+sh get-docker.sh
+sudo usermod -aG docker $USER  # if not root
+```
