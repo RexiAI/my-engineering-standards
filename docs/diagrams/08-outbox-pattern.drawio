@@ -1,0 +1,55 @@
+<mxfile host="app.diagrams.net" modified="2024-01-01T00:00:00.000Z" agent="opencode-doc-gen" version="24.0.0" type="device">
+  <diagram name="Outbox-Pattern" id="outbox-1">
+    <mxGraphModel dx="1422" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="700" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Outbox pattern — atomic DB + outbox write, relay publishes to broker" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="1020" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="service" value="Service&#10;(e.g. OrderService.createOrder)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="100" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="db" value="Application Database&#10;(PostgreSQL)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="320" y="80" width="180" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="outbox_table" value="outbox table&#10;{ event_id PK, event_type, payload,&#10;aggregate_type, aggregate_id,&#10;created_at, published_at NULL }&#10;partial index on published_at IS NULL" style="shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="320" y="220" width="180" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="relay" value="Outbox Relay&#10;(separate process / @Scheduled)&#10;1. SELECT ... WHERE published_at IS NULL&#10;2. publish to broker&#10;3. UPDATE outbox SET published_at = NOW()&#10;    WHERE event_id IN (...)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="600" y="200" width="200" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="broker" value="Message Broker&#10;(Kafka / RabbitMQ / SQS / SNS)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="880" y="100" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="consumer" value="Consumer Service&#10;(PaymentService, etc.)&#10;1. consume from broker&#10;2. dedup via alreadyProcessed(store, event_id)&#10;3. process" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="880" y="240" width="160" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="t1" value="BEGIN&#10;INSERT INTO orders ...&#10;INSERT INTO outbox ...&#10;COMMIT&#10;(atomic)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="200" y="100" width="100" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="atomic write" style="endArrow=classic;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;strokeColor=#82b366;strokeWidth=2;" edge="1" parent="1" source="service" target="db">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" style="endArrow=classic;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;strokeColor=#9673a6;strokeWidth=2;" edge="1" parent="1" source="outbox_table" target="relay">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="publish" style="endArrow=classic;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;strokeColor=#9673a6;strokeWidth=2;" edge="1" parent="1" source="relay" target="broker">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="consume" style="endArrow=classic;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeColor=#82b366;strokeWidth=2;" edge="1" parent="1" source="broker" target="consumer">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dedup" value="Dedup store (Redis SETNX or DB):&#10;SETNX processed:{event_id} = 1 (TTL 7d)&#10;alreadyProcessed(event_id) check BEFORE processing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;align=left;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="600" y="400" width="200" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="props" value="+ reliable publication without 2PC — atomic with business write&#10;+ at-least-once delivery, idempotent on consumer side via dedup&#10;+ ordering preserved per (aggregate_id) within transaction&#10;− adds latency vs direct publish (poll interval matters)&#10;− need cleanup: DELETE FROM outbox WHERE published_at &lt; NOW() - INTERVAL '7 days'" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="40" y="400" width="540" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="ci" value="CI Quality Gate — scripts/lint-outbox-schema.sh validates: required columns, partial index on published_at IS NULL, cleanup query. scripts/check-outbox-relay.sh validates: relay component exists, consumer dedup logic exists. ci/templates/archunit/OutboxArchRules.java enforces: services must publish via outbox (no direct broker), outbox relay must exist, consumers must have dedup store, outbox relay not in controller layer." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="40" y="520" width="1020" height="80" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

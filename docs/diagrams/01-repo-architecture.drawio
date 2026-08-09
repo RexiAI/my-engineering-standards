@@ -1,0 +1,61 @@
+<mxfile host="app.diagrams.net" modified="2024-01-01T00:00:00.000Z" agent="opencode-doc-gen" version="24.0.0" type="device">
+  <diagram name="Repo-Architecture" id="repo-arch-1">
+    <mxGraphModel dx="1422" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="my-engineering-standards repo — top-level layout" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="1020" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="standards" value=".standards submodule consumed by child repos&#10;↓&#10;git submodule add ...my-engineering-standards.git .standards" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="380" y="80" width="340" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="docs" value="docs/&#10;21 canonical standards docs&#10;(ARCHITECTURE, TESTING, SAGA, OUTBOX, etc.)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="40" y="180" width="220" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="agents" value="agents/&#10;7 OpenCode agent specs&#10;(spec-pipeline orchestrator + 6 subagents)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="280" y="180" width="220" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="commands" value="commands/&#10;/spec and /build slash-command specs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="520" y="180" width="160" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="lang" value="language-specific/&#10;java/ | go/ | javascript/&#10;(AGENTS.md + linter/formatter configs)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="700" y="180" width="220" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="ci" value="ci/&#10;templates/ — Dockerfiles, Pact, ArchUnit, mutation, ESLint saga&#10;gitlab/ — reusable anchors (test→lint→contract→integration→deploy→docker)&#10;.github/ — reusable workflows (same shape)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="40" y="300" width="380" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="scripts" value="scripts/&#10;bootstrap.sh — bridge .standards into child repo&#10;init-ci.sh — generate CI workflows with optional --with-saga&#10;init-deploy.sh — generate Kamal/Dokku/SSH deploy&#10;detect/check/lint — Saga &amp; Outbox CI gates" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="440" y="300" width="280" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="templates" value="templates/&#10;ADR, branch-protection, PULL_REQUEST_TEMPLATE,&#10;Kamalfile, Dockerfiles (go|next|node|spring),&#10;session-start-check, session-end-check" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="740" y="300" width="180" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="okf" value="okf/&#10;Operational Knowledge Framework&#10;(context policy, RAG vs stuffing, context rot, MCP)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="40" y="420" width="280" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="skills" value="skills/&#10;design-taste-frontend (UX spec)&#10;hallmark (anti-slop design)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="340" y="420" width="220" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="diagrams" value="docs/diagrams/&#10;Edit source: draw.io&#10;Render: Confluence data-mxgraph" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="580" y="420" width="220" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="config" value="Top-level config&#10;AGENTS.md — master rules loaded in child repos&#10;opencode.json — per-agent model pins&#10;.releaserc.json — semantic-release&#10;Makefile — validate / lint / stats&#10;.gitattributes — fix v1.4.0 CRLF bug" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="820" y="420" width="200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;startArrow=classic;" edge="1" parent="1" source="standards" target="docs">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;startArrow=classic;" edge="1" parent="1" source="standards" target="agents">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;startArrow=classic;" edge="1" parent="1" source="standards" target="lang">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="legend" value="Yellow = AI pipeline (agents + commands)  |  Blue = Standards &amp; tooling  |  Green = language rules  |  Lavender = entry point  |  Grey = supporting" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="40" y="580" width="1020" height="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

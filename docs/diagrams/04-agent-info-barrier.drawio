@@ -1,0 +1,112 @@
+<mxfile host="app.diagrams.net" modified="2024-01-01T00:00:00.000Z" agent="opencode-doc-gen" version="24.0.0" type="device">
+  <diagram name="Agent-Info-Barrier" id="info-barrier-1">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="700" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Information barrier — what each agent can and cannot see" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="1020" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="informal" value="00-informal.md&#10;(loose prose — human only)" style="shape=note;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="40" y="100" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="tasks" value="10-tasks.md&#10;(formalized tasks)" style="shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="240" y="100" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ac" value="20-acceptance/&#10;(Given/When/Then)" style="shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="420" y="100" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="design" value="15-design.md&#10;(design read, per-task directives)" style="shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="600" y="100" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="src" value="source code, tests,&#10;linter, formatter" style="shape=note;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="800" y="100" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="spec" value="spec-specifier&#10;(Stage 1)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="220" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ux" value="spec-ux&#10;(Stage 1.5)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="280" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="coder" value="spec-coder&#10;(Stage 2)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="340" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="refactorer" value="spec-refactorer&#10;(Stage 3)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="400" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="verifier" value="spec-verifier&#10;(Stage 4)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="460" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="architect" value="spec-architect&#10;(Stage 5)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="520" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="a1y" value="✓" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=18;fontColor=#82b366;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="220" y="220" width="20" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="a1t" value="writes" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=9;fontColor=#9673a6" vertex="1" parent="1">
+          <mxGeometry x="250" y="225" width="40" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="a1a" value="writes" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=9;fontColor=#9673a6" vertex="1" parent="1">
+          <mxGeometry x="430" y="225" width="40" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="a2y" value="✓" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=18;fontColor=#82b366;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="220" y="280" width="20" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="a2t" value="reads" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=9;fontColor=#9673a6" vertex="1" parent="1">
+          <mxGeometry x="250" y="285" width="40" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="a2a" value="reads" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=9;fontColor=#9673a6" vertex="1" parent="1">
+          <mxGeometry x="430" y="285" width="40" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="a2d" value="writes (or SKIPS)" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=9;fontColor=#9673a6" vertex="1" parent="1">
+          <mxGeometry x="610" y="285" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="a3n" value="✗ DENIED" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=11;fontColor=#b85450;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="100" y="345" width="80" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="a3t" value="reads" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=9;fontColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="250" y="345" width="40" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="a3a" value="reads" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=9;fontColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="430" y="345" width="40" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="a3d" value="reads" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=9;fontColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="610" y="345" width="40" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="a3s" value="writes tests + impl" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=9;fontColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="810" y="345" width="80" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="a4n" value="✗ DENIED (all specs/**)" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=11;fontColor=#b85450;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="405" width="160" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="a4s" value="refactors source, adds property tests" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=9;fontColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="810" y="405" width="120" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="a5n" value="✗ DENIED" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=11;fontColor=#b85450;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="100" y="465" width="80" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="a5t" value="reads" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=9;fontColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="250" y="465" width="40" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="a5a" value="reads" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=9;fontColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="430" y="465" width="40" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="a5s" value="re-runs all tests/lint" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=9;fontColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="810" y="465" width="120" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="a5v" value="writes 25-verification.md" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=9;fontColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="430" y="475" width="120" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="a6n" value="✗ DENIED" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=11;fontColor=#b85450;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="100" y="525" width="80" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="a6s" value="kills mutants, commits, pushes, opens draft PR" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=9;fontColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="810" y="525" width="120" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="caveat" value="⚠ Honest caveat (docs/SPEC_PIPELINE.md §The information barrier):&#10;This barrier is a documented convention enforced by each agent's frontmatter permission.read deny patterns. Live-fire testing found it holds under normal instruction, but is NOT reliably enforced under explicit user override — at least one of the four subagents (Architect) complied when told to ignore its scope and read 00-informal.md anyway. Treat the barrier as a strongly-worded convention backed by the stage-4 Verifier gate, not as a security boundary. The Verifier's scenario-traceability check (scripts/check-scenario-traceability.sh) is the actual behavioral enforcement — an agent that peeked and implemented something not in any scenario still fails the gate." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="40" y="600" width="1020" height="100" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
