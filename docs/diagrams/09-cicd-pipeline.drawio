@@ -1,0 +1,76 @@
+<mxfile host="app.diagrams.net" modified="2024-01-01T00:00:00.000Z" agent="opencode-doc-gen" version="24.0.0" type="device">
+  <diagram name="CI-CD-Pipeline" id="cicd-1">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1300" pageHeight="600" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="CI/CD pipeline — composable parent/child model (GitHub Actions, same shape for GitLab)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="1220" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="pr" value="PR opened / push to branch" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="60" y="100" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="parent" value="Parent workflow (this repo)&#10;.github/workflows/backend/ci-go.yml (or -java, -node)&#10;defined as workflow_call" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="60" y="180" width="280" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="child" value="Child workflow (child repo)&#10;uses: RexiAI/my-engineering-standards/.github/workflows/backend/ci-go.yml@v1&#10;with: go-version, docker-registry, etc." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="380" y="180" width="320" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="jobs" value="Jobs (per language, in order):" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="290" width="300" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="j1" value="unit-test&#10;make test (Java: mvn test)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="40" y="320" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="j2" value="lint&#10;make lint (PMD / golangci / ESLint)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="240" y="320" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="j3" value="saga-gates&#10;detect-saga-outbox.sh → check-* shells&#10;Java: ArchUnit *ArchTest&#10;Go: go run go-saga-lint.go&#10;Node: eslint saga rules" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="440" y="320" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="j4" value="contract-test&#10;Pact provider verify (PR only)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="640" y="320" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="j5" value="integration-test&#10;Testcontainers, real DB (PR only)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="840" y="320" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="j6" value="security&#10;trivy, OWASP dep-check" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="1040" y="320" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" style="endArrow=classic;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeColor=#82b366;strokeWidth=2;" edge="1" parent="1" source="pr" target="parent">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="uses:" style="endArrow=classic;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;strokeColor=#d6b656;strokeWidth=2;" edge="1" parent="1" source="parent" target="child">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" style="endArrow=classic;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeColor=#82b366;strokeWidth=1;" edge="1" parent="1" source="child" target="j1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="onmain" value="On merge to main:" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="400" width="300" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="j7" value="deploy&#10;make build → upload binary" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="40" y="430" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="j8" value="docker&#10;buildx + push to ghcr.io&#10;tags: semver + sha + latest" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="240" y="430" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="j9" value="deploy-to-host&#10;Kamal / Dokku / SSH&#10;(uses shared ci-deploy-* workflow)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="440" y="430" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="j10" value="release&#10;semantic-release → tag vX.Y.Z → GitHub release" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="640" y="430" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="weekly" value="Weekly E2E (ci-e2e-weekly.yml):&#10;scheduled cron — runs full e2e against deployed staging" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;align=left;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="840" y="430" width="380" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="versioning" value="Versioning: tags created by CI on main only. feat → minor, fix → patch, BREAKING CHANGE footer / feat! → major. chore/docs/test/refactor → no release. Never create tags manually." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;align=left;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="40" y="500" width="1180" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="guard" value="Guard clause: deploy jobs exit 0 (skip) with ::warning:: if SSH_HOST / SSH_PRIVATE_KEY missing — no false-fails on safe skipping." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;align=left;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="40" y="550" width="1180" height="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

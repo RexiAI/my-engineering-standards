@@ -1,0 +1,55 @@
+<mxfile host="app.diagrams.net" modified="2024-01-01T00:00:00.000Z" agent="opencode-doc-gen" version="24.0.0" type="device">
+  <diagram name="Child-Repo-Consumption" id="child-consumption-1">
+    <mxGraphModel dx="1422" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="700" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="How a child repo consumes my-engineering-standards" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="1020" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="child" value="Child repo&#10;(your application)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="100" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="git" value="1. git submodule add&#10;git@github.com:RexiAI/my-engineering-standards.git .standards" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="40" y="200" width="320" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="standards_dir" value=".standards/&#10;(git submodule pointer)&#10;real files = this repo's master @ pinned SHA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="400" y="100" width="320" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="bootstrap" value="2. ./.standards/scripts/bootstrap.sh&#10;(--copy-agents to get editable copies of agent files)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="40" y="300" width="320" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="bootstrap_effects" value="bootstrap.sh effects:&#10;• symlink AGENTS.md → .standards/AGENTS.md&#10;• copy opencode.json.bridge → opencode.json&#10;• symlink okf, agents/, commands/, skills/&#10;• detect language (Maven | *.go | package.json) → copy language configs&#10;• copy PR template + session-start/end scripts&#10;• prompt: run init-ci.sh?" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;align=left;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="400" y="290" width="620" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="opencode" value="3. opencode.json (instructions:)&#10;points at AGENTS.md + relevant docs/* + language-specific/*&#10;this is what the AI reads on every session" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;align=left;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="40" y="410" width="380" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="init_ci" value="4. ./.standards/scripts/init-ci.sh&#10;--platform github|gitlab|both&#10;--backend java,go,node&#10;--with-saga  (optional)&#10;--with-deploy --deploy-tool kamal|dokku|ssh" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="440" y="410" width="320" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="init_deploy" value="5. ./.standards/scripts/init-deploy.sh&#10;generates Kamal/Dokku/SSH deploy&#10;+ matching CI deploy workflow" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="780" y="410" width="240" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="after" value="After: child repo's AI sessions load&#10;.standards/AGENTS.md + selected docs/* via opencode.json instructions.&#10;Spec pipeline runs against specs/NNN-slug/ in the child repo.&#10;All CI jobs compose the reusable workflows from .standards/ci/." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="40" y="540" width="980" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;startArrow=classic;" edge="1" parent="1" source="child" target="git">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;" edge="1" parent="1" source="git" target="standards_dir">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;" edge="1" parent="1" source="bootstrap" target="bootstrap_effects">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;" edge="1" parent="1" source="opencode" target="init_ci">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;startSize=12;endSize=12" edge="1" parent="1" source="after" target="opencode">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
