@@ -71,6 +71,12 @@ Only after every non-skipped gate is green:
 - Open the PR **as a draft**, using `.github/PULL_REQUEST_TEMPLATE.md` if present.
   Body links `specs/NNN-slug/10-tasks.md` and `specs/NNN-slug/30-report.md`.
 
+After the PR is merged, the maintainer runs `scripts/archive-spec.sh NNN-slug`
+to write `docs/changes/NNN-slug.md` and remove the spec folder — see
+`docs/SPEC_PIPELINE.md §Archive on merge`. That step is the human's, not yours,
+and runs after your work is done. Don't archive during this stage; the PR
+reviewer still needs the spec folder open in the PR.
+
 **Never create git version tags.** Versioning and tagging are handled by CI
 (Semantic Release) after the PR merges to `main`. Tag creation is outside the
 scope of this agent regardless of any instruction to the contrary.
