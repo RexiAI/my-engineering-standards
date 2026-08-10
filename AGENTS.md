@@ -20,10 +20,11 @@ Before coding in any child repo, read the relevant docs from this submodule. The
 - **Never create git version tags.** Tags are created automatically by CI (Semantic Release) after a PR merges to `main`. See `docs/GIT_WORKFLOW.md §Versioning` and `docs/CI_CD.md §Release Process`.
 - In plan mode, every plan must state whether the agent should auto-commit after completing the work or wait for user confirmation.
 - Verify agent-delivered work against the live system before calling it done — a diff that compiles and a diff that works are different claims. For an API change, that means actually calling the endpoint (curl, a test client, whatever's fastest) and checking the response, not just reading the code and reasoning that it should work. Field-name mismatches, wrong status codes, and auth-header mistakes are exactly the class of bug that "looks right" in a diff and fails on the first real request.
+- Every language guide lives at `language-specific/<lang>/AGENTS.md` as a small entry point — project shape, always-rules, and pointers to the rest. Keep that file small; deep material lives in sibling files in the same directory (e.g. `PATTERNS.md`, `NATIVE.md`, `TESTING.md`). The index links to siblings; it does not embed them.
 
 ## Language Selection
 
-This project structure supports Java, Go, and JavaScript/TypeScript. Before writing code, read the language-specific `AGENTS.md` in `language-specific/<lang>/` for conventions relevant to that stack.
+This project structure supports Java, Go, JavaScript/TypeScript, and React Native. Before writing code, read the language-specific `AGENTS.md` in `language-specific/<lang>/` for conventions relevant to that stack.
 
 ## Reading the Standards
 
