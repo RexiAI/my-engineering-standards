@@ -47,7 +47,7 @@ after the fact.
 ## Artifact layout
 
 ```
-specs/NNN-slug/
+specs/NNN-slug/                          ← PR branch only, gone on main
   00-informal.md        you write this, and only this
   10-tasks.md           specifier: numbered tasks, acceptance criteria
   15-design.md          ux designer: design read, dial values, per-task directives (frontend specs only)
@@ -55,9 +55,33 @@ specs/NNN-slug/
     AC-NNN-name.md      specifier: Given/When/Then scenarios, one file per task
   25-verification.md    verifier: independent re-check results, PASS/FAIL verdict
   30-report.md          architect: mutation score, complexity, gate results
+
+docs/changes/NNN-slug.md                 ← long-lived, on main, written by archive-spec.sh
 ```
 
 `NNN` is a zero-padded 3-digit sequence, e.g. `001-discount-system`.
+
+## Archive on merge
+
+The `specs/NNN-slug/` folder is pipeline scratch. It belongs on the PR branch
+for review, not on `main` — committed specs drift into a graveyard of "what we
+thought then" that future maintainers read instead of the actual code, and the
+information barrier (`§The information barrier`) is harder to reason about when
+the spec is reachable from `main` to anyone with read access.
+
+`scripts/archive-spec.sh NNN-slug` runs after the PR is merged. It writes a
+single one-pager to `docs/changes/NNN-slug.md` containing the original ask,
+task list, acceptance-scenario IDs, verification verdict, and the
+mutation/complexity report, then `git rm -r specs/NNN-slug/`. The script
+stages both moves and prints the commit message to run. It does not commit or
+push — that stays with the human, like every other commit in `AGENTS.md`.
+
+This is the only spec artifact that survives to `main`: a one-pager per
+merged feature, not seven files per feature. The acceptance scenarios survive
+in the test files as `AC-NNN-NN` IDs (the traceability check requires this
+anyway, `§Why no scenario mutation`); the verification verdict and mutation
+score survive in the one-pager; the original prose does not, because what the
+code actually does is the source of truth.
 
 ## Scenario format
 
