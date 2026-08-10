@@ -1,0 +1,42 @@
+# Expo / React Native .gitignore
+# Drop into a child Expo project at the repo root (or merge with an
+# existing .gitignore).
+
+# Expo
+.expo/
+.expo-shared/
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+web-build/
+
+# Generated native directories (created by `npx expo prebuild`)
+ios/
+android/
+
+# Local signing material
+*.jks
+*.keystore
+*.p12
+*.cer
+*.mobileprovision
+
+# Apple / Google service config — never commit
+google-services.json
+GoogleService-Info.plist
+
+# Environment files — secrets never committed
+.env*
+!.env.example
+
+# Metro / bundler cache
+.metro-health-check*
+
+# OS / editor noise
+.DS_Store
+*.swp
+.idea/
+.vscode/
