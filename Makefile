@@ -10,9 +10,9 @@ DOCS := AGENTS.md README.md \
   docs/SCALABILITY.md docs/SCHEMA_EVOLUTION.md docs/SECURITY.md \
   docs/STREAM_PROCESSING.md docs/TESTING.md docs/SPEC_PIPELINE.md
 
-LANG_AGENTS := language-specific/java/AGENTS.md \
-  language-specific/go/AGENTS.md \
-  language-specific/javascript/AGENTS.md
+LANG_AGENTS := language-specific/java/SKILL.md \
+  language-specific/go/SKILL.md \
+  language-specific/javascript/SKILL.md
 
 TEMPLATES := templates/ADR.md templates/Kamalfile templates/docker-compose.prod.yml templates/nginx.conf
 

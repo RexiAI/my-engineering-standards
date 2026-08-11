@@ -1,3 +1,10 @@
+---
+name: java
+description: Java standards: project shape, build commands, code conventions, test guidance, and pointers to PATTERNS.md / TESTING.md / checkstyle.xml / pmd-rules.xml. Use whenever a child repo uses Java or Spring Boot.
+license: See repo root
+applyTo: "**/pom.xml, **/*.java"
+---
+
 # Java Standards
 
 ## Build System

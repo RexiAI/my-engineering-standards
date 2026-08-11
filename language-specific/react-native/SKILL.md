@@ -1,3 +1,10 @@
+---
+name: react-native
+description: React Native standards: Expo managed workflow, TypeScript strict, Hermes, new architecture; NATIVE.md / PATTERNS.md / TESTING.md pointers; no Node-only APIs in app code. Use whenever a child repo uses React Native.
+license: See repo root
+applyTo: "**/{app,src}/**/*.{ts,tsx,js,jsx}, **/app.json, **/eas.json"
+---
+
 # React Native Standards
 
 This is the entry point for the React Native stack. Repo-wide rules (conventional commits, layered testing, secrets handling) are inherited from the root `AGENTS.md` and are not restated here.
@@ -28,4 +35,4 @@ This is the entry point for the React Native stack. Repo-wide rules (conventiona
 
 ## Adoption
 
-Child repos opt in by adding `language-specific/react-native/AGENTS.md` to their `opencode.json` `instructions` array, alongside any other language-specific guides they use.
+Child repos opt in by adding `language-specific/react-native/SKILL.md` to their `opencode.json` `instructions` array, alongside any other language-specific guides they use.

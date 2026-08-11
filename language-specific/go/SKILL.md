@@ -1,3 +1,10 @@
+---
+name: go
+description: Go standards: project shape, build/test/lint commands (make ci-fast / ci / ci-full), code conventions, and pointers to PATTERNS.md / TESTING.md / golangci.yml. Use whenever a child repo uses Go.
+license: See repo root
+applyTo: "**/go.mod, **/*.go"
+---
+
 # Go Standards
 
 ## Build System
