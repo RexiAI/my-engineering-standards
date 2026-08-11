@@ -1,12 +1,12 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "agent": {
-    "spec-specifier": { "model": "opencode-go/kimi-k3" },
-    "spec-ux": { "model": "opencode-go/kimi-k3" },
-    "spec-verifier": { "model": "opencode-go/kimi-k3" },
-    "spec-architect": { "model": "opencode-go/kimi-k3" },
-    "spec-coder": { "model": "opencode-go/minimax-m3" },
-    "spec-refactorer": { "model": "opencode-go/minimax-m3" },
-    "spec-pipeline": { "model": "opencode-go/minimax-m3" }
+    "spec-specifier": { "model": "opencode-go/deepseek-v4-flash" },
+    "spec-ux": { "model": "opencode-go/deepseek-v4-flash" },
+    "spec-verifier": { "model": "opencode-go/qwen3.7-plus" },
+    "spec-architect": { "model": "opencode-go/qwen3.7-plus" },
+    "spec-coder": { "model": "opencode-go/deepseek-v4-flash" },
+    "spec-refactorer": { "model": "opencode-go/deepseek-v4-flash" },
+    "spec-pipeline": { "model": "opencode-go/deepseek-v4-flash" }
   }
 }

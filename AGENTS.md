@@ -46,13 +46,13 @@ This repo's spec pipeline agents are configured to use OpenCode Go subscription 
 
 | Agent | Primary Model | Fallback Chain (via `@smart-coders-hq/opencode-model-fallback` plugin) |
 |---|---|---|
-| spec-specifier | `opencode-go/kimi-k3` | `glm-5.2` → `kimi-k2.7-code` |
-| spec-ux | `opencode-go/kimi-k3` | `glm-5.2` → `kimi-k2.7-code` |
-| spec-verifier | `opencode-go/kimi-k3` | `glm-5.2` → `kimi-k2.7-code` |
-| spec-architect | `opencode-go/kimi-k3` | `glm-5.2` → `kimi-k2.7-code` |
-| spec-coder | `opencode-go/minimax-m3` | `kimi-k2.7-code` → `glm-5.1` |
-| spec-refactorer | `opencode-go/minimax-m3` | `kimi-k2.7-code` → `glm-5.1` |
-| spec-pipeline | `opencode-go/minimax-m3` | `kimi-k2.7-code` → `glm-5.1` |
+| spec-specifier | `opencode-go/deepseek-v4-flash` | `glm-5.2` → `kimi-k2.7-code` |
+| spec-ux | `opencode-go/deepseek-v4-flash` | `glm-5.2` → `kimi-k2.7-code` |
+| spec-verifier | `opencode-go/qwen3.7-plus` | `glm-5.2` → `kimi-k2.7-code` |
+| spec-architect | `opencode-go/qwen3.7-plus` | `glm-5.2` → `kimi-k2.7-code` |
+| spec-coder | `opencode-go/deepseek-v4-flash` | `kimi-k2.7-code` → `glm-5.1` |
+| spec-refactorer | `opencode-go/deepseek-v4-flash` | `kimi-k2.7-code` → `glm-5.1` |
+| spec-pipeline | `opencode-go/deepseek-v4-flash` | `kimi-k2.7-code` → `glm-5.1` |
 
 **Plugin triggers**: `rate_limit`, `quota_exceeded`, `5xx`, `timeout`, `overloaded`. Cooldown: 5 min; retry original after 15 min; max depth: 3.
 
