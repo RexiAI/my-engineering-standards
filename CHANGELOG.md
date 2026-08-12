@@ -1,3 +1,21 @@
+# [1.12.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.11.0...v1.12.0) (2026-08-12)
+
+
+### Bug Fixes
+
+* **release:** point semantic-release at main branch ([#20](https://github.com/RexiAI/my-engineering-standards/issues/20)) ([f1393fc](https://github.com/RexiAI/my-engineering-standards/commit/f1393fc47377e207fa669d0baeb2e8de2cd3d811))
+* **spec-006:** annotate check-orchestration.sh with AC-006 scenario IDs ([#16](https://github.com/RexiAI/my-engineering-standards/issues/16)) ([3cfaed4](https://github.com/RexiAI/my-engineering-standards/commit/3cfaed41f0fcb52067ddccfbee330e9112a32547))
+
+
+### Features
+
+* add archive-spec.sh and CI workflow for spec pipeline ([#12](https://github.com/RexiAI/my-engineering-standards/issues/12)) ([ad1393b](https://github.com/RexiAI/my-engineering-standards/commit/ad1393b05bf8c178ac4a9ae36f5fe3df7e33bc7b))
+* add React Native engineering standard (spec 001) ([#11](https://github.com/RexiAI/my-engineering-standards/issues/11)) ([28b78d6](https://github.com/RexiAI/my-engineering-standards/commit/28b78d642fc812ecabf252fd339c9b89aa5bbb3d))
+* add remaining specs folder with 13 spec directories ([#18](https://github.com/RexiAI/my-engineering-standards/issues/18)) ([c783f16](https://github.com/RexiAI/my-engineering-standards/commit/c783f165f4c29d6629aa37b2bf1eea123a4e068f))
+* **agents:** add agent and skill standards conformance gate ([#19](https://github.com/RexiAI/my-engineering-standards/issues/19)) ([43af840](https://github.com/RexiAI/my-engineering-standards/commit/43af840ca0b112e6b535a40d023dfd3512b4f88a))
+* **agents:** orchestration self-conformance check (spec 006) ([#15](https://github.com/RexiAI/my-engineering-standards/issues/15)) ([3f0d726](https://github.com/RexiAI/my-engineering-standards/commit/3f0d7269d241b1f381f2ef33920827ff7bd8152a)), closes [#13](https://github.com/RexiAI/my-engineering-standards/issues/13)
+* **loops:** add loop engineering foundation (spec 016) ([#14](https://github.com/RexiAI/my-engineering-standards/issues/14)) ([0fd82bd](https://github.com/RexiAI/my-engineering-standards/commit/0fd82bd1252e2538ff445c743504d34b9e6b185d))
+
 # [1.11.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.10.0...v1.11.0) (2026-08-02)
 
 
