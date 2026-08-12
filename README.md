@@ -53,7 +53,8 @@ my-engineering-standards/
 │   ├── spec-coder.md            # Stage 2: tests + implementation
 │   ├── spec-refactorer.md       # Stage 3: structure + complexity
 │   ├── spec-verifier.md         # Stage 4: independent re-check
-│   └── spec-architect.md        # Stage 5: mutation testing + PR
+│   ├── spec-mutation-runner.md  # Stage 5a: mutation testing
+│   └── spec-pr-opener.md        # Stage 5b: commit, push, open PR
 ├── skills/
 │   ├── design-taste-frontend/   # Anti-slop frontend design skill (vendored)
 │   │   └── SKILL.md

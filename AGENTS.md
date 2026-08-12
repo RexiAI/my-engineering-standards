@@ -15,8 +15,9 @@ Before coding in any child repo, read the relevant docs from this submodule. The
 - Never commit secrets, credentials, or tokens. For small projects `.env` files are fine (always in `.gitignore`). For production, use a secrets manager.
 - Write tests in layers: unit, acceptance, integration, e2e — see `docs/TESTING.md`. Use mutation testing to validate test quality (`production` tier, see `docs/CONFORMANCE_TIERS.md`).
 - Design principles (KISS, DRY, YAGNI, SOLID, cyclomatic ≤6, property tests) are mechanically enforced by `scripts/check-code-principles.sh` — see `docs/CODING_CONVENTIONS.md §Design Principles`. The spec pipeline's Verifier runs it as an independent gate; run it standalone via the `check-principles` skill any time you want a design audit. A FAIL is a defect; a WARN is a review hint.
+- Orchestration wiring is mechanically checked by `scripts/check-orchestration.sh` — every `agent:`/`agent_type=`/backtick agent reference resolves to a real file under `agents/`, every skill cited in `agents/*.md` resolves under `skills/<name>/SKILL.md`, every `scripts/...` path cited in `agents/`, `commands/`, and `AGENTS.md` resolves (a `.sh`/`.ps1` twin counts), and every `docs/[A-Z_]+.md` / `language-specific/<lang>/SKILL.md` reference in `agents/*.md` resolves. It runs in this repo's own `.github/workflows/self-ci.yml`; stand it up standalone with `scripts/check-orchestration.sh [ROOT]`. Exit 0 = all orchestration references resolve; exit 1 = at least one broken reference, printed as `[BROKEN] <citing-file> -> <broken-ref>`.
 - Use conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`.
-- Never commit or push changes unless the user explicitly instructs it. Commits and pushes require manual confirmation. **Exception**: the spec pipeline's Architect stage (`agents/spec-architect.md`) may commit, push, and open a draft PR unattended, but only on a `spec/NNN-slug` branch and only after every configured quality gate is green — see `docs/SPEC_PIPELINE.md §Commit and push carve-out`. No other agent or workflow gets this exception.
+- Never commit or push changes unless the user explicitly instructs it. Commits and pushes require manual confirmation. **Exception**: the spec pipeline's PR Opener stage (`agents/spec-pr-opener.md`) may commit, push, and open a draft PR unattended, but only on a `spec/NNN-slug` branch and only after every configured quality gate is green (including a green Mutation Runner report) — see `docs/SPEC_PIPELINE.md §Commit and push carve-out`. The Mutation Runner (`agents/spec-mutation-runner.md`) never commits or pushes. No other agent or workflow gets this exception.
 - **All changes reach `main` via pull request. Direct push to `main` or `master` is forbidden — for humans and agents alike, with no exceptions.** This applies to this repo and every child repo. See `docs/GIT_WORKFLOW.md §Strategy: Trunk-Based Development` and `templates/branch-protection.md`.
 - **Never create git version tags.** Tags are created automatically by CI (Semantic Release) after a PR merges to `main`. See `docs/GIT_WORKFLOW.md §Versioning` and `docs/CI_CD.md §Release Process`.
 - In plan mode, every plan must state whether the agent should auto-commit after completing the work or wait for user confirmation.
@@ -52,7 +53,8 @@ This repo's spec pipeline agents are configured to use OpenCode Go subscription 
 | spec-specifier | `opencode-go/deepseek-v4-flash` | `glm-5.2` → `kimi-k2.7-code` |
 | spec-ux | `opencode-go/deepseek-v4-flash` | `glm-5.2` → `kimi-k2.7-code` |
 | spec-verifier | `opencode-go/qwen3.7-plus` | `glm-5.2` → `kimi-k2.7-code` |
-| spec-architect | `opencode-go/qwen3.7-plus` | `glm-5.2` → `kimi-k2.7-code` |
+| spec-mutation-runner | `opencode-go/qwen3.7-plus` | `glm-5.2` → `kimi-k2.7-code` |
+| spec-pr-opener | `opencode-go/qwen3.7-plus` | `glm-5.2` → `kimi-k2.7-code` |
 | spec-coder | `opencode-go/deepseek-v4-flash` | `kimi-k2.7-code` → `glm-5.1` |
 | spec-refactorer | `opencode-go/deepseek-v4-flash` | `kimi-k2.7-code` → `glm-5.1` |
 | spec-pipeline | `opencode-go/deepseek-v4-flash` | `kimi-k2.7-code` → `glm-5.1` |

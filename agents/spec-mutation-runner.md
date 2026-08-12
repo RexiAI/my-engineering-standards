@@ -36,8 +36,8 @@ what you read there instead of what the tests actually prove.
 
 Per `docs/SPEC_PIPELINE.md §Conformance tiers`, mutation testing is a `production`-
 tier gate. At `mvp` tier, skip this stage entirely and write a one-line note in
-`30-report.md` saying so. The spec-architect role runs at every tier; the
-mutation *test* does not.
+`30-report.md` saying so. The Architect role runs at every tier; the mutation
+*test* does not.
 
 - **Java**: `mvn verify -Pmutation` (PiTest). Target ≥80%.
 - **Go**: `go-mutesting` or `gremlins`, whichever is present/configured in the
