@@ -20,6 +20,7 @@ Before coding in any child repo, read the relevant docs from this submodule. The
 - **All changes reach `main` via pull request. Direct push to `main` or `master` is forbidden — for humans and agents alike, with no exceptions.** This applies to this repo and every child repo. See `docs/GIT_WORKFLOW.md §Strategy: Trunk-Based Development` and `templates/branch-protection.md`.
 - **Never create git version tags.** Tags are created automatically by CI (Semantic Release) after a PR merges to `main`. See `docs/GIT_WORKFLOW.md §Versioning` and `docs/CI_CD.md §Release Process`.
 - In plan mode, every plan must state whether the agent should auto-commit after completing the work or wait for user confirmation.
+- Loops never skip L1 (report) on a production repo — see `docs/LOOP_ENGINEERING.md §Readiness levels`.
 - Verify agent-delivered work against the live system before calling it done — a diff that compiles and a diff that works are different claims. For an API change, that means actually calling the endpoint (curl, a test client, whatever's fastest) and checking the response, not just reading the code and reasoning that it should work. Field-name mismatches, wrong status codes, and auth-header mistakes are exactly the class of bug that "looks right" in a diff and fails on the first real request.
 - Every language guide lives at `language-specific/<lang>/SKILL.md` as a small entry point — project shape, always-rules, and pointers to the rest. Keep that file small; deep material lives in sibling files in the same directory (e.g. `PATTERNS.md`, `NATIVE.md`, `TESTING.md`). The index links to siblings; it does not embed them.
 
@@ -40,6 +41,7 @@ This project structure supports Java, Go, JavaScript/TypeScript, and React Nativ
 - Read `docs/SCHEMA_EVOLUTION.md` before designing data models or APIs.
 - Read `docs/CONTRACT_TESTING.md` before writing service integration tests.
 - Read `docs/SPEC_PIPELINE.md` before running `/spec` or `/build`, or before writing an informal spec under `specs/`.
+- Read `docs/LOOP_ENGINEERING.md` before designing or running a loop (an automated agent cycle with durable state).
 
 ## OpenCode Go Model Configuration
 

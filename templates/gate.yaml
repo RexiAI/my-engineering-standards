@@ -1,0 +1,9 @@
+denylist:
+  - ".env*"
+  - "**/secrets/**"
+  - "auth/**"
+  - "payments/**"
+  - "k8s/production/**"
+  - "migrations/**"
+autoMergeEnabled: false
+autoMergeAllowlist: []
