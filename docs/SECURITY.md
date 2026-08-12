@@ -70,7 +70,7 @@ A third-party API's raw error response is not automatically safe to forward. Pro
 | Talisman | Git history for secrets | Pre-commit |
 | CodeQL | Source code SAST | CI (`.github/workflows/shared/ci-security.yml`, every push) |
 | Trivy | Filesystem dependency/CVE scan | CI (`.github/workflows/shared/ci-security.yml`, every push) |
-| ZAP | Running service DAST | Go services only, via `make docker-run-scan` (see `language-specific/go/AGENTS.md`) |
+| ZAP | Running service DAST | Go services only, via `make docker-run-scan` (see `language-specific/go/SKILL.md`) |
 
 Checkmarx, Bamboo, and Nancy are not used anywhere in this repo's CI — removed from this table (previously stale references).
 

@@ -6,8 +6,7 @@ permission:
     "specs/**": deny
     "*": allow
   bash:
-    "git commit*": ask
-    "git push*": ask
+    "git push*": deny
     "*": allow
 ---
 

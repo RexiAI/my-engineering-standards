@@ -1,5 +1,5 @@
 ---
-description: Independently re-runs the full test suite, scenario traceability, and complexity gates and confirms prior stages' claims are actually true. Stage 4 of the spec pipeline — see docs/SPEC_PIPELINE.md. Never commits, pushes, or writes production code.
+description: Runs the full test suite, scenario traceability, complexity gates, and the design-principles gate (KISS/DRY/YAGNI/SOLID via check-code-principles.sh) and confirms prior stages' claims are actually true. Stage 4 of the spec pipeline — see docs/SPEC_PIPELINE.md. Never commits, pushes, or writes production code.
 mode: subagent
 permission:
   read:
@@ -45,7 +45,7 @@ follows, applied to checking instead of building.
    Do not take the Refactorer's or Coder's word that scenarios are covered.
 
 2. **Full test suite, for real.** Run the project's actual test command (`go test
-   ./...`, `mvn test`, `npm test`, etc.) yourself. A report claiming "all tests
+./...`, `mvn test`, `npm test`, etc.) yourself. A report claiming "all tests
    green" is not evidence — the exit code and real output are. If a test is
    skipped, disabled, or silently not running, that is a failure, not a pass.
 
@@ -53,6 +53,17 @@ follows, applied to checking instead of building.
    `eslint`) yourself against the changed files. Confirm the Refactorer's claimed
    complexity reduction actually holds under the tool, not just under its own
    summary.
+
+3.5. **Design-principles gate.** Run
+   `scripts/check-code-principles.sh` (or `.standards/scripts/…` from a child
+   repo) yourself against the changed files. This is the mechanical enforcement
+   of the KISS, DRY, YAGNI, and SOLID principles plus cyclomatic complexity and
+   property-test coverage — not a self-assessment, an independent run. Do not
+   take the Refactorer's word that duplication was removed, complexity is ≤6, or
+   property tests exist; the script's FAILs and WARNs are the evidence. Every
+   FAIL is a pipeline stop. A WARN is a review hint — record it in the report and
+   flag it to the Architect, but do not stop the pipeline on a WARN alone unless
+   the project's instructions say otherwise.
 
 4. **Scenario-to-behavior spot check.** Pick at least 2 acceptance scenarios at
    random from `20-acceptance/` and manually confirm the corresponding test's
@@ -70,6 +81,8 @@ Write `specs/NNN-slug/25-verification.md`:
 
 - Each check above: PASS/FAIL with the actual command run and its real output (or a
   representative excerpt), not a paraphrase.
+- Design-principles gate: the `check-code-principles.sh` exit code and every FAIL /
+  WARN line, verbatim.
 - Spot-check results: which scenarios you checked, what you found.
 - Overall verdict: **PASS** (Architect may proceed) or **FAIL** (pipeline stops
   here, list every reason).

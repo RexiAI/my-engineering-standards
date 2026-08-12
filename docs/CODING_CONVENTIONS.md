@@ -24,9 +24,58 @@
 
 ## Design Principles
 
+The principles below are the mechanical standards this repo enforces on code.
+`scripts/check-code-principles.sh` audits them across Java, Go, and JS/TS; the
+spec pipeline's Verifier stage runs it as an independent gate. A FAIL is a
+defect; a WARN is a review hint to verify before merging.
+
+### KISS — Keep It Simple, Stupid
+
+- **Methods under 20 lines**, classes under 200 lines, files under 500 lines.
+  Split by responsibility, not by arbitrary size limits.
+- **≤6 parameters per method.** More means the method is doing too much — bundle
+  the arguments into a request object or split the method.
+- **Low nesting.** Deeply nested conditionals (>6 brace levels) are a smell;
+  extract methods or return early.
+
+### DRY — Don't Repeat Yourself
+
+- Same shape repeated across files is structural duplication, not just literal
+  copy-paste. Consolidate only when the duplication shares a **reason to
+  change** — two pieces that merely look similar for unrelated reasons are not
+  duplicates.
+- `scripts/check-code-principles.sh` flags identical 4-line blocks appearing in
+  2+ places. Verify the "same reason to change" rule before consolidating.
+
+### YAGNI — You Aren't Gonna Need It
+
+- **No interface for one implementation.** An abstraction with exactly one
+  concrete implementation is premature; add the interface when a second
+  implementation exists or is demonstrably imminent.
+- No empty method bodies in production code, no config knobs for values that
+  never change, no speculative generality.
+
+### SOLID
+
+- **S**ingle Responsibility — one reason to change per class; a god file (>400
+  lines, >15 methods) is a sign to split.
+- **O**pen/Closed — open for extension, closed for modification. Large
+  `switch`/`if-else` chains that dispatch on a type discriminator (≥4 cases)
+  should be polymorphic dispatch or a lookup instead.
+- **L**iskov Substitution — subtypes must be substitutable for their base
+  without breaking callers. Heavy `instanceof`/type-test dispatch (≥3 in one
+  file) usually means substitutability is broken.
+- **I**nterface Segregation — clients shouldn't depend on methods they don't
+  use. Split fat interfaces (>5 methods) by role.
+- **D**ependency Inversion — depend on abstractions, and point dependencies
+  inward. Domain/engine code must never import infrastructure (store,
+  repository, persistence, DB clients). See `docs/ARCHITECTURE.md`.
+
+### Base rules
+
 - **Prefer composition over inheritance.** Use interfaces and delegation instead of abstract base classes. For tests, use plain `@BeforeEach` + helper methods instead of `AbstractBaseTestSuite` base classes.
 - **Keep things small.** Classes under 200 lines, methods under 20 lines, files under 500 lines. Split by responsibility, not by arbitrary size limits.
-- **Cyclomatic complexity ≤6 per method/function.** Enforced via PMD `CyclomaticComplexity`/`CognitiveComplexity` (Java), golangci `cyclop`/`gocognit` (Go), ESLint `complexity` (JS/TS) — see `language-specific/<lang>/`. Extract methods, invert conditionals, or replace nested branching with early returns rather than raise the threshold.
+- **Cyclomatic complexity ≤6 per method/function.** Enforced via PMD `CyclomaticComplexity`/`CognitiveComplexity` (Java), golangci `cyclop`/`gocognit` (Go), ESLint `complexity` (JS/TS) — see `language-specific/<lang>/`. Extract methods, invert conditionals, or replace nested branching with early returns rather than raise the threshold. `scripts/check-code-principles.sh` applies the same threshold as a language-agnostic heuristic.
 - **Dependency rule.** Source code dependencies must point inward. Domain code never depends on infrastructure code. Controllers depend on services, services on repositories, never the reverse.
 - **Generalize, don't special-case.** One mechanism should handle all similar cases. Avoid if/else chains that check exception types — use polymorphic dispatch or Result pattern matching.
 - **Design interfaces to be deep.** A module's interface should be much simpler than its implementation. If a method just delegates with the same signature, it's a pass-through — remove it.

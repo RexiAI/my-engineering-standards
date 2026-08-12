@@ -1,4 +1,4 @@
-# Wired via `make lint` -> golangci-lint run ./... (see docs/CI_CD.md, language-specific/go/AGENTS.md §Commands).
+# Wired via `make lint` -> golangci-lint run ./... (see docs/CI_CD.md, language-specific/go/SKILL.md §Commands).
 #
 # KNOWN ISSUE (found via docs/SPEC_PIPELINE.md live-fire testing, not yet fixed):
 # this file has not been fully migrated to golangci-lint v2 linter names. Verified

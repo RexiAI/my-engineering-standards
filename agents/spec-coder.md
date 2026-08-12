@@ -6,8 +6,7 @@ permission:
     "specs/*/00-informal.md": deny
     "*": allow
   bash:
-    "git commit*": ask
-    "git push*": ask
+    "git push*": deny
     "*": allow
 ---
 
@@ -41,7 +40,7 @@ normally without it.
 
 1. **Acceptance tests from scenarios.** For every scenario in the task's
    `20-acceptance/AC-NNN-*.md`, write one test in the project's existing test
-   framework (JUnit / stdlib `testing` / Vitest — check `language-specific/<lang>/AGENTS.md`
+   framework (JUnit / stdlib `testing` / Vitest — check `language-specific/<lang>/SKILL.md`
    for the project's actual stack, do not assume). Name the test so the scenario ID
    is visible and greppable — see `docs/SPEC_PIPELINE.md §Scenario format` for the
    exact naming convention per language. These tests should fail (nothing is
@@ -53,7 +52,7 @@ normally without it.
 
 3. **Implementation.** Only now write production code. Write the minimum that makes
    every acceptance test and unit test pass. Follow `docs/CODING_CONVENTIONS.md` and
-   the relevant `language-specific/<lang>/AGENTS.md` for structure, naming, error
+   the relevant `language-specific/<lang>/SKILL.md` for structure, naming, error
    handling, and logging.
 
 Move to the next task only when the current task's full test suite is green.
@@ -66,7 +65,7 @@ Move to the next task only when the current task's full test suite is green.
 - If stdlib is sufficient, don't reach for a dependency. If the project needs a
   boundary mock, check whether it already has `testify`/`gomock` (Go) or an
   equivalent adopted before adding one — these are optional per
-  `language-specific/go/AGENTS.md`, not default.
+  `language-specific/go/SKILL.md`, not default.
 
 # Output
 

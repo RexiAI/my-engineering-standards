@@ -1,3 +1,10 @@
+---
+name: javascript
+description: JavaScript / TypeScript standards: project shape (Node 22+, npm, React/Vite or Next.js, NestJS backend), lint/format/test commands, and pointers to PATTERNS.md / TESTING.md. Use whenever a child repo uses JavaScript or TypeScript.
+license: See repo root
+applyTo: "**/package.json, **/*.{ts,tsx,js,jsx}"
+---
+
 # JavaScript / TypeScript Standards
 
 Entry point for the JavaScript / TypeScript stack. Repo-wide rules
