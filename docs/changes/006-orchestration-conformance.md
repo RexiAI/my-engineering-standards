@@ -170,7 +170,8 @@ Acceptance criteria:
 - On the real repo, the docs check reports zero broken references
   (docs/SPEC_PIPELINE.md, docs/CODING_CONVENTIONS.md,
   language-specific/go/SKILL.md all exist). A scratch agent file citing
-  `docs/NONEXISTENT.md` makes the script exit 1 naming the ref and the citing file.
+  a scratch agent file citing a nonexistent `docs/` file makes the script
+  exit 1 naming the ref and the citing file.
 - Scope is `agents/*.md` only (this mirrors the informal spec: "in agents/").
   `docs/` refs in AGENTS.md, commands/, and other markdown are not this script's
   job — `make validate-refs` already covers the whole repo.
