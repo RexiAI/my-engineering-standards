@@ -10,20 +10,24 @@
 # such reference resolves before the pipeline is trusted to run.
 #
 # Checks:
-#   1. Agent references — every agent name cited in commands/*.md and agents/*.md
-#      (YAML `agent:` frontmatter, backtick-quoted `spec-*` tokens, and literal
-#      `agent_type='...'` / `agent_type="..."` assignments) resolves to
-#      `agents/<name>.md`.
-#   2. Skill references — every skill cited in agents/*.md (backtick-quoted name
-#      on a line mentioning skill, or a `name: <name>` assignment) resolves to
-#      `skills/<name>/SKILL.md`.
-#   3. scripts/ paths — every `scripts/<file>.sh`/`.ps1` path cited in
-#      agents/, commands/, and AGENTS.md resolves to an existing file (a
+#   1. Agent references (AC-006-01) — every agent name cited in commands/*.md
+#      and agents/*.md (YAML `agent:` frontmatter, backtick-quoted `spec-*`
+#      tokens, and literal `agent_type='...'` / `agent_type="..."` assignments)
+#      resolves to `agents/<name>.md`.
+#   2. Skill references (AC-006-02) — every skill cited in agents/*.md
+#      (backtick-quoted name on a line mentioning skill, or a `name: <name>`
+#      assignment) resolves to `skills/<name>/SKILL.md`.
+#   3. scripts/ paths (AC-006-03) — every `scripts/<file>.sh`/`.ps1` path cited
+#      in agents/, commands/, and AGENTS.md resolves to an existing file (a
 #      `.sh`/`.ps1` twin counts as resolving). `.standards/scripts/…` child-repo
 #      paths are NOT repo scripts/ references and are not matched.
-#   4. docs/ and language-specific/ refs — every `docs/[A-Z_]+.md` and
-#      `language-specific/[a-z]+/SKILL.md` cross-reference in agents/*.md
-#      resolves. The `<lang>` template placeholder is never matched.
+#   4. docs/ and language-specific/ refs (AC-006-04) — every
+#      `docs/[A-Z_]+.md` and `language-specific/[a-z]+/SKILL.md`
+#      cross-reference in agents/*.md resolves. The `<lang>` template
+#      placeholder is never matched.
+#   Tasks 5-6 (AC-006-05, AC-006-06) remove the dangling spec-architect token
+#   and wire the check into self-ci; enforced by check-orchestration.sh passing
+#   on a clean tree with the self-ci step present.
 #
 # Usage:
 #   scripts/check-orchestration.sh [ROOT]
