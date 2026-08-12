@@ -1,20 +1,23 @@
 .PHONY: help validate validate-docs validate-refs validate-all lint format stats
 
 DOCS := AGENTS.md README.md \
+  docs/AGENTS_AND_SKILLS.md \
   docs/ARCHITECTURE.md docs/CI_CD.md docs/CODING_CONVENTIONS.md \
   docs/CONFORMANCE_TIERS.md \
   docs/CONTRACT_TESTING.md docs/DATA_STORAGE_DECISIONS.md \
   docs/DEPLOYMENT.md docs/EVENTUAL_CONSISTENCY.md docs/GIT_WORKFLOW.md \
-  docs/IDEMPOTENCY.md docs/MESSAGE_DELIVERY.md docs/OBSERVABILITY.md \
+  docs/IDEMPOTENCY.md docs/LOOP_ENGINEERING.md docs/MESSAGE_DELIVERY.md docs/OBSERVABILITY.md \
   docs/OUTBOX_PATTERN.md docs/RESILIENCE.md docs/SAGA_PATTERN.md \
   docs/SCALABILITY.md docs/SCHEMA_EVOLUTION.md docs/SECURITY.md \
   docs/STREAM_PROCESSING.md docs/TESTING.md docs/SPEC_PIPELINE.md
 
 LANG_AGENTS := language-specific/java/SKILL.md \
   language-specific/go/SKILL.md \
-  language-specific/javascript/SKILL.md
+  language-specific/javascript/SKILL.md \
+  language-specific/react-native/SKILL.md
 
-TEMPLATES := templates/ADR.md templates/Kamalfile templates/docker-compose.prod.yml templates/nginx.conf
+TEMPLATES := templates/ADR.md templates/Kamalfile templates/docker-compose.prod.yml templates/nginx.conf \
+  templates/agent.md templates/SKILL.md
 
 ALL_FILES := $(DOCS) $(LANG_AGENTS) $(TEMPLATES)
 
@@ -70,7 +73,10 @@ validate-refs:
 	if [ $$errors -eq 0 ]; then echo "All docs/ cross-references valid."; \
 	else echo "$$errors broken reference(s)!"; exit 1; fi
 
-validate-all: validate validate-docs validate-refs
+validate-skills:
+	@./scripts/check-skills.sh
+
+validate-all: validate validate-docs validate-refs validate-skills
 	@echo "All validations passed."
 
 lint:

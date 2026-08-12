@@ -67,6 +67,9 @@ jobs:
       - name: Check orchestration references
         run: ./scripts/check-orchestration.sh
 
+      - name: Check skills specification
+        run: ./scripts/check-skills.sh
+
       - name: make lint
         run: make lint
 
