@@ -67,6 +67,9 @@ jobs:
       - name: make lint
         run: make lint
 
+      - name: Run loop files check
+        run: ./scripts/check-loop-files.sh
+
       - name: Install shellcheck
         run: sudo apt-get update -y && sudo apt-get install -y shellcheck
 
