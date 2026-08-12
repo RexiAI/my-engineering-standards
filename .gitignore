@@ -19,4 +19,3 @@ reports/
 # for testing the spec pipeline against itself (docs/SPEC_PIPELINE.md). Child
 # repos get the real thing via scripts/bootstrap.sh pointing at .standards/.
 .opencode/
-specs

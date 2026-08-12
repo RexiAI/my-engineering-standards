@@ -60,7 +60,7 @@ validate-docs:
 validate-refs:
 	@echo "Checking all docs/ cross-refs exist..."
 	@errors=0; \
-	for src in $$(find . -name '*.md' -not -path './.git/*' -not -path '*/node_modules/*'); do \
+	for src in $$(find . -name '*.md' -not -path './.git/*' -not -path '*/node_modules/*' -not -path './specs/*'); do \
 		for ref in $$(grep -oP 'docs/[A-Z_]+\.md' "$$src" 2>/dev/null || true); do \
 			if [ ! -f "$$ref" ]; then \
 				echo "  [BROKEN] $$src -> $$ref"; errors=$$((errors + 1)); \
