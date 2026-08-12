@@ -37,7 +37,7 @@
         <mxCell id="verifier" value="spec-verifier&#10;(Stage 4)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;fontStyle=1" vertex="1" parent="1">
           <mxGeometry x="40" y="460" width="160" height="40" as="geometry" />
         </mxCell>
-        <mxCell id="architect" value="spec-architect&#10;(Stage 5)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;fontStyle=1" vertex="1" parent="1">
+        <mxCell id="architect" value="spec-mutation-runner (5a) +&#10;spec-pr-opener (5b)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;fontStyle=1" vertex="1" parent="1">
           <mxGeometry x="40" y="520" width="160" height="40" as="geometry" />
         </mxCell>
         <mxCell id="a1y" value="✓" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=18;fontColor=#82b366;fontStyle=1" vertex="1" parent="1">

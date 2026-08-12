@@ -64,6 +64,9 @@ jobs:
       - name: make validate-all
         run: make validate-all
 
+      - name: Check orchestration references
+        run: ./scripts/check-orchestration.sh
+
       - name: make lint
         run: make lint
 

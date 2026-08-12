@@ -19,7 +19,8 @@ stage 0. You review once, after stage 1. Everything after that runs to a draft P
 | 2 | Coder | `spec-coder` | Nothing — runs to green tests |
 | 3 | Refactorer | `spec-refactorer` | Nothing — runs to clean structure |
 | 4 | Verifier | `spec-verifier` | Nothing — independently re-checks stages 2-3 |
-| 5 | Architect | `spec-architect` | Nothing — runs to mutation-clean, only if Verifier passed |
+| 5a | Mutation Runner | `spec-mutation-runner` | Nothing — runs to mutation-clean, only if Verifier passed |
+| 5b | PR Opener | `spec-pr-opener` | Nothing — commits, pushes, opens draft PR, only if Mutation Runner green |
 | — | Output | — | Review the draft PR |
 
 Two commands drive it: `/spec` runs stage 1 and stops. `/build` runs stages 2-5 and
@@ -126,7 +127,8 @@ only from `10-tasks.md` and `20-acceptance/`.
 | `spec-coder` | `specs/*/00-informal.md` | Must reason from tasks + scenarios + `15-design.md` only |
 | `spec-refactorer` | `specs/**` (all) | No knowledge of requirements — judges structure only |
 | `spec-verifier` | `specs/*/00-informal.md` | Verifies against tasks + scenarios, same discipline as the Coder |
-| `spec-architect` | `specs/*/00-informal.md` | Kills mutants from tests + scenarios only |
+| `spec-mutation-runner` | `specs/*/00-informal.md` | Kills mutants from tests + scenarios only |
+| `spec-pr-opener` | `specs/*/00-informal.md` | Reads `30-report.md` only; commits + pushes + opens PR |
 
 **This is a documented convention in each agent's frontmatter (`permission.read`
 deny patterns), not a proven hard wall.** Live-fire testing against this exact
@@ -216,7 +218,8 @@ If you want per-stage differentiation, set it in your own `opencode.json`:
     "spec-specifier":  { "model": "your-provider/strong-model" },
     "spec-ux":         { "model": "your-provider/strong-model" },
     "spec-verifier":   { "model": "your-provider/strong-model" },
-    "spec-architect":  { "model": "your-provider/strong-model" },
+    "spec-mutation-runner": { "model": "your-provider/strong-model" },
+    "spec-pr-opener":  { "model": "your-provider/strong-model" },
     "spec-coder":      { "model": "your-provider/fast-model" },
     "spec-refactorer": { "model": "your-provider/fast-model" },
     "spec-pipeline":   { "model": "your-provider/fast-model" }

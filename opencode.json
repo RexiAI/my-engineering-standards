@@ -4,7 +4,8 @@
     "spec-specifier": { "model": "opencode-go/deepseek-v4-flash" },
     "spec-ux": { "model": "opencode-go/deepseek-v4-flash" },
     "spec-verifier": { "model": "opencode-go/qwen3.7-plus" },
-    "spec-architect": { "model": "opencode-go/qwen3.7-plus" },
+    "spec-mutation-runner": { "model": "opencode-go/qwen3.7-plus" },
+    "spec-pr-opener": { "model": "opencode-go/qwen3.7-plus" },
     "spec-coder": { "model": "opencode-go/deepseek-v4-flash" },
     "spec-refactorer": { "model": "opencode-go/deepseek-v4-flash" },
     "spec-pipeline": { "model": "opencode-go/deepseek-v4-flash" }
