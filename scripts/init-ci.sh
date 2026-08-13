@@ -68,7 +68,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     *)
       err "Unknown flag: $1"
-      echo "Usage: $0 [--platform github|gitlab|both] [--backend java,go,node] [--frontend nextjs,react,angular,static] [--registry ghcr.io] [--with-saga] [--with-deploy] [--deploy-tool kamal|dokku|ssh]"
+      echo "Usage: $0 [--platform github|gitlab|both] [--backend java,go,node] [--frontend nextjs,react,angular,react-native,static] [--registry ghcr.io] [--with-saga] [--with-deploy] [--deploy-tool kamal|dokku|ssh]"
       exit 1
       ;;
   esac
@@ -104,27 +104,39 @@ ok "Standards found: $STANDARDS_DIR"
 # ── Step 1: Detect / use backend languages ────
 detect_backend() {
   BACKEND=()
-  [ -f pom.xml ]         && BACKEND+=("java")
-  [ -f go.mod ]          && BACKEND+=("go")
+  [ -f pom.xml ] && BACKEND+=("java")
+  [ -f go.mod ]  && BACKEND+=("go")
 
   if [ ${#BACKEND[@]} -eq 0 ]; then
     warn "No backend files detected (pom.xml / go.mod)"
-    if [ ! -t 0 ]; then
-      warn "Non-interactive stdin — defaulting to no backend. Pass --backend to set one."
-    else
-      echo ""
-      echo "Select backend language (or None):"
-      select L in "Java" "Go" "None" "Cancel"; do
-        case $L in
-          Java)   BACKEND=("java"); break;;
-          Go)     BACKEND=("go"); break;;
-          None)   break;;
-          Cancel) exit 1;;
-        esac
-      done
-    fi
+    _prompt_backend
   fi
   [ ${#BACKEND[@]} -gt 0 ] && info "Backend: ${BACKEND[*]}"
+  true
+}
+
+# Interactive fallback when no backend files are found. Sets the BACKEND global.
+_prompt_backend() {
+  if [ ! -t 0 ]; then
+    warn "Non-interactive stdin — defaulting to no backend. Pass --backend to set one."
+    return 0
+  fi
+
+  echo ""
+  echo "Select backend language (or None):"
+  local -A values=(
+    [Java]=java
+    [Go]=go
+  )
+  select L in "Java" "Go" "None" "Cancel"; do
+    local v="${values[$L]:-}"
+    if [ -n "$v" ]; then
+      BACKEND=("$v")
+      return 0
+    fi
+    [ "$L" = "None" ]   && return 0
+    [ "$L" = "Cancel" ] && exit 1
+  done
   true
 }
 
@@ -132,34 +144,58 @@ detect_backend() {
 detect_frontend() {
   FRONTEND=""
   if [ -f package.json ]; then
-    if grep -q '"next"' package.json 2>/dev/null; then
-      FRONTEND="nextjs"
-    elif grep -q '"react"' package.json 2>/dev/null; then
-      FRONTEND="react"
-    elif grep -q '"@angular"' package.json 2>/dev/null; then
-      FRONTEND="angular"
-    fi
+    FRONTEND="$(_detect_frontend_pkg)"
   fi
-
   if [ -z "$FRONTEND" ]; then
-    if [ ! -t 0 ]; then
-      warn "No frontend detected, non-interactive stdin — defaulting to none. Pass --frontend to set one."
-    else
-      echo ""
-      echo "Select frontend type (or None):"
-      select F in "Next.js" "React (Vite)" "Angular" "Static HTML" "None" "Cancel"; do
-        case $F in
-          "Next.js")       FRONTEND="nextjs"; break;;
-          "React (Vite)")  FRONTEND="react"; break;;
-          "Angular")       FRONTEND="angular"; break;;
-          "Static HTML")   FRONTEND="static"; break;;
-          "None")          break;;
-          "Cancel")        exit 1;;
-        esac
-      done
-    fi
+    _prompt_frontend
   fi
   [ -n "$FRONTEND" ] && info "Frontend: $FRONTEND"
+  true
+}
+
+# Marker precedence matters: an Expo app also lists "react" and
+# "react-native", so the more specific markers must win before "react".
+_detect_frontend_pkg() {
+  if grep -qE '"(expo|react-native)"' package.json 2>/dev/null; then
+    echo "react-native"; return 0
+  fi
+  if grep -q '"next"' package.json 2>/dev/null; then
+    echo "nextjs"; return 0
+  fi
+  if grep -q '"react"' package.json 2>/dev/null; then
+    echo "react"; return 0
+  fi
+  if grep -q '"@angular"' package.json 2>/dev/null; then
+    echo "angular"; return 0
+  fi
+  echo ""
+}
+
+# Interactive fallback when no frontend marker is found. Sets the FRONTEND global.
+_prompt_frontend() {
+  if [ ! -t 0 ]; then
+    warn "No frontend detected, non-interactive stdin — defaulting to none. Pass --frontend to set one."
+    return 0
+  fi
+
+  echo ""
+  echo "Select frontend type (or None):"
+  local -A values=(
+    [Next.js]=nextjs
+    ["React (Vite)"]=react
+    [Angular]=angular
+    ["React Native (Expo)"]=react-native
+    ["Static HTML"]=static
+  )
+  select F in "Next.js" "React (Vite)" "Angular" "React Native (Expo)" "Static HTML" "None" "Cancel"; do
+    local v="${values[$F]:-}"
+    if [ -n "$v" ]; then
+      FRONTEND="$v"
+      return 0
+    fi
+    [ "$F" = "None" ]   && return 0
+    [ "$F" = "Cancel" ] && exit 1
+  done
   true
 }
 
@@ -197,7 +233,7 @@ fi
 
 # ── Step 3: Ask for secrets ───────────────────
 collect_secrets() {
-  GHCR_TOKEN=""; MAVEN_USERNAME=""; MAVEN_PASSWORD=""; NPM_TOKEN=""; SONAR_TOKEN=""; PACT_BROKER_URL=""
+  GHCR_TOKEN=""; MAVEN_USERNAME=""; MAVEN_PASSWORD=""; NPM_TOKEN=""; EXPO_TOKEN=""; SONAR_TOKEN=""; PACT_BROKER_URL=""
 
   if [ ! -t 0 ]; then
     info "Non-interactive stdin — skipping secrets prompt (add secrets manually later)."
@@ -210,18 +246,30 @@ collect_secrets() {
   echo "2) Skip (add secrets manually later)"
   read -r SECRETS_CHOICE
 
-  if [ "$SECRETS_CHOICE" = "1" ]; then
-    read -rp "  GHCR_TOKEN: " GHCR_TOKEN
-    if [[ " ${BACKEND[*]} " =~ "java" ]]; then
-      read -rp "  MAVEN_USERNAME: " MAVEN_USERNAME
-      read -rp "  MAVEN_PASSWORD: " MAVEN_PASSWORD
-    fi
-    if [[ " ${BACKEND[*]} " =~ "node" ]] || [ -n "$FRONTEND" ]; then
-      read -rp "  NPM_TOKEN: " NPM_TOKEN
-    fi
-    read -rp "  SONAR_TOKEN (optional): " SONAR_TOKEN
-    read -rp "  PACT_BROKER_URL (optional): " PACT_BROKER_URL
+  if [ "$SECRETS_CHOICE" != "1" ]; then
+    return
   fi
+
+  read -rp "  GHCR_TOKEN: " GHCR_TOKEN
+  if [[ " ${BACKEND[*]} " =~ "java" ]]; then
+    read -rp "  MAVEN_USERNAME: " MAVEN_USERNAME
+    read -rp "  MAVEN_PASSWORD: " MAVEN_PASSWORD
+  fi
+  if _wants_npm_token; then
+    read -rp "  NPM_TOKEN: " NPM_TOKEN
+  fi
+  if [ "$FRONTEND" = "react-native" ]; then
+    read -rp "  EXPO_TOKEN: " EXPO_TOKEN
+  fi
+  read -rp "  SONAR_TOKEN (optional): " SONAR_TOKEN
+  read -rp "  PACT_BROKER_URL (optional): " PACT_BROKER_URL
+}
+
+# NPM_TOKEN is prompted when there is a node backend or any frontend.
+_wants_npm_token() {
+  [ -n "$FRONTEND" ] && return 0
+  [[ " ${BACKEND[*]} " =~ "node" ]] && return 0
+  return 1
 }
 
 collect_secrets
@@ -263,41 +311,31 @@ EOF
 EOF
   done
 
-  if [ -n "$FRONTEND" ]; then
-    cat >> "$target" << EOF
-  frontend-ci:
-    uses: RexiAI/my-engineering-standards/.github/workflows/frontend/ci-${FRONTEND}.yml@main
-    with:
-      docker-registry: $registry
-    secrets:
-       GHCR_TOKEN: \${{ secrets.GHCR_TOKEN }}
-EOF
-   fi
+  _gh_frontend_job "$target" "$registry"
 
-  # Add deploy job for production if --with-deploy
-  if [ "$WITH_DEPLOY_FLAG" = "true" ]; then
-    cat >> "$target" << EOF
+  _gh_deploy_job "$target"
+
+  ok "Generated: .github/workflows/ci.yml"
+
+  # Copy saga templates when --with-saga
+  if [ "$saga_enabled" = "true" ]; then
+    _copy_saga_templates
+  fi
+
+  _gh_dependabot
+  _gh_releaserc
+  _copy_go_makefile
+}
+
+# Deploy job for production, appended only when --with-deploy is set.
+_gh_deploy_job() {
+  local target="$1"
+  [ "$WITH_DEPLOY_FLAG" != "true" ] && return 0
+
+  cat >> "$target" << EOF
 
   deploy:
-    needs: [$(
-      # Build needs array dynamically
-      needs_list=""
-      for lang in "${BACKEND[@]}"; do
-        if [ -n "$needs_list" ]; then
-          needs_list="${needs_list}, backend-ci-${lang}"
-        else
-          needs_list="backend-ci-${lang}"
-        fi
-      done
-      if [ -n "$FRONTEND" ]; then
-        if [ -n "$needs_list" ]; then
-          needs_list="${needs_list}, frontend-ci"
-        else
-          needs_list="frontend-ci"
-        fi
-      fi
-      echo "$needs_list"
-    )]
+    needs: [$(_gh_deploy_needs)]
     if: \${{ github.event_name == 'push' && github.ref_name == github.event.repository.default_branch }}
     uses: RexiAI/my-engineering-standards/.github/workflows/shared/ci-deploy-${DEPLOY_TOOL}.yml@main
     with:
@@ -310,50 +348,93 @@ EOF
       SSH_PORT: \${{ secrets.SSH_PORT }}
       GHCR_TOKEN: \${{ secrets.GHCR_TOKEN }}
 EOF
-    ok "Added deploy job to ci.yml (configure SSH_HOST, SSH_USER, SSH_PRIVATE_KEY secrets)"
-    info "Deploy tool: ${DEPLOY_TOOL}. Run ./.standards/scripts/init-deploy.sh --deploy-tool ${DEPLOY_TOOL} to set up deploy config"
+  ok "Added deploy job to ci.yml (configure SSH_HOST, SSH_USER, SSH_PRIVATE_KEY secrets)"
+  info "Deploy tool: ${DEPLOY_TOOL}. Run ./.standards/scripts/init-deploy.sh --deploy-tool ${DEPLOY_TOOL} to set up deploy config"
+}
+
+# Frontend job block: react-native swaps the docker-registry/GHCR pair for a
+# node-version/EXPO_TOKEN pair (EAS builds remotely, no registry push).
+_gh_frontend_job() {
+  local target="$1"
+  local registry="$2"
+  [ -z "$FRONTEND" ] && return 0
+
+  local workflow="frontend/ci-${FRONTEND}.yml"
+  local with_block="      docker-registry: $registry"
+  local secrets_block="       GHCR_TOKEN: \${{ secrets.GHCR_TOKEN }}"
+  if [ "$FRONTEND" = "react-native" ]; then
+    workflow="frontend/ci-react-native.yml"
+    with_block="      node-version: \"22\""
+    secrets_block="      EXPO_TOKEN: \${{ secrets.EXPO_TOKEN }}"
   fi
 
-   ok "Generated: .github/workflows/ci.yml"
+  cat >> "$target" << EOF
+  frontend-ci:
+    uses: RexiAI/my-engineering-standards/.github/workflows/${workflow}@main
+    with:
+${with_block}
+    secrets:
+${secrets_block}
+EOF
+}
 
-  # Copy saga templates if --with-saga
-  if [ "$saga_enabled" = "true" ]; then
-    _copy_saga_templates
-  fi
-
-  # Dependabot
-  if [ ! -f "$PROJECT_ROOT/.github/dependabot.yml" ]; then
-    local eco="npm"
-    for lang in "${BACKEND[@]}"; do
-      case $lang in
-        java) eco="maven";;
-        go)   eco="gomod";;
-        node) eco="npm";;
-      esac
-    done
-    mkdir -p "$PROJECT_ROOT/.github"
-    sed "s/LANG_ECOSYSTEM/$eco/g" "$STANDARDS_DIR/ci/templates/dependabot.yml" \
-      > "$PROJECT_ROOT/.github/dependabot.yml"
-    ok "Generated: .github/dependabot.yml"
-  fi
-
-  # Semantic Release config (Node backend or frontend)
-  if [ ! -f "$PROJECT_ROOT/.releaserc.json" ]; then
-    local has_node=false
-    for lang in "${BACKEND[@]}"; do [ "$lang" = "node" ] && has_node=true; done
-    if [ "$has_node" = true ] || [ -n "$FRONTEND" ]; then
-      cp "$STANDARDS_DIR/ci/templates/releaserc.json" "$PROJECT_ROOT/.releaserc.json"
-      ok "Generated: .releaserc.json"
-    fi
-  fi
-
-  # Copy Makefile if Go and no existing Makefile
+# Comma-separated needs list for the GitHub deploy job (backend + optional frontend).
+_gh_deploy_needs() {
+  local needs_list=""
+  local lang
   for lang in "${BACKEND[@]}"; do
-    if [ "$lang" = "go" ] && [ ! -f "$PROJECT_ROOT/Makefile" ]; then
-      cp "$STANDARDS_DIR/ci/templates/Makefile.go" "$PROJECT_ROOT/Makefile"
-      ok "Generated: Makefile (Go template)"
+    if [ -n "$needs_list" ]; then
+      needs_list="${needs_list}, backend-ci-${lang}"
+    else
+      needs_list="backend-ci-${lang}"
     fi
   done
+  if [ -n "$FRONTEND" ]; then
+    if [ -n "$needs_list" ]; then
+      needs_list="${needs_list}, frontend-ci"
+    else
+      needs_list="frontend-ci"
+    fi
+  fi
+  echo "$needs_list"
+}
+
+_gh_dependabot() {
+  [ -f "$PROJECT_ROOT/.github/dependabot.yml" ] && return 0
+  mkdir -p "$PROJECT_ROOT/.github"
+  sed "s/LANG_ECOSYSTEM/$(_dependabot_ecosystem)/g" "$STANDARDS_DIR/ci/templates/dependabot.yml" \
+    > "$PROJECT_ROOT/.github/dependabot.yml"
+  ok "Generated: .github/dependabot.yml"
+}
+
+# Last backend language wins (the original loop semantics).
+_dependabot_ecosystem() {
+  local eco="npm"
+  local lang
+  for lang in "${BACKEND[@]}"; do
+    case $lang in
+      java) eco="maven";;
+      go)   eco="gomod";;
+      node) eco="npm";;
+    esac
+  done
+  echo "$eco"
+}
+
+_gh_releaserc() {
+  [ -f "$PROJECT_ROOT/.releaserc.json" ] && return 0
+  if _has_node_backend || [ -n "$FRONTEND" ]; then
+    cp "$STANDARDS_DIR/ci/templates/releaserc.json" "$PROJECT_ROOT/.releaserc.json"
+    ok "Generated: .releaserc.json"
+  fi
+}
+
+_has_node_backend() {
+  local lang
+  for lang in "${BACKEND[@]}"; do
+    [ "$lang" = "node" ] && return 0
+  done
+  return 1
 }
 
 generate_gitlab() {
@@ -400,6 +481,34 @@ variables:
   CI_REGISTRY: $registry
 EOF
 
+  _gl_backend_jobs "$target" "$saga_enabled"
+  _gl_frontend_job "$target"
+
+  # Add production deploy job when --with-deploy
+  if [ "$WITH_DEPLOY_FLAG" = "true" ]; then
+    cat >> "$target" << EOF
+
+include:
+  - local: .standards/ci/templates/child-ci-deploy-${DEPLOY_TOOL}.yml
+
+deploy-prod:
+  extends: .${DEPLOY_TOOL}-deploy
+  stage: deploy
+  variables:
+    SERVICE_NAME: ""
+EOF
+    ok "Added deploy-prod job to .gitlab-ci.yml (configure SSH_HOST, SSH_USER, SSH_PRIVATE_KEY CI/CD variables)"
+    info "Deploy tool: ${DEPLOY_TOOL}. Run ./.standards/scripts/init-deploy.sh --deploy-tool ${DEPLOY_TOOL} to set up deploy config"
+  fi
+
+  ok "Generated: .gitlab-ci.yml"
+  _copy_go_makefile
+}
+
+_gl_backend_jobs() {
+  local target="$1"
+  local saga_enabled="$2"
+  local lang
   for lang in "${BACKEND[@]}"; do
     cat >> "$target" << EOF
 
@@ -441,10 +550,18 @@ ${lang}-docker:
   stage: docker
 EOF
   done
+}
 
-  if [ -n "$FRONTEND" ]; then
-    if [ "$FRONTEND" = "static" ]; then
-      cat >> "$target" << EOF
+# Frontend jobs for GitLab. React Native shares the unit/lint/build jobs with
+# the web frontends (the extends names interpolate through FRONTEND) and only
+# swaps the tail job: typecheck+eas instead of docker. Emitted in the original
+# job order (unit, lint, typecheck, build, eas) to keep generated output stable.
+_gl_frontend_job() {
+  local target="$1"
+  [ -z "$FRONTEND" ] && return 0
+
+  if [ "$FRONTEND" = "static" ]; then
+    cat >> "$target" << EOF
 
 frontend-lint:
   extends: .static-lint
@@ -454,8 +571,10 @@ frontend-docker:
   extends: .static-docker
   stage: docker
 EOF
-    else
-      cat >> "$target" << EOF
+    return 0
+  fi
+
+  cat >> "$target" << EOF
 
 frontend-unit:
   extends: .${FRONTEND}-unit
@@ -464,44 +583,39 @@ frontend-unit:
 frontend-lint:
   extends: .${FRONTEND}-lint
   stage: lint
+EOF
+
+  if [ "$FRONTEND" = "react-native" ]; then
+    cat >> "$target" << EOF
+
+frontend-typecheck:
+  extends: .react-native-typecheck
+  stage: test
+EOF
+  fi
+
+  cat >> "$target" << EOF
 
 frontend-build:
   extends: .${FRONTEND}-build
   stage: deploy
+EOF
+
+  if [ "$FRONTEND" = "react-native" ]; then
+    cat >> "$target" << EOF
+
+frontend-eas:
+  extends: .react-native-eas
+  stage: docker
+EOF
+  else
+    cat >> "$target" << EOF
 
 frontend-docker:
   extends: .${FRONTEND}-docker
   stage: docker
 EOF
-    fi
   fi
-
-  # Add production deploy job when --with-deploy
-  if [ "$WITH_DEPLOY_FLAG" = "true" ]; then
-    cat >> "$target" << EOF
-
-include:
-  - local: .standards/ci/templates/child-ci-deploy-${DEPLOY_TOOL}.yml
-
-deploy-prod:
-  extends: .${DEPLOY_TOOL}-deploy
-  stage: deploy
-  variables:
-    SERVICE_NAME: ""
-EOF
-    ok "Added deploy-prod job to .gitlab-ci.yml (configure SSH_HOST, SSH_USER, SSH_PRIVATE_KEY CI/CD variables)"
-    info "Deploy tool: ${DEPLOY_TOOL}. Run ./.standards/scripts/init-deploy.sh --deploy-tool ${DEPLOY_TOOL} to set up deploy config"
-  fi
-
-   ok "Generated: .gitlab-ci.yml"
-
-  # Copy Makefile if Go and no existing Makefile
-  for lang in "${BACKEND[@]}"; do
-    if [ "$lang" = "go" ] && [ ! -f "$PROJECT_ROOT/Makefile" ]; then
-      cp "$STANDARDS_DIR/ci/templates/Makefile.go" "$PROJECT_ROOT/Makefile"
-      ok "Generated: Makefile (Go template)"
-    fi
-  done
 }
 
 # ── Step 4b: Copy saga templates ─────────────────────────────────────────────
@@ -573,6 +687,17 @@ _copy_saga_templates() {
   info "Reference: docs/SAGA_PATTERN.md §CI Quality Gates, docs/OUTBOX_PATTERN.md §CI Quality Gates"
 }
 
+# Copy Makefile if Go and no existing Makefile — shared by both generators.
+_copy_go_makefile() {
+  local lang
+  for lang in "${BACKEND[@]}"; do
+    if [ "$lang" = "go" ] && [ ! -f "$PROJECT_ROOT/Makefile" ]; then
+      cp "$STANDARDS_DIR/ci/templates/Makefile.go" "$PROJECT_ROOT/Makefile"
+      ok "Generated: Makefile (Go template)"
+    fi
+  done
+}
+
 # ── Step 5: Print summary ─────────────────────────────────────────────────────
 print_summary() {
   echo ""
@@ -581,27 +706,11 @@ print_summary() {
   echo "╚══════════════════════════════════════╝"
   echo ""
   echo "Generated files:"
-  [ -f .github/workflows/ci.yml ] && echo "  • .github/workflows/ci.yml (backend: ${BACKEND[*]}, frontend: ${FRONTEND:-none})"
-  [ -f .github/dependabot.yml ]   && echo "  • .github/dependabot.yml"
-  [ -f .gitlab-ci.yml ]           && echo "  • .gitlab-ci.yml"
-  [ -f .releaserc.json ]          && echo "  • .releaserc.json"
-  [ -f Makefile ]                 && echo "  • Makefile"
+  _print_generated_files
   echo ""
   echo "Next steps:"
-  if [ "$CI" = "github" ] || [ "$CI" = "both" ]; then
-    echo "  1. Add repo secrets in GitHub → Settings → Secrets and variables → Actions:"
-    [ -n "$GHCR_TOKEN" ]     && echo "     - GHCR_TOKEN (GitHub Container Registry token)"
-    [ -n "$MAVEN_USERNAME" ] && echo "     - MAVEN_USERNAME"
-    [ -n "$MAVEN_PASSWORD" ] && echo "     - MAVEN_PASSWORD"
-    [ -n "$NPM_TOKEN" ]      && echo "     - NPM_TOKEN"
-    [ -n "$SONAR_TOKEN" ]    && echo "     - SONAR_TOKEN (optional)"
-    [ -n "$PACT_BROKER_URL" ] && echo "     - PACT_BROKER_URL (optional)"
-    echo "  2. Push and check Actions tab"
-  fi
-  if [ "$CI" = "gitlab" ] || [ "$CI" = "both" ]; then
-    echo "  1. Add CI/CD variables in GitLab → Settings → CI/CD → Variables"
-    echo "  2. Push and check Pipelines tab"
-  fi
+  _print_gh_next_steps
+  _print_gl_next_steps
   echo "  3. Review generated files and customize as needed"
   if [ "${WITH_SAGA_FLAG:-}" = "true" ]; then
     echo ""
@@ -621,6 +730,50 @@ print_summary() {
     echo "  • Reference: docs/DEPLOYMENT.md §Production Deployment"
   fi
   echo ""
+}
+
+_print_generated_files() {
+  [ -f .github/workflows/ci.yml ] && echo "  • .github/workflows/ci.yml (backend: ${BACKEND[*]}, frontend: ${FRONTEND:-none})"
+  [ -f .github/dependabot.yml ]   && echo "  • .github/dependabot.yml"
+  [ -f .gitlab-ci.yml ]           && echo "  • .gitlab-ci.yml"
+  [ -f .releaserc.json ]          && echo "  • .releaserc.json"
+  [ -f Makefile ]                 && echo "  • Makefile"
+  true
+}
+
+# Print "     - SECRET (description)" for every secret captured above.
+_print_gh_secrets() {
+  while read -r name label; do
+    [ -n "${!name}" ] && echo "     - $label"
+  done <<'EOF'
+GHCR_TOKEN GHCR_TOKEN (GitHub Container Registry token)
+MAVEN_USERNAME MAVEN_USERNAME
+MAVEN_PASSWORD MAVEN_PASSWORD
+NPM_TOKEN NPM_TOKEN
+EXPO_TOKEN EXPO_TOKEN (Expo/EAS build, merge-to-main only)
+SONAR_TOKEN SONAR_TOKEN (optional)
+PACT_BROKER_URL PACT_BROKER_URL (optional)
+EOF
+  true
+}
+
+_print_gh_next_steps() {
+  case $CI in
+    github|both)
+      echo "  1. Add repo secrets in GitHub → Settings → Secrets and variables → Actions:"
+      _print_gh_secrets
+      echo "  2. Push and check Actions tab"
+      ;;
+  esac
+}
+
+_print_gl_next_steps() {
+  case $CI in
+    gitlab|both)
+      echo "  1. Add CI/CD variables in GitLab → Settings → CI/CD → Variables"
+      echo "  2. Push and check Pipelines tab"
+      ;;
+  esac
 }
 
 # ── Main ──────────────────────────────────────
