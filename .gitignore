@@ -15,6 +15,11 @@ reports/
 .env.local
 .serena/
 
+# Per-machine model overrides for the spec pipeline (see docs/SPEC_PIPELINE.md
+# §Model configuration). The committed template config/model.local.env.example
+# stays trackable; the real file must never be committed.
+config/model.local.env
+
 # Local dogfooding scaffold — this repo's own agent/ and command/ symlinked in
 # for testing the spec pipeline against itself (docs/SPEC_PIPELINE.md). Child
 # repos get the real thing via scripts/bootstrap.sh pointing at .standards/.
