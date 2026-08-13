@@ -48,7 +48,7 @@ This project structure supports Java, Go, JavaScript/TypeScript, and React Nativ
 
 ## OpenCode Go Model Configuration
 
-This repo's spec pipeline agents are configured to use OpenCode Go subscription models via `opencode.json`:
+This repo's spec pipeline agents are configured to use OpenCode Go subscription models via `opencode.json` `{env:SPEC_*_MODEL}` references:
 
 | Agent | Primary Model | Fallback Chain (via `@smart-coders-hq/opencode-model-fallback` plugin) |
 |---|---|---|
@@ -60,6 +60,17 @@ This repo's spec pipeline agents are configured to use OpenCode Go subscription 
 | spec-coder | `opencode-go/deepseek-v4-flash` | `kimi-k2.7-code` → `glm-5.1` |
 | spec-refactorer | `opencode-go/deepseek-v4-flash` | `kimi-k2.7-code` → `glm-5.1` |
 | spec-pipeline | `opencode-go/deepseek-v4-flash` | `kimi-k2.7-code` → `glm-5.1` |
+
+Per-machine values come from the gitignored `config/model.local.env` (falling
+back to the committed `config/model.local.env.example` defaults) via
+`scripts/load-model-env.sh`, wired into your shell profile once
+(`source <repo>/scripts/load-model-env.sh`). Switching a model means editing
+`config/model.local.env` and restarting opencode — **no commit, no PR**.
+`scripts/check-model-env.sh` enforces structurally that `opencode.json` keeps no
+literal model id and the real env file is never tracked; self-ci additionally
+downloads a pinned opencode binary and runs `scripts/model-env.runtime-check.sh`
+to verify the resolution behavior. See `docs/SPEC_PIPELINE.md §Model
+configuration` for the full mechanism and precedence.
 
 **Plugin triggers**: `rate_limit`, `quota_exceeded`, `5xx`, `timeout`, `overloaded`. Cooldown: 5 min; retry original after 15 min; max depth: 3.
 
