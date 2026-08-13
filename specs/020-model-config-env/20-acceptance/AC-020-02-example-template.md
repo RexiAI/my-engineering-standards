@@ -19,7 +19,8 @@ When each `SPEC_*_MODEL` line is inspected
 Then a comment line directly above it states which agent the var drives and that the value is the committed default until overridden locally
 And no var line has a comment missing
 
-## AC-020-02-04 — Header documents copy → fill → restart → never commit
+## AC-020-02-04 — Header documents the one-time setup: profile wiring, optional copy, restart, never commit
 Given `config/model.local.env.example` exists
 When its header comment block is read
-Then it instructs copying the file to `config/model.local.env`, filling in real model ids, restarting opencode (config is read once at startup), and never committing the real file
+Then it instructs wiring `source <repo>/scripts/load-model-env.sh` into the shell profile once so every shell exports these vars automatically
+And it instructs copying the file to `config/model.local.env` only when overriding, filling in real model ids, restarting opencode (config is read once at startup), and never committing the real file
