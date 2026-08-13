@@ -285,36 +285,41 @@ Scenarios: `20-acceptance/AC-021-08-self-ci-gates.md`
 | AC-005 all YAML validates, orchestration refs resolve, no CRLF | 8 | `AC-021-08-self-ci-gates.md` |
 | AC-006 EAS jobs gated on EXPO_TOKEN and documented; no-Expo repo stays green on unit/lint/typecheck | 1 + 2 + 5 | `AC-021-01-github-workflow.md`, `AC-021-02-gitlab-template.md`, `AC-021-05-ci-cd-docs.md` |
 
-## Open questions (need a human answer before /build)
+## Decisions (human-confirmed; all questions resolved — no open questions remain)
 
-1. **`build/export` job = local `npx expo export`.** The informal spec lists
-   "build/export (expo export or EAS build)". This spec picks `npx expo export`
-   (local, no network/Expo account) for the per-push build job, so a repo
-   without EXPO_TOKEN still gets a real bundle check, and a separate gated
-   `eas-build` job for the deploy/main path. Confirm this split.
-2. **EAS Submit is documented, not a v1 job.** The CI_CD.md table lists an
-   `eas-submit` row (release path, store credentials), but the workflow ships no
-   `eas-submit` job in v1 — consistent with the informal spec's deferral of the
-   `init-deploy.sh` EAS path. Confirm no `eas submit` CI job is wanted yet.
-3. **Maestro E2E = documented hook only in v1.** The workflow contains no active
-   Maestro job; `docs/CI_CD.md` documents the opt-in hook (`.maestro/` flows +
-   `maestro test .maestro/`). This matches the informal spec's stated preference
-   ("skip in v1 of the template with a documented hook"). Confirm no
-   commented-out job block is required in the workflow itself.
-4. **`child-ci-react-native.yml` is a reference, not copied by init-ci.sh.**
-   `init-ci.sh` writes `ci.yml` inline via heredoc and never copies
-   `ci/templates/child-ci-*.yml` — that is existing behavior for `child-ci-node.yml`
-   too. AC-003's "generates a `.github/workflows/ci.yml` that includes it" is
-   therefore interpreted as "wires the `frontend/ci-react-native.yml` reusable
-   workflow" (GitHub) and "includes `ci/gitlab/frontend/ci-react-native.yml` +
-   extends `.react-native-*`" (GitLab). Confirm this reading.
-5. **EAS project id is committed config, not a secret.** Only `EXPO_TOKEN`
-   becomes a CI secret placeholder. The EAS project id lives in `eas.json` /
-   `app.json` in the child repo and is documented as such in CI_CD.md. Confirm.
-6. **`typecheck` command is exactly `npx tsc --noEmit`**, no `--if-present`
-   fallback. Deterministic and works in any Expo TypeScript project; a child
-   with a custom `typecheck` script still satisfies it via the same tsc binary.
-   Confirm no fallback is wanted.
-7. **Generated GitHub `ci.yml` for RN passes `node-version: "22"` in `with:`**
-   (unlike the other generated frontend jobs which pass only `docker-registry`)
-   so the job carries an explicit, declared input. Confirm.
+1. **`build/export` job = local `npx expo export` — RESOLVED (human: OK).**
+   The informal spec lists "build/export (expo export or EAS build)". This spec
+   picks `npx expo export` (local, no network/Expo account) for the per-push
+   build job, so a repo without EXPO_TOKEN still gets a real bundle check, and
+   a separate gated `eas-build` job covers the deploy/main path. Confirmed; no
+   change. (`AC-021-01-06`, `AC-021-01-07`, `AC-021-02-05`, `AC-021-02-06`.)
+2. **EAS Submit is documented, not a v1 job — RESOLVED (human: OK).**
+   The CI_CD.md table lists an `eas-submit` row (release path, store
+   credentials), but the workflow ships no `eas-submit` job in v1 — consistent
+   with the informal spec's deferral of the `init-deploy.sh` EAS path.
+   Confirmed; no change. (`AC-021-05-01` documents the row only; no workflow
+   scenario asserts an `eas-submit` job.)
+3. **Maestro E2E = documented hook only in v1 — RESOLVED (human: OK).**
+   The workflow contains no active Maestro job; `docs/CI_CD.md` documents the
+   opt-in hook (`.maestro/` flows + `maestro test .maestro/`). Confirmed; no
+   commented-out job block in the workflow itself. (`AC-021-05-02`.)
+4. **`child-ci-react-native.yml` is a reference, not copied by init-ci.sh —
+   RESOLVED (human: OK).** `init-ci.sh` writes `ci.yml` inline via heredoc and
+   never copies `ci/templates/child-ci-*.yml` — that is existing behavior for
+   `child-ci-node.yml` too. AC-003's "generates a `.github/workflows/ci.yml`
+   that includes it" is therefore interpreted as "wires the
+   `frontend/ci-react-native.yml` reusable workflow" (GitHub) and "includes
+   `ci/gitlab/frontend/ci-react-native.yml` + extends `.react-native-*`"
+   (GitLab). Confirmed; no change. (`AC-021-04-06`, `AC-021-04-07`.)
+5. **EAS project id is committed config, not a secret — RESOLVED (human: OK).**
+   Only `EXPO_TOKEN` becomes a CI secret placeholder. The EAS project id lives
+   in `eas.json` / `app.json` in the child repo and is documented as such in
+   CI_CD.md. Confirmed; no change. (`AC-021-05-03`.)
+6. **`typecheck` command is exactly `npx tsc --noEmit` — RESOLVED (human: OK).**
+   No `--if-present` fallback. Deterministic and works in any Expo TypeScript
+   project; a child with a custom `typecheck` script still satisfies it via the
+   same tsc binary. Confirmed; no change. (`AC-021-01-05`, `AC-021-02-04`.)
+7. **Generated GitHub `ci.yml` for RN passes `node-version: "22"` in `with:` —
+   RESOLVED (human: OK).** Unlike the other generated frontend jobs (which pass
+   only `docker-registry`), the RN job carries an explicit, declared input.
+   Confirmed; no change. (`AC-021-04-06`.)
