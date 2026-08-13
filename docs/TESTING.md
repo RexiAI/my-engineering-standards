@@ -23,6 +23,7 @@ following it.
 - **Java**: Use JUnit 5 (`@ExtendWith(MockitoExtension.class)`), Mockito for mocks, AssertJ for assertions. Avoid loading Spring context in unit tests.
 - **Go**: Use the stdlib `testing` package as the default — it's sufficient for the large majority of tests and adds no dependency. `testify` (assertions) and `github.com/golang/mock`/`gomockhandler` (mock generation) are optional additions for projects with enough table-driven complexity or interface surface to justify them; do not add either as a default. This supersedes the previous blanket "use testify/gomock" guidance, which contradicted docs/CODING_CONVENTIONS.md §Dependencies ("prefer stdlib, justify each dependency").
 - **JS/TS**: Use Jest. Prefer React Testing Library for component tests. Use Snapshot Testing sparingly (only for stable components).
+- **React Native**: unit and component tests run through Jest with the **jest-expo** preset and [React Native Testing Library](../language-specific/react-native/TESTING.md) — distinct from plain Jest, which does not know how to render native components or mock Expo modules. See `language-specific/react-native/TESTING.md` for the RNTL vs Maestro split and what to mock.
 
 ### Test Data (Builder Pattern)
 
@@ -105,6 +106,10 @@ const redis = new RedisMock()
 E2E tests run the full service in a Docker container alongside all dependencies (PostgreSQL, Redis, LocalStack, WireMock mocks). They verify real HTTP endpoints against the running service.
 
 *Conformance tier for cadence*: `mvp` projects with no staging environment and no cross-service contracts (see docs/CONFORMANCE_TIERS.md) can run E2E on every push/PR instead of weekly — there's no separate contract-test layer to cover PR-time verification, so E2E is doing double duty. `production`+ projects with contract tests covering cross-service compatibility should keep E2E on the weekly schedule against staging and let contract tests cover every PR. See docs/CI_CD.md §Weekly E2E Pipeline for the exact trigger.
+
+### React Native E2E (Maestro)
+
+React Native E2E uses [Maestro](https://maestro.mobile.dev/): YAML flows that drive the real binary on a simulator or device (`maestro test .maestro/`). Because it is emulator-dependent it is a scheduled/optional job, not a per-push gate — see docs/CI_CD.md §React Native (Expo). [Detox](https://wix.github.io/Detox/) is the upgrade path for projects that outgrow Maestro's synchronous control. See `language-specific/react-native/TESTING.md` for the RNTL vs Maestro scope split and flow skeletons.
 
 ### One script, run by both CI and local dev
 
@@ -248,6 +253,7 @@ Mutation testing validates that tests actually catch bugs by introducing small c
 - **Java**: PiTest (`pitest-maven` plugin, profile-activated). Run with `mvn verify -Pmutation`. Target mutation coverage >= 80%. No shared parent POM exists in this repo to pin this centrally — copy `ci/templates/pitest-profile.xml` into each project.
 - **Go**: Gremlins (`gremlins unleash`), actively maintained and coverage-aware. See `ci/templates/mutation.mk`. `go-mutesting` was considered and rejected — fewer mutators, unmaintained.
 - **JS/TS**: Stryker Mutator for JavaScript/TypeScript projects. Run with `npx stryker run`. See `ci/templates/stryker.conf.json`.
+- **React Native**: Stryker with the Jest runner (`testRunner: "jest"`, handles the jest-expo preset). Run with `npx stryker run`. See `ci/templates/stryker.react-native.conf.json`.
 - Run mutation tests periodically (not every commit — too slow). Run before major releases and when adding tests to ensure they are effective.
 
 ## Static Analysis
