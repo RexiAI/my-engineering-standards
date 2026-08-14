@@ -120,7 +120,7 @@ my-engineering-standards/                    ← Parent (this repo)
 your-project/                                ← Child repo (e.g. monorepo with api + web)
 ├── .github/workflows/ci.yml                ← Generated: composes backend + frontend jobs
 ├── .github/dependabot.yml                  ← Generated
-├── .releaserc.json                         ← Generated (Node only)
+├── .releaserc.json                         ← Generated (Node/frontend; also Java/Go-only with --with-release)
 ├── Makefile                                ← Generated (Go only)
 └── .standards/                             ← Git submodule
 ```
@@ -299,6 +299,7 @@ Steps:
 | `SONAR_TOKEN` | SonarQube analysis (optional) |
 | `PACT_BROKER_URL` | Contract tests (optional) |
 | `EXPO_TOKEN` | EAS build (React Native; merge-to-main path only) |
+| `GH_TOKEN` | Semantic Release (release, opt-in only) |
 
 ## Weekly E2E Pipeline
 
