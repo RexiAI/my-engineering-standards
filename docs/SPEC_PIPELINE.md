@@ -98,6 +98,31 @@ anyway, `§Why no scenario mutation`); the verification verdict and mutation
 score survive in the one-pager; the original prose does not, because what the
 code actually does is the source of truth.
 
+## Definition of done
+
+A spec pipeline run is done when all of the following hold — mechanically, not
+aspirationally:
+
+1. **Every stage reported green.** Coder suite green; Refactorer structure
+   clean; Verifier PASS (`25-verification.md`); Mutation Runner GREEN
+   (`30-report.md`).
+2. **`specs/NNN-slug/30-report.md` exists.** This is the *finished* signal —
+   both `archive-spec.sh` (refuses to archive without it) and the enforcement
+   gate (`check-specs-archived.sh`) key off it.
+3. **Stage 5b ran `scripts/archive-spec.sh` as its final act.** The PR carries
+   `docs/changes/NNN-slug.md` and no longer contains `specs/NNN-slug/`.
+4. **Draft PR open** on `spec/NNN-slug`, body linking `10-tasks.md` and
+   `30-report.md`.
+5. **Gate green.** `scripts/check-specs-archived.sh` (self-ci `validate` job, no
+   `continue-on-error`) passes — a finished spec can never merge without its
+   archive.
+
+The pipeline finishes at the moment stage 5b pushes the archive commit and
+opens the draft PR. Nothing runs after the merge; the merge commit itself lands
+`main` with the spec already archived. What happens after merge is out of
+scope for the pipeline: release tagging (Semantic Release) and human review of
+the diff.
+
 ## Scenario format
 
 No Cucumber, no Gherkin runner, in any language — see "Why no BDD runner" below.

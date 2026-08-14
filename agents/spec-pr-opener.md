@@ -63,5 +63,8 @@ Do not commit anything. Report which precondition failed and why, and stop.
 
 # Output
 
-End your turn with: branch name, commit count, PR URL (if opened), or the
-failing precondition if not.
+End your turn with: branch name, commit count, the archive commit (`docs(changes):
+archive NNN-slug`) and confirmation that `docs/changes/NNN-slug.md` exists and
+`specs/NNN-slug/` is removed, PR URL (if opened), or the failing precondition if
+not. This set is the pipeline's definition of done (see `docs/SPEC_PIPELINE.md
+§Definition of done`) — a turn that omits the archive is an incomplete run.

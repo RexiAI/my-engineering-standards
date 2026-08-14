@@ -1,40 +1,62 @@
 ---
 name: archive-spec
-description: Post-merge cleanup for a finished spec. Writes a single one-pager to `docs/changes/NNN-slug.md` summarizing the spec, then removes `specs/NNN-slug/`. Use after the spec pipeline's PR has merged to `main` — never before; the PR reviewer still needs the spec folder open in the PR.
+description: Archive a finished spec to `docs/changes/NNN-slug.md` and remove `specs/NNN-slug/`. Primary caller is the spec pipeline (stage 5b runs `scripts/archive-spec.sh` automatically inside the PR); this skill is the manual fallback for legacy specs already merged without an archive. Use only for finished specs (30-report.md present) — never mid-pipeline.
 license: See repo root
 allowed-tools: Bash(.standards/scripts/archive-spec.sh:*) Bash(./.standards/scripts/archive-spec.sh:*) Bash(git:*)
 ---
 
 # When to use
 
-After `spec/NNN-slug`'s PR has merged to `main`. The spec folder is no longer needed on main — its content lives in the code (acceptance tests), the PR (review), and now this one-pager.
+Two cases:
+
+1. **Legacy cleanup** — a spec PR merged before the archive-in-PR flow existed
+   (or the bot never ran), leaving `specs/NNN-slug/` on `main`. Run this skill
+   to move it to `docs/changes/`.
+2. **Fallback** — if stage 5b failed to archive and the PR is blocked by the
+   gate (`scripts/check-specs-archived.sh`).
+
+Do **not** use mid-pipeline: `archive-spec.sh` refuses to archive a spec
+without a `30-report.md` (i.e. not finished), and the PR reviewer still needs
+the spec folder open in the PR.
 
 # Invocation
 
-Run from the repo root, after merge:
+Run from the repo root:
 
 ```bash
 ./.standards/scripts/archive-spec.sh NNN-slug
 # e.g. ./.standards/scripts/archive-spec.sh 001-discount-system
 ```
 
-The script stages both the new `docs/changes/NNN-slug.md` and the `git rm -r specs/NNN-slug/` and prints the commit message to run. **It does not commit or push.** That stays with the human, per this repo's AGENTS.md.
+The script stages both the new `docs/changes/NNN-slug.md` and the
+`git rm -r specs/NNN-slug/` and prints the commit message to run. **It does not
+commit or push.** That stays with the human, per this repo's AGENTS.md — except
+inside the pipeline, where stage 5b (`spec-pr-opener`) commits it as part of the
+spec PR per the `docs/SPEC_PIPELINE.md §Commit and push carve-out`.
 
 # What the script does
 
-1. Reads `specs/NNN-slug/{10-tasks.md, 25-verification.md, 30-report.md}` and composes a one-page summary at `docs/changes/NNN-slug.md` containing:
-   - Original ask (from `00-informal.md`'s first paragraph).
-   - Task list (bullet summary).
+1. Verifies the spec is finished: `specs/NNN-slug/30-report.md` must exist.
+2. Reads `specs/NNN-slug/{10-tasks.md, 25-verification.md, 30-report.md}` and composes a one-page summary at `docs/changes/NNN-slug.md` containing:
+   - Original ask (from `00-informal.md`).
+   - Task list.
    - Acceptance-scenario IDs (`AC-NNN-NN`).
    - Verification verdict.
    - Mutation / complexity report.
-2. Stages the new file plus `git rm -r specs/NNN-slug/`.
-3. Prints the commit message. Human runs `git commit` and `git push`.
+3. Stages the new file plus `git rm -r specs/NNN-slug/`.
+4. Prints the commit message. The human (or stage 5b) runs `git commit` and `git push`.
 
-# Why no agent owns this
+# Automated flow (normal path)
 
-The one-page summary is the only spec artifact that survives to `main`. Everything else in `specs/` was pipeline scratch. The human commits because the script *stages* but does not commit — same carve-out as every other commit in this repo per `AGENTS.md`.
+In the spec pipeline, stage 5b (PR Opener) runs this script automatically as its
+final act, so the archive rides inside the spec PR and the merge lands `main`
+with the spec already archived. The enforcement gate
+`scripts/check-specs-archived.sh` (self-ci `validate` job, no `continue-on-error`)
+fails any PR that would merge a finished spec without its archive — see
+`docs/SPEC_PIPELINE.md §Archive in the PR` and `§Definition of done`.
 
-# CI alternative
+# Why the script does not commit
 
-`.github/workflows/archive-spec.yml` runs this script automatically after a `spec/NNN-slug` PR merges. The skill here is the manual fallback for repos without that workflow.
+The one-page summary is the only spec artifact that survives to `main`.
+Everything else in `specs/` was pipeline scratch. The script *stages* but does
+not commit — outside stage 5b, commits stay with the human per `AGENTS.md`.
