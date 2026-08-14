@@ -20,7 +20,7 @@ stage 0. You review once, after stage 1. Everything after that runs to a draft P
 | 3 | Refactorer | `spec-refactorer` | Nothing — runs to clean structure |
 | 4 | Verifier | `spec-verifier` | Nothing — independently re-checks stages 2-3 |
 | 5a | Mutation Runner | `spec-mutation-runner` | Nothing — runs to mutation-clean, only if Verifier passed |
-| 5b | PR Opener | `spec-pr-opener` | Nothing — commits, pushes, opens draft PR, only if Mutation Runner green |
+| 5b | PR Opener | `spec-pr-opener` | Nothing — commits, archives the spec, pushes, opens draft PR, only if Mutation Runner green |
 | — | Output | — | Review the draft PR |
 
 Two commands drive it: `/spec` runs stage 1 and stops. `/build` runs stages 2-5 and
@@ -57,12 +57,12 @@ specs/NNN-slug/                          ← PR branch only, gone on main
   25-verification.md    verifier: independent re-check results, PASS/FAIL verdict
   30-report.md          architect: mutation score, complexity, gate results
 
-docs/changes/NNN-slug.md                 ← long-lived, on main, written by archive-spec.sh
+docs/changes/NNN-slug.md                 ← long-lived, on main, written by stage 5b via archive-spec.sh
 ```
 
 `NNN` is a zero-padded 3-digit sequence, e.g. `001-discount-system`.
 
-## Archive on merge
+## Archive in the PR
 
 The `specs/NNN-slug/` folder is pipeline scratch. It belongs on the PR branch
 for review, not on `main` — committed specs drift into a graveyard of "what we
@@ -70,12 +70,26 @@ thought then" that future maintainers read instead of the actual code, and the
 information barrier (`§The information barrier`) is harder to reason about when
 the spec is reachable from `main` to anyone with read access.
 
-`scripts/archive-spec.sh NNN-slug` runs after the PR is merged. It writes a
-single one-pager to `docs/changes/NNN-slug.md` containing the original ask,
-task list, acceptance-scenario IDs, verification verdict, and the
-mutation/complexity report, then `git rm -r specs/NNN-slug/`. The script
+`scripts/archive-spec.sh NNN-slug` writes a single one-pager to
+`docs/changes/NNN-slug.md` containing the original ask, task list,
+acceptance-scenario IDs, verification verdict, and the mutation/complexity
+report, then `git rm -r specs/NNN-slug/`. **Stage 5b (PR Opener) runs this as
+its final act, inside the spec PR** — so the merge commit itself carries the
+archive: `main` lands with `docs/changes/NNN-slug.md` present and `specs/NNN-slug/`
+absent. Nothing runs after the merge; there is no post-merge cleanup step.
+
+Enforcement: `scripts/check-specs-archived.sh` (wired into the `validate` job of
+`.github/workflows/self-ci.yml`, no `continue-on-error`) fails any PR that would
+merge a *finished* spec — one with a `30-report.md` — without its
+`docs/changes/NNN-slug.md` archive. The check is index-aware (`git ls-files`), so
+untracked local scratch under `specs/` is not policed.
+
+`archive-spec.sh` refuses to archive a spec that is not finished (no
+`30-report.md`), so stage 5b cannot run it early; for legacy specs merged before
+this flow existed, a human can still run it manually post-merge — the script
 stages both moves and prints the commit message to run. It does not commit or
-push — that stays with the human, like every other commit in `AGENTS.md`.
+push — outside stage 5b, that stays with the human, like every other commit in
+`AGENTS.md`.
 
 This is the only spec artifact that survives to `main`: a one-pager per
 merged feature, not seven files per feature. The acceptance scenarios survive
