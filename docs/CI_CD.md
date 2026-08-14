@@ -373,6 +373,40 @@ Semantic Release runs automatically after every successful merge to `main`. The 
 `ci-release.yml` is conditioned on `github.ref_name == github.event.repository.default_branch`
 (GitHub) or `$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH` (GitLab).
 
+### Why init-ci.sh doesn't wire the release job
+
+The release bot is the one piece of CI the bootstrap deliberately does not
+auto-generate. Three reasons:
+
+- **Credentials are repo-owned, not bootstrappable.** Semantic Release needs a
+  repo-scoped write token (`GH_TOKEN` with `contents: write`). `init-ci.sh`
+  generates config and CI wiring, but it cannot provision secrets — every child
+  release requires a human to add the secret in the repo's settings regardless.
+  Generating a release workflow without that secret would create a permanently
+  failing job, so the bootstrap leaves the wiring to the repo owner instead.
+- **Release is an authority, not a job.** A release creates tags, publishes
+  releases, and auto-commits `CHANGELOG.md` back to `main` (via
+  `@semantic-release/git`). CI jobs are side-effect-free and safe to
+  auto-generate; release changes repo state and publishes artifacts. Whether a
+  repo gets a bot with that power — approval gates, release cadence, even
+  whether it is versioned at all — is a per-repo ownership decision, not a
+  bootstrap default.
+- **Not every child repo has a release cadence.** Services under active change
+  get tags; internal or experimental repos would get noisy releases. Opt-in
+  lets each child decide.
+
+This also explains the parent-vs-child asymmetry. The standards repo runs its
+own `.github/workflows/release.yml`, but that is not a template children are
+meant to copy: the standards repo is itself the released artifact children pin
+via the `.standards/` submodule, so its bot is the parent's own wiring. A
+child's release bot is a per-child opt-in decision, not a bootstrap template.
+
+These claims match the tree. A default `init-ci.sh` run emits no `release:` job
+and never prompts for `GH_TOKEN`; the `release:` job block in the generated
+`ci.yml` example in [GitHub Actions: Child composes Parent](#github-actions-child-composes-parent)
+exists in the docs only — default generation never produces it. The opt-in path
+below (or the `init-ci.sh --with-release` generator flag) is what produces it.
+
 ### Version bump rules
 
 | Commit type | Version bump | Example |
