@@ -1,3 +1,10 @@
+# [1.13.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.12.0...v1.13.0) (2026-08-14)
+
+
+### Features
+
+* **spec 020 + 021:** model config via env + React Native CI/SDLC parity ([#21](https://github.com/RexiAI/my-engineering-standards/issues/21)) ([107f417](https://github.com/RexiAI/my-engineering-standards/commit/107f417414181f7dc955ad328faea4698fd65595))
+
 # [1.12.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.11.0...v1.12.0) (2026-08-12)
 
 
