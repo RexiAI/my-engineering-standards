@@ -38,13 +38,15 @@ Only after `30-report.md` is green:
   task), on the current branch — which must be `spec/NNN-slug`, never
   `main`/`master`. If it isn't, stop and report instead of committing anywhere
   else.
-- Push the branch.
 - Run `scripts/archive-spec.sh NNN-slug` — the archive rides inside this PR, so
   the merge lands `main` with the spec already moved to `docs/changes/NNN-slug.md`
   (see `docs/SPEC_PIPELINE.md §Archive in the PR`). Commit it as
-  `docs(changes): archive NNN-slug` and push again. Do **not** read the generated
-  archive file or any other file under `docs/changes/` or `specs/NNN-slug/` — the
-  archive step is mechanical; its content is not yours to reason about.
+  `docs(changes): archive NNN-slug`. Do **not** read the generated archive file
+  or any other file under `docs/changes/` or `specs/NNN-slug/` — the archive
+  step is mechanical; its content is not yours to reason about.
+- Push the branch **after** the archive commit, so the pushed head never carries
+  an unarchived finished spec (the self-ci gate `scripts/check-specs-archived.sh`
+  would otherwise red-flag the intermediate commit).
 - Open the PR **as a draft**, using `.github/PULL_REQUEST_TEMPLATE.md` if present.
   Body links `specs/NNN-slug/10-tasks.md` and `specs/NNN-slug/30-report.md` and
   notes the spec is archived in this same PR.
