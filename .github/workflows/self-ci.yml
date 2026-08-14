@@ -80,12 +80,15 @@ jobs:
       - name: Install pinned opencode binary and verify model env resolution
         run: |
           set -euo pipefail
-          curl -sSL -o /tmp/opencode-linux-x64.tar.gz https://github.com/anomalyco/opencode/releases/download/v1.18.18/opencode-linux-x64.tar.gz
-          tar -xzf /tmp/opencode-linux-x64.tar.gz -C /tmp
-          /tmp/opencode --version
+          # Extract into its own dir: running a binary at /tmp/opencode makes
+          # opencode try to mkdir its storage dir at the same path → EEXIST.
+          mkdir -p /tmp/opencode-bin
+          curl -sSL -o /tmp/opencode-bin/opencode-linux-x64.tar.gz https://github.com/anomalyco/opencode/releases/download/v1.18.18/opencode-linux-x64.tar.gz
+          tar -xzf /tmp/opencode-bin/opencode-linux-x64.tar.gz -C /tmp/opencode-bin
+          /tmp/opencode-bin/opencode --version
           bash scripts/check-model-env.sh
           bash scripts/model-env.selftest.sh
-          bash scripts/model-env.runtime-check.sh /tmp/opencode
+          bash scripts/model-env.runtime-check.sh /tmp/opencode-bin/opencode
 
       - name: Run loop files check
         run: ./scripts/check-loop-files.sh
