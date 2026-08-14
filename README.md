@@ -9,6 +9,18 @@ git submodule add git@github.com:RexiAI/my-engineering-standards.git .standards
 ./.standards/scripts/bootstrap.sh
 ```
 
+## Model Configuration (one-time setup)
+
+The `spec-*` agents resolve their model from `{env:SPEC_*_MODEL}` references. Per-machine values come from the gitignored `config/model.local.env` (falling back to the committed `config/model.local.env.example` defaults) via `scripts/load-model-env.sh`.
+
+Wire the loader into your shell profile **once** so every shell exports the vars before OpenCode launches:
+
+```bash
+echo 'source <repo>/scripts/load-model-env.sh' >> ~/.bashrc   # or ~/.zshrc
+```
+
+Switching a model means editing `config/model.local.env` and restarting OpenCode — no commit, no PR. See `docs/SPEC_PIPELINE.md` for details.
+
 ## OKF — Operational Knowledge Framework
 
 [`okf/`](okf/index.md) documents how we work with AI: practices, decisions, and runbooks for managing context windows, choosing between RAG and context stuffing, detecting context rot, and setting up MCP servers.
