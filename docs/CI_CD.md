@@ -407,6 +407,47 @@ and never prompts for `GH_TOKEN`; the `release:` job block in the generated
 exists in the docs only — default generation never produces it. The opt-in path
 below (or the `init-ci.sh --with-release` generator flag) is what produces it.
 
+### Opting in: wiring the release bot
+
+Release is opt-in per child. Two paths produce the same wiring: the generator
+flag (`./.standards/scripts/init-ci.sh --with-release`, which emits everything
+below), or the manual steps — reproducible from the docs and the standards-repo
+files they reference, with no other information needed.
+
+1. **`.releaserc.json`** — a release job without config is broken, so the
+   config comes first. For a child with a node backend or a frontend,
+   `init-ci.sh` already generates it (`_gh_releaserc`) on every GitHub run. A
+   Java-only or Go-only child copies `ci/templates/releaserc.json` to
+   `.releaserc.json` manually. (With `init-ci.sh --with-release`, the script
+   generates it for Java-only/Go-only children too; an existing
+   `.releaserc.json` is never overwritten.)
+2. **Add the `release:` job** to `.github/workflows/ci.yml`:
+
+   ```yaml
+   release:
+     if: ${{ github.event_name == 'push' && github.ref_name == github.event.repository.default_branch }}
+     uses: RexiAI/my-engineering-standards/.github/workflows/shared/ci-release.yml@main
+     secrets:
+       GH_TOKEN: ${{ secrets.GH_TOKEN }}
+   ```
+
+   The reusable workflow (`.github/workflows/shared/ci-release.yml` in the
+   standards repo) declares `GH_TOKEN` `required: true` and has no internal
+   default-branch gate — the `if:` above (a push to the default branch) must
+   live on the caller's job, and the secret key must be exactly `GH_TOKEN`
+   (GitHub errors on an undeclared secret).
+3. **Add the secret.** On GitHub Actions, add a `GH_TOKEN` secret with
+   `contents: write` (repo → Settings → Secrets and variables → Actions). On
+   GitLab, the include path is `ci/gitlab/shared/ci-release.yml`: add
+   `- local: .standards/ci/gitlab/shared/ci-release.yml` to the `include:`
+   list and a `release:` job extending `.semantic-release`. The template's own
+   default-branch rule applies, and the credential is a project access token
+   with `write_repository` scope.
+
+**The no-op boundary.** A child that never opts in is unaffected: a default
+`init-ci.sh` run emits no release job and requires no `GH_TOKEN` secret, so
+unit/lint/build CI stays green. Opting in is purely additive.
+
 ### Version bump rules
 
 | Commit type | Version bump | Example |
