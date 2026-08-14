@@ -1,0 +1,46 @@
+# React Native CI jobs for GitLab — include from child .gitlab-ci.yml
+
+.node-variables:
+  variables:
+    NODE_VERSION: "22"
+
+.node-cache:
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - node_modules/
+    policy: pull-push
+
+.node-setup:
+  image: node:${NODE_VERSION}
+  tags: [docker]
+  before_script:
+    - npm ci
+
+.react-native-unit:
+  extends: [.node-setup, .node-cache]
+  script:
+    - npm test -- --passWithNoTests 2>/dev/null || npm test
+
+.react-native-lint:
+  extends: [.node-setup, .node-cache]
+  script:
+    - npm run lint --if-present
+    - npm run format:check --if-present
+
+.react-native-typecheck:
+  extends: [.node-setup, .node-cache]
+  script:
+    - npx tsc --noEmit
+
+.react-native-build:
+  extends: [.node-setup, .node-cache]
+  script:
+    - npx expo export
+
+.react-native-eas:
+  extends: [.node-setup, .node-cache]
+  script:
+    - npx eas-cli build --non-interactive
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $EXPO_TOKEN != null

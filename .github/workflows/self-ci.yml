@@ -73,6 +73,23 @@ jobs:
       - name: make lint
         run: make lint
 
+      # Model-config gate (docs/SPEC_PIPELINE.md §Model configuration): the
+      # hermetic check + selftest need no binary; the runtime check proves real
+      # {env:SPEC_*_MODEL} resolution with the pinned opencode release. No
+      # continue-on-error: a loader/gate/wiring regression fails the job.
+      - name: Install pinned opencode binary and verify model env resolution
+        run: |
+          set -euo pipefail
+          # Extract into its own dir: running a binary at /tmp/opencode makes
+          # opencode try to mkdir its storage dir at the same path → EEXIST.
+          mkdir -p /tmp/opencode-bin
+          curl -sSL -o /tmp/opencode-bin/opencode-linux-x64.tar.gz https://github.com/anomalyco/opencode/releases/download/v1.18.18/opencode-linux-x64.tar.gz
+          tar -xzf /tmp/opencode-bin/opencode-linux-x64.tar.gz -C /tmp/opencode-bin
+          /tmp/opencode-bin/opencode --version
+          bash scripts/check-model-env.sh
+          bash scripts/model-env.selftest.sh
+          bash scripts/model-env.runtime-check.sh /tmp/opencode-bin/opencode
+
       - name: Run loop files check
         run: ./scripts/check-loop-files.sh
 

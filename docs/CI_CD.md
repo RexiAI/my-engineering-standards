@@ -49,6 +49,24 @@ Checkstyle config exists at `language-specific/java/checkstyle.xml` but is optio
 | `deploy` | `npm publish` | Merge to main |
 | `docker` | Docker build & push to GHCR | Merge to main |
 
+### React Native (Expo)
+
+Mobile apps get the same per-push loop as the other frontends, with two divergences: there is no Docker image step by default (EAS builds remotely in Expo's cloud), and E2E is emulator-dependent so it is scheduled/optional rather than a per-push gate.
+
+| Step | Command | When |
+|------|---------|------|
+| `unit-test` | `npm test -- --passWithNoTests` | Every push |
+| `lint` | `npm run lint && npm run format:check` | Every push |
+| `typecheck` | `npx tsc --noEmit` | Every push |
+| `build/export` | `npx expo export` | Every push |
+| `eas-build` | `npx eas-cli build --non-interactive` | Merge to main — requires EXPO_TOKEN |
+| `eas-submit` | EAS Submit | Release path (store credentials) |
+| `e2e (Maestro)` | `maestro test .maestro/` | Optional / scheduled — documented hook |
+
+No Docker image step by default: EAS builds remotely, so there is nothing to push to a container registry on the happy path. Maestro E2E is emulator-dependent (it drives the real binary on a simulator or device), so it is a scheduled/optional job, not a per-push gate; v1 ships a documented hook — `.maestro/` flows run with `maestro test .maestro/` — rather than an active job in the workflow. See docs/TESTING.md and `language-specific/react-native/TESTING.md` for the RNTL vs Maestro split.
+
+EAS jobs run only when `EXPO_TOKEN` is present, so a repo without an Expo account still gets green unit/lint/typecheck (and a real export bundle check). The EAS project id is committed config in `eas.json`/`app.json`, not a CI secret.
+
 ## Architecture
 
 ### Composable Parent-Child Model
@@ -65,6 +83,7 @@ my-engineering-standards/                    ← Parent (this repo)
 │   ├── frontend/
 │   │   ├── ci-nextjs.yml                   ← Reusable: Next.js
 │   │   ├── ci-react.yml                    ← Reusable: React (Vite)
+│   │   ├── ci-react-native.yml             ← Reusable: React Native (Expo)
 │   │   ├── ci-angular.yml                  ← Reusable: Angular
 │   │   └── ci-static.yml                   ← Reusable: static HTML
 │   └── shared/
@@ -279,6 +298,7 @@ Steps:
 | `NPM_TOKEN` | npm publish (Node.js) |
 | `SONAR_TOKEN` | SonarQube analysis (optional) |
 | `PACT_BROKER_URL` | Contract tests (optional) |
+| `EXPO_TOKEN` | EAS build (React Native; merge-to-main path only) |
 
 ## Weekly E2E Pipeline
 

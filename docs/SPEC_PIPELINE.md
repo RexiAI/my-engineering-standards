@@ -210,31 +210,66 @@ that does pin `model:` silently wins over `opencode.json` every time.
 With nothing configured, each subagent inherits the model of whichever primary
 agent invoked it — no vendor coupling, works with any provider you already use.
 
-If you want per-stage differentiation, set it in your own `opencode.json`:
+Per-stage differentiation works through a **per-machine env mechanism** — no
+editing and committing `opencode.json` is involved. `opencode.json` (repo root)
+resolves every `agent.<name>.model` from an `{env:SPEC_*_MODEL}` reference, and
+the committed `config/model.local.env.example` carries the defaults. The
+reasoning behind the default split (Specifier, UX Designer, Verifier, and
+Architect do the pipeline's highest-judgment work — detecting ambiguity,
+inferring design direction from a brief, adversarially checking prior stages'
+claims, and reasoning about surviving mutants — while Coder, Refactorer, and
+the orchestrator do more bounded, well-specified work; a weak Verifier is worse
+than none) is encoded as the committed defaults in `config/model.local.env.example`,
+not as literals in `opencode.json`.
 
-```json
-{
-  "agent": {
-    "spec-specifier":  { "model": "your-provider/strong-model" },
-    "spec-ux":         { "model": "your-provider/strong-model" },
-    "spec-verifier":   { "model": "your-provider/strong-model" },
-    "spec-mutation-runner": { "model": "your-provider/strong-model" },
-    "spec-pr-opener":  { "model": "your-provider/strong-model" },
-    "spec-coder":      { "model": "your-provider/fast-model" },
-    "spec-refactorer": { "model": "your-provider/fast-model" },
-    "spec-pipeline":   { "model": "your-provider/fast-model" }
-  }
-}
-```
+### One-time setup (per machine)
 
-The reasoning behind that split (this repo's own local pins, in
-`opencode.json` at the repo root, not shipped): Specifier, UX Designer, Verifier, and
-Architect do the pipeline's highest-judgment work — detecting ambiguity, inferring
-design direction from a brief, adversarially checking prior stages' claims, and
-reasoning about surviving mutants — and Architect alone holds commit/push authority.
-Coder, Refactorer, and the orchestrator do more bounded, well-specified work. A weak Verifier is worse than none: it manufactures
-false confidence instead of catching real gaps, which is the reason this stage
-exists at all (see `§Why a separate Verifier stage` above).
+1. **Wire the loader into your shell profile once** so every shell exports the
+   model vars automatically before opencode launches:
+
+   ```bash
+   echo 'source <repo>/scripts/load-model-env.sh' >> ~/.bashrc   # or ~/.zshrc
+   ```
+
+   The loader is never sourced per-launch by hand — the profile wiring is the
+   mechanism. It exports the 8 `SPEC_*_MODEL` vars with the committed defaults
+   when no override file exists, so the steady state (no env file present)
+   resolves to the defaults with no empty-string breakage.
+
+2. **Only if you want to override a model** (otherwise skip this entirely):
+
+   ```bash
+   cp config/model.local.env.example config/model.local.env
+   # edit config/model.local.env, fill in the model ids you want
+   ```
+
+   Then **restart opencode** — config is read once at startup, so a restart is
+   required after any change. **No commit, no PR** — `config/model.local.env`
+   is gitignored and can never be committed.
+
+**Precedence** (per var, first non-empty source wins): a pre-existing exported
+env var > the gitignored `config/model.local.env` when present > the committed
+defaults in `config/model.local.env.example`. The profile wiring is what
+prevents the empty-string failure: `{env:VAR}` with an unset var resolves to
+empty — this opencode build has **no default syntax** (`{env:VAR:-default}`,
+`{env:VAR|default}`, and `{env:VAR=default}` all resolve to `""` when unset),
+so the defaults must arrive via the loader.
+
+**Boundary, honestly documented**: the supported launch path is shell-launched
+opencode — interactive shells, and shells spawned from them (`opencode run`,
+`/spec`, `/build`, subagents), all inherit the exported vars. A GUI or
+daemon-launched opencode that spawns no interactive shell will not have the
+vars; the loader's fail-loudly branch (exit 1, naming the var) surfaces that
+state instead of silently shipping empty models.
+
+**Structural enforcement**: `scripts/check-model-env.sh` is the gate — every
+`agent.*.model` must be an `{env:SPEC_*_MODEL}` reference (no literal model id
+anywhere in `opencode.json`), `config/model.local.env` must never be tracked by
+git, and the example must define exactly the referenced vars. Self-ci
+additionally downloads a pinned opencode binary and runs
+`scripts/model-env.runtime-check.sh` against a scratch project to verify the
+actual resolution behavior in three cases (defaults via loader, overrides win,
+loader absent → empty).
 
 If you need to customize an agent's prompt or permissions, not just its model, run
 `./scripts/bootstrap.sh --copy-agents` (or `make init-ai COPY_AGENTS=1`) to get real,

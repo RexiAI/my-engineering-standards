@@ -1,0 +1,19 @@
+# Generated CI for React Native project
+# Template: ci/templates/child-ci-react-native.yml
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  ci:
+    uses: RexiAI/my-engineering-standards/.github/workflows/frontend/ci-react-native.yml@main
+    with:
+      node-version: "22"
+    secrets:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}

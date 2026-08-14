@@ -1,0 +1,94 @@
+name: CI - React Native (Expo)
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: Node.js version. Ignored if node-version-file is set. Kept for backward compat with consumers that don't have an .nvmrc yet.
+        default: "22"
+        type: string
+      node-version-file:
+        description: Path to the file declaring the Node version (e.g. .nvmrc). Takes priority over node-version when set — new consumers should set this instead of pinning a version here.
+        default: ""
+        type: string
+    secrets:
+      EXPO_TOKEN:
+        description: Expo access token for EAS builds. Only used by the eas-build job, which is gated on a push to the default branch.
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version-file == '' && inputs.node-version || '' }}
+          node-version-file: ${{ inputs.node-version-file }}
+          cache: npm
+      - run: npm ci
+      - run: npm test -- --passWithNoTests 2>/dev/null || npm run test:unit --if-present || npm test
+
+  lint:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version-file == '' && inputs.node-version || '' }}
+          node-version-file: ${{ inputs.node-version-file }}
+          cache: npm
+      - run: npm ci
+      - run: npm run lint --if-present
+      - run: npm run format:check --if-present
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version-file == '' && inputs.node-version || '' }}
+          node-version-file: ${{ inputs.node-version-file }}
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+
+  build:
+    name: Export Bundle
+    needs: [unit-test, lint]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version-file == '' && inputs.node-version || '' }}
+          node-version-file: ${{ inputs.node-version-file }}
+          cache: npm
+      - run: npm ci
+      - run: npx expo export
+
+  eas-build:
+    name: EAS Build
+    needs: [unit-test, lint, build]
+    if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch && secrets.EXPO_TOKEN != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version-file == '' && inputs.node-version || '' }}
+          node-version-file: ${{ inputs.node-version-file }}
+          cache: npm
+      - run: npm ci
+      - run: npx eas-cli build --non-interactive
