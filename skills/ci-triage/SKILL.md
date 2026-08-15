@@ -63,3 +63,50 @@ for "seen before" before classifying anything as a repeat.
 Infrastructure failures (runner OOM, registry down, secrets missing) and
 workflow-config failures (workflow syntax, missing tooling) are **not code
 defects**. They are routed to escalation, never "fixed" by editing code.
+
+# Isolated fix flow
+
+For a `regression`, the fix is the **smallest change** that addresses the
+specific failure, made in an isolated worktree via `git worktree add` — never on the swept branch, and never on `main`.
+Work on a branch in the worktree and let the checker (next section) verify before anything is proposed.
+
+# Maker/checker split
+
+The fixing pass (maker) and a separate checking pass (checker) are distinct —
+the same agent never both produces and approves. The checker confirms before any PR or comment is proposed, that:
+
+- (a) the fix addresses the failure — verified against the failing commit's log,
+  not a guess;
+- (b) there are no unrelated changes — the diff touches only what the failure
+  needs;
+- (c) tests and lint pass — the local suite plus `make validate-all` / `make lint`.
+
+# Bounded remediation
+
+Remediation is bounded: at most **3 attempts** per failure. Each attempt is
+recorded in `loop-run-log.md` (spec 016's append-only file, one `run_id` per
+failure) per its JSON schema. This counter is the loop's own **circuit breaker**,
+independent of spec 008's pipeline budget and 014's round counter — a
+sweeper that runs tomorrow is never capped by a pipeline budget that ran today.
+
+# Escalation
+
+On attempt exhaustion the loop escalates to a human with pruned context: the
+failing job, the run link, and the last log excerpt. The escalation surface is a
+GitHub issue (the repo's human handoff channel) carrying that context, under the
+stable label `ci-sweeper`. The loop never loops forever.
+
+Escalate when any of these holds:
+
+- infrastructure failure (runner OOM, registry down, secrets missing);
+- the failure touches more than 5 files or core architecture;
+- security-sensitive failures;
+- max attempts exceeded;
+- intermittent flakes needing quarantine.
+
+# Deferral
+
+Before starting a fix, check `STATE.md` (spec 016's durable state). When
+`STATE.md` shows an in-flight remediation of the same failure on the same branch
+— the 014-owned `spec/NNN-slug` case — the sweeper defers rather than competing
+with the pipeline's own post-PR loop.
