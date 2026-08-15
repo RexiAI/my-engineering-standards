@@ -35,14 +35,18 @@
 #
 # Usage:
 #   .standards/scripts/check-code-principles.sh [SOURCE_DIR] [--tier mvp|production|multi-service]
+#                                           [-ReportPath <file>]
 #
 # SOURCE_DIR defaults to the current directory. --tier overrides auto-detection
 # from the project's AGENTS_*.md "Conformance tier:" declaration (see
 # docs/CONFORMANCE_TIERS.md). --warn-as-error promotes every WARN to a failure.
+# -ReportPath <file> additionally writes the machine-readable JSON report
+# (tier, gates, fails, warns) atomically to <file> — stdout is unchanged.
 #
 # Exit codes:
 #   0 — no FAILs (WARNs may exist)
 #   1 — at least one FAIL (or a WARN with --warn-as-error)
+#   2 — unknown option, or -ReportPath with a missing/empty value
 #
 # Standards reference:
 #   docs/CODING_CONVENTIONS.md §Design Principles
@@ -50,6 +54,10 @@
 #   docs/TESTING.md §Property Testing
 #   docs/CONFORMANCE_TIERS.md
 set -euo pipefail
+
+# Shared -ReportPath machinery (strip_dashes/json_escape/json_array/
+# emit_json_report) — see scripts/gate-report-lib.sh.
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/gate-report-lib.sh"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -59,20 +67,31 @@ NC='\033[0m'
 FAILS=0
 WARNS=0
 WARN_AS_ERROR=false
+REPORT_PATH=""
+FAILS_LIST=()
+WARNS_LIST=()
 
-fail() { echo -e "${RED}FAIL${NC} $*"; FAILS=$((FAILS + 1)); }
+fail() { local msg="$*"; echo -e "${RED}FAIL${NC} $msg"; FAILS=$((FAILS + 1)); FAILS_LIST+=("$msg"); }
 pass() { echo -e "${GREEN}PASS${NC} $*"; }
-warn() { echo -e "${YELLOW}WARN${NC} $*"; WARNS=$((WARNS + 1)); }
+warn() { local msg="$*"; echo -e "${YELLOW}WARN${NC} $msg"; WARNS=$((WARNS + 1)); WARNS_LIST+=("$msg"); }
 
 SOURCE_DIR="."
 TIER=""
 while [ $# -gt 0 ]; do
-  case "$1" in
-    --tier) TIER="${2:-}"; shift 2 ;;
-    --warn-as-error) WARN_AS_ERROR=true; shift ;;
-    -*) echo "Unknown option: $1" >&2; exit 2 ;;
-    *) SOURCE_DIR="$1"; shift ;;
-  esac
+  if [ "${1#-}" != "$1" ]; then
+    name="$(strip_dashes "$1")"
+    case "$name" in
+      tier) TIER="${2:-}"; shift 2 ;;
+      warn-as-error) WARN_AS_ERROR=true; shift ;;
+      ReportPath)
+        REPORT_PATH="${2:-}"
+        [ -n "$REPORT_PATH" ] || { echo "Error: -ReportPath requires a non-empty file path" >&2; exit 2; }
+        shift 2 ;;
+      *) echo "Unknown option: $1" >&2; exit 2 ;;
+    esac
+  else
+    SOURCE_DIR="$1"; shift
+  fi
 done
 
 # ── Conformance tier auto-detection ──────────────────────────────────────────
@@ -494,6 +513,25 @@ check_property_tests() {
   esac
 }
 
+# ── JSON report (-ReportPath, telemetry) ─────────────────────────────────────
+# -ReportPath <file> writes the machine-readable report (same fields as the
+# --json stdout mode: tier, gates, fails, warns) atomically to <file> (spec 012).
+# json_escape / json_array / emit_json_report come from gate-report-lib.sh.
+emit_report() {
+  [ -n "$REPORT_PATH" ] || return 0
+  local json fails_json warns_json
+  fails_json=""
+  warns_json=""
+  [ "${#FAILS_LIST[@]}" -gt 0 ] && fails_json="$(json_array "${FAILS_LIST[@]}")"
+  [ "${#WARNS_LIST[@]}" -gt 0 ] && warns_json="$(json_array "${WARNS_LIST[@]}")"
+  # gates: the five categories this run covers (all five until 007's --gates
+  # scoping merges and narrows the set).
+  json="{\"tier\":\"$(json_escape "$TIER")\","
+  json="${json}\"gates\":[\"complexity\",\"dry\",\"yagni\",\"solid\",\"property-tests\"],"
+  json="${json}\"fails\":[${fails_json}],\"warns\":[${warns_json}]}"
+  emit_json_report "$REPORT_PATH" "$json"
+}
+
 # ── Run ──────────────────────────────────────────────────────────────────────
 run_complexity_kiss java $NONTEST_JAVA
 run_complexity_kiss go $NONTEST_GO
@@ -540,6 +578,7 @@ else
 fi
 
 echo "---------------------------------------------"
+emit_report
 if [ "$TOTAL" -gt 0 ]; then
   echo -e "${RED}✘ Design-principles check: ${FAILS} FAIL(s), ${WARNS} WARN(s).${NC}"
   echo "  Reference: docs/CODING_CONVENTIONS.md §Design Principles, docs/ARCHITECTURE.md, docs/TESTING.md"
