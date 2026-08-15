@@ -52,6 +52,29 @@ No agent is mapped to T3: T3 is the universal prohibition, not an assignment.
 
 ## Model-Assignment Discipline
 
+Model assignments for the spec pipeline live in exactly one authoritative
+place: `opencode.json`, under the `agent.<name>.model` key. `opencode.json` is
+the single authoritative source of which model runs each pipeline stage.
+
+The `AGENTS.md` model table (`AGENTS.md §OpenCode Go Model Configuration`) is a
+**mirror** of that source, for humans and for the model-fallback plugin's
+documentation. It is not a second source of truth: only its fallback-chain
+column carries information `opencode.json` does not, and that column must not be
+edited to reflect a primary model change without the `opencode.json` change
+landing in the same commit.
+
+**Same-commit rule:** change a model only by editing `opencode.json` **and** the
+`AGENTS.md` mirror table in the same commit. Never edit one without the other.
+
+**Frontmatter rule:** agent files must not pin a `model:` key (per
+`docs/SPEC_PIPELINE.md §Model configuration` — a pinned `.md` model silently overrides
+`opencode.json`). If a child repo pins a model in frontmatter anyway,
+that edit must land in the same commit as the mirror table edit.
+
+**Conformance note:** violating the same-commit rule is a governance defect — a
+review blocker, same class as the ADR rule. The drift observed in this repo (a
+model entry pointing at a nonexistent agent, `spec-architect`) is exactly what
+this rule exists to prevent.
 
 ## ADR Requirement
 
