@@ -1,6 +1,6 @@
 ---
 name: bootstrap
-description: Use One-time setup when a user says "bootstrap this repo against the standards" or "wire up the spec pipeline." The goal is to bridge this engineering-standards repo into a child repo as a `.standards/` submodule, including symlinking (or copying) the spec-pipeline agent and command files. 
+description: One-time setup to bridge this engineering-standards repo into a child repo as a `.standards/` submodule, including symlinking (or copying) the spec-pipeline agent and command files. Use when a user says "bootstrap this repo against the standards" or "wire up the spec pipeline."
 license: See repo root
 allowed-tools: Bash(.standards/scripts/bootstrap.sh:*) Bash(./.standards/scripts/bootstrap.sh:*)
 ---
