@@ -77,13 +77,27 @@ follows, applied to checking instead of building.
 
 # Report
 
-Write `specs/NNN-slug/25-verification.md`:
+Write `specs/NNN-slug/25-verification.md`. Every one of the five contract checks
+above — scenario traceability, full test suite, complexity gate, design-principles
+gate, and scenario-to-behavior spot check — must carry an evidence block in the
+uniform format defined by `docs/SPEC_PIPELINE.md §Audit contract`: a
+`## Evidence: <check name>` heading followed by the exact `command:` as run, the
+real output (or a representative excerpt), the `exit:` code, and an `at:`
+timestamp in `YYYY-MM-DDTHH:MM:SSZ` (i.e. `date -u +%Y-%m-%dT%H:%M:%SZ`). The raw
+output goes verbatim, never as a paraphrase — the audit-trail gate
+(`scripts/check-audit-trail.sh`) parses these blocks, so a missing marker or a
+paraphrased output fails the gate.
 
-- Each check above: PASS/FAIL with the actual command run and its real output (or a
-  representative excerpt), not a paraphrase.
+- Scenario traceability: `command: scripts/check-scenario-traceability.sh`, its
+  output, exit code, timestamp.
+- Full test suite: the project's real test command, its output, exit code,
+  timestamp.
+- Complexity gate: the real linter, its output, exit code, timestamp.
 - Design-principles gate: the `check-code-principles.sh` exit code and every FAIL /
-  WARN line, verbatim.
-- Spot-check results: which scenarios you checked, what you found.
+  WARN line, verbatim, plus the timestamp.
+- Scenario-to-behavior spot check: which scenarios you checked, what you found,
+  plus the timestamp.
+- No unaccounted behavior: a finding line (not a command).
 - Overall verdict: **PASS** (Architect may proceed) or **FAIL** (pipeline stops
   here, list every reason).
 
