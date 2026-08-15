@@ -609,3 +609,8 @@ validate-refs, validate-skills, validate-all, lint, format, stats — no test
 target). The shipped shell check `scripts/check-audit-trail.sh` is spec 015's
 test carrier; its `--selftest` exercises every acceptance scenario
 (AC-015-07..14), re-confirmed above.
+
+## PR
+
+PR: https://github.com/RexiAI/my-engineering-standards/pull/31
+Commits: 5
