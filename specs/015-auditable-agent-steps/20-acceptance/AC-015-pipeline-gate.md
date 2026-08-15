@@ -10,12 +10,14 @@ Then it instructs running `scripts/check-audit-trail.sh <slug>` before committin
 
 And it instructs stopping the pipeline without opening the PR when the gate exits non-zero
 
-## AC-015-16 — Self-CI runs the gate when a spec folder is present
+## AC-015-16 — Self-CI runs the gate when a finished spec folder is present
 
 Given `.github/workflows/self-ci.yml` exists
 
 When I read the workflow
 
-Then it contains a step that runs `scripts/check-audit-trail.sh` for each present `specs/*/` directory
+Then it contains a step that runs `scripts/check-audit-trail.sh` for each present spec directory carrying a `30-report.md` (the pipeline's finished signal)
 
-And the step exits 0 when no spec folder exists
+And it skips in-flight spec directories that lack `30-report.md`
+
+And the step exits 0 when no finished spec exists

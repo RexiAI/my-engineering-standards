@@ -108,7 +108,9 @@ Maps the informal spec's "Run at pipeline end" (AC-004).
   `scripts/check-audit-trail.sh <slug>`; if it exits non-zero, stop and report — do not open
   the PR.
 - `.github/workflows/self-ci.yml`: add a step that runs `scripts/check-audit-trail.sh` for
-  each present `specs/*/` directory; when no spec folder exists the step exits 0.
+  each present spec directory carrying a `30-report.md` — the pipeline's finished signal,
+  same convention as the archived-specs step — skipping in-flight directories without
+  `30-report.md`; the step exits 0 when no finished spec exists.
 
 **Scenarios:** AC-015-15 — AC-015-16
 
