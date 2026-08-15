@@ -67,6 +67,12 @@ jobs:
       - name: Check orchestration references
         run: ./scripts/check-orchestration.sh
 
+      # Phase-2 loop mechanics gate (docs/SPEC_PIPELINE.md §Post-PR CI
+      # check-and-remediate loop (phase 2), spec 014): grep-assert the post-PR
+      # CI check is wired into the pipeline prompts/docs. No continue-on-error.
+      - name: Check post-PR CI loop mechanics
+        run: ./scripts/check-post-pr-ci-loop.sh
+
       - name: Check skills specification
         run: ./scripts/check-skills.sh
 
