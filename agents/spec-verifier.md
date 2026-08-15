@@ -117,6 +117,30 @@ Do not attempt to fix anything yourself. Stop the pipeline. The report is the
 handoff — whoever fixes it (human, or a re-run of Coder/Refactorer) re-triggers you
 afterward.
 
+# Scoped re-verification (AC-007-02)
+
+When a BLOCK (or FAIL) is fixed, re-run only the gate(s) that blocked, not the
+whole suite. "Gate" here means one of the Verifier's checks: 1 (traceability),
+2 (test suite), 3 (complexity linter), 3.5 (design-principles), 4 (spot check),
+5 (no unaccounted behavior). A one-line fix must not re-run every scan: the
+unchanged gates' prior results stand without being re-executed; only the failing
+gate(s) are re-run.
+
+For the script-backed gates, narrow further with the script's scoped flag where it
+supports it:
+
+- `scripts/check-code-principles.sh --gates <name>` — re-run only the failing
+  design-principles category (`complexity`, `dry`, `yagni`, `solid`,
+  `property-tests`).
+- `scripts/check-scenario-traceability.sh --checks <1|2>` — re-run only the failing
+  traceability check (1 = scenario-to-test, 2 = reference-to-scenario).
+
+A gate that is a single whole script with no subset (checks 2, 3, 4) is re-run as
+the whole script — that is still scoped relative to the full suite. The re-run
+appends to the existing `specs/NNN-slug/25-verification.md` under the gate it
+belongs to, preserving the prior full run's content: the report is the combined
+full run + delta, not a rewrite. The overall verdict reflects the re-run.
+
 # Output
 
 End your turn with the overall verdict and the path to `25-verification.md`.
