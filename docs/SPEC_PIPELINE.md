@@ -215,6 +215,38 @@ a narrow, stated exception:
 - The PR body links `10-tasks.md` and `30-report.md`. CI gates are the reviewer of
   record; you review the diff same as any other PR.
 
+## Post-PR CI check-and-remediate loop (phase 2)
+
+After the PR Opener opens the draft PR (stage 5b), the pipeline checks the PR's
+CI status and, on FAIL, runs a bounded fix-and-repush loop. The budget *policy*
+for this loop — at most 3 rounds, counter **independent of Phase 1** — comes from
+spec 008's remediation-budget section (`008-remediation-budget`, "Phase 2 —
+Post-PR loop"); this section defines only the *mechanics*, and is valid only once
+008's section exists.
+
+The repo's CI on a feature-branch PR is the **Self CI** workflow
+(`.github/workflows/self-ci.yml`, GitHub Actions). Immediately after the PR is
+opened, the Verifier queries its checks and records PASS/FAIL per check:
+
+- Status query: `gh pr checks <PR_NUMBER> --json name,state,bucket,workflow,link`.
+  The `bucket` field (`pass`/`fail`/`pending`) is the PASS/FAIL parse rule.
+- Pending checks are polled until terminal (`gh pr checks --watch` or a bounded
+  re-query); `pending` is neither a pass nor a fail.
+- On FAIL, failing check IDs are captured from the checks API
+  (`gh api repos/RexiAI/my-engineering-standards/commits/<head_sha>/check-runs`,
+  `conclusion == "failure"`, record `name` + `id`), the failing job logs are read
+  (`gh run list --branch spec/NNN-slug --workflow "Self CI"` then
+  `gh run view <RUN-ID> --log-failed`), and the concrete failure reason is
+  recorded in `25-verification.md`.
+- The CI outcome is recorded per check and per round in `25-verification.md`.
+
+On FAIL the orchestrator routes the diagnosed fix to the Coder (behavior) or the
+Refactorer (structure), the PR Opener commits and pushes the fix round — each
+re-push re-triggers CI — and the Verifier re-checks. The loop runs at most 3
+fix-and-repush rounds (counter independent of Phase 1). On exhaustion the pipeline
+stops and escalates to the human with the failing check IDs and the last log evidence
+— never a silent green.
+
 ## Conformance tiers
 
 Per `docs/CONFORMANCE_TIERS.md`, the pipeline runs fewer stages at lower tiers
