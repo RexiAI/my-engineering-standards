@@ -32,6 +32,24 @@ the only push-capable agent: it may push to a branch named `spec/NNN-slug` and
 open a **draft** PR, only after every configured quality gate is green, per
 `docs/SPEC_PIPELINE.md §Commit and push carve-out`.
 
+### Agent-to-tier mapping
+
+Each agent's tier is its highest granted action class as read from its permission frontmatter.
+T3 prohibitions apply to all agents regardless of tier.
+
+| Agent | Stage | Trust tier | Frontmatter basis (real) | Policy override (if any) |
+|---|---|---|---|---|
+| `spec-verifier` | 4 | **T0** | edit only `specs/*/25-verification.md` (`*: deny`); `git commit*`/`git push*` denied | none — reads, runs gates, writes only its report |
+| `spec-specifier` | 1 | **T1** | edit `specs/**` allow, `*` deny; `git *` allow | none |
+| `spec-coder` | 2 | **T1** | read denies only `00-informal.md`; `git push*` denied, other git allowed | prose says never commit/push — frontmatter would allow `git commit` |
+| `spec-refactorer` | 3 | **T1** | read denies `specs/**`; `git push*` denied, other git allowed | prose says never commit/push — frontmatter would allow `git commit` |
+| `spec-mutation-runner` | 5a | **T1** | read denies `00-informal.md`; `git commit*`/`git push*` denied | none — edits tests/report, no git write |
+| `spec-pr-opener` | 5b | **T2** | read denies `00-informal.md`; `git push*` is `ask`; git commit allowed | none — the only push-capable agent |
+| `spec-ux` | 1.5 | **T2 (frontmatter) / T1 (policy)** | read `*` allow; `git commit*` ask, `git push*` ask | prose says "Do not commit or push" — frontmatter permits push only on human confirmation |
+| `spec-pipeline` | orchestrator | **T1 (policy)** | no `permission` block at all — opencode primary defaults grant full access | policy (its instructions) forbids commit/push; frontmatter imposes no restriction |
+
+No agent is mapped to T3: T3 is the universal prohibition, not an assignment.
+
 ## Model-Assignment Discipline
 
 
