@@ -78,3 +78,12 @@ this rule exists to prevent.
 
 ## ADR Requirement
 
+Any change to **pipeline roles**, the **gate catalog**, or **billing
+constraints** must be recorded as an Architecture Decision Record before the
+change merges. This is review-blocking: a PR that changes one of these without
+an accompanying ADR cannot merge.
+
+ADRs are written from `templates/ADR.md`, live in `docs/adr/`, and follow the
+lifecycle in `docs/GIT_WORKFLOW.md §Architecture Decision Records (ADRs)`
+(Proposed → Accepted → Deprecated → Superseded). `docs/adr/README.md` is the
+index of recorded ADRs.
