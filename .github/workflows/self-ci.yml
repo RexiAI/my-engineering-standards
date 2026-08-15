@@ -45,6 +45,15 @@ jobs:
             exit 1
           fi
 
+      # CI Sweeper deliverables gate (spec 017): the ci-triage skill and the
+      # ci-sweeper workflow must carry every required string, and the gate must
+      # fail closed. The --self-test run proves the gate rejects a broken
+      # fixture. Not continue-on-error: a sweeper regression fails the job.
+      - name: Check CI sweeper deliverables
+        run: |
+          ./scripts/check-ci-sweeper.sh
+          ./scripts/check-ci-sweeper.sh --self-test
+
       - name: Check shell scripts parse (bash -n)
         run: |
           errors=0
@@ -87,12 +96,9 @@ jobs:
       - name: Install pinned opencode binary and verify model env resolution
         run: |
           set -euo pipefail
-          # Extract into its own dir: running a binary at /tmp/opencode makes
-          # opencode try to mkdir its storage dir at the same path → EEXIST.
-          mkdir -p /tmp/opencode-bin
-          curl -sSL -o /tmp/opencode-bin/opencode-linux-x64.tar.gz https://github.com/anomalyco/opencode/releases/download/v1.18.18/opencode-linux-x64.tar.gz
-          tar -xzf /tmp/opencode-bin/opencode-linux-x64.tar.gz -C /tmp/opencode-bin
-          /tmp/opencode-bin/opencode --version
+          # Pin lives in scripts/install-opencode.sh — shared with the CI
+          # Sweeper workflow so both run the same opencode release.
+          bash scripts/install-opencode.sh
           bash scripts/check-model-env.sh
           bash scripts/model-env.selftest.sh
           bash scripts/model-env.runtime-check.sh /tmp/opencode-bin/opencode
