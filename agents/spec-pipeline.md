@@ -29,6 +29,14 @@ You are invoked in one of two ways:
   gate), stop and relay exactly what it said — do not paper over it or attempt
   the stage yourself.
 
+Before delegating to `spec-verifier`, export the loop/retry context for the
+telemetry record (spec 008 budgets, spec 012): `SPEC_LOOP_COUNT`,
+`SPEC_PHASE1_RETRIES`, `SPEC_PHASE2_RETRIES`, sourced from your loop/retry
+tracking for the current run. The Verifier's `record-gate-run.sh` fills those
+record fields from these env vars — that is how the budget audit trail reaches
+`runs.jsonl`. If you have no tracked counts, export nothing; the record defaults
+those fields to 0.
+
 Never skip the human review gate between Specifier and Coder. Never commit or push
 yourself — that is the PR Opener's job (stage 5b), under the narrow carve-out in
 `docs/SPEC_PIPELINE.md §Commit and push carve-out`, not yours.
