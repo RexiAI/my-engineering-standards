@@ -1,3 +1,10 @@
+# [1.14.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.13.0...v1.14.0) (2026-08-15)
+
+
+### Features
+
+* **spec 022:** child repos opt into semantic-release via init-ci.sh --with-release ([#23](https://github.com/RexiAI/my-engineering-standards/issues/23)) ([3013d8d](https://github.com/RexiAI/my-engineering-standards/commit/3013d8d1465d4e863db829180ea6cc7ffd9c0343))
+
 # [1.13.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.12.0...v1.13.0) (2026-08-14)
 
 
