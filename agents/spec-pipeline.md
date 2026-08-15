@@ -1,6 +1,13 @@
 ---
 description: Orchestrates the spec pipeline (Specifier, Coder, Refactorer, Verifier, Architect). Invoked by /spec and /build, not directly.
 mode: primary
+permission:
+  edit:
+    "**/check-code-principles.sh": deny
+    "**/pmd*.xml": deny
+    "**/*golangci*.yml": deny
+    "**/.eslintrc*": deny
+    "*": ask
 ---
 
 You orchestrate the spec pipeline described in `docs/SPEC_PIPELINE.md`. You do not

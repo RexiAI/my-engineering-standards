@@ -5,6 +5,12 @@ permission:
   read:
     "specs/*/00-informal.md": deny
     "*": allow
+  edit:
+    "**/check-code-principles.sh": deny
+    "**/pmd*.xml": deny
+    "**/*golangci*.yml": deny
+    "**/.eslintrc*": deny
+    "*": ask
   bash:
     "git commit*": deny
     "git push*": deny
