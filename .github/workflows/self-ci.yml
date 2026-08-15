@@ -108,6 +108,19 @@ jobs:
         run: |
           shellcheck scripts/*.sh templates/*.sh
 
+      # Gate self-tests (spec 012): one deliberately-bad fixture per gate
+      # proving each gate fires with the right severity, plus the traceability
+      # and telemetry regression nets. No continue-on-error: a gate regression
+      # (e.g. the complexity threshold raised so a fixture no longer fires)
+      # fails the job. The principles selftest fail-fasts with a clear message
+      # if 007's --gates flag is not yet merged — 012 lands in the same batch.
+      - name: Run gate selftests
+        run: |
+          set -euo pipefail
+          bash scripts/check-code-principles.selftest.sh
+          bash scripts/check-scenario-traceability.selftest.sh
+          bash scripts/tests/gate-telemetry.selftest.sh
+
       # Note: this intentionally mirrors `make lint`'s YAML scope (.github + ci),
       # not full-repo. Expanding scope belongs in the Makefile, not here.
       - name: Validate YAML syntax (.github, ci)
