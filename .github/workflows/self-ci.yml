@@ -70,6 +70,13 @@ jobs:
       - name: Check skills specification
         run: ./scripts/check-skills.sh
 
+      # Finished-spec gate (docs/SPEC_PIPELINE.md §Archive in the PR): a spec
+      # with a 30-report.md must be archived (docs/changes/NNN-slug.md) inside
+      # its PR. No continue-on-error: a finished spec that would land scratch
+      # on main fails the job.
+      - name: Check finished specs are archived
+        run: ./scripts/check-specs-archived.sh
+
       - name: make lint
         run: make lint
 

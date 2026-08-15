@@ -120,7 +120,7 @@ my-engineering-standards/                    ← Parent (this repo)
 your-project/                                ← Child repo (e.g. monorepo with api + web)
 ├── .github/workflows/ci.yml                ← Generated: composes backend + frontend jobs
 ├── .github/dependabot.yml                  ← Generated
-├── .releaserc.json                         ← Generated (Node only)
+├── .releaserc.json                         ← Generated (Node/frontend; also Java/Go-only with --with-release)
 ├── Makefile                                ← Generated (Go only)
 └── .standards/                             ← Git submodule
 ```
@@ -299,6 +299,7 @@ Steps:
 | `SONAR_TOKEN` | SonarQube analysis (optional) |
 | `PACT_BROKER_URL` | Contract tests (optional) |
 | `EXPO_TOKEN` | EAS build (React Native; merge-to-main path only) |
+| `GH_TOKEN` | Semantic Release (release, opt-in only) |
 
 ## Weekly E2E Pipeline
 
@@ -372,6 +373,81 @@ since the last release, and the git tag is the sole source of truth.
 Semantic Release runs automatically after every successful merge to `main`. The release job in
 `ci-release.yml` is conditioned on `github.ref_name == github.event.repository.default_branch`
 (GitHub) or `$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH` (GitLab).
+
+### Why init-ci.sh doesn't wire the release job
+
+The release bot is the one piece of CI the bootstrap deliberately does not
+auto-generate. Three reasons:
+
+- **Credentials are repo-owned, not bootstrappable.** Semantic Release needs a
+  repo-scoped write token (`GH_TOKEN` with `contents: write`). `init-ci.sh`
+  generates config and CI wiring, but it cannot provision secrets — every child
+  release requires a human to add the secret in the repo's settings regardless.
+  Generating a release workflow without that secret would create a permanently
+  failing job, so the bootstrap leaves the wiring to the repo owner instead.
+- **Release is an authority, not a job.** A release creates tags, publishes
+  releases, and auto-commits `CHANGELOG.md` back to `main` (via
+  `@semantic-release/git`). CI jobs are side-effect-free and safe to
+  auto-generate; release changes repo state and publishes artifacts. Whether a
+  repo gets a bot with that power — approval gates, release cadence, even
+  whether it is versioned at all — is a per-repo ownership decision, not a
+  bootstrap default.
+- **Not every child repo has a release cadence.** Services under active change
+  get tags; internal or experimental repos would get noisy releases. Opt-in
+  lets each child decide.
+
+This also explains the parent-vs-child asymmetry. The standards repo runs its
+own `.github/workflows/release.yml`, but that is not a template children are
+meant to copy: the standards repo is itself the released artifact children pin
+via the `.standards/` submodule, so its bot is the parent's own wiring. A
+child's release bot is a per-child opt-in decision, not a bootstrap template.
+
+These claims match the tree. A default `init-ci.sh` run emits no `release:` job
+and never prompts for `GH_TOKEN`; the `release:` job block in the generated
+`ci.yml` example in [GitHub Actions: Child composes Parent](#github-actions-child-composes-parent)
+exists in the docs only — default generation never produces it. The opt-in path
+below (or the `init-ci.sh --with-release` generator flag) is what produces it.
+
+### Opting in: wiring the release bot
+
+Release is opt-in per child. Two paths produce the same wiring: the generator
+flag (`./.standards/scripts/init-ci.sh --with-release`, which emits everything
+below), or the manual steps — reproducible from the docs and the standards-repo
+files they reference, with no other information needed.
+
+1. **`.releaserc.json`** — a release job without config is broken, so the
+   config comes first. For a child with a node backend or a frontend,
+   `init-ci.sh` already generates it (`_gh_releaserc`) on every GitHub run. A
+   Java-only or Go-only child copies `ci/templates/releaserc.json` to
+   `.releaserc.json` manually. (With `init-ci.sh --with-release`, the script
+   generates it for Java-only/Go-only children too; an existing
+   `.releaserc.json` is never overwritten.)
+2. **Add the `release:` job** to `.github/workflows/ci.yml`:
+
+   ```yaml
+   release:
+     if: ${{ github.event_name == 'push' && github.ref_name == github.event.repository.default_branch }}
+     uses: RexiAI/my-engineering-standards/.github/workflows/shared/ci-release.yml@main
+     secrets:
+       GH_TOKEN: ${{ secrets.GH_TOKEN }}
+   ```
+
+   The reusable workflow (`.github/workflows/shared/ci-release.yml` in the
+   standards repo) declares `GH_TOKEN` `required: true` and has no internal
+   default-branch gate — the `if:` above (a push to the default branch) must
+   live on the caller's job, and the secret key must be exactly `GH_TOKEN`
+   (GitHub errors on an undeclared secret).
+3. **Add the secret.** On GitHub Actions, add a `GH_TOKEN` secret with
+   `contents: write` (repo → Settings → Secrets and variables → Actions). On
+   GitLab, the include path is `ci/gitlab/shared/ci-release.yml`: add
+   `- local: .standards/ci/gitlab/shared/ci-release.yml` to the `include:`
+   list and a `release:` job extending `.semantic-release`. The template's own
+   default-branch rule applies, and the credential is a project access token
+   with `write_repository` scope.
+
+**The no-op boundary.** A child that never opts in is unaffected: a default
+`init-ci.sh` run emits no release job and requires no `GH_TOKEN` secret, so
+unit/lint/build CI stays green. Opting in is purely additive.
 
 ### Version bump rules
 

@@ -13,6 +13,16 @@ set -euo pipefail
 #                     --platform github \
 #                     --languages java,go \
 #                     --registry ghcr.io
+#
+# Acceptance scenario coverage (spec 022, docs/SPEC_PIPELINE.md §Scenario format):
+#   AC-022-01  docs/CI_CD.md §Release Process rationale — why the bootstrap does
+#              not auto-wire release (credentials repo-owned, release as an
+#              authority, opt-in cadence, parent-vs-child asymmetry)
+#   AC-022-02  docs/CI_CD.md §Release Process opt-in steps + no-op child boundary
+#   AC-022-03  this script: --with-release flag (GitHub + GitLab generation,
+#              GH_TOKEN prompt + summary, .releaserc.json coupling)
+#   AC-022-04  self-CI gates green (make lint / validate-all, orchestration,
+#              skills, bash -n, no CRLF, scoped git status)
 # ──────────────────────────────────────────────
 
 RED='\033[0;31m'
@@ -33,6 +43,7 @@ FRONTEND_FLAG=""
 REGISTRY_FLAG=""
 WITH_SAGA_FLAG=""
 WITH_DEPLOY_FLAG=""
+WITH_RELEASE_FLAG=""
 DEPLOY_TOOL="kamal"
 
 while [[ $# -gt 0 ]]; do
@@ -61,6 +72,13 @@ while [[ $# -gt 0 ]]; do
       WITH_DEPLOY_FLAG="true"
       shift
       ;;
+    --with-release)
+      # Opt-in Semantic Release wiring (AC-022-03-01): emits the release job
+      # via the reusable include on both platforms, prompts for GH_TOKEN, and
+      # couples .releaserc.json for Java/Go-only children (AC-022-03-04/08).
+      WITH_RELEASE_FLAG="true"
+      shift
+      ;;
     --deploy-tool)
       DEPLOY_TOOL="$2"
       WITH_DEPLOY_FLAG="true"
@@ -68,7 +86,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     *)
       err "Unknown flag: $1"
-      echo "Usage: $0 [--platform github|gitlab|both] [--backend java,go,node] [--frontend nextjs,react,angular,react-native,static] [--registry ghcr.io] [--with-saga] [--with-deploy] [--deploy-tool kamal|dokku|ssh]"
+      echo "Usage: $0 [--platform github|gitlab|both] [--backend java,go,node] [--frontend nextjs,react,angular,react-native,static] [--registry ghcr.io] [--with-saga] [--with-deploy] [--deploy-tool kamal|dokku|ssh] [--with-release]"
       exit 1
       ;;
   esac
@@ -233,7 +251,7 @@ fi
 
 # ── Step 3: Ask for secrets ───────────────────
 collect_secrets() {
-  GHCR_TOKEN=""; MAVEN_USERNAME=""; MAVEN_PASSWORD=""; NPM_TOKEN=""; EXPO_TOKEN=""; SONAR_TOKEN=""; PACT_BROKER_URL=""
+  GHCR_TOKEN=""; MAVEN_USERNAME=""; MAVEN_PASSWORD=""; NPM_TOKEN=""; EXPO_TOKEN=""; SONAR_TOKEN=""; PACT_BROKER_URL=""; GH_TOKEN=""
 
   if [ ! -t 0 ]; then
     info "Non-interactive stdin — skipping secrets prompt (add secrets manually later)."
@@ -250,6 +268,11 @@ collect_secrets() {
     return
   fi
 
+  _prompt_secrets
+}
+
+# One read per secret, gated on the language/frontend flags that use it.
+_prompt_secrets() {
   read -rp "  GHCR_TOKEN: " GHCR_TOKEN
   if [[ " ${BACKEND[*]} " =~ "java" ]]; then
     read -rp "  MAVEN_USERNAME: " MAVEN_USERNAME
@@ -263,12 +286,17 @@ collect_secrets() {
   fi
   read -rp "  SONAR_TOKEN (optional): " SONAR_TOKEN
   read -rp "  PACT_BROKER_URL (optional): " PACT_BROKER_URL
+  if [ "$WITH_RELEASE_FLAG" = "true" ]; then
+    # Release is opt-in (AC-022-03-05): GH_TOKEN is only prompted when the
+    # flag is set — a child that never opts in has no required secret.
+    read -rp "  GH_TOKEN (Semantic Release, opt-in): " GH_TOKEN
+  fi
 }
 
 # NPM_TOKEN is prompted when there is a node backend or any frontend.
 _wants_npm_token() {
+  _has_node_backend && return 0
   [ -n "$FRONTEND" ] && return 0
-  [[ " ${BACKEND[*]} " =~ "node" ]] && return 0
   return 1
 }
 
@@ -315,6 +343,8 @@ EOF
 
   _gh_deploy_job "$target"
 
+  _gh_release_job "$target"
+
   ok "Generated: .github/workflows/ci.yml"
 
   # Copy saga templates when --with-saga
@@ -350,6 +380,28 @@ _gh_deploy_job() {
 EOF
   ok "Added deploy job to ci.yml (configure SSH_HOST, SSH_USER, SSH_PRIVATE_KEY secrets)"
   info "Deploy tool: ${DEPLOY_TOOL}. Run ./.standards/scripts/init-deploy.sh --deploy-tool ${DEPLOY_TOOL} to set up deploy config"
+}
+
+# Release job for Semantic Release, appended only when --with-release is set.
+# The reusable ci-release.yml declares a required GH_TOKEN secret but has no
+# internal default-branch gate — the condition lives on this job, mirroring
+# _gh_deploy_job. No separate release.yml workflow is emitted (AC-022-03-02).
+_gh_release_job() {
+  local target="$1"
+  # Regression guard (AC-022-03-03): without --with-release the default output
+  # is byte-compatible with today — no release job, no GH_TOKEN line.
+  [ "$WITH_RELEASE_FLAG" != "true" ] && return 0
+
+  cat >> "$target" << EOF
+
+  release:
+    if: \${{ github.event_name == 'push' && github.ref_name == github.event.repository.default_branch }}
+    uses: RexiAI/my-engineering-standards/.github/workflows/shared/ci-release.yml@main
+    secrets:
+      GH_TOKEN: \${{ secrets.GH_TOKEN }}
+EOF
+  ok "Added release job to ci.yml (Semantic Release, default-branch push)"
+  info "Set the GH_TOKEN secret (contents: write) in GitHub → Settings → Secrets and variables → Actions"
 }
 
 # Frontend job block: react-native swaps the docker-registry/GHCR pair for a
@@ -422,8 +474,12 @@ _dependabot_ecosystem() {
 }
 
 _gh_releaserc() {
+  # Never overwrite an existing .releaserc.json (AC-022-03-04/08).
   [ -f "$PROJECT_ROOT/.releaserc.json" ] && return 0
-  if _has_node_backend || [ -n "$FRONTEND" ]; then
+  # Node backend / any frontend: generated on every GitHub run. Java-only or
+  # Go-only children: only generated when --with-release is set — a release job
+  # without config is broken, so the flag couples the copy (decision D3).
+  if _has_node_backend || [ -n "$FRONTEND" ] || [ "$WITH_RELEASE_FLAG" = "true" ]; then
     cp "$STANDARDS_DIR/ci/templates/releaserc.json" "$PROJECT_ROOT/.releaserc.json"
     ok "Generated: .releaserc.json"
   fi
@@ -452,6 +508,11 @@ EOF
   done
   if [ -n "$FRONTEND" ]; then
     echo "  - local: .standards/ci/gitlab/frontend/ci-${FRONTEND}.yml" >> "$target"
+  fi
+  if [ "$WITH_RELEASE_FLAG" = "true" ]; then
+    # GitLab symmetric (AC-022-03-06): include the shared release template;
+    # no own ci-release.yml copy is emitted (decision D2).
+    echo "  - local: .standards/ci/gitlab/shared/ci-release.yml" >> "$target"
   fi
 
   # Add saga-gates stage when --with-saga
@@ -483,10 +544,35 @@ EOF
 
   _gl_backend_jobs "$target" "$saga_enabled"
   _gl_frontend_job "$target"
+  _gl_release_job "$target"
+  _gl_deploy_job "$target"
 
-  # Add production deploy job when --with-deploy
-  if [ "$WITH_DEPLOY_FLAG" = "true" ]; then
-    cat >> "$target" << EOF
+  ok "Generated: .gitlab-ci.yml"
+  _copy_go_makefile
+}
+
+# Release job (--with-release, AC-022-03-06): extends the .semantic-release
+# hidden job from the shared include; the template's own default-branch rule
+# applies, so no extra rule is emitted here.
+_gl_release_job() {
+  local target="$1"
+  [ "$WITH_RELEASE_FLAG" != "true" ] && return 0
+
+  cat >> "$target" << EOF
+
+release:
+  extends: .semantic-release
+EOF
+  ok "Added release job to .gitlab-ci.yml (Semantic Release, default-branch rule)"
+  info "GitLab: add a project access token with write_repository scope (Settings → CI/CD → Variables)"
+}
+
+# Production deploy job (--with-deploy): extends the per-tool deploy template.
+_gl_deploy_job() {
+  local target="$1"
+  [ "$WITH_DEPLOY_FLAG" != "true" ] && return 0
+
+  cat >> "$target" << EOF
 
 include:
   - local: .standards/ci/templates/child-ci-deploy-${DEPLOY_TOOL}.yml
@@ -497,12 +583,8 @@ deploy-prod:
   variables:
     SERVICE_NAME: ""
 EOF
-    ok "Added deploy-prod job to .gitlab-ci.yml (configure SSH_HOST, SSH_USER, SSH_PRIVATE_KEY CI/CD variables)"
-    info "Deploy tool: ${DEPLOY_TOOL}. Run ./.standards/scripts/init-deploy.sh --deploy-tool ${DEPLOY_TOOL} to set up deploy config"
-  fi
-
-  ok "Generated: .gitlab-ci.yml"
-  _copy_go_makefile
+  ok "Added deploy-prod job to .gitlab-ci.yml (configure SSH_HOST, SSH_USER, SSH_PRIVATE_KEY CI/CD variables)"
+  info "Deploy tool: ${DEPLOY_TOOL}. Run ./.standards/scripts/init-deploy.sh --deploy-tool ${DEPLOY_TOOL} to set up deploy config"
 }
 
 _gl_backend_jobs() {
@@ -712,24 +794,46 @@ print_summary() {
   _print_gh_next_steps
   _print_gl_next_steps
   echo "  3. Review generated files and customize as needed"
-  if [ "${WITH_SAGA_FLAG:-}" = "true" ]; then
-    echo ""
-    echo "Saga/Outbox gate templates copied:"
-    echo "  • Fill in TODO markers in the integration test templates"
-    echo "  • Java: add pom-fragment.xml dependency to pom.xml"
-    echo "  • Node: wire eslint-saga-rules plugin in eslint.config.js"
-    echo "  • Reference: docs/SAGA_PATTERN.md §CI Quality Gates"
-    echo "               docs/OUTBOX_PATTERN.md §CI Quality Gates"
-  fi
-  if [ "${WITH_DEPLOY_FLAG:-}" = "true" ]; then
-    echo ""
-    echo "Deployment configuration:"
-    echo "  • Deploy job added to CI pipeline (tool: ${DEPLOY_TOOL})"
-    echo "  • Run ./.standards/scripts/init-deploy.sh --deploy-tool ${DEPLOY_TOOL} to set up deploy config"
-    echo "  • Set secrets: SSH_HOST, SSH_USER, SSH_PRIVATE_KEY, SSH_PORT"
-    echo "  • Reference: docs/DEPLOYMENT.md §Production Deployment"
-  fi
+  _print_saga_note
+  _print_deploy_note
+  _print_release_note
   echo ""
+}
+
+_print_saga_note() {
+  [ "${WITH_SAGA_FLAG:-}" != "true" ] && return 0
+  echo ""
+  echo "Saga/Outbox gate templates copied:"
+  echo "  • Fill in TODO markers in the integration test templates"
+  echo "  • Java: add pom-fragment.xml dependency to pom.xml"
+  echo "  • Node: wire eslint-saga-rules plugin in eslint.config.js"
+  echo "  • Reference: docs/SAGA_PATTERN.md §CI Quality Gates"
+  echo "               docs/OUTBOX_PATTERN.md §CI Quality Gates"
+}
+
+_print_deploy_note() {
+  [ "${WITH_DEPLOY_FLAG:-}" != "true" ] && return 0
+  echo ""
+  echo "Deployment configuration:"
+  echo "  • Deploy job added to CI pipeline (tool: ${DEPLOY_TOOL})"
+  echo "  • Run ./.standards/scripts/init-deploy.sh --deploy-tool ${DEPLOY_TOOL} to set up deploy config"
+  echo "  • Set secrets: SSH_HOST, SSH_USER, SSH_PRIVATE_KEY, SSH_PORT"
+  echo "  • Reference: docs/DEPLOYMENT.md §Production Deployment"
+}
+
+_print_release_note() {
+  # Release note (AC-022-03-05): lists GH_TOKEN / the GitLab token requirement
+  # without inventing a variable name the GitLab template does not use.
+  [ "${WITH_RELEASE_FLAG:-}" != "true" ] && return 0
+  echo ""
+  echo "Release (opt-in):"
+  echo "  • Release job added to CI pipeline (Semantic Release on default-branch push)"
+  case $CI in
+    github) echo "  • Set secret: GH_TOKEN (GitHub Actions, contents: write)" ;;
+    gitlab) echo "  • Set a project access token with write_repository scope (GitLab)" ;;
+    both)   echo "  • GitHub: GH_TOKEN secret; GitLab: project access token with write_repository scope" ;;
+  esac
+  echo "  • Reference: docs/CI_CD.md §Release Process"
 }
 
 _print_generated_files() {
@@ -753,6 +857,7 @@ NPM_TOKEN NPM_TOKEN
 EXPO_TOKEN EXPO_TOKEN (Expo/EAS build, merge-to-main only)
 SONAR_TOKEN SONAR_TOKEN (optional)
 PACT_BROKER_URL PACT_BROKER_URL (optional)
+GH_TOKEN GH_TOKEN (Semantic Release, opt-in only)
 EOF
   true
 }
