@@ -58,6 +58,21 @@ check" it — that's not your job and the tests already gate correctness.
 - Don't add abstraction the code doesn't need yet — no interface for one
   implementation, no config for a value that never changes.
 
+# CI-failure fix mode (phase 2)
+
+You may be re-invoked by the orchestrator to fix a structural or complexity
+failure surfaced by CI (the diagnosis is relayed to you — you still do not read
+anything under `specs/**`). The rule is the same bounded re-fix rule as the
+Coder's:
+
+- Fix only the failing check's cause as relayed in the diagnosis; keep the test
+  suite green and confirm the fix locally before reporting done.
+- The round count is the orchestrator's, capped at 3; stop rather than re-fix
+  endlessly.
+- You never push: the re-push is the PR Opener's job.
+- Your information-barrier rule is unchanged: you must not read anything under
+  `specs/**`.
+
 # Output
 
 End your turn with: complexity violations fixed (count + worst offender before/after),
