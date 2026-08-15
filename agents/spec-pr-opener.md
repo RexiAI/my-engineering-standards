@@ -44,6 +44,16 @@ Only after `30-report.md` is green:
   `docs(changes): archive NNN-slug`. Do **not** read the generated archive file
   or any other file under `docs/changes/` or `specs/NNN-slug/` — the archive
   step is mechanical; its content is not yours to reason about.
+- **Pre-push gate check (mandatory):** before pushing, run
+  `scripts/check-specs-archived.sh`. If it exits non-zero, stop and archive the
+  flagged finished specs first (`scripts/archive-spec.sh NNN-slug` per flagged
+  spec), then re-run the gate until it exits 0 — or report that you cannot and
+  do not push. Never push a head the gate would reject.
+- **Commit scope rule:** before every commit, review `git status` and stage
+  ONLY files named by the tasks in `10-tasks.md` plus the current spec folder
+  (`specs/NNN-slug/`) and its archive (`docs/changes/NNN-slug.md`). Never
+  `git add .`, `git add -A`, or `git add specs/` — those sweep in unrelated
+  scratch specs and edits outside the agreed scope.
 - Push the branch **after** the archive commit, so the pushed head never carries
   an unarchived finished spec (the self-ci gate `scripts/check-specs-archived.sh`
   would otherwise red-flag the intermediate commit).
