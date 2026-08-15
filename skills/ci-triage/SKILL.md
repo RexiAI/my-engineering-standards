@@ -110,3 +110,39 @@ Before starting a fix, check `STATE.md` (spec 016's durable state). When
 `STATE.md` shows an in-flight remediation of the same failure on the same branch
 — the 014-owned `spec/NNN-slug` case — the sweeper defers rather than competing
 with the pipeline's own post-PR loop.
+
+# State contract — STATE.md CI Sweeper section
+
+The **CI Sweeper** section of `STATE.md` (spec 016's durable state file,
+consumed by reference, not re-specified) records one block per in-flight failure
+with these fields:
+
+- last run timestamp
+- failing commit SHA
+- failing job
+- attempt count
+- worktree/PR link
+- outcome
+
+The section is updated on each run; resolved failures are removed from the CI
+Sweeper section each run, while in-flight failures are retained.
+
+`STATE.md` and `loop-run-log.md` are spec 016's files, consumed by reference.
+The CI Sweeper section is operative only after 016's foundation lands; until
+then the loop records state at L1 (report) and never runs unattended.
+
+# Cost guidance
+
+- The loop exits early when CI is green — the workflow trigger skips green runs;
+  the loop itself must also short-circuit.
+- No full sweep on a no-op run: no code change since the last sweep, or the
+  failure is already resolved.
+- Record the per-run token estimate (`tokens_estimate`) per spec 016's
+  `loop-run-log.md` schema.
+
+# Readiness
+
+This loop runs at **L1 (report)** — it triages and reports, and does not run
+unattended fixes. The standing rules (path denylist, no auto-merge, human
+gates) live in `docs/LOOP_ENGINEERING.md` and `templates/loop-constraints.md`;
+merging any PR this loop proposes is always a human action.
