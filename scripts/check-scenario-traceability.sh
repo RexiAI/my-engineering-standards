@@ -67,7 +67,7 @@ if [ ! -d "$SPECS_DIR" ]; then
   exit 0
 fi
 
-GREP_EXCLUDES='--exclude-dir=node_modules --exclude-dir=target --exclude-dir=vendor --exclude-dir=.git --exclude-dir=dist --exclude-dir=specs'
+GREP_EXCLUDES='--exclude-dir=node_modules --exclude-dir=target --exclude-dir=vendor --exclude-dir=.git --exclude-dir=.standards --exclude-dir=dist --exclude-dir=specs'
 
 # ── Collect scenario IDs from specs/*/20-acceptance/*.md ─────────────────────
 # Match "## AC-NNN-NN" headings, e.g. "## AC-002-01 — Apply a percentage discount"
