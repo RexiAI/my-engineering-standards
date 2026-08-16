@@ -43,6 +43,17 @@ Support standard OAuth2 grant types:
 - **Larger projects / production**: Use a secrets manager (HashiCorp Vault, AWS SSM Parameter Store, Kubernetes Secrets). Environment variables reference secret store paths rather than containing raw values.
 - Talisman pre-commit hook scans for accidental secret commits.
 
+### OpenCode Zen API Key
+
+The spec pipeline can route agents through OpenCode Zen (`https://opencode.ai/zen/v1`)
+using the `OPENCODE_API_KEY` env var (see `docs/SPEC_PIPELINE.md §Using OpenCode Zen`).
+Treat it like any other credential:
+
+- **Never** put it in `config/model.local.env`, `opencode.json`, or any committed file — those carry model ids, not keys.
+- Export it in your shell profile (`~/.bashrc`, `~/.zshrc`) or a gitignored `.env`.
+- In CI, store it as a secret (e.g. `OPENCODE_API_KEY` in GitHub Actions) — never hardcoded in the workflow.
+- `scripts/check-zen-connectivity.sh` reads it only from the environment and skips when it is absent.
+
 ## Input Validation
 
 - Validate all input at the controller boundary.

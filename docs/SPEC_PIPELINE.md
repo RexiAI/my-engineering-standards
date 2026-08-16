@@ -310,6 +310,52 @@ additionally downloads a pinned opencode binary and runs
 actual resolution behavior in three cases (defaults via loader, overrides win,
 loader absent → empty).
 
+### Using OpenCode Zen
+
+The spec-pipeline model vars accept any provider ID opencode can resolve,
+including **OpenCode Zen** — OpenAI-compatible gateway at
+`https://opencode.ai/zen/v1`, authed with an API key from
+`https://opencode.ai/zen`. Zen models are prefixed `opencode-zen/` in the
+`SPEC_*_MODEL` vars (e.g. `opencode-zen/kimi-k3` for Kimi K3).
+
+Two ways to use Zen with this pipeline:
+
+**Option A — automatic fallback (no per-agent config).** If your opencode
+console has "Use balance" enabled, requests that hit OpenCode Go rate limits or
+quota are routed to your Zen balance by the model-fallback plugin. No env var
+changes needed; you only need the API key on the machine running the pipeline.
+
+**Option B — explicit Zen models per agent.** Override any `SPEC_*_MODEL` var to
+an `opencode-zen/` model:
+
+```bash
+# config/model.local.env (gitignored) — see §One-time setup
+SPEC_VERIFIER_MODEL=opencode-zen/kimi-k3
+SPEC_CODER_MODEL=opencode-zen/kimi-k3
+```
+
+and export the key in your shell profile:
+
+```bash
+echo 'export OPENCODE_API_KEY=sk-zen-...' >> ~/.bashrc   # or ~/.zshrc
+```
+
+Then restart opencode. The committed `config/model.local.env.example` carries a
+commented `opencode-zen/kimi-k3` line under every var so the switch is a
+one-line uncomment.
+
+**Key hygiene**: `OPENCODE_API_KEY` is a real credential — never put it in
+`config/model.local.env`, `opencode.json`, or any committed file. Profile or
+`.env` (gitignored) only; CI uses a secret, never a hardcoded value. See
+`docs/SECURITY.md §Secrets Management`.
+
+**Explicit fallback chains (optional).** For fine-grained per-agent fallback
+order (e.g. Go primary, Zen as the safety net), copy
+`config/model-fallback.json.example` to `~/.config/opencode/model-fallback.json`
+and adjust. The plugin triggers on `rate_limit`, `quota_exceeded`, `5xx`,
+`timeout`, and `overloaded`; a missing file or key skips the check silently, so
+machines without a key run normally.
+
 If you need to customize an agent's prompt or permissions, not just its model, run
 `./scripts/bootstrap.sh --copy-agents` (or `make init-ai COPY_AGENTS=1`) to get real,
 editable files in `.opencode/agents/` and `.opencode/commands/` instead of a

@@ -1,0 +1,16 @@
+{
+  "fallbackChains": {
+    "spec-specifier": ["opencode-go/deepseek-v4-flash", "opencode-zen/kimi-k3"],
+    "spec-ux": ["opencode-go/deepseek-v4-flash", "opencode-zen/kimi-k3"],
+    "spec-verifier": ["opencode-go/qwen3.7-plus", "opencode-zen/kimi-k3"],
+    "spec-mutation-runner": ["opencode-go/qwen3.7-plus", "opencode-zen/kimi-k3"],
+    "spec-pr-opener": ["opencode-go/qwen3.7-plus", "opencode-zen/kimi-k3"],
+    "spec-coder": ["opencode-go/deepseek-v4-flash", "opencode-zen/kimi-k3"],
+    "spec-refactorer": ["opencode-go/deepseek-v4-flash", "opencode-zen/kimi-k3"],
+    "spec-pipeline": ["opencode-go/deepseek-v4-flash", "opencode-zen/kimi-k3"]
+  },
+  "triggers": ["rate_limit", "quota_exceeded", "5xx", "timeout", "overloaded"],
+  "cooldownMinutes": 5,
+  "retryOriginalAfterMinutes": 15,
+  "maxDepth": 3
+}

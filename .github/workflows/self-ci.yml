@@ -100,6 +100,16 @@ jobs:
       - name: Run loop files check
         run: ./scripts/check-loop-files.sh
 
+      # Optional OpenCode Zen connectivity check (docs/SPEC_PIPELINE.md §Using
+      # OpenCode Zen). Soft by design: continue-on-error so a missing or bad
+      # key can never block a merge — the script itself also skips (exit 0)
+      # when OPENCODE_API_KEY is unset.
+      - name: Verify OpenCode Zen connectivity (if key present)
+        continue-on-error: true
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        run: ./scripts/check-zen-connectivity.sh
+
       - name: Install shellcheck
         run: sudo apt-get update -y && sudo apt-get install -y shellcheck
 
