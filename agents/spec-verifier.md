@@ -79,8 +79,7 @@ follows, applied to checking instead of building.
 
 Write `specs/NNN-slug/25-verification.md`:
 
-- Each check above: PASS/FAIL with the actual command run and its real output (or a
-  representative excerpt), not a paraphrase.
+- Each check above: PASS/FAIL with the actual command run and its real output, not a paraphrase.
 - Design-principles gate: the `check-code-principles.sh` exit code and every FAIL /
   WARN line, verbatim.
 - Spot-check results: which scenarios you checked, what you found.
