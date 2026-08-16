@@ -1,3 +1,10 @@
+## [1.14.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.14.0...v1.14.1) (2026-08-16)
+
+
+### Bug Fixes
+
+* **scripts:** make init-ci.sh and bootstrap.sh executable; exclude .standards from traceability scan ([#33](https://github.com/RexiAI/my-engineering-standards/issues/33)) ([2ccb653](https://github.com/RexiAI/my-engineering-standards/commit/2ccb65344c255fdf36f805515eda76a764d685c8))
+
 # [1.14.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.13.0...v1.14.0) (2026-08-15)
 
 
