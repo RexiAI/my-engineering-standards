@@ -35,11 +35,17 @@
 #
 # Usage:
 #   .standards/scripts/check-code-principles.sh [SOURCE_DIR] [--tier mvp|production|multi-service]
-#       [-BaseRef <ref>] [--blocking <gates>] [--warn-as-error]
+#       [-BaseRef <ref>] [--blocking <gates>] [--warn-as-error] [--gates <list>] [--json]
 #
 # SOURCE_DIR defaults to the current directory. --tier overrides auto-detection
 # from the project's AGENTS_*.md "Conformance tier:" declaration (see
 # docs/CONFORMANCE_TIERS.md). --warn-as-error promotes every WARN to a failure.
+# --gates restricts the run to a comma-separated subset of the five gate
+# categories (complexity, dry, yagni, solid, property-tests) — the Verifier's
+# scoped re-verification of a single failing category (AC-007-02, AC-007-03);
+# --json prints a single JSON object { "tier", "gates", "fails", "warns" }
+# carrying the same findings as the human output, for transcription into
+# specs/NNN-slug/25-verification.md (AC-007-03-05, AC-007-03-06).
 #
 # Blame scoping (-BaseRef <ref>): judge only the change — the diff of the
 # working tree against <ref>, scoped to the source files this script audits.
@@ -66,17 +72,26 @@
 #   over default); an unknown gate name or an empty value exits 2.
 #
 # Exit codes:
-#   0 — no FAILs (WARNs may exist)
+#   0 — no FAILs (WARNs may exist), or no source files to check
 #   1 — at least one FAIL (or a WARN with --warn-as-error)
-#   2 — usage or tooling failure (unknown option, bad --blocking value,
-#       unresolvable -BaseRef ref, not a git repository)
+#   2 — could not perform the check for a non-finding reason: a required tool
+#       (find/xargs/awk/grep/sed/tr/sort/wc/head/mktemp/rm) is missing, the
+#       source directory is unusable, a usage error (unknown option, unknown
+#       --gates name, empty --gates value, bad/empty --blocking value), an
+#       unresolvable -BaseRef ref, or not a git repository. A missing tool is a
+#       tooling failure, never a false PASS — the `|| true` swallows on the
+#       tooling paths are preflighted so a gate that could not run exits 2
+#       (AC-007-03-07).
 #
 # Standards reference:
 #   docs/CODING_CONVENTIONS.md §Design Principles
 #   docs/ARCHITECTURE.md (DIP / dependency rule)
 #   docs/TESTING.md §Property Testing
 #   docs/CONFORMANCE_TIERS.md
+#   agents/spec-verifier.md (script-is-authority / BLOCK discipline)
 set -euo pipefail
+
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/check-common.sh"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -93,18 +108,49 @@ BLOCKING_ARG=""
 BLOCKING_ARG_SET=false
 BLOCKING_SET="complexity property-tests"
 
-fail() { echo -e "${RED}FAIL${NC} $*"; FAILS=$((FAILS + 1)); }
-pass() { echo -e "${GREEN}PASS${NC} $*"; }
-warn() { echo -e "${YELLOW}WARN${NC} $*"; WARNS=$((WARNS + 1)); }
+fail() { # fail <message> [file] [line]
+  FAILS=$((FAILS + 1))
+  if [ "$JSON" = true ]; then FAILS_JSON+=("$1" "${2:-}" "${3:-}"); else echo -e "${RED}FAIL${NC} $1"; fi
+}
+pass() { [ "$JSON" = false ] && echo -e "${GREEN}PASS${NC} $*"; return 0; }
+warn() { # warn <message> [file] [line]
+  WARNS=$((WARNS + 1))
+  if [ "$JSON" = true ]; then WARNS_JSON+=("$1" "${2:-}" "${3:-}"); else echo -e "${YELLOW}WARN${NC} $1"; fi
+}
+say() { [ "$JSON" = false ] && echo "$@"; return 0; }
+
+emit_json() {
+  local i gates_json="" fails_json="" warns_json=""
+  for g in "${SELECTED_GATES[@]}"; do gates_json+="\"$(json_escape "$g")\", "; done
+  gates_json="${gates_json%, }"
+  for ((i = 0; i < ${#FAILS_JSON[@]}; i += 3)); do
+    fails_json+="{ \"message\": \"$(json_escape "${FAILS_JSON[i]}")\", \"file\": \"$(json_escape "${FAILS_JSON[i + 1]:-}")\", \"line\": \"$(json_escape "${FAILS_JSON[i + 2]:-}")\" }, "
+  done
+  fails_json="${fails_json%, }"
+  for ((i = 0; i < ${#WARNS_JSON[@]}; i += 3)); do
+    warns_json+="{ \"message\": \"$(json_escape "${WARNS_JSON[i]}")\", \"file\": \"$(json_escape "${WARNS_JSON[i + 1]:-}")\", \"line\": \"$(json_escape "${WARNS_JSON[i + 2]:-}")\" }, "
+  done
+  warns_json="${warns_json%, }"
+  printf '{\n  "tier": "%s",\n  "gates": [%s],\n  "fails": [%s],\n  "warns": [%s]\n}\n' \
+    "$(json_escape "$TIER")" "$gates_json" "$fails_json" "$warns_json"
+}
+
+FAILS_JSON=()
+WARNS_JSON=()
 
 SOURCE_DIR="."
 TIER=""
+GATES=""
+GATES_SET=false
+JSON=false
 while [ $# -gt 0 ]; do
   case "$1" in
-    --tier) TIER="${2:-}"; shift 2 ;;
+    --tier) TIER="${2:-}"; shift $(( $# > 1 ? 2 : 1 )) ;;
     --warn-as-error) WARN_AS_ERROR=true; shift ;;
     --blocking) BLOCKING_ARG="${2:-}"; BLOCKING_ARG_SET=true; shift 2 ;;
     -BaseRef) BASE_REF="${2:-}"; BASE_REF_SET=true; shift 2 ;;
+    --gates) GATES_SET=true; GATES="${2:-}"; shift $(( $# > 1 ? 2 : 1 )) ;;
+    --json) JSON=true; shift ;;
     -*) echo "Unknown option: $1" >&2; exit 2 ;;
     *) SOURCE_DIR="$1"; shift ;;
   esac
@@ -171,6 +217,37 @@ if [ "$BASE_REF_SET" = true ]; then
   : > "$BLAME_FULLY_ADDED"
 fi
 
+# ── --gates validation (AC-007-03-04): unknown name or empty value = exit 2 ──
+SELECTED_GATES=()
+if [ "$GATES_SET" = true ]; then
+  if [ -z "$GATES" ]; then
+    echo "ERROR: --gates requires a comma-separated list of gate names (complexity, dry, yagni, solid, property-tests)" >&2
+    exit 2
+  fi
+  IFS=',' read -r -a gate_list <<< "$GATES"
+  for g in "${gate_list[@]}"; do
+    case "$g" in
+      complexity|dry|yagni|solid|property-tests) SELECTED_GATES+=("$g") ;;
+      *) echo "ERROR: unknown gate '$g' (valid: complexity, dry, yagni, solid, property-tests)" >&2; exit 2 ;;
+    esac
+  done
+else
+  SELECTED_GATES=(complexity dry yagni solid property-tests)
+fi
+
+contains_gate() { # contains_gate <name>
+  local g
+  for g in "${SELECTED_GATES[@]}"; do [ "$g" = "$1" ] && return 0; done
+  return 1
+}
+
+# ── Tooling preflight (AC-007-03-07): a missing tool is exit 2, never a PASS ──
+require_tools design-principles find xargs awk grep sed tr sort wc head mktemp rm
+
+if [ ! -d "$SOURCE_DIR" ] || [ ! -r "$SOURCE_DIR" ]; then
+  echo "ERROR: source directory '$SOURCE_DIR' is missing or unreadable — cannot perform the design-principles check" >&2
+  exit 2
+fi
 # ── Conformance tier auto-detection ──────────────────────────────────────────
 if [ -z "$TIER" ]; then
   for f in "$SOURCE_DIR"/AGENTS_*.md; do
@@ -190,12 +267,11 @@ GO_FILES=$(find "$SOURCE_DIR" $FIND_PRUNE -prune -o -name '*.go' -print 2>/dev/n
 NODE_FILES=$(find "$SOURCE_DIR" $FIND_PRUNE -prune -o \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \) -print 2>/dev/null || true)
 
 [ -z "$JAVA_FILES" ] && [ -z "$GO_FILES" ] && [ -z "$NODE_FILES" ] && {
-  echo "No Java, Go, or JS/TS source files found under $SOURCE_DIR — nothing to check."
-  exit 0
+  finish_clean "No Java, Go, or JS/TS source files found under $SOURCE_DIR — nothing to check."
 }
 
-echo "Checking design principles in: $SOURCE_DIR (tier: $TIER)"
-echo ""
+say "Checking design principles in: $SOURCE_DIR (tier: $TIER)"
+say ""
 
 # Non-test source files (principles apply to production code).
 NONTEST_JAVA=$(echo "$JAVA_FILES" | grep -vE '/test/|/tests/|src/test/' || true)
@@ -307,12 +383,40 @@ END { while (top>=0) end_method() }
 AWK
 )"
 
+# split_loc <file:line> — split an analyzer location into LOC_FILE / LOC_LINE.
+split_loc() {
+  LOC_FILE="${1%%:*}"
+  LOC_LINE="${1#*:}"
+  LOC_LINE="${LOC_LINE%%:*}"
+}
+
+# report_one_violation <lang> <line> — emit one analyzer line as FAIL/WARN.
+report_one_violation() {
+  local lang="$1" line="$2"
+  [ -z "$line" ] && return 0
+  LOC_FILE=""; LOC_LINE=""
+  if [[ "$line" == *:*:* ]]; then
+    split_loc "$line"
+  fi
+  case "$line" in
+    *CC=*) fail "Cyclomatic complexity >6 ($lang): $line" "$LOC_FILE" "$LOC_LINE" ;;
+    *KISS_LINES=*) warn "Method body >20 lines ($lang): $line" "$LOC_FILE" "$LOC_LINE" ;;
+    *KISS_PARAMS=*) warn "Method with >6 parameters ($lang): $line" "$LOC_FILE" "$LOC_LINE" ;;
+  esac
+}
+
 run_complexity_kiss() {
   local lang="$1"; shift
   local files=("$@")
   [ "${#files[@]}" -eq 0 ] && return 0
-  local out
-  out=$(printf '%s\n' "${files[@]}" | xargs awk -v LANG="$lang" "$complexity_awk" 2>/dev/null || true)
+  local out rc
+  # No `|| true` swallow: an awk/xargs failure means the check could not run —
+  # that is a tooling failure (exit 2), never a silent PASS (AC-007-03-07).
+  out=$(printf '%s\n' "${files[@]}" | xargs awk -v LANG="$lang" "$complexity_awk" 2>&1) || rc=$?
+  if [ "${rc:-0}" -ne 0 ]; then
+    echo "ERROR: complexity/KISS analyzer failed to run (awk/xargs) — cannot complete the check" >&2
+    exit 2
+  fi
   [ -z "$out" ] && { pass "Complexity/KISS ($lang): no violations found"; return 0; }
   local line f s e
   while IFS= read -r line; do
@@ -321,9 +425,9 @@ run_complexity_kiss() {
     s=$(printf '%s' "$line" | cut -d: -f2)
     e=$(printf '%s' "$line" | cut -d: -f3)
     case "$line" in
-      *CC=*) emit "$(classify "complexity" "fail" "$f" "$s" "$e")" "Cyclomatic complexity >6 ($lang): $line" ;;
-      *KISS_LINES=*) emit "$(classify "complexity" "warn" "$f" "$s" "$e")" "Method body >20 lines ($lang): $line" ;;
-      *KISS_PARAMS=*) emit "$(classify "complexity" "warn" "$f" "$s" "$e")" "Method with >6 parameters ($lang): $line" ;;
+      *CC=*) emit "$(classify "complexity" "fail" "$f" "$s" "$e")" "Cyclomatic complexity >6 ($lang): $line" "$f" "$s" ;;
+      *KISS_LINES=*) emit "$(classify "complexity" "warn" "$f" "$s" "$e")" "Method body >20 lines ($lang): $line" "$f" "$s" ;;
+      *KISS_PARAMS=*) emit "$(classify "complexity" "warn" "$f" "$s" "$e")" "Method with >6 parameters ($lang): $line" "$f" "$s" ;;
     esac
   done <<< "$out"
 }
@@ -362,7 +466,7 @@ check_dry() {
       dline=$(printf '%s' "$loc" | sed -nE 's/.*:([0-9]+)$/\1/p')
       sev=$(classify "dry" "warn" "$dfile" "$dline" "$dline")
       if [ "$sev" = none ]; then continue; fi
-      emit "$sev" "Possible duplication (${count}x identical 4-line block, first at $loc): ${win//$'\x1f'/ /}"
+      emit "$sev" "Possible duplication (${count}x identical 4-line block, first at $loc): ${win//$'\x1f'/ /}" "$dfile" "$dline"
     done < "$tmp"
   else
     pass "DRY: no duplicate 4-line blocks detected"
@@ -389,12 +493,12 @@ check_yagni() {
           [ -z "$name" ] && continue
           impls=$(grep -rE "implements[^,{]*$name\b" $GREP_EXCLUDES "$SOURCE_DIR" --include="*.java" 2>/dev/null | wc -l | tr -d ' ' || true)
           if [ "$impls" -eq 1 ]; then
-            emit "$(classify "yagni" "fail" "$f" "$ln" "$ln")" "YAGNI: interface $name has exactly one implementation (premature abstraction) — $f:$ln"
+            emit "$(classify "yagni" "fail" "$f" "$ln" "$ln")" "YAGNI: interface $name has exactly one implementation (premature abstraction) — $f:$ln" "$f" "$ln"
             found=true
           fi
         done < <(grep -nE '^\s*(public\s+)?interface[ \t]+' "$f" 2>/dev/null || true)
         while IFS=: read -r ln _; do
-          emit "$(classify "yagni" "warn" "$f" "$ln" "$ln")" "Empty method body ($lang): $f:$ln"
+          emit "$(classify "yagni" "warn" "$f" "$ln" "$ln")" "Empty method body ($lang): $f:$ln" "$f" "$ln"
           found=true
         done < <(grep -nE '\{\s*\}' "$f" 2>/dev/null | grep -vE '//|test' || true)
       done
@@ -411,7 +515,7 @@ check_yagni() {
           [ -z "$name" ] && continue
           refs=$(grep -rE "\b$name\b" $GREP_EXCLUDES "$SOURCE_DIR" --include="*.go" 2>/dev/null | grep -v "interface[ \t]*$name" | wc -l | tr -d ' ' || true)
           if [ "$refs" -le 1 ]; then
-            emit "$(classify "yagni" "fail" "$f" "$ln" "$ln")" "YAGNI: Go interface $name is declared but barely referenced (premature abstraction) — $f:$ln"
+            emit "$(classify "yagni" "fail" "$f" "$ln" "$ln")" "YAGNI: Go interface $name is declared but barely referenced (premature abstraction) — $f:$ln" "$f" "$ln"
             found=true
           fi
         done < <(grep -nE 'type[ \t]+[A-Za-z0-9_]+[ \t]+interface\b' "$f" 2>/dev/null || true)
@@ -429,7 +533,7 @@ check_yagni() {
           [ -z "$name" ] && continue
           impls=$(grep -rE "implements[^,{]*$name\b" $GREP_EXCLUDES "$SOURCE_DIR" --include="*.ts" 2>/dev/null | wc -l | tr -d ' ' || true)
           if [ "$impls" -eq 1 ]; then
-            emit "$(classify "yagni" "fail" "$f" "$ln" "$ln")" "YAGNI: interface $name has exactly one implementation (premature abstraction) — $f:$ln"
+            emit "$(classify "yagni" "fail" "$f" "$ln" "$ln")" "YAGNI: interface $name has exactly one implementation (premature abstraction) — $f:$ln" "$f" "$ln"
             found=true
           fi
         done < <(grep -nE '^\s*(export\s+)?interface[ \t]+' "$f" 2>/dev/null || true)
@@ -455,7 +559,7 @@ check_solid_srp() {
       *) methods=0 ;;
     esac
     if [ "$lines" -gt 400 ] || [ "$methods" -gt 15 ]; then
-      emit "$(classify "solid" "warn" "$f" "" "")" "SRP: possible god file ($lang) — $f: ${lines} lines, ${methods} methods (split by responsibility)"
+      emit "$(classify "solid" "warn" "$f" "" "")" "SRP: possible god file ($lang) — $f: ${lines} lines, ${methods} methods (split by responsibility)" "$f"
       found=true
     fi
   done
@@ -479,13 +583,13 @@ check_solid_ocp() {
       [ -n "$r" ] || continue
       ocpfile=$(printf '%s' "$r" | cut -d: -f1)
       ocpline=$(printf '%s' "$r" | cut -d: -f2)
-      emit "$(classify "solid" "warn" "$ocpfile" "$ocpline" "$ocpline")" "OCP: type-dispatch switch should be polymorphic ($lang) — $r"
+      emit "$(classify "solid" "warn" "$ocpfile" "$ocpline" "$ocpline")" "OCP: type-dispatch switch should be polymorphic ($lang) — $r" "$ocpfile" "$ocpline"
       found=true
     done <<< "$res"
     eif=$(grep -cE '^\s*else[ \t]+if' "$f" 2>/dev/null || true)
     if [ "${eif:-0}" -ge 4 ]; then
       eifline=$(grep -nE '^\s*else[ \t]+if' "$f" 2>/dev/null | head -1 | cut -d: -f1)
-      emit "$(classify "solid" "warn" "$f" "$eifline" "$eifline")" "OCP: ${eif}-branch if/else chain ($lang) — $f (consider polymorphism or a lookup)"
+      emit "$(classify "solid" "warn" "$f" "$eifline" "$eifline")" "OCP: ${eif}-branch if/else chain ($lang) — $f (consider polymorphism or a lookup)" "$f" "$eifline"
       found=true
     fi
   done
@@ -505,7 +609,7 @@ check_solid_lsp() {
     [ -f "$f" ] || continue
     c=$(grep -c 'instanceof' "$f" 2>/dev/null || true)
     if [ "$c" -ge 3 ]; then
-      emit "$(classify "solid" "warn" "$f" "" "")" "LSP: ${c} instanceof checks in one file ($lang) — $f (suggests broken substitutability or type dispatch)"
+      emit "$(classify "solid" "warn" "$f" "" "")" "LSP: ${c} instanceof checks in one file ($lang) — $f (suggests broken substitutability or type dispatch)" "$f"
       found=true
     fi
   done
@@ -528,7 +632,7 @@ check_solid_isp() {
       [ -n "$r" ] || continue
       ispfile=$(printf '%s' "$r" | cut -d: -f1)
       ispline=$(printf '%s' "$r" | cut -d: -f2)
-      emit "$(classify "solid" "warn" "$ispfile" "$ispline" "$ispline")" "ISP: fat interface (>5 methods) — $r (split by role)"
+      emit "$(classify "solid" "warn" "$ispfile" "$ispline" "$ispline")" "ISP: fat interface (>5 methods) — $r (split by role)" "$ispfile" "$ispline"
       found=true
     done <<< "$res"
   done
@@ -547,7 +651,7 @@ check_solid_dip() {
             hit=$(grep -nE '^\s*import\s+.*\.(infrastructure|persistence|repository)\.' "$f" 2>/dev/null || true)
             if [ -n "$hit" ]; then
               dln=$(printf '%s\n' "$hit" | head -1 | cut -d: -f1)
-              emit "$(classify "solid" "fail" "$f" "$dln" "$dln")" "DIP: domain/engine code imports infrastructure ($lang) — $f:$dln"
+              emit "$(classify "solid" "fail" "$f" "$dln" "$dln")" "DIP: domain/engine code imports infrastructure ($lang) — $f:$dln" "$f" "$dln"
               found=true
             fi
             ;;
@@ -561,7 +665,7 @@ check_solid_dip() {
             hit=$(grep -nE '^\s*"[^"]*/(store|infra|repository)[^"]*"' "$f" 2>/dev/null || true)
             if [ -n "$hit" ]; then
               dln=$(printf '%s\n' "$hit" | head -1 | cut -d: -f1)
-              emit "$(classify "solid" "fail" "$f" "$dln" "$dln")" "DIP: domain/engine code imports store/infra/repository ($lang) — $f:$dln"
+              emit "$(classify "solid" "fail" "$f" "$dln" "$dln")" "DIP: domain/engine code imports store/infra/repository ($lang) — $f:$dln" "$f" "$dln"
               found=true
             fi
             ;;
@@ -575,7 +679,7 @@ check_solid_dip() {
             hit=$(grep -nE "from\s+['\"].*(/store|/infra|/repository|/repositories|/infrastructure)" "$f" 2>/dev/null || true)
             if [ -n "$hit" ]; then
               dln=$(printf '%s\n' "$hit" | head -1 | cut -d: -f1)
-              emit "$(classify "solid" "fail" "$f" "$dln" "$dln")" "DIP: domain/engine code imports infrastructure ($lang) — $f:$dln"
+              emit "$(classify "solid" "fail" "$f" "$dln" "$dln")" "DIP: domain/engine code imports infrastructure ($lang) — $f:$dln" "$f" "$dln"
               found=true
             fi
             ;;
@@ -589,7 +693,7 @@ check_solid_dip() {
 # ── Property tests (production tier and above) ───────────────────────────────
 check_property_tests() {
   case "$TIER" in
-    mvp) echo "Property tests: skipped (project tier is $TIER — production+ required)"; return 0 ;;
+    mvp) say "Property tests: skipped (project tier is $TIER — production+ required)"; return 0 ;;
   esac
   local lang="$1"
   local src
@@ -695,10 +799,10 @@ classify() { # classify <gate> <legacy> <file> <start> <end> → fail|warn|none
   if is_blocking "$gate"; then echo "$legacy"; else echo warn; fi
 }
 
-emit() { # emit <severity> <message> — route a finding to fail/warn (none = silent)
+emit() { # emit <severity> <message> [file] [line] — route a finding to fail/warn (none = silent)
   case "$1" in
-    fail) fail "$2" ;;
-    warn) warn "$2" ;;
+    fail) fail "$2" "${3:-}" "${4:-}" ;;
+    warn) warn "$2" "${3:-}" "${4:-}" ;;
   esac
 }
 
@@ -774,42 +878,54 @@ compute_diff() { # compute_diff <newline-separated audited files>
 if [ -n "$BASE_REF" ]; then
   compute_diff "$ALL_NONTEST"
 fi
-run_complexity_kiss java $NONTEST_JAVA
-run_complexity_kiss go $NONTEST_GO
-run_complexity_kiss node $NONTEST_NODE
-echo ""
+# --gates restricts execution to the listed categories (AC-007-03-01,
+# AC-007-03-02); the default runs all five, byte-identical to prior behavior.
+if contains_gate complexity; then
+  run_complexity_kiss java $NONTEST_JAVA
+  run_complexity_kiss go $NONTEST_GO
+  run_complexity_kiss node $NONTEST_NODE
+  say ""
+fi
 
-echo "--- DRY ---"
-check_dry "$ALL_NONTEST"
-echo ""
+if contains_gate dry; then
+  say "--- DRY ---"
+  check_dry "$ALL_NONTEST"
+  say ""
+fi
 
-echo "--- YAGNI ---"
-check_yagni "$NONTEST_JAVA" java
-check_yagni "$NONTEST_GO" go
-check_yagni "$NONTEST_NODE" node
-echo ""
+if contains_gate yagni; then
+  say "--- YAGNI ---"
+  check_yagni "$NONTEST_JAVA" java
+  check_yagni "$NONTEST_GO" go
+  check_yagni "$NONTEST_NODE" node
+  say ""
+fi
 
-echo "--- SOLID ---"
-check_solid_srp "$NONTEST_JAVA" java
-check_solid_srp "$NONTEST_GO" go
-check_solid_srp "$NONTEST_NODE" node
-check_solid_ocp "$NONTEST_JAVA" java
-check_solid_ocp "$NONTEST_GO" go
-check_solid_ocp "$NONTEST_NODE" node
-check_solid_lsp "$NONTEST_JAVA" java
-check_solid_lsp "$NONTEST_NODE" node
-check_solid_isp "$NONTEST_JAVA" java
-check_solid_isp "$NONTEST_NODE" node
-check_solid_dip java
-check_solid_dip go
-check_solid_dip node
-echo ""
+if contains_gate solid; then
+  say "--- SOLID ---"
+  check_solid_srp "$NONTEST_JAVA" java
+  check_solid_srp "$NONTEST_GO" go
+  check_solid_srp "$NONTEST_NODE" node
+  check_solid_ocp "$NONTEST_JAVA" java
+  check_solid_ocp "$NONTEST_GO" go
+  check_solid_ocp "$NONTEST_NODE" node
+  check_solid_lsp "$NONTEST_JAVA" java
+  check_solid_lsp "$NONTEST_NODE" node
+  check_solid_isp "$NONTEST_JAVA" java
+  check_solid_isp "$NONTEST_NODE" node
+  check_solid_dip java
+  check_solid_dip go
+  check_solid_dip node
+  say ""
+fi
 
-echo "--- Property tests ---"
-check_property_tests java
-check_property_tests go
-check_property_tests node
-echo ""
+if contains_gate property-tests; then
+  say "--- Property tests ---"
+  check_property_tests java
+  check_property_tests go
+  check_property_tests node
+  say ""
+fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 if [ "$WARN_AS_ERROR" = true ]; then
@@ -818,12 +934,26 @@ else
   TOTAL=$FAILS
 fi
 
-echo "---------------------------------------------"
+# Report the subset when --gates narrowed the run (AC-007-03-01); the default
+# full run keeps its prior summary text byte-for-byte.
+GATE_SUMMARY=""
+[ "${#SELECTED_GATES[@]}" -lt 5 ] && GATE_SUMMARY="(gates: $(IFS=,; echo "${SELECTED_GATES[*]}"))"
+
+say "---------------------------------------------"
 if [ "$TOTAL" -gt 0 ]; then
-  echo -e "${RED}✘ Design-principles check: ${FAILS} FAIL(s), ${WARNS} WARN(s).${NC}"
-  echo "  Reference: docs/CODING_CONVENTIONS.md §Design Principles, docs/ARCHITECTURE.md, docs/TESTING.md"
-  exit 1
+  say -e "${RED}✘ Design-principles check${GATE_SUMMARY:+ }${GATE_SUMMARY}: ${FAILS} FAIL(s), ${WARNS} WARN(s).${NC}"
+  say "  Reference: docs/CODING_CONVENTIONS.md §Design Principles, docs/ARCHITECTURE.md, docs/TESTING.md"
+else
+  say -e "${GREEN}✔ Design-principles check${GATE_SUMMARY:+ }${GATE_SUMMARY}: ${FAILS} FAIL(s), ${WARNS} WARN(s).${NC}"
+  [ "$WARNS" -gt 0 ] && say "  WARNs are review hints — verify each before merging."
 fi
-echo -e "${GREEN}✔ Design-principles check: ${FAILS} FAIL(s), ${WARNS} WARN(s).${NC}"
-[ "$WARNS" -gt 0 ] && echo "  WARNs are review hints — verify each before merging."
-exit 0
+
+if [ "$JSON" = true ]; then
+  emit_json
+fi
+
+if [ "$TOTAL" -gt 0 ]; then
+  exit 1
+else
+  exit 0
+fi
