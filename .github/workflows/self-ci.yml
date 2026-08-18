@@ -100,6 +100,11 @@ jobs:
       - name: Run loop files check
         run: ./scripts/check-loop-files.sh
 
+      # PR Babysitter loop gate (spec 018): the check script doubles as the
+      # spec's test carrier, so a missing deliverable fails the Validate job.
+      - name: Check PR Babysitter loop deliverables
+        run: ./scripts/check-pr-babysitter.sh
+
       - name: Install shellcheck
         run: sudo apt-get update -y && sudo apt-get install -y shellcheck
 
