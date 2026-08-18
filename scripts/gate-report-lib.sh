@@ -15,7 +15,11 @@
 # the name so the styles coexist without two incompatible parsers.
 strip_dashes() { local a="$1"; while [ "${a#-}" != "$a" ]; do a="${a#-}"; done; printf '%s' "$a"; }
 
-json_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+json_escape() {
+  local s="$1"
+  s=$(printf '%s' "$s" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/\\t/g; s/\r/\\r/g; s/\n/\\n/g')
+  printf '%s' "$s"
+}
 
 json_array() {
   local first=1 item
