@@ -140,14 +140,16 @@ str_contains() {
 
 # verify_secret_name_only <AC-ID> <file> <label>
 #   The OPENCODE_API_KEY token may appear only as the secret-name reference
-#   (secrets.OPENCODE_API_KEY or the "key:" line); any other form is a
-#   violation. Shared by the shared-workflow and trigger-workflow checks
-#   (AC-024-02-04 / AC-024-03-06) — the same rule, one implementation.
+#   (secrets.OPENCODE_API_KEY, the "key:" line, or the env-var mapped from it
+#   as env.OPENCODE_API_KEY); any other form is a violation. Shared by the
+#   shared-workflow and trigger-workflow checks (AC-024-02-04 / AC-024-03-06)
+#   — the same rule, one implementation.
 verify_secret_name_only() {
   local acid="$1" file="$2" label="$3"
   if grep 'OPENCODE_API_KEY' "$file" \
      | grep -v 'secrets.OPENCODE_API_KEY' \
-     | grep -v 'OPENCODE_API_KEY:' | grep -q .; then
+     | grep -v 'OPENCODE_API_KEY:' \
+     | grep -v 'env.OPENCODE_API_KEY' | grep -q .; then
     fail "$acid: OPENCODE_API_KEY appears in $label in a form other than the secret name reference"
   else
     pass "$acid: OPENCODE_API_KEY appears in $label only as the secret name"
@@ -375,8 +377,11 @@ if [ -f "$SHARED_WF" ]; then
   else
     pass "AC-024-02-03: OPENCODE_API_KEY is declared without required: true"
   fi
+  # Empty-key guard (AC-024-02-03): secrets is not a legal context in an if:
+  # at any scope, so the guard must gate on the mapped job env var. Verify
+  # the job env maps the secret and a step guards on env.OPENCODE_API_KEY.
   verify_grep AC-024-02-03 "$SHARED_WF" "review job guarded by the empty-key check" \
-    "secrets.OPENCODE_API_KEY != ''"
+    "env.OPENCODE_API_KEY != ''"
 fi
 
 echo ""
@@ -488,10 +493,13 @@ fi
 
 echo ""
 
-# AC-024-03-05 — No key: job skipped, never a required-check failure
+# AC-024-03-05 — No key: job skipped, never a required-check failure.
+# The trigger job has no if:-level secrets guard (illegal in GitHub Actions);
+# the no-key skip is guaranteed by the shared reusable workflow it calls,
+# which gates its review step on env.OPENCODE_API_KEY.
 if [ -f "$TRIGGER_WF" ]; then
-  verify_grep AC-024-03-05 "$TRIGGER_WF" "job guarded by the empty-key check" \
-    "secrets.OPENCODE_API_KEY != ''"
+  verify_grep AC-024-03-05 "$TRIGGER_WF" "trigger delegates to the self-guarding shared workflow" \
+    "ci-pr-review.yml"
 fi
 
 echo ""

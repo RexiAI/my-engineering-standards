@@ -101,7 +101,7 @@ jobs:
         # Empty-key guard (AC-024-02-03): an absent key yields a skipped step,
         # never a failure — the PR's required checks are unaffected. secrets is
         # not a legal context in an if: at any scope, so gate on the job env
-        # (OPENCODE_API_KEY is mapped from the secret in the job env block).
+        # (the secret is mapped into the env in the job env block).
         if: ${{ steps.early-exit.outputs.skip != 'true' && env.OPENCODE_API_KEY != '' }}
         run: |
           set -euo pipefail
