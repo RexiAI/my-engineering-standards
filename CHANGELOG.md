@@ -1,3 +1,10 @@
+# [1.23.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.22.0...v1.23.0) (2026-08-19)
+
+
+### Features
+
+* **spec 018:** PR Babysitter loop ([#37](https://github.com/RexiAI/my-engineering-standards/issues/37)) ([62c15b9](https://github.com/RexiAI/my-engineering-standards/commit/62c15b9969f144c566a4e9f6e1ac5accebcdb968))
+
 # [1.22.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.21.0...v1.22.0) (2026-08-19)
 
 
