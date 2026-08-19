@@ -1,40 +1,39 @@
-name: Deploy to Production (Kamal)
-
-description: Deploy Docker images to production infrastructure using Kamal
+name: Deploy to Production (Dokku)
 
 on:
   workflow_call:
     inputs:
       service-name:
         description: Name of the service to deploy
-        required: true
+        type: string
         default: "my-service"
+      dokku-app-name:
+        description: Dokku app name (defaults to service-name)
+        type: string
+        default: ""
       docker-registry:
         description: Container registry host
-        required: false
+        type: string
         default: "ghcr.io"
-      kamal-version:
-        description: Kamal version (for cache key)
-        required: false
-        default: "1.9.0"
+      image-tag:
+        description: Image tag to deploy (defaults to latest)
+        type: string
+        default: "latest"
     secrets:
       SSH_HOST:
         description: Production server hostname/IP
         required: false
       SSH_USER:
-        description: SSH username for production server
+        description: SSH username for production server (usually dokku)
         required: false
       SSH_PRIVATE_KEY:
         description: SSH private key for production server
         required: false
-        env: SSH_PRIVATE_KEY
       SSH_PORT:
         description: SSH port for production server
         required: false
-        default: "22"
-        env: SSH_PORT
       GHCR_TOKEN:
-        description: GitHub Container Registry token
+        description: GitHub Container Registry token (for host-side docker login)
         required: false
 
 permissions:
@@ -58,7 +57,6 @@ jobs:
           echo "Checking deployment prerequisites..."
           missing=""
           [ -z "${{ secrets.SSH_HOST }}" ] && missing="$missing SSH_HOST"
-          [ -z "${{ secrets.SSH_USER }}" ] && missing="$missing SSH_USER"
           [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ] && missing="$missing SSH_PRIVATE_KEY"
           if [ -n "$missing" ]; then
             echo "::warning::Production deploy skipped — missing secrets:$missing"
@@ -76,21 +74,11 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production
-      url: https://${{ secrets.SSH_HOST }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Setup Ruby (for Kamal)
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "3.3"
-          bundler-cache: false
-
-      - name: Install Kamal
-        run: gem install kamal -v ${{ inputs.kamal-version }}
 
       - name: Load SSH private key
         run: |
@@ -105,30 +93,23 @@ jobs:
           ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
             -p "${{ secrets.SSH_PORT || '22' }}" \
             -i ~/.ssh/id_rsa \
-            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "${{ secrets.SSH_USER || 'dokku' }}@${{ secrets.SSH_HOST }}" \
             "echo 'SSH connection successful to \$HOSTNAME'"
 
-      - name: Verify .kamal config exists
-        run: |
-          if [ ! -f .kamal/config.rb ]; then
-            echo "ERROR: .kamal/config.rb not found."
-            echo "Run ./.standards/scripts/init-deploy.sh to generate deployment config."
-            exit 1
-          fi
-          echo ".kamal/ contents:"
-          ls -la .kamal/
-
-      - name: Deploy service with Kamal
+      - name: Deploy service to Dokku
         run: |
           echo "=== Starting deployment ==="
-          echo "Service: ${{ inputs.service-name }}"
+          APP="${{ inputs.dokku-app-name || inputs.service-name }}"
+          IMAGE="${{ inputs.docker-registry }}/${{ github.repository }}/${{ inputs.service-name }}:${{ inputs.image-tag }}"
+          echo "App: $APP"
+          echo "Image: $IMAGE"
           echo "Host: ${{ secrets.SSH_HOST }}"
-          echo "Port: ${{ secrets.SSH_PORT || '22' }}"
-          export SERVICE_NAME="${{ inputs.service-name }}"
-          export SSH_HOST="${{ secrets.SSH_HOST }}"
-          export SSH_USER="${{ secrets.SSH_USER }}"
-          export SSH_PORT="${{ secrets.SSH_PORT || '22' }}"
-          kamal deploy --verbose
+
+          ssh -o StrictHostKeyChecking=no -p "${{ secrets.SSH_PORT || '22' }}" \
+            -i ~/.ssh/id_rsa \
+            "${{ secrets.SSH_USER || 'dokku' }}@${{ secrets.SSH_HOST }}" \
+            "dokku git:from-image '$APP' '$IMAGE'"
+
           echo "=== Deployment completed successfully ==="
 
   skip-deploy:
@@ -140,6 +121,8 @@ jobs:
       - name: Report skipped deployment
         run: |
           echo "::warning::Production deployment is not configured."
-          echo "Add SSH_HOST, SSH_USER, SSH_PRIVATE_KEY secrets to enable production deploys."
-          echo "Run ./.standards/scripts/init-deploy.sh to set up Kamal config."
-          echo "See docs/DEPLOYMENT.md §Kamal + VPS for details."
+          echo "Add SSH_HOST, SSH_PRIVATE_KEY secrets to enable production deploys."
+          echo "One-time setup on Dokku host:"
+          echo "  dokku apps:create ${{ inputs.service-name }}"
+          echo "  dokku letsencrypt:enable ${{ inputs.service-name }}"
+          echo "See docs/DEPLOYMENT.md §Backend: Dokku + VPS for details."

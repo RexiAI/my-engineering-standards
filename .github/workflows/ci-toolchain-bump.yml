@@ -15,7 +15,7 @@ name: Toolchain Bump
 #     workflow_dispatch: {}
 #   jobs:
 #     bump:
-#       uses: RexiAI/my-engineering-standards/.github/workflows/shared/ci-toolchain-bump.yml@main
+#       uses: RexiAI/my-engineering-standards/.github/workflows/ci-toolchain-bump.yml@main
 
 on:
   workflow_call:

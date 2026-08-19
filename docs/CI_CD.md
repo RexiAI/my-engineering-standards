@@ -134,7 +134,7 @@ The child's `ci.yml` calls orthogonal reusable workflows — one per layer:
 jobs:
   # ── Backend CI ──
   backend-ci:
-    uses: RexiAI/my-engineering-standards/.github/workflows/backend/ci-go.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-go.yml@main
     with:
       go-version-file: go.mod
       docker-registry: ghcr.io
@@ -143,7 +143,7 @@ jobs:
 
   # ── Frontend CI ──
   frontend-ci:
-    uses: RexiAI/my-engineering-standards/.github/workflows/frontend/ci-nextjs.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-nextjs.yml@main
     with:
       node-version-file: .nvmrc
     secrets:
@@ -153,14 +153,14 @@ jobs:
   release:
     needs: [backend-ci, frontend-ci]
     if: github.ref_name == github.event.repository.default_branch
-    uses: RexiAI/my-engineering-standards/.github/workflows/shared/ci-release.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-release.yml@main
     secrets:
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
   # ── Shared: E2E (weekly schedule) ──
   e2e:
     if: github.event_name == 'schedule'
-    uses: RexiAI/my-engineering-standards/.github/workflows/shared/ci-e2e-weekly.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-e2e-weekly.yml@main
     with:
       target-url: https://staging.example.com
 ```
@@ -176,13 +176,13 @@ jobs:
 | Python | `.python-version` | `python-version-file: .python-version` | `actions/setup-python` reads it natively |
 | Java | `.java-version` (plain text, e.g. `21`) | `java-version-file: .java-version` | `actions/setup-java` has **no** native version-file input — `ci-java.yml`'s `resolve-version` job reads the file itself and feeds the resolved value to every other job via job outputs |
 
-`backend/ci-{go,node,java}.yml` and `frontend/ci-{nextjs,react,angular}.yml` all default their `<lang>-version` input to the value that was hardcoded before v1.5.0 (`"1.26"`/`"22"`/`"21"`) for consumers who haven't adopted a manifest file yet. If a consumer sets `<lang>-version-file`, that always takes priority. New consumers should always set the version-file input and skip `<lang>-version` entirely — see the composed `ci.yml` example above.
+ `ci-{go,node,java}.yml` and `ci-{nextjs,react,angular}.yml` all default their `<lang>-version` input to the value that was hardcoded before v1.5.0 (`"1.26"`/`"22"`/`"21"`) for consumers who haven't adopted a manifest file yet. If a consumer sets `<lang>-version-file`, that always takes priority. New consumers should always set the version-file input and skip `<lang>-version` entirely — see the composed `ci.yml` example above.
 
 Dockerfile templates (`templates/Dockerfile.{go,node,next}`) take the same version as a `ARG GO_VERSION=1.26` / `ARG NODE_VERSION=22` build-time default, overridable with `--build-arg` from the same manifest (`--build-arg GO_VERSION=$(go list -m -f '{{.GoVersion}}')`, `--build-arg NODE_VERSION=$(cat .nvmrc)`).
 
 `GOTOOLCHAIN=auto` (Go's own default since 1.21) means a Go 1.22 CI runner will silently download and run whatever version `go.mod`'s `go` or `toolchain` line declares — bumping the manifest is enough, no runner image change needed. `pyenv`/`nvm`/`asdf` behave the same way for their languages when their respective version-file is present.
 
-**Reproducibility vs. freshness are separate problems.** Pin in the manifest for reproducibility — never `GOTOOLCHAIN=latest`, never `FROM golang:latest`, both make `git bisect` and rebuilds non-deterministic. `.github/workflows/shared/ci-toolchain-bump.yml` handles freshness: a weekly reusable workflow that queries each ecosystem's official release feed (go.dev, nodejs.org, actions/python-versions), rewrites the manifest file if a newer version exists, and opens a PR so CI validates the bump before merge — the same pattern Dependabot uses for libraries, applied to the runtime itself. Wire it into a consumer with:
+**Reproducibility vs. freshness are separate problems.** Pin in the manifest for reproducibility — never `GOTOOLCHAIN=latest`, never `FROM golang:latest`, both make `git bisect` and rebuilds non-deterministic. `.github/workflows/ci-toolchain-bump.yml` handles freshness: a weekly reusable workflow that queries each ecosystem's official release feed (go.dev, nodejs.org, actions/python-versions), rewrites the manifest file if a newer version exists, and opens a PR so CI validates the bump before merge — the same pattern Dependabot uses for libraries, applied to the runtime itself. Wire it into a consumer with:
 
 ```yaml
 # .github/workflows/toolchain-bump.yml
@@ -192,7 +192,7 @@ on:
   workflow_dispatch: {}
 jobs:
   bump:
-    uses: RexiAI/my-engineering-standards/.github/workflows/shared/ci-toolchain-bump.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-toolchain-bump.yml@main
 ```
 
 It skips any manifest that doesn't exist in the consumer repo — safe to add even if you only use one of Go/Node/Python.
@@ -271,23 +271,32 @@ Pre-filled (monorepo, e.g. Go API + Next.js frontend):
   --registry ghcr.io
 ```
 
-### Migration from Legacy Structure
+### Workflow paths: flat, top-level only
 
-If your child repo uses the old flat paths (`ci-java.yml`, `e2e-weekly.yml`), update your `ci.yml`:
+All reusable workflows live flat in `.github/workflows/` — no `backend/`, `frontend/`, or `shared/` subdirectories. GitHub does not support reusable workflows in subdirectories of `.github/workflows/`; a reusable workflow must be at the top level or the caller workflow fails to build with `invalid value workflow reference: workflows must be defined at the top level of the .github/workflows/ directory`, which prevents every job (including `release`) from running.
 
-| Old Path | New Path |
+A consumer's `uses:` therefore always points at a flat path:
+
+```yaml
+uses: RexiAI/my-engineering-standards/.github/workflows/ci-go.yml@main
+uses: RexiAI/my-engineering-standards/.github/workflows/ci-release.yml@main
+```
+
+If your `ci.yml` still references the old subdirectory paths (`backend/`, `frontend/`, `shared/`), update them to the flat equivalents:
+
+| Old (subdir) Path | New (flat) Path |
 |----------|----------|
-| `workflows/ci-java.yml` | `workflows/backend/ci-java.yml` |
-| `workflows/ci-go.yml` | `workflows/backend/ci-go.yml` |
-| `workflows/ci-node.yml` | `workflows/backend/ci-node.yml` |
-| `workflows/e2e-weekly.yml` | `workflows/shared/ci-e2e-weekly.yml` |
-| `workflows/release.yml` | `workflows/shared/ci-release.yml` |
-| `workflows/dependabot.yml` | `workflows/shared/ci-dependabot.yml` |
+| `workflows/backend/ci-java.yml` | `workflows/ci-java.yml` |
+| `workflows/backend/ci-go.yml` | `workflows/ci-go.yml` |
+| `workflows/backend/ci-node.yml` | `workflows/ci-node.yml` |
+| `workflows/frontend/ci-{angular,nextjs,react,react-native,static}.yml` | `workflows/ci-{angular,nextjs,react,react-native,static}.yml` |
+| `workflows/shared/ci-{contract,dependabot,deploy-*,e2e,e2e-weekly,release,security,toolchain-bump}.yml` | `workflows/ci-{contract,dependabot,deploy-*,e2e,e2e-weekly,release,security,toolchain-bump}.yml` |
+| `workflows/shared/pr-review.yml` | `workflows/ci-pr-review.yml` |
 
 Steps:
-1. Update `uses:` paths in `.github/workflows/ci.yml` to include `backend/`, `frontend/`, or `shared/` prefix
-2. Split monolithic `ci-node.yml` into backend (NestJS) + frontend (Next.js/React) jobs
-3. Regenerate with `init-ci.sh --platform github --backend node --frontend nextjs`
+1. Update `uses:` paths in `.github/workflows/ci.yml` to the flat paths above (drop the `backend/`, `frontend/`, `shared/` prefix)
+2. Regenerate with `init-ci.sh --platform github --backend node --frontend nextjs` (it now emits flat paths)
+3. Split monolithic `ci-node.yml` into backend (NestJS) + frontend (Next.js/React) jobs if you have a monorepo
 
 ### Required Secrets
 
@@ -320,7 +329,7 @@ on:
 
 jobs:
   e2e:
-    uses: RexiAI/my-engineering-standards/.github/workflows/shared/ci-e2e-weekly.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-e2e-weekly.yml@main
     with:
       target-url: https://staging.example.com
       smoke-endpoints: /health,/api/v1/users/me,/api/v1/products
@@ -429,12 +438,12 @@ files they reference, with no other information needed.
    ```yaml
    release:
      if: ${{ github.event_name == 'push' && github.ref_name == github.event.repository.default_branch }}
-     uses: RexiAI/my-engineering-standards/.github/workflows/shared/ci-release.yml@main
+     uses: RexiAI/my-engineering-standards/.github/workflows/ci-release.yml@main
      secrets:
        GH_TOKEN: ${{ secrets.GH_TOKEN }}
    ```
 
-   The reusable workflow (`.github/workflows/shared/ci-release.yml` in the
+   The reusable workflow (`.github/workflows/ci-release.yml` in the
    standards repo) declares `GH_TOKEN` `required: true` and has no internal
    default-branch gate — the `if:` above (a push to the default branch) must
    live on the caller's job, and the secret key must be exactly `GH_TOKEN`
@@ -510,7 +519,7 @@ PR review is opt-in per child, mirroring `§Release Process`:
 ```
 
 The flag appends a `pr-review` job to the generated `.github/workflows/ci.yml`
-that calls `RexiAI/my-engineering-standards/.github/workflows/shared/pr-review.yml@main`
+that calls `RexiAI/my-engineering-standards/.github/workflows/ci-pr-review.yml@main`
 with `OPENCODE_API_KEY` mapped from the repo's secrets, and prompts for the
 secret during generation. On `--platform gitlab` the flag prints a warning and
 emits nothing — the shared workflow is GitHub Actions-only.

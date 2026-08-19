@@ -35,9 +35,6 @@ jobs:
   review:
     name: Review PR
     runs-on: ubuntu-latest
-    # Empty-key guard (AC-024-02-03): an absent key yields a skipped job,
-    # never a failure — the PR's required checks are unaffected.
-    if: ${{ secrets.OPENCODE_API_KEY != '' }}
     env:
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
       PR_NUMBER: ${{ inputs.pr-number }}
@@ -101,7 +98,11 @@ jobs:
           echo "skip=${skip}" >> "$GITHUB_OUTPUT"
 
       - name: Review the PR with the pr-review agent
-        if: steps.early-exit.outputs.skip != 'true'
+        # Empty-key guard (AC-024-02-03): an absent key yields a skipped step,
+        # never a failure — the PR's required checks are unaffected. secrets is
+        # not a legal context in an if: at any scope, so gate on the job env
+        # (OPENCODE_API_KEY is mapped from the secret in the job env block).
+        if: ${{ steps.early-exit.outputs.skip != 'true' && env.OPENCODE_API_KEY != '' }}
         run: |
           set -euo pipefail
           # Headless run on a bare runner has no shell profile, so load the

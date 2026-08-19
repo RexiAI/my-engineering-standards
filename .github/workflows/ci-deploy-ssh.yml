@@ -1,44 +1,39 @@
-name: Deploy to Production (Dokku)
-
-description: Deploy Docker images to a Dokku host via git:from-image
+name: Deploy to Production (SSH + Docker Compose)
 
 on:
   workflow_call:
     inputs:
       service-name:
         description: Name of the service to deploy
-        required: true
+        type: string
         default: "my-service"
-      dokku-app-name:
-        description: Dokku app name (defaults to service-name)
-        required: false
-        default: ""
       docker-registry:
         description: Container registry host
-        required: false
+        type: string
         default: "ghcr.io"
       image-tag:
         description: Image tag to deploy (defaults to latest)
-        required: false
+        type: string
         default: "latest"
+      app-dir:
+        description: Directory on host to deploy to (defaults to /opt/<service>)
+        type: string
+        default: ""
     secrets:
       SSH_HOST:
         description: Production server hostname/IP
         required: false
       SSH_USER:
-        description: SSH username for production server (usually dokku)
+        description: SSH username for production server
         required: false
       SSH_PRIVATE_KEY:
         description: SSH private key for production server
         required: false
-        env: SSH_PRIVATE_KEY
       SSH_PORT:
         description: SSH port for production server
         required: false
-        default: "22"
-        env: SSH_PORT
       GHCR_TOKEN:
-        description: GitHub Container Registry token (for host-side docker login)
+        description: GitHub Container Registry token
         required: false
 
 permissions:
@@ -79,7 +74,6 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production
-      url: https://${{ secrets.SSH_HOST }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -99,22 +93,49 @@ jobs:
           ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
             -p "${{ secrets.SSH_PORT || '22' }}" \
             -i ~/.ssh/id_rsa \
-            "${{ secrets.SSH_USER || 'dokku' }}@${{ secrets.SSH_HOST }}" \
+            "${{ secrets.SSH_USER || 'root' }}@${{ secrets.SSH_HOST }}" \
             "echo 'SSH connection successful to \$HOSTNAME'"
 
-      - name: Deploy service to Dokku
+      - name: Copy compose + nginx config to host
+        run: |
+          APP_DIR="${{ inputs.app-dir || format('/opt/{0}', inputs.service-name) }}"
+          SSH_CMD="ssh -o StrictHostKeyChecking=no -p ${{ secrets.SSH_PORT || '22' }} -i ~/.ssh/id_rsa"
+          REMOTE="${{ secrets.SSH_USER || 'root' }}@${{ secrets.SSH_HOST }}"
+
+          echo "Ensuring remote dir $APP_DIR exists..."
+          $SSH_CMD "$REMOTE" "mkdir -p '$APP_DIR'"
+
+          echo "Copying docker-compose.prod.yml..."
+          scp -o StrictHostKeyChecking=no -P "${{ secrets.SSH_PORT || '22' }}" \
+            -i ~/.ssh/id_rsa \
+            docker-compose.prod.yml \
+            "$REMOTE:$APP_DIR/docker-compose.prod.yml"
+
+          echo "Copying nginx.conf (if present)..."
+          if [ -f nginx.conf ]; then
+            scp -o StrictHostKeyChecking=no -P "${{ secrets.SSH_PORT || '22' }}" \
+              -i ~/.ssh/id_rsa \
+              nginx.conf \
+              "$REMOTE:$APP_DIR/nginx.conf"
+          fi
+
+      - name: Deploy service with Docker Compose
         run: |
           echo "=== Starting deployment ==="
-          APP="${{ inputs.dokku-app-name || inputs.service-name }}"
+          APP_DIR="${{ inputs.app-dir || format('/opt/{0}', inputs.service-name) }}"
+          REMOTE="${{ secrets.SSH_USER || 'root' }}@${{ secrets.SSH_HOST }}"
           IMAGE="${{ inputs.docker-registry }}/${{ github.repository }}/${{ inputs.service-name }}:${{ inputs.image-tag }}"
-          echo "App: $APP"
+          echo "Service: ${{ inputs.service-name }}"
           echo "Image: $IMAGE"
+          echo "Dir: $APP_DIR"
           echo "Host: ${{ secrets.SSH_HOST }}"
 
-          ssh -o StrictHostKeyChecking=no -p "${{ secrets.SSH_PORT || '22' }}" \
-            -i ~/.ssh/id_rsa \
-            "${{ secrets.SSH_USER || 'dokku' }}@${{ secrets.SSH_HOST }}" \
-            "dokku git:from-image '$APP' '$IMAGE'"
+          ssh -o StrictHostKeyChecking=no -p "${{ secrets.SSH_PORT || '22' }}" -i ~/.ssh/id_rsa \
+            "$REMOTE" \
+            "cd '$APP_DIR' && \
+             export IMAGE='$IMAGE' && \
+             docker compose -f docker-compose.prod.yml pull && \
+             docker compose -f docker-compose.prod.yml up -d --force-recreate"
 
           echo "=== Deployment completed successfully ==="
 
@@ -128,7 +149,6 @@ jobs:
         run: |
           echo "::warning::Production deployment is not configured."
           echo "Add SSH_HOST, SSH_PRIVATE_KEY secrets to enable production deploys."
-          echo "One-time setup on Dokku host:"
-          echo "  dokku apps:create ${{ inputs.service-name }}"
-          echo "  dokku letsencrypt:enable ${{ inputs.service-name }}"
-          echo "See docs/DEPLOYMENT.md §Backend: Dokku + VPS for details."
+          echo "One-time setup on host:"
+          echo "  scp templates/setup-host.sh host:/tmp/ && ssh host 'bash /tmp/setup-host.sh --backend ssh --domain example.com'"
+          echo "See docs/DEPLOYMENT.md §Backend: Raw SSH + Docker Compose for details."

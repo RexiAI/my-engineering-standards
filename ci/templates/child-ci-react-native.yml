@@ -12,7 +12,7 @@ on:
 
 jobs:
   ci:
-    uses: RexiAI/my-engineering-standards/.github/workflows/frontend/ci-react-native.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-react-native.yml@main
     with:
       node-version: "22"
     secrets:

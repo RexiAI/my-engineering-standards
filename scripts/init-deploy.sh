@@ -331,7 +331,7 @@ on:
 
 jobs:
   backend-ci:
-    uses: RexiAI/my-engineering-standards/.github/workflows/backend/ci-${BACKEND:-go}.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-${BACKEND:-go}.yml@main
     with:
       docker-registry: $REGISTRY
     secrets:
@@ -340,7 +340,7 @@ jobs:
   deploy:
     needs: [backend-ci]
     if: \${ github.event_name == 'push' && github.ref_name == github.ref }
-    uses: RexiAI/my-engineering-standards/.github/workflows/shared/ci-deploy-${DEPLOY_TOOL}.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-deploy-${DEPLOY_TOOL}.yml@main
     with:
       service-name: $SERVICE_NAME
       docker-registry: $REGISTRY
@@ -354,7 +354,7 @@ EOF
     ok "Generated: .github/workflows/ci.yml (customize jobs as needed)"
   else
     warn "ci.yml already exists — add the deploy job manually:"
-    echo "  uses: RexiAI/my-engineering-standards/.github/workflows/shared/ci-deploy-${DEPLOY_TOOL}.yml@main"
+    echo "  uses: RexiAI/my-engineering-standards/.github/workflows/ci-deploy-${DEPLOY_TOOL}.yml@main"
   fi
 fi
 

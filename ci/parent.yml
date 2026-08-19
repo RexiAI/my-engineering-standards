@@ -54,9 +54,9 @@ DOCKER_REGISTRY: "ghcr.io"
 # GitHub (composable — child repo calls multiple `uses:` jobs):
 #   jobs:
 #     backend-ci:
-#       uses: RexiAI/my-engineering-standards/.github/workflows/backend/ci-java.yml@main
+#       uses: RexiAI/my-engineering-standards/.github/workflows/ci-java.yml@main
 #     frontend-ci:
-#       uses: RexiAI/my-engineering-standards/.github/workflows/frontend/ci-nextjs.yml@main
+#       uses: RexiAI/my-engineering-standards/.github/workflows/ci-nextjs.yml@main
 #
 # GitLab:
 #   include:

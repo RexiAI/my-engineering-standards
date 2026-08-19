@@ -1,26 +1,20 @@
-name: Deploy to Production (SSH + Docker Compose)
-
-description: Deploy Docker images to a raw VM/EC2 via SSH and docker compose
+name: Deploy to Production (Kamal)
 
 on:
   workflow_call:
     inputs:
       service-name:
         description: Name of the service to deploy
-        required: true
+        type: string
         default: "my-service"
       docker-registry:
         description: Container registry host
-        required: false
+        type: string
         default: "ghcr.io"
-      image-tag:
-        description: Image tag to deploy (defaults to latest)
-        required: false
-        default: "latest"
-      app-dir:
-        description: Directory on host to deploy to (defaults to /opt/<service>)
-        required: false
-        default: ""
+      kamal-version:
+        description: Kamal version (for cache key)
+        type: string
+        default: "1.9.0"
     secrets:
       SSH_HOST:
         description: Production server hostname/IP
@@ -31,12 +25,9 @@ on:
       SSH_PRIVATE_KEY:
         description: SSH private key for production server
         required: false
-        env: SSH_PRIVATE_KEY
       SSH_PORT:
         description: SSH port for production server
         required: false
-        default: "22"
-        env: SSH_PORT
       GHCR_TOKEN:
         description: GitHub Container Registry token
         required: false
@@ -62,6 +53,7 @@ jobs:
           echo "Checking deployment prerequisites..."
           missing=""
           [ -z "${{ secrets.SSH_HOST }}" ] && missing="$missing SSH_HOST"
+          [ -z "${{ secrets.SSH_USER }}" ] && missing="$missing SSH_USER"
           [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ] && missing="$missing SSH_PRIVATE_KEY"
           if [ -n "$missing" ]; then
             echo "::warning::Production deploy skipped — missing secrets:$missing"
@@ -79,12 +71,20 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production
-      url: https://${{ secrets.SSH_HOST }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Setup Ruby (for Kamal)
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: false
+
+      - name: Install Kamal
+        run: gem install kamal -v ${{ inputs.kamal-version }}
 
       - name: Load SSH private key
         run: |
@@ -99,50 +99,30 @@ jobs:
           ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
             -p "${{ secrets.SSH_PORT || '22' }}" \
             -i ~/.ssh/id_rsa \
-            "${{ secrets.SSH_USER || 'root' }}@${{ secrets.SSH_HOST }}" \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
             "echo 'SSH connection successful to \$HOSTNAME'"
 
-      - name: Copy compose + nginx config to host
+      - name: Verify .kamal config exists
         run: |
-          APP_DIR="${{ inputs.app-dir || format('/opt/{0}', inputs.service-name) }}"
-          SSH_CMD="ssh -o StrictHostKeyChecking=no -p ${{ secrets.SSH_PORT || '22' }} -i ~/.ssh/id_rsa"
-          REMOTE="${{ secrets.SSH_USER || 'root' }}@${{ secrets.SSH_HOST }}"
-
-          echo "Ensuring remote dir $APP_DIR exists..."
-          $SSH_CMD "$REMOTE" "mkdir -p '$APP_DIR'"
-
-          echo "Copying docker-compose.prod.yml..."
-          scp -o StrictHostKeyChecking=no -P "${{ secrets.SSH_PORT || '22' }}" \
-            -i ~/.ssh/id_rsa \
-            docker-compose.prod.yml \
-            "$REMOTE:$APP_DIR/docker-compose.prod.yml"
-
-          echo "Copying nginx.conf (if present)..."
-          if [ -f nginx.conf ]; then
-            scp -o StrictHostKeyChecking=no -P "${{ secrets.SSH_PORT || '22' }}" \
-              -i ~/.ssh/id_rsa \
-              nginx.conf \
-              "$REMOTE:$APP_DIR/nginx.conf"
+          if [ ! -f .kamal/config.rb ]; then
+            echo "ERROR: .kamal/config.rb not found."
+            echo "Run ./.standards/scripts/init-deploy.sh to generate deployment config."
+            exit 1
           fi
+          echo ".kamal/ contents:"
+          ls -la .kamal/
 
-      - name: Deploy service with Docker Compose
+      - name: Deploy service with Kamal
         run: |
           echo "=== Starting deployment ==="
-          APP_DIR="${{ inputs.app-dir || format('/opt/{0}', inputs.service-name) }}"
-          REMOTE="${{ secrets.SSH_USER || 'root' }}@${{ secrets.SSH_HOST }}"
-          IMAGE="${{ inputs.docker-registry }}/${{ github.repository }}/${{ inputs.service-name }}:${{ inputs.image-tag }}"
           echo "Service: ${{ inputs.service-name }}"
-          echo "Image: $IMAGE"
-          echo "Dir: $APP_DIR"
           echo "Host: ${{ secrets.SSH_HOST }}"
-
-          ssh -o StrictHostKeyChecking=no -p "${{ secrets.SSH_PORT || '22' }}" -i ~/.ssh/id_rsa \
-            "$REMOTE" \
-            "cd '$APP_DIR' && \
-             export IMAGE='$IMAGE' && \
-             docker compose -f docker-compose.prod.yml pull && \
-             docker compose -f docker-compose.prod.yml up -d --force-recreate"
-
+          echo "Port: ${{ secrets.SSH_PORT || '22' }}"
+          export SERVICE_NAME="${{ inputs.service-name }}"
+          export SSH_HOST="${{ secrets.SSH_HOST }}"
+          export SSH_USER="${{ secrets.SSH_USER }}"
+          export SSH_PORT="${{ secrets.SSH_PORT || '22' }}"
+          kamal deploy --verbose
           echo "=== Deployment completed successfully ==="
 
   skip-deploy:
@@ -154,7 +134,6 @@ jobs:
       - name: Report skipped deployment
         run: |
           echo "::warning::Production deployment is not configured."
-          echo "Add SSH_HOST, SSH_PRIVATE_KEY secrets to enable production deploys."
-          echo "One-time setup on host:"
-          echo "  scp templates/setup-host.sh host:/tmp/ && ssh host 'bash /tmp/setup-host.sh --backend ssh --domain example.com'"
-          echo "See docs/DEPLOYMENT.md §Backend: Raw SSH + Docker Compose for details."
+          echo "Add SSH_HOST, SSH_USER, SSH_PRIVATE_KEY secrets to enable production deploys."
+          echo "Run ./.standards/scripts/init-deploy.sh to set up Kamal config."
+          echo "See docs/DEPLOYMENT.md §Kamal + VPS for details."
