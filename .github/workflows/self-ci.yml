@@ -73,6 +73,12 @@ jobs:
       - name: make validate-all
         run: make validate-all
 
+      # Design-gate blame scoping (spec 011): scratch-repo tests for
+      # check-code-principles.sh -BaseRef. A violation in any AC-011-02
+      # assertion fails the job — no continue-on-error.
+      - name: Check design-gate blame scoping (scratch repos)
+        run: bash scripts/tests/check-code-principles-blame.sh
+
       - name: Check orchestration references
         run: ./scripts/check-orchestration.sh
 

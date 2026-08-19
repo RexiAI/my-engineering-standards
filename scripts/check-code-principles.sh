@@ -34,7 +34,8 @@
 # complexity gate. Treat WARN output as a review hint, FAIL as a defect.
 #
 # Usage:
-#   .standards/scripts/check-code-principles.sh [SOURCE_DIR] [--tier mvp|production|multi-service] [--gates <list>] [--warn-as-error] [--json]
+#   .standards/scripts/check-code-principles.sh [SOURCE_DIR] [--tier mvp|production|multi-service]
+#       [-BaseRef <ref>] [--blocking <gates>] [--warn-as-error] [--gates <list>] [--json]
 #
 # SOURCE_DIR defaults to the current directory. --tier overrides auto-detection
 # from the project's AGENTS_*.md "Conformance tier:" declaration (see
@@ -46,15 +47,41 @@
 # carrying the same findings as the human output, for transcription into
 # specs/NNN-slug/25-verification.md (AC-007-03-05, AC-007-03-06).
 #
+# Blame scoping (-BaseRef <ref>): judge only the change — the diff of the
+# working tree against <ref>, scoped to the source files this script audits.
+#   - Only files present in the diff are evaluated; findings in untouched files
+#     are not reported (the gate judges the author's change, not the whole tree).
+#   - A line-anchored finding whose line range overlaps an added line of the
+#     diff is diff-introduced; a finding in a touched file without overlap is
+#     pre-existing debt (reported as WARN). File-level findings treat any added
+#     line in the file as overlap. A file added entirely by the diff is fully
+#     diff-introduced.
+#   - `property-tests` is a presence check with no line anchor — never
+#     blame-scoped.
+#   - Tooling failures (unresolvable ref, not a git repository) are reported to
+#     stderr and exit 2 — never a false PASS.
+#
+# Blocking set (which gates may emit FAIL):
+#   Gate names: complexity (cyclomatic CC + KISS size findings), dry, yagni,
+#   solid (SRP/OCP/LSP/ISP/DIP as one unit), property-tests.
+#   Default blocking set: complexity,property-tests — the objective gates in
+#   this repo's terms. A gate outside the blocking set is warn-only and never
+#   emits FAIL, with or without -BaseRef (DIP and YAGNI single-implementation
+#   findings therefore report as WARN). Override with --blocking <comma-list>
+#   or the PRINCIPLES_BLOCKING_GATES environment variable (flag wins over env
+#   over default); an unknown gate name or an empty value exits 2.
+#
 # Exit codes:
 #   0 — no FAILs (WARNs may exist), or no source files to check
 #   1 — at least one FAIL (or a WARN with --warn-as-error)
 #   2 — could not perform the check for a non-finding reason: a required tool
 #       (find/xargs/awk/grep/sed/tr/sort/wc/head/mktemp/rm) is missing, the
-#       source directory is unusable, or a usage error (unknown --gates name,
-#       empty --gates value, unknown option). A missing tool is a tooling
-#       failure, never a false PASS — the `|| true` swallows on the tooling
-#       paths are preflighted so a gate that could not run exits 2 (AC-007-03-07).
+#       source directory is unusable, a usage error (unknown option, unknown
+#       --gates name, empty --gates value, bad/empty --blocking value), an
+#       unresolvable -BaseRef ref, or not a git repository. A missing tool is a
+#       tooling failure, never a false PASS — the `|| true` swallows on the
+#       tooling paths are preflighted so a gate that could not run exits 2
+#       (AC-007-03-07).
 #
 # Standards reference:
 #   docs/CODING_CONVENTIONS.md §Design Principles
@@ -74,6 +101,12 @@ NC='\033[0m'
 FAILS=0
 WARNS=0
 WARN_AS_ERROR=false
+
+BASE_REF=""
+BASE_REF_SET=false
+BLOCKING_ARG=""
+BLOCKING_ARG_SET=false
+BLOCKING_SET="complexity property-tests"
 
 fail() { # fail <message> [file] [line]
   FAILS=$((FAILS + 1))
@@ -114,12 +147,75 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --tier) TIER="${2:-}"; shift $(( $# > 1 ? 2 : 1 )) ;;
     --warn-as-error) WARN_AS_ERROR=true; shift ;;
+    --blocking) BLOCKING_ARG="${2:-}"; BLOCKING_ARG_SET=true; shift 2 ;;
+    -BaseRef) BASE_REF="${2:-}"; BASE_REF_SET=true; shift 2 ;;
     --gates) GATES_SET=true; GATES="${2:-}"; shift $(( $# > 1 ? 2 : 1 )) ;;
     --json) JSON=true; shift ;;
     -*) echo "Unknown option: $1" >&2; exit 2 ;;
     *) SOURCE_DIR="$1"; shift ;;
   esac
 done
+
+if [ "$BASE_REF_SET" = true ] && [ -z "$BASE_REF" ]; then
+  echo "Error: -BaseRef requires a value (the git ref to diff against)" >&2
+  exit 2
+fi
+
+# ── Blocking set (which gates may emit FAIL) ─────────────────────────────────
+# Gate names: complexity, dry, yagni, solid, property-tests. Default:
+# complexity,property-tests (the objective gates). --blocking wins over the
+# PRINCIPLES_BLOCKING_GATES env var, which wins over the default.
+blocking_raw() { # blocking_raw — resolve --blocking / env var / default into a raw comma list
+  if [ "$BLOCKING_ARG_SET" = true ]; then
+    [ -n "$BLOCKING_ARG" ] || { echo "Error: --blocking requires a comma-separated list of gates (complexity, dry, yagni, solid, property-tests)" >&2; exit 2; }
+    printf '%s' "$BLOCKING_ARG"
+    return
+  fi
+  if [ "${PRINCIPLES_BLOCKING_GATES+x}" = "x" ]; then
+    printf '%s' "$PRINCIPLES_BLOCKING_GATES"
+    return
+  fi
+  printf '%s' "complexity,property-tests"
+}
+
+valid_gate() { # valid_gate <name> — 0 if a known gate name
+  case "$1" in
+    complexity|dry|yagni|solid|property-tests) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+resolve_blocking_set() {
+  local raw g
+  raw=$(blocking_raw | tr -d '[:space:]')
+  BLOCKING_SET=""
+  for g in $(printf '%s' "$raw" | tr ',' '\n' | sed '/^$/d'); do
+    if ! valid_gate "$g"; then
+      echo "Error: unknown gate name in blocking set: '$g' (valid gates: complexity, dry, yagni, solid, property-tests)" >&2
+      exit 2
+    fi
+    BLOCKING_SET="${BLOCKING_SET}${BLOCKING_SET:+ }$g"
+  done
+  [ -n "$BLOCKING_SET" ] || { echo "Error: blocking set is empty — must name at least one of: complexity, dry, yagni, solid, property-tests" >&2; exit 2; }
+}
+resolve_blocking_set
+
+# ── Git work-tree guard (-BaseRef) ───────────────────────────────────────────
+# Fail before scanning anything: blame scoping is meaningless outside a repo.
+if [ "$BASE_REF_SET" = true ]; then
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "Error: -BaseRef '$BASE_REF' — not inside a git repository; cannot compute the diff" >&2
+    exit 2
+  fi
+  BLAME_DIR=$(mktemp -d)
+  trap 'rm -rf "$BLAME_DIR"' EXIT
+  BLAME_TOUCHED="$BLAME_DIR/touched"
+  BLAME_RANGES="$BLAME_DIR/ranges"
+  BLAME_FULLY_ADDED="$BLAME_DIR/full"
+  : > "$BLAME_TOUCHED"
+  : > "$BLAME_RANGES"
+  : > "$BLAME_FULLY_ADDED"
+fi
 
 # ── --gates validation (AC-007-03-04): unknown name or empty value = exit 2 ──
 SELECTED_GATES=()
@@ -152,7 +248,6 @@ if [ ! -d "$SOURCE_DIR" ] || [ ! -r "$SOURCE_DIR" ]; then
   echo "ERROR: source directory '$SOURCE_DIR' is missing or unreadable — cannot perform the design-principles check" >&2
   exit 2
 fi
-
 # ── Conformance tier auto-detection ──────────────────────────────────────────
 if [ -z "$TIER" ]; then
   for f in "$SOURCE_DIR"/AGENTS_*.md; do
@@ -251,11 +346,11 @@ function begin_method(line, lang, dbefore,   d) {
 function end_method( ) {
   if (top<0) return
   if (STACK[top,"c"] > 6)
-    printf "%s:%d:%s:CC=%d\n", FILENAME, STACK[top,"l"], STACK[top,"n"], STACK[top,"c"]
+    printf "%s:%d:%d:%s:CC=%d\n", FILENAME, STACK[top,"l"], FNR, STACK[top,"n"], STACK[top,"c"]
   if (STACK[top,"lines"] > 20)
-    printf "%s:%d:%s:KISS_LINES=%d\n", FILENAME, STACK[top,"l"], STACK[top,"n"], STACK[top,"lines"]
+    printf "%s:%d:%d:%s:KISS_LINES=%d\n", FILENAME, STACK[top,"l"], FNR, STACK[top,"n"], STACK[top,"lines"]
   if (STACK[top,"params"] > 6)
-    printf "%s:%d:%s:KISS_PARAMS=%d\n", FILENAME, STACK[top,"l"], STACK[top,"n"], STACK[top,"params"]
+    printf "%s:%d:%d:%s:KISS_PARAMS=%d\n", FILENAME, STACK[top,"l"], FNR, STACK[top,"n"], STACK[top,"params"]
   top--
 }
 function params(h,   p,c,i,n,instr) {
@@ -323,7 +418,18 @@ run_complexity_kiss() {
     exit 2
   fi
   [ -z "$out" ] && { pass "Complexity/KISS ($lang): no violations found"; return 0; }
-  while IFS= read -r line; do report_one_violation "$lang" "$line"; done <<< "$out"
+  local line f s e
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    f=$(printf '%s' "$line" | cut -d: -f1)
+    s=$(printf '%s' "$line" | cut -d: -f2)
+    e=$(printf '%s' "$line" | cut -d: -f3)
+    case "$line" in
+      *CC=*) emit "$(classify "complexity" "fail" "$f" "$s" "$e")" "Cyclomatic complexity >6 ($lang): $line" "$f" "$s" ;;
+      *KISS_LINES=*) emit "$(classify "complexity" "warn" "$f" "$s" "$e")" "Method body >20 lines ($lang): $line" "$f" "$s" ;;
+      *KISS_PARAMS=*) emit "$(classify "complexity" "warn" "$f" "$s" "$e")" "Method with >6 parameters ($lang): $line" "$f" "$s" ;;
+    esac
+  done <<< "$out"
 }
 
 # ── DRY: duplicate 4-line windows ────────────────────────────────────────────
@@ -354,9 +460,13 @@ check_dry() {
     END { if (count >= 2 && prevloc != "") print count "\t" prev "\t" prevloc }
   ' | sort -rn | head -10 > "$tmp"
   if [ -s "$tmp" ]; then
+    local dfile dline sev
     while IFS=$'\t' read -r count win loc; do
-      split_loc "$loc"
-      warn "Possible duplication (${count}x identical 4-line block, first at $loc): ${win//$'\x1f'/ /}" "$LOC_FILE" "$LOC_LINE"
+      dfile=$(printf '%s' "$loc" | sed -E 's/:[0-9]+$//')
+      dline=$(printf '%s' "$loc" | sed -nE 's/.*:([0-9]+)$/\1/p')
+      sev=$(classify "dry" "warn" "$dfile" "$dline" "$dline")
+      if [ "$sev" = none ]; then continue; fi
+      emit "$sev" "Possible duplication (${count}x identical 4-line block, first at $loc): ${win//$'\x1f'/ /}" "$dfile" "$dline"
     done < "$tmp"
   else
     pass "DRY: no duplicate 4-line blocks detected"
@@ -374,18 +484,21 @@ check_yagni() {
     java)
       for f in $files; do
         [ -f "$f" ] || continue
-        while IFS= read -r iface; do
-          [ -z "$iface" ] && continue
+        local lniface ln iface
+        while IFS= read -r lniface; do
+          [ -z "$lniface" ] && continue
+          ln=${lniface%%:*}
+          iface=${lniface#*:}
           name=$(echo "$iface" | grep -oE 'interface[ \t]+[A-Za-z0-9_]+' | awk '{print $2}')
           [ -z "$name" ] && continue
           impls=$(grep -rE "implements[^,{]*$name\b" $GREP_EXCLUDES "$SOURCE_DIR" --include="*.java" 2>/dev/null | wc -l | tr -d ' ' || true)
           if [ "$impls" -eq 1 ]; then
-            fail "YAGNI: interface $name has exactly one implementation (premature abstraction) — $f" "$f"
+            emit "$(classify "yagni" "fail" "$f" "$ln" "$ln")" "YAGNI: interface $name has exactly one implementation (premature abstraction) — $f:$ln" "$f" "$ln"
             found=true
           fi
-        done < <(grep -E '^\s*(public\s+)?interface[ \t]+' "$f" 2>/dev/null || true)
+        done < <(grep -nE '^\s*(public\s+)?interface[ \t]+' "$f" 2>/dev/null || true)
         while IFS=: read -r ln _; do
-          warn "Empty method body ($lang): $f:$ln" "$f" "$ln"
+          emit "$(classify "yagni" "warn" "$f" "$ln" "$ln")" "Empty method body ($lang): $f:$ln" "$f" "$ln"
           found=true
         done < <(grep -nE '\{\s*\}' "$f" 2>/dev/null | grep -vE '//|test' || true)
       done
@@ -393,31 +506,37 @@ check_yagni() {
     go)
       for f in $files; do
         [ -f "$f" ] || continue
-        while IFS= read -r iface; do
-          [ -z "$iface" ] && continue
+        local lniface ln iface
+        while IFS= read -r lniface; do
+          [ -z "$lniface" ] && continue
+          ln=${lniface%%:*}
+          iface=${lniface#*:}
           name=$(echo "$iface" | grep -oE 'interface[ \t]+[A-Za-z0-9_]+' | awk '{print $2}')
           [ -z "$name" ] && continue
           refs=$(grep -rE "\b$name\b" $GREP_EXCLUDES "$SOURCE_DIR" --include="*.go" 2>/dev/null | grep -v "interface[ \t]*$name" | wc -l | tr -d ' ' || true)
           if [ "$refs" -le 1 ]; then
-            fail "YAGNI: Go interface $name is declared but barely referenced (premature abstraction) — $f" "$f"
+            emit "$(classify "yagni" "fail" "$f" "$ln" "$ln")" "YAGNI: Go interface $name is declared but barely referenced (premature abstraction) — $f:$ln" "$f" "$ln"
             found=true
           fi
-        done < <(grep -E 'type[ \t]+[A-Za-z0-9_]+[ \t]+interface\b' "$f" 2>/dev/null || true)
+        done < <(grep -nE 'type[ \t]+[A-Za-z0-9_]+[ \t]+interface\b' "$f" 2>/dev/null || true)
       done
       ;;
     node)
       for f in $files; do
         [ -f "$f" ] || continue
-        while IFS= read -r iface; do
-          [ -z "$iface" ] && continue
+        local lniface ln iface
+        while IFS= read -r lniface; do
+          [ -z "$lniface" ] && continue
+          ln=${lniface%%:*}
+          iface=${lniface#*:}
           name=$(echo "$iface" | grep -oE 'interface[ \t]+[A-Za-z0-9_]+' | awk '{print $2}')
           [ -z "$name" ] && continue
           impls=$(grep -rE "implements[^,{]*$name\b" $GREP_EXCLUDES "$SOURCE_DIR" --include="*.ts" 2>/dev/null | wc -l | tr -d ' ' || true)
           if [ "$impls" -eq 1 ]; then
-            fail "YAGNI: interface $name has exactly one implementation (premature abstraction) — $f" "$f"
+            emit "$(classify "yagni" "fail" "$f" "$ln" "$ln")" "YAGNI: interface $name has exactly one implementation (premature abstraction) — $f:$ln" "$f" "$ln"
             found=true
           fi
-        done < <(grep -E '^\s*(export\s+)?interface[ \t]+' "$f" 2>/dev/null || true)
+        done < <(grep -nE '^\s*(export\s+)?interface[ \t]+' "$f" 2>/dev/null || true)
       done
       ;;
   esac
@@ -429,6 +548,7 @@ check_solid_srp() {
   local files="$1"; local lang="$2"
   [ -z "$files" ] && return 0
   local found=false
+  local f lines methods
   for f in $files; do
     [ -f "$f" ] || continue
     lines=$(wc -l < "$f" | tr -d ' ')
@@ -439,7 +559,7 @@ check_solid_srp() {
       *) methods=0 ;;
     esac
     if [ "$lines" -gt 400 ] || [ "$methods" -gt 15 ]; then
-      warn "SRP: possible god file ($lang) — $f: ${lines} lines, ${methods} methods (split by responsibility)" "$f"
+      emit "$(classify "solid" "warn" "$f" "" "")" "SRP: possible god file ($lang) — $f: ${lines} lines, ${methods} methods (split by responsibility)" "$f"
       found=true
     fi
   done
@@ -450,7 +570,7 @@ check_solid_ocp() {
   local files="$1"; local lang="$2"
   [ -z "$files" ] && return 0
   local found=false
-  local res r eif
+  local res r eif ocpfile ocpline eifline
   for f in $files; do
     [ -f "$f" ] || continue
     # switch with >=4 cases (word-boundary: matches `switch x {` Go form too)
@@ -461,13 +581,15 @@ check_solid_ocp() {
     ' "$f" 2>/dev/null || true)
     while IFS= read -r r; do
       [ -n "$r" ] || continue
-      split_loc "$r"
-      warn "OCP: type-dispatch switch should be polymorphic ($lang) — $r" "$LOC_FILE" "$LOC_LINE"
+      ocpfile=$(printf '%s' "$r" | cut -d: -f1)
+      ocpline=$(printf '%s' "$r" | cut -d: -f2)
+      emit "$(classify "solid" "warn" "$ocpfile" "$ocpline" "$ocpline")" "OCP: type-dispatch switch should be polymorphic ($lang) — $r" "$ocpfile" "$ocpline"
       found=true
     done <<< "$res"
     eif=$(grep -cE '^\s*else[ \t]+if' "$f" 2>/dev/null || true)
     if [ "${eif:-0}" -ge 4 ]; then
-      warn "OCP: ${eif}-branch if/else chain ($lang) — $f (consider polymorphism or a lookup)" "$f"
+      eifline=$(grep -nE '^\s*else[ \t]+if' "$f" 2>/dev/null | head -1 | cut -d: -f1)
+      emit "$(classify "solid" "warn" "$f" "$eifline" "$eifline")" "OCP: ${eif}-branch if/else chain ($lang) — $f (consider polymorphism or a lookup)" "$f" "$eifline"
       found=true
     fi
   done
@@ -482,11 +604,12 @@ check_solid_lsp() {
     *) return 0 ;;
   esac
   local found=false
+  local f c
   for f in $files; do
     [ -f "$f" ] || continue
     c=$(grep -c 'instanceof' "$f" 2>/dev/null || true)
     if [ "$c" -ge 3 ]; then
-      warn "LSP: ${c} instanceof checks in one file ($lang) — $f (suggests broken substitutability or type dispatch)" "$f"
+      emit "$(classify "solid" "warn" "$f" "" "")" "LSP: ${c} instanceof checks in one file ($lang) — $f (suggests broken substitutability or type dispatch)" "$f"
       found=true
     fi
   done
@@ -497,7 +620,7 @@ check_solid_isp() {
   local files="$1"; local lang="$2"
   [ -z "$files" ] && return 0
   local found=false
-  local res r
+  local res r ispfile ispline
   for f in $files; do
     [ -f "$f" ] || continue
     res=$(awk '
@@ -507,8 +630,9 @@ check_solid_isp() {
     ' "$f" 2>/dev/null || true)
     while IFS= read -r r; do
       [ -n "$r" ] || continue
-      split_loc "$r"
-      warn "ISP: fat interface (>5 methods) — $r (split by role)" "$LOC_FILE" "$LOC_LINE"
+      ispfile=$(printf '%s' "$r" | cut -d: -f1)
+      ispline=$(printf '%s' "$r" | cut -d: -f2)
+      emit "$(classify "solid" "warn" "$ispfile" "$ispline" "$ispline")" "ISP: fat interface (>5 methods) — $r (split by role)" "$ispfile" "$ispline"
       found=true
     done <<< "$res"
   done
@@ -518,13 +642,18 @@ check_solid_isp() {
 check_solid_dip() {
   local lang="$1"
   local found=false
+  local f hit dln
   case "$lang" in
     java)
       for f in $JAVA_FILES; do
         case "$f" in
           */domain/*|*/engine/*|*/core/*)
-            hit=$(grep -E '^\s*import\s+.*\.(infrastructure|persistence|repository)\.' "$f" 2>/dev/null || true)
-            [ -n "$hit" ] && { fail "DIP: domain/engine code imports infrastructure ($lang) — $f" "$f"; found=true; }
+            hit=$(grep -nE '^\s*import\s+.*\.(infrastructure|persistence|repository)\.' "$f" 2>/dev/null || true)
+            if [ -n "$hit" ]; then
+              dln=$(printf '%s\n' "$hit" | head -1 | cut -d: -f1)
+              emit "$(classify "solid" "fail" "$f" "$dln" "$dln")" "DIP: domain/engine code imports infrastructure ($lang) — $f:$dln" "$f" "$dln"
+              found=true
+            fi
             ;;
         esac
       done
@@ -533,8 +662,12 @@ check_solid_dip() {
       for f in $GO_FILES; do
         case "$f" in
           */domain/*|*/engine/*|*/core/*)
-            hit=$(grep -E '^\s*"[^"]*/(store|infra|repository)[^"]*"' "$f" 2>/dev/null || true)
-            [ -n "$hit" ] && { fail "DIP: domain/engine code imports store/infra/repository ($lang) — $f" "$f"; found=true; }
+            hit=$(grep -nE '^\s*"[^"]*/(store|infra|repository)[^"]*"' "$f" 2>/dev/null || true)
+            if [ -n "$hit" ]; then
+              dln=$(printf '%s\n' "$hit" | head -1 | cut -d: -f1)
+              emit "$(classify "solid" "fail" "$f" "$dln" "$dln")" "DIP: domain/engine code imports store/infra/repository ($lang) — $f:$dln" "$f" "$dln"
+              found=true
+            fi
             ;;
         esac
       done
@@ -543,8 +676,12 @@ check_solid_dip() {
       for f in $NODE_FILES; do
         case "$f" in
           */domain/*|*/engine/*|*/core/*|*/entities/*)
-            hit=$(grep -E "from\s+['\"].*(/store|/infra|/repository|/repositories|/infrastructure)" "$f" 2>/dev/null || true)
-            [ -n "$hit" ] && { fail "DIP: domain/engine code imports infrastructure ($lang) — $f" "$f"; found=true; }
+            hit=$(grep -nE "from\s+['\"].*(/store|/infra|/repository|/repositories|/infrastructure)" "$f" 2>/dev/null || true)
+            if [ -n "$hit" ]; then
+              dln=$(printf '%s\n' "$hit" | head -1 | cut -d: -f1)
+              emit "$(classify "solid" "fail" "$f" "$dln" "$dln")" "DIP: domain/engine code imports infrastructure ($lang) — $f:$dln" "$f" "$dln"
+              found=true
+            fi
             ;;
         esac
       done
@@ -595,7 +732,152 @@ check_property_tests() {
   esac
 }
 
+# ── Blame scoping helpers (-BaseRef) ─────────────────────────────────────────
+# Classification contract:
+#   -BaseRef unset: a gate in the blocking set keeps its legacy per-finding
+#   severity (CC FAIL, KISS WARN, ...); a gate outside the blocking set is
+#   warn-only (this is where DIP and YAGNI single-impl demote to WARN).
+#   -BaseRef set: untouched files are not evaluated (not reported); within the
+#   diff, a blocking-gate finding whose line range overlaps an added line is
+#   FAIL, otherwise pre-existing WARN; judgment gates are always WARN.
+abs_of() { # abs_of <path> — normalize a (possibly relative) path to absolute
+  case "$1" in
+    /*) printf '%s' "$1" ;;
+    ./*) printf '%s' "$(pwd)${1#.}" ;;
+    *) printf '%s' "$(pwd)/$1" ;;
+  esac
+}
+
+is_blocking() { # is_blocking <gate> — 0 if the gate may emit FAIL
+  local g
+  for g in $BLOCKING_SET; do [ "$g" = "$1" ] && return 0; done
+  return 1
+}
+
+file_touched() { # file_touched <absfile> — 0 if the file is present in the diff
+  [ -f "$BLAME_TOUCHED" ] || return 1
+  grep -qxF "$1" "$BLAME_TOUCHED" >/dev/null 2>&1
+}
+
+file_fully_added() { # file_fully_added <absfile> — 0 if the diff added the whole file
+  [ -f "$BLAME_FULLY_ADDED" ] || return 1
+  grep -qxF "$1" "$BLAME_FULLY_ADDED" >/dev/null 2>&1
+}
+
+ranges_overlap() { # ranges_overlap <absfile> <start> <end> — 0 if any added range overlaps
+  [ -f "$BLAME_RANGES" ] || return 1
+  local line ranges r s e
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    ranges="${line#*$'\t'}"
+    for r in $ranges; do
+      s="${r%%-*}"
+      e="${r#*-}"
+      if [ "$3" -ge "$s" ] && [ "$2" -le "$e" ]; then return 0; fi
+    done
+  done < <(grep -F "$1"$'\t' "$BLAME_RANGES" 2>/dev/null || true)
+  return 1
+}
+
+classify_blame() { # classify_blame <gate> <file> <start> <end> → fail|warn|none under -BaseRef
+  local gate="$1" file="$2" start="$3" end="$4" af
+  af=$(abs_of "$file")
+  if ! file_touched "$af"; then echo none; return; fi
+  if ! is_blocking "$gate"; then echo warn; return; fi
+  if file_fully_added "$af"; then echo fail; return; fi
+  if [ -z "$start" ]; then echo fail; return; fi  # file-level: touched ⇒ overlap
+  if ranges_overlap "$af" "$start" "$end"; then echo fail; return; fi
+  echo warn
+}
+
+classify() { # classify <gate> <legacy> <file> <start> <end> → fail|warn|none
+  local gate="$1" legacy="$2"
+  if [ -n "$BASE_REF" ]; then
+    classify_blame "$gate" "$3" "$4" "$5"
+    return
+  fi
+  if is_blocking "$gate"; then echo "$legacy"; else echo warn; fi
+}
+
+emit() { # emit <severity> <message> [file] [line] — route a finding to fail/warn (none = silent)
+  case "$1" in
+    fail) fail "$2" "${3:-}" "${4:-}" ;;
+    warn) warn "$2" "${3:-}" "${4:-}" ;;
+  esac
+}
+
+collect_rel_paths() { # collect_rel_paths <repo_root> — audited files on stdin → repo-relative paths on stdout
+  local repo_root="$1" p a
+  while IFS= read -r p; do
+    [ -z "$p" ] || [ ! -f "$p" ] && continue
+    a=$(abs_of "$p")
+    case "$a" in
+      "$repo_root"/*) printf '%s\n' "${a#"$repo_root"/}" ;;
+    esac
+  done
+}
+
+hunk_range() { # hunk_range <@@ hunk line> — echo the added range "start-end", or return 1 if none added
+  local line="$1" start count
+  start=$(printf '%s' "$line" | sed -nE 's/^@@ -[0-9]+(,[0-9]+)? \+([0-9]+)(,([0-9]+))? @@.*/\2/p')
+  [ -n "$start" ] || return 1
+  count=$(printf '%s' "$line" | sed -nE 's/^@@ -[0-9]+(,[0-9]+)? \+([0-9]+),([0-9]+) @@.*/\3/p')
+  [ -n "$count" ] || count=1
+  [ "$count" -ge 1 ] || return 1
+  printf '%s' "$start-$((start + count - 1))"
+}
+
+parse_diff_hunks() { # parse_diff_hunks <diff> <repo_root> — fill BLAME_TOUCHED / BLAME_RANGES
+  local diffout="$1" repo_root="$2" line cur rng
+  # `+++ b/<path>` resets the current file; each `@@ -l +c,d @@` hunk
+  # (unified=0, no context) contributes added range c..c+d-1.
+  while IFS= read -r line; do
+    case "$line" in
+      '+++ /dev/null') cur="" ;;
+      '+++ b/'*)
+        cur="$repo_root/${line#'+++ b/'}"
+        echo "$cur" >> "$BLAME_TOUCHED"
+        ;;
+      '@@ -'*)
+        [ -n "$cur" ] || continue
+        rng=$(hunk_range "$line") || continue
+        echo "$cur"$'\t'"$rng" >> "$BLAME_RANGES"
+        ;;
+    esac
+  done <<< "$diffout"
+}
+
+compute_diff() { # compute_diff <newline-separated audited files>
+  local files="$1" repo_root errf rel=() diffout u untracked
+  repo_root=$(git rev-parse --show-toplevel 2>/dev/null) || {
+    echo "Error: -BaseRef '$BASE_REF' — git rev-parse --show-toplevel failed; cannot compute the diff" >&2
+    exit 2
+  }
+  errf="$BLAME_DIR/diff.err"
+  # Absolute paths for every audited file, then repo-relative for git.
+  mapfile -t rel < <(collect_rel_paths "$repo_root" <<< "$files")
+  [ "${#rel[@]}" -eq 0 ] && return 0
+  if ! diffout=$(printf '%s\0' "${rel[@]}" | xargs -0 git -C "$repo_root" diff --unified=0 "$BASE_REF" -- 2>"$errf"); then
+    echo "Error: -BaseRef '$BASE_REF' — git diff failed: $(head -1 "$errf")" >&2
+    exit 2
+  fi
+  parse_diff_hunks "$diffout" "$repo_root"
+  # Untracked (not gitignored) audited files are entirely diff-introduced.
+  untracked=$(printf '%s\0' "${rel[@]}" | xargs -0 git -C "$repo_root" ls-files --others --exclude-standard -- 2>/dev/null || true)
+  while IFS= read -r u; do
+    [ -z "$u" ] && continue
+    echo "$repo_root/$u" >> "$BLAME_TOUCHED"
+    echo "$repo_root/$u" >> "$BLAME_FULLY_ADDED"
+  done <<< "$untracked"
+  sort -u "$BLAME_TOUCHED" -o "$BLAME_TOUCHED"
+  sort -u "$BLAME_RANGES" -o "$BLAME_RANGES"
+  sort -u "$BLAME_FULLY_ADDED" -o "$BLAME_FULLY_ADDED"
+}
+
 # ── Run ──────────────────────────────────────────────────────────────────────
+if [ -n "$BASE_REF" ]; then
+  compute_diff "$ALL_NONTEST"
+fi
 # --gates restricts execution to the listed categories (AC-007-03-01,
 # AC-007-03-02); the default runs all five, byte-identical to prior behavior.
 if contains_gate complexity; then
