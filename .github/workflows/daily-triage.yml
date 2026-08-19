@@ -1,0 +1,125 @@
+# Daily Triage loop — spec 019
+#
+# This repo's first `on: schedule` workflow. Runs the L1 report-only triage
+# loop per docs/LOOP_ENGINEERING.md §Readiness levels (016): a headless
+# `opencode run` that triages open PRs, specs awaiting build or stuck at a
+# gate, CI health, and unresolved open questions; writes outcomes to STATE.md;
+# appends one loop-run-log.md entry; and notifies a human only when action is
+# required. It makes no code change, opens no PR, and merges nothing.
+#
+# Scheduling note: GitHub Actions `schedule:` (cron) delivery is best-effort —
+# there is no exact-time guarantee. Acceptable for a daily triage cadence.
+# `workflow_dispatch` is also provided so the first run fires immediately and
+# a human can re-run on demand.
+#
+# State persistence: this workflow commits STATE.md + loop-run-log.md to a
+# dedicated `loop-state` branch — never to `main` (AGENTS.md: no direct push
+# to main, no exceptions). The branch is created on the first run if absent.
+#
+# Provider credentials: the headless opencode run needs an API key for the
+# models pinned in opencode.json (opencode-go/*). It is supplied as a GitHub
+# Actions repository secret `OPENCODE_API_KEY`, exposed to the run as the
+# `OPENCODE_API_KEY` env var that the opencode-go provider reads. The human
+# must add this secret. When it is absent the workflow exits 0 with a
+# "not configured" message instead of failing the branch.
+name: Daily Triage
+
+on:
+  schedule:
+    - cron: '0 6 * * 1-5'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: read
+  actions: read
+
+jobs:
+  triage:
+    name: Daily Triage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Seed the two durable state files from origin/loop-state when they exist.
+      # A missing loop-state branch on the first run is fine — the run creates
+      # the files from the 016 templates / documented shapes.
+      - name: Seed loop state from loop-state branch
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code origin loop-state > /dev/null 2>&1; then
+            git fetch origin loop-state
+            for f in STATE.md loop-run-log.md; do
+              if git cat-file -e "origin/loop-state:$f" 2>/dev/null; then
+                git show "origin/loop-state:$f" > "$f"
+                echo "Seeded $f from origin/loop-state"
+              fi
+            done
+          else
+            echo "No origin/loop-state branch yet (first run) — will bootstrap from 016 templates/shapes."
+          fi
+
+      # Install the pinned opencode binary and sanity-check it. Same pinned
+      # release the repo's own self-ci uses for the model-env runtime check.
+      - name: Install opencode
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/opencode-bin
+          curl -sSL -o /tmp/opencode-bin/opencode-linux-x64.tar.gz \
+            https://github.com/anomalyco/opencode/releases/download/v1.18.18/opencode-linux-x64.tar.gz
+          tar -xzf /tmp/opencode-bin/opencode-linux-x64.tar.gz -C /tmp/opencode-bin
+          /tmp/opencode-bin/opencode --version
+
+      # The workflow never creates or edits the notification issue — that is
+      # the run's job (the skill instructs creating or updating the issue via
+      # gh only when ACTION_REQUIRED). This step only guards the credential.
+      - name: Check provider key is configured
+        id: provider-check
+        run: |
+          if [ -z "${OPENCODE_API_KEY:-}" ]; then
+            echo "::warning::Daily Triage not configured: the OPENCODE_API_KEY secret is absent. Skipping the run."
+            echo "not-configured=true" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+
+      # Headless triage run. The prompt names the skill and instructs reading
+      # it first. Not passed --auto; the run's edit/write scope comes from the
+      # skill's allowed-tools (STATE.md, loop-run-log.md, loop-budget.md only).
+      - name: Run daily triage loop
+        if: steps.provider-check.outputs.not-configured != 'true'
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        run: |
+          /tmp/opencode-bin/opencode run \
+            --dir "$GITHUB_WORKSPACE" \
+            "Read skills/loop-triage/SKILL.md first and follow it exactly for this run of the Daily Triage loop."
+
+      # Persist state to loop-state. Staging is limited to the two state files;
+      # any other change fails the workflow (report-only enforcement). Pushes to
+      # loop-state, never to main. Skips the commit when neither file changed.
+      - name: Commit and push state to loop-state
+        if: steps.provider-check.outputs.not-configured != 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Report-only: any change outside the two state files is a violation.
+          other=$(git status --porcelain | grep -vE '^\?\? (STATE\.md|loop-run-log\.md)$|^ M (STATE\.md|loop-run-log\.md)$' || true)
+          if [ -n "$other" ]; then
+            echo "ERROR: the run modified files other than STATE.md and loop-run-log.md:"
+            echo "$other"
+            exit 1
+          fi
+          # Skip the commit when neither state file changed.
+          if git diff --quiet -- STATE.md loop-run-log.md \
+             && [ -z "$(git status --porcelain -- STATE.md loop-run-log.md)" ]; then
+            echo "No state changes; skipping commit."
+            exit 0
+          fi
+          git add STATE.md loop-run-log.md
+          git commit -m "chore(loop): daily triage state update"
+          git push origin HEAD:loop-state
