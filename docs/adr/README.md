@@ -6,7 +6,6 @@ mandated template. ADRs follow the lifecycle in
 `docs/GIT_WORKFLOW.md §Architecture Decision Records (ADRs)`:
 Proposed → Accepted → Deprecated → Superseded.
 
-No ADRs are recorded yet — the index starts empty. Per the ADR requirement in
-`docs/GOVERNANCE.md`, the first ADR should itself document this governance split
-(adding trust tiers and a model-discipline rule changes pipeline roles) — a
-follow-up recommendation, not part of the spec that created this index.
+| ADR | Title | Status |
+|-----|-------|--------|
+| 0001 | [Pure direnv dotenv for spec-pipeline model configuration and credentials](0001-direnv-model-env.md) | Accepted |
