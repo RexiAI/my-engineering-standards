@@ -69,6 +69,17 @@ Write `specs/NNN-slug/30-report.md` (the contract is `docs/SPEC_PIPELINE.md
 - Complexity summary carried from the Refactorer.
 - Every equivalent mutant named and why it is un-killable.
 - Final test status (the full suite, one final time, and its result).
+- Evidence rows in the contract's block style (`docs/SPEC_PIPELINE.md §Audit
+  contract`): each machine-readable row (mutation score, final test status)
+  carries a `command:` line, an `exit:` code, and an `at:` timestamp in
+  `YYYY-MM-DDTHH:MM:SSZ` (UTC) — never a prose paraphrase.
+- **Remediation record** (docs/SPEC_PIPELINE.md §Remediation budget): for each
+  BLOCK that occurred during the run, the phase (1 or 2) and the attempt count
+  at which it was resolved; or an explicit `none` when no BLOCK occurred. Carry
+  the record forward from `25-verification.md` (the verifier's re-verification
+  attempt entries) and from the orchestrator's loop summary — never guessed or
+  invented. If no `25-verification.md` attempt information is present, say so
+  in the record rather than fabricating a phase and attempt count.
 
 # Output
 
