@@ -1,6 +1,6 @@
 #!/bin/bash
 # agent-env.selftest.sh — Hermetic regression net for the per-machine agent
-# environment (spec 013): scripts/load-env.sh (+ .ps1 twin), scripts/guard-env.sh,
+# environment (spec 013): scripts/load-env.sh, scripts/guard-env.sh,
 # and scripts/check-no-hardcoded-secrets.sh. Fixtures live in mktemp -d with
 # trap cleanup; nothing here touches the real repo's config or git state.
 #
@@ -12,12 +12,11 @@
 #   AC-013-02  real file gitignored; guard refuses a staged/tracked real file
 #              (scratch repos); clean repo passes; self-ci wiring
 #   AC-013-03  load-env.sh sources + exports; fails loudly when example present;
-#              quiet no-op when both missing; never clobbers pre-set vars; the
-#              .ps1 twin exists with a documented parity contract
+#              quiet no-op when both missing; never clobbers pre-set vars
 #   AC-013-04  check-no-hardcoded-secrets.sh over agents/ commands/ scripts/
 #              docs/ (fixture violations exit 1, clean dirs exit 0), self-ci wiring
 #   AC-013-05  AGENTS.md documents the per-machine setup (copy/fill/never
-#              commit, source load-env.sh, .ps1 twin, credentials, enforcement)
+#              commit, source load-env.sh, credentials, enforcement)
 #   AC-013-06  agents read credentials via the loader, never literals (PR Opener
 #              sources load-env.sh, orchestrator relies on the loaded shell)
 #
@@ -39,7 +38,7 @@ NC='\033[0m'
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOADER="$ROOT/scripts/load-env.sh"
-PS1_TWIN="$ROOT/scripts/load-env.ps1"
+# (PowerShell twin removed — spec 013 no longer supports PowerShell)
 GUARD="$ROOT/scripts/guard-env.sh"
 SECRETS_CHECK="$ROOT/scripts/check-no-hardcoded-secrets.sh"
 REAL_ENV="config/agent.local.env"
@@ -281,14 +280,6 @@ else
   bad "AC-013-03-04 pre-existing exported GITHUB_TOKEN wins over the file value (got: $(printf '%s ' $snap))"
 fi
 
-# 03-05: .ps1 twin exists with a documented parity contract
-if [ -f "$PS1_TWIN" ] && grep -qi 'load-env.sh' "$PS1_TWIN" \
-   && grep -qi 'no-op' "$PS1_TWIN" && grep -qi 'clobber' "$PS1_TWIN"; then
-  ok "AC-013-03-05 scripts/load-env.ps1 exists and documents the parity contract"
-else
-  bad "AC-013-03-05 scripts/load-env.ps1 exists and documents the parity contract"
-fi
-
 echo "== AC-013-04 check-no-hardcoded-secrets =="
 
 # 04-01: literal token prefix under a scanned dir -> exit 1, prints file:line
@@ -349,11 +340,10 @@ echo "== AC-013-05 per-machine setup documented =="
 if grep -qi 'per-machine agent environment' "$ROOT/AGENTS.md" \
    && grep -q 'cp config/agent.local.env.example config/agent.local.env' "$ROOT/AGENTS.md" \
    && grep -q 'scripts/load-env.sh' "$ROOT/AGENTS.md" \
-   && grep -qi 'never commit' "$ROOT/AGENTS.md" \
-   && grep -q 'scripts/load-env.ps1' "$ROOT/AGENTS.md"; then
-  ok "AC-013-05-01 AGENTS.md documents copy -> fill -> never commit, sourcing load-env.sh, and the .ps1 twin"
+   && grep -qi 'never commit' "$ROOT/AGENTS.md"; then
+  ok "AC-013-05-01 AGENTS.md documents copy -> fill -> never commit and sourcing load-env.sh"
 else
-  bad "AC-013-05-01 AGENTS.md documents copy -> fill -> never commit, sourcing load-env.sh, and the .ps1 twin"
+  bad "AC-013-05-01 AGENTS.md documents copy -> fill -> never commit and sourcing load-env.sh"
 fi
 
 if grep -q 'GITHUB_TOKEN' "$ROOT/AGENTS.md" && grep -q 'GH_TOKEN' "$ROOT/AGENTS.md" \

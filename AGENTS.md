@@ -94,7 +94,7 @@ One-time setup per machine:
 ```bash
 cp config/agent.local.env.example config/agent.local.env   # committed template → gitignored real file
 # edit config/agent.local.env — fill in the real values
-source scripts/load-env.sh                                 # PowerShell: scripts/load-env.ps1
+source scripts/load-env.sh
 ```
 
 Source `scripts/load-env.sh` in the shell where `/spec` and `/build` run, so the

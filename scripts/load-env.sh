@@ -19,8 +19,6 @@
 # to the repo root (parent of scripts/). Pass it explicitly to run against
 # scratch fixtures (selftest).
 #
-# PowerShell twin: scripts/load-env.ps1 — same behavior contract (see its
-# header; not executed in CI, kept in sync by hand).
 #
 # Exit codes:
 #   0 — loaded (or nothing to load)

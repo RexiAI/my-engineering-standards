@@ -15,7 +15,7 @@ gitignored real file + a loader script:
 - `config/agent.local.env.example` — committed, lists every credential the
   pipeline needs with placeholder values and a comment per variable.
 - `config/agent.local.env` — gitignored, holds the real values on each machine.
-- `scripts/load-env.sh` (+ `.ps1` twin) — sources the real file and exports the
+- `scripts/load-env.sh` — sources the real file and exports the
   variables; fails loudly if the real file is missing but the template exists.
 
 Bring the same pattern to this repo:
@@ -162,7 +162,7 @@ Acceptance criteria:
 
 Scenarios: `20-acceptance/AC-013-02-guard-gitignore.md`
 
-### Task 3 — `scripts/load-env.sh` (+ `scripts/load-env.ps1` twin)
+### Task 3 — `scripts/load-env.sh`
 
 A model-free bash loader that sources the real file and exports its variables;
 fails loudly when the real file is missing but the example exists.
@@ -180,12 +180,8 @@ Acceptance criteria:
 - Bash-only, no new dependencies; runs from any cwd (resolve paths relative to
   the script's own location or the caller's repo root, documented in the
   header).
-- `scripts/load-env.ps1` twin with the same behavior contract (source real file,
-  export vars, fail loudly when real missing + example present, no-op when both
-  missing, do not clobber pre-set vars). The self-ci `ubuntu-latest` image has
-  no PowerShell, so the `.ps1` is **not executed in CI** — its acceptance is
-  existence + a documented parity contract, and the `.sh` selftest asserts the
-  `.ps1` file exists.
+- No PowerShell twin: spec 013 ships a bash loader only. (A `.ps1` twin was
+  originally specified but removed — PowerShell is not supported.)
 
 Scenarios: `20-acceptance/AC-013-03-loader.md`
 
@@ -345,9 +341,9 @@ self-ci" scenario per behavior file, mirroring `AC-012-03-selfci-wiring.md`).
 4. **Loader clobber policy.** Chosen: pre-existing exported variables win (a
    machine override survives sourcing). The alternative (file always wins, the
    acdc-civ default) is a one-line difference — confirm which you want.
-5. **`.ps1` twin is not CI-executable** on the `ubuntu-latest` self-ci image
-   (no PowerShell). Its acceptance is existence + a documented parity contract,
-   not an executed test. Acceptable, or should self-ci install PowerShell?
+5. **`.ps1` twin not supported.** The original spec proposed a PowerShell twin,
+   but PowerShell support was dropped — spec 013 ships a bash loader only, with
+   no `.ps1` file.
 
 ## Acceptance scenarios
 
@@ -452,12 +448,7 @@ syntax-checks the **first** argument, so the initial 5-file batch exit 0 was a
 false green for files 2–5. Re-ran per-file (as self-ci's `find -name '*.sh'`
 loop does) — all four new `.sh` files parse cleanly, each exit 0.
 
-`scripts/load-env.ps1` is PowerShell, not bash: `bash -n` errors on its
-`param(` (line 22) — **expected and correct**. self-ci's `bash -n` step globs
-only `*.sh` (`.github/workflows/self-ci.yml:58`), so the `.ps1` is out of parse
-scope by design; its acceptance per Task 3 / AC-013-03-05 is existence + a
-documented parity contract, both satisfied (selftest asserts existence and the
-header's parity terms: no-op, clobber, load-env.sh).
+No PowerShell twin exists — spec 013 ships a bash loader only.
 
 **self-ci wiring** — `.github/workflows/self-ci.yml` parses as YAML (PyYAML,
 `jobs: ['validate']`), and the new step exists:
@@ -620,7 +611,7 @@ Diff skim (6 modified files + 5 new files). Every change traces to a task:
 | `agents/spec-pr-opener.md` — defensive loader sourcing | Task 6 |
 | `okf/mcp-server-connection.md:79` — placeholder rewrite | Task 5 |
 | `config/agent.local.env.example` (new) | Task 1 |
-| `scripts/load-env.sh`, `scripts/load-env.ps1` (new) | Task 3 |
+| `scripts/load-env.sh` (new) | Task 3 |
 | `scripts/guard-env.sh` (new) | Task 4 |
 | `scripts/check-no-hardcoded-secrets.sh` (new) | Task 5 |
 | `scripts/agent-env.selftest.sh` (new) | Task 8 |
