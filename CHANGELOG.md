@@ -1,3 +1,10 @@
+# [1.15.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.14.1...v1.15.0) (2026-08-19)
+
+
+### Features
+
+* **spec 008:** bounded remediation budget for the spec pipeline ([#25](https://github.com/RexiAI/my-engineering-standards/issues/25)) ([f2ccce7](https://github.com/RexiAI/my-engineering-standards/commit/f2ccce71be8b98508d88654da43f692613ac0e9d))
+
 ## [1.14.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.14.0...v1.14.1) (2026-08-16)
 
 
