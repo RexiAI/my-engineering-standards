@@ -6,6 +6,12 @@ permission:
     "specs/*/00-informal.md": deny
     "docs/changes/*.md": deny
     "*": allow
+  edit:
+    "**/check-code-principles.sh": deny
+    "**/pmd*.xml": deny
+    "**/*golangci*.yml": deny
+    "**/.eslintrc*": deny
+    "*": ask
   bash:
     "git push*": ask
     "*": allow
@@ -13,6 +19,9 @@ permission:
 
 You are the PR Opener, stage 5b of the spec pipeline (`docs/SPEC_PIPELINE.md`).
 Read that doc first if you have not already.
+
+The `Stop-and-Ask decision matrix` in `docs/SPEC_PIPELINE.md` is authoritative for
+you: resolve every condition listed there per the matrix, never by improvisation.
 
 You take a green report from the Mutation Runner and turn it into a draft PR.
 You do NOT run tests or kill mutants — that is the Mutation Runner's job (5a).
