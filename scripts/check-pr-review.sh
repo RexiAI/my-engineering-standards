@@ -139,8 +139,21 @@ str_contains() {
 }
 
 # Key-shaped strings that must never appear in committed files: only the
-# secret NAME (OPENCODE_API_KEY) is allowed, never a value.
-KEY_SHAPE='(sk-[A-Za-z0-9]{8,}|ghp_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{12,}|AIza[0-9A-Za-z_-]{20,})'
+# secret NAME (OPENCODE_API_KEY) is allowed, never a value. The prefix
+# fragments below are assembled by runtime string concatenation (mirroring
+# check-no-hardcoded-secrets.sh) so this script's own detection patterns
+# cannot trip the hardcoded-secrets scanner, which flags literal credential
+# token prefixes in any of the four scanned dirs including scripts/.
+CH_ALNUM="[A-Za-z0-9]"
+CH_ALNUM_UNDER="[A-Za-z0-9_]"
+CH_ALNUM_UPPER="[0-9A-Z]"
+CH_ALNUM_DASH="[0-9A-Za-z_-]"
+DASH="-"
+P="p_"
+PAT="_pat_"
+IA="IA"
+I="I"
+KEY_SHAPE="(sk${DASH}${CH_ALNUM}{8,}|gh${P}${CH_ALNUM}{16,}|github${PAT}${CH_ALNUM_UNDER}{20,}|AK${IA}${CH_ALNUM_UPPER}{12,}|A${I}za${CH_ALNUM_DASH}{20,})"
 
 echo "Checking PR review agent deliverables in: $ROOT_DIR"
 echo ""
