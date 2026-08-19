@@ -1,0 +1,24 @@
+# Per-machine direnv environment for this repo's spec pipeline (spec 025).
+#
+# ONE-TIME SETUP:
+#   1. Install direnv (https://direnv.net) and wire the hook once in your
+#      shell profile:
+#        eval "$(direnv hook bash)"   # or your shell's hook
+#   2. Copy this template to the repo root and allow it:
+#        cp templates/.envrc.example .envrc
+#        direnv allow
+#      The repo-root .envrc is PER-MACHINE and gitignored — NEVER commit it.
+#
+# WHAT EACH LINE LOADS (later lines win: a dotenv line clobbers any
+# pre-existing value, exported shell vars included — the .envrc is the
+# per-directory source of truth):
+#   1. config/model.local.env.example — committed defaults for the 8
+#      SPEC_*_MODEL vars opencode.json interpolates. Loaded first so every var
+#      is non-empty when opencode launches ({env:VAR} resolves empty when
+#      unset — this opencode build has no default syntax).
+#   2. config/model.local.env — gitignored per-machine override.
+#   3. config/agent.local.env — gitignored per-machine credentials
+#      (GITHUB_TOKEN, GH_TOKEN).
+dotenv_if_exists config/model.local.env.example
+dotenv_if_exists config/model.local.env
+dotenv_if_exists config/agent.local.env
