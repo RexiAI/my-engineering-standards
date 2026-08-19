@@ -108,6 +108,30 @@ else
     fi
 fi
 
+# 3d. Per-machine direnv .envrc (spec 025): write the child .envrc from the
+# committed template when absent; ensure the child's .gitignore covers it and
+# the per-machine env files. The .envrc is per-machine — never committed.
+if [ ! -f "$REPO_ROOT/.envrc" ]; then
+    cp "$STANDARDS_DIR/templates/.envrc.child" "$REPO_ROOT/.envrc"
+    echo "[COPY] templates/.envrc.child -> .envrc (per-machine, gitignored)"
+    echo "  Run 'direnv allow' at the repo root to load it."
+else
+    echo "[SKIP] .envrc already exists — not overwriting"
+fi
+touch "$REPO_ROOT/.gitignore"
+if ! grep -q '^\.envrc$' "$REPO_ROOT/.gitignore" 2>/dev/null; then
+    printf '\n# Per-machine direnv file (spec 025): never committed.\n.envrc\n' >> "$REPO_ROOT/.gitignore"
+    echo "[APPEND] .envrc -> .gitignore"
+fi
+mkdir -p "$REPO_ROOT/config"
+touch "$REPO_ROOT/config/.gitignore"
+for env_pat in model.local.env agent.local.env; do
+    if ! grep -qx "$env_pat" "$REPO_ROOT/config/.gitignore" 2>/dev/null; then
+        printf '%s\n' "$env_pat" >> "$REPO_ROOT/config/.gitignore"
+        echo "  [APPEND] $env_pat -> config/.gitignore"
+    fi
+done
+
 # 4. Copy PR template
 mkdir -p "$REPO_ROOT/.github"
 if [ ! -f "$REPO_ROOT/.github/PULL_REQUEST_TEMPLATE.md" ]; then
@@ -229,7 +253,7 @@ echo ""
 echo "=== Bootstrap complete ==="
 echo "Next steps:"
 echo "  1. Review and commit the new files:"
-echo "     git add .standards AGENTS.md opencode.json okf .github/ Makefile"
+echo "     git add .standards AGENTS.md opencode.json okf .github/ config/.gitignore Makefile"
 echo "  2. OpenCode will auto-discover AGENTS.md and load instructions from .standards/"
 echo "  3. Run session hygiene check: ./session-start-check.sh"
 echo "  4. Push and verify CI pipeline runs"

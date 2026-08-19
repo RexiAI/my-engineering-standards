@@ -418,7 +418,7 @@ that does pin `model:` silently wins over `opencode.json` every time.
 With nothing configured, each subagent inherits the model of whichever primary
 agent invoked it — no vendor coupling, works with any provider you already use.
 
-Per-stage differentiation works through a **per-machine env mechanism** — no
+Per-stage differentiation works through a **per-machine direnv mechanism** — no
 editing and committing `opencode.json` is involved. `opencode.json` (repo root)
 resolves every `agent.<name>.model` from an `{env:SPEC_*_MODEL}` reference, and
 the committed `config/model.local.env.example` carries the defaults. The
@@ -432,19 +432,32 @@ not as literals in `opencode.json`.
 
 ### One-time setup (per machine)
 
-1. **Wire the loader into your shell profile once** so every shell exports the
-   model vars automatically before opencode launches:
+1. **Install direnv and wire the hook once** so every shell loads the env
+   automatically before opencode launches:
 
    ```bash
-   echo 'source <repo>/scripts/load-model-env.sh' >> ~/.bashrc   # or ~/.zshrc
+   eval "$(direnv hook bash)"   # or your shell's hook (zsh, fish, …)
    ```
 
-   The loader is never sourced per-launch by hand — the profile wiring is the
-   mechanism. It exports the 8 `SPEC_*_MODEL` vars with the committed defaults
-   when no override file exists, so the steady state (no env file present)
-   resolves to the defaults with no empty-string breakage.
+2. **Copy the parent `.envrc` template and allow it:**
 
-2. **Only if you want to override a model** (otherwise skip this entirely):
+   ```bash
+   cp templates/.envrc.example .envrc
+   direnv allow
+   ```
+
+   The repo-root `.envrc` is **per-machine and gitignored** — never committed.
+   It is the only committed-adjacent wiring: the committed surface is the
+   template (`templates/.envrc.example`), and it loads, in order via
+   `dotenv_if_exists`:
+
+   | Line | File | Role |
+   |---|---|---|
+   | 1 | `config/model.local.env.example` | committed defaults for the 8 `SPEC_*_MODEL` vars |
+   | 2 | `config/model.local.env` | gitignored per-machine override |
+   | 3 | `config/agent.local.env` | gitignored per-machine credentials (`GITHUB_TOKEN`, `GH_TOKEN`) |
+
+3. **Only if you want to override a model** (otherwise skip this entirely):
 
    ```bash
    cp config/model.local.env.example config/model.local.env
@@ -455,31 +468,45 @@ not as literals in `opencode.json`.
    required after any change. **No commit, no PR** — `config/model.local.env`
    is gitignored and can never be committed.
 
-**Precedence** (per var, first non-empty source wins): a pre-existing exported
-env var > the gitignored `config/model.local.env` when present > the committed
-defaults in `config/model.local.env.example`. The profile wiring is what
-prevents the empty-string failure: `{env:VAR}` with an unset var resolves to
-empty — this opencode build has **no default syntax** (`{env:VAR:-default}`,
-`{env:VAR|default}`, and `{env:VAR=default}` all resolve to `""` when unset),
-so the defaults must arrive via the loader.
+**Child repos** (this repo consumed as a `.standards/` submodule) get the same
+shape from `scripts/bootstrap.sh`: it copies `templates/.envrc.child` to the
+child's root `.envrc` when absent (and appends `.envrc` to the child's root
+`.gitignore`), and writes/keeps a child `config/.gitignore` covering
+`model.local.env` and `agent.local.env`. The child template's first
+`dotenv_if_exists` line points at
+`.standards/config/model.local.env.example` — the **parent's committed**
+defaults. The submodule never carries gitignored files, so a parent's
+per-machine override never propagates to children; a child's own
+`config/model.local.env` override wins over the parent defaults.
 
-**Boundary, honestly documented**: the supported launch path is shell-launched
-opencode — interactive shells, and shells spawned from them (`opencode run`,
-`/spec`, `/build`, subagents), all inherit the exported vars. A GUI or
-daemon-launched opencode that spawns no interactive shell will not have the
-vars; the loader's fail-loudly branch (exit 1, naming the var) surfaces that
-state instead of silently shipping empty models.
+**Precedence** (per var): later `dotenv_if_exists` lines win. A dotenv line
+**clobbers** any pre-existing value — pre-exported shell vars included. This is
+accepted and documented: the `.envrc` is the per-directory source of truth.
+The example loads first, which is what prevents the empty-string failure:
+`{env:VAR}` with an unset var resolves to empty — this opencode build has
+**no default syntax** (`{env:VAR:-default}`, `{env:VAR|default}`, and
+`{env:VAR=default}` all resolve to `""` when unset) — so the defaults must
+arrive via the first dotenv line.
+
+**Boundary, honestly documented**: the supported launch path is a shell loaded
+by direnv — interactive shells, and shells spawned from them (`opencode run`,
+`/spec`, `/build`, subagents), all inherit the loaded vars. A GUI or
+daemon-launched opencode that spawns no direnv-loaded shell will resolve the
+`{env:SPEC_*_MODEL}` references to empty — surfaced as empty model resolution,
+not a loud failure.
 
 **Structural enforcement**: `scripts/check-model-env.sh` is the gate — every
 `agent.*.model` in the `agent` block must be an `{env:SPEC_*_MODEL}` reference
 (no literal model id in the agent block; the pr-review agent's pinned
 `opencode-go/kimi-k3` model and the OpenCode Zen provider block are the
 deliberate exceptions, see `§Using OpenCode Zen` below), `config/model.local.env`
-must never be tracked by git, and the example must define exactly the
-referenced vars. Self-ci additionally downloads a pinned opencode binary and
-runs `scripts/model-env.runtime-check.sh` against a scratch project to verify
-the actual resolution behavior in three cases (defaults via loader, overrides
-win, loader absent → empty).
+and `config/agent.local.env` must never be tracked by git, and the example must
+define exactly the referenced vars. Self-ci additionally runs
+`scripts/model-env.selftest.sh` (hermetic dotenv-emulation regressions) and
+downloads a pinned opencode binary to run `scripts/model-env.runtime-check.sh`
+against a scratch project, verifying the actual resolution behavior in three
+cases (example loaded → defaults; file override + untouched pre-exported var;
+nothing loaded → empty).
 
 If you need to customize an agent's prompt or permissions, not just its model, run
 `./scripts/bootstrap.sh --copy-agents` (or `make init-ai COPY_AGENTS=1`) to get real,

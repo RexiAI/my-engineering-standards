@@ -6,7 +6,9 @@
 # "plus" model tier. Every consumer sources this file — check-model-env.sh,
 # model-env.selftest.sh, model-env.runtime-check.sh — so the roster lives in one
 # place. Adding or renaming an agent means editing this file, not four scripts.
-# (load-model-env.sh keeps its own inline copy: see its header for why.)
+# (The .envrc templates get their values from config/model.local.env.example —
+# the roster here is the check/selftest/runtime-check consumers' source of
+# truth, not the runtime wiring.)
 #
 # Sourced files do not set shell flags; the sourcing script's own
 # `set -euo pipefail` governs. Defines only names, no exported state.

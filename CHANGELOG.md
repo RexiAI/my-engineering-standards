@@ -1,3 +1,10 @@
+# [1.25.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.24.0...v1.25.0) (2026-08-19)
+
+
+### Features
+
+* **spec 025:** pure direnv dotenv for model config and credentials ([#41](https://github.com/RexiAI/my-engineering-standards/issues/41)) ([2093430](https://github.com/RexiAI/my-engineering-standards/commit/2093430cb807c8fc1368723989fcb5d31c332d14))
+
 # [1.24.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.23.0...v1.24.0) (2026-08-19)
 
 

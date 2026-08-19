@@ -62,13 +62,18 @@ This repo's spec pipeline agents are configured to use OpenCode Go subscription 
 | spec-refactorer | `opencode-go/deepseek-v4-flash` | `kimi-k2.7-code` → `glm-5.1` |
 | spec-pipeline | `opencode-go/deepseek-v4-flash` | `kimi-k2.7-code` → `glm-5.1` |
 
-Per-machine values come from the gitignored `config/model.local.env` (falling
-back to the committed `config/model.local.env.example` defaults) via
-`scripts/load-model-env.sh`, wired into your shell profile once
-(`source <repo>/scripts/load-model-env.sh`). Switching a model means editing
-`config/model.local.env` and restarting opencode — **no commit, no PR**.
+Per-machine values arrive via the gitignored repo-root `.envrc` (direnv). It
+loads the committed `config/model.local.env.example` defaults, then the
+gitignored `config/model.local.env` override, then the gitignored
+`config/agent.local.env` credentials — each via a `dotenv_if_exists` line
+(later lines win; a dotenv line clobbers any pre-existing value). One-time
+setup per machine: copy `templates/.envrc.example` to `.envrc`, run
+`direnv allow`, and (only to override a default) copy
+`config/model.local.env.example` to `config/model.local.env`. Switching a
+model means editing `config/model.local.env` and restarting opencode — **no
+commit, no PR**.
 `scripts/check-model-env.sh` enforces structurally that `opencode.json` keeps no
-literal model id and the real env file is never tracked; self-ci additionally
+literal model id and neither real env file is ever tracked; self-ci additionally
 downloads a pinned opencode binary and runs `scripts/model-env.runtime-check.sh`
 to verify the resolution behavior. See `docs/SPEC_PIPELINE.md §Model
 configuration` for the full mechanism and precedence.
@@ -94,13 +99,15 @@ One-time setup per machine:
 ```bash
 cp config/agent.local.env.example config/agent.local.env   # committed template → gitignored real file
 # edit config/agent.local.env — fill in the real values
-source scripts/load-env.sh
+cp templates/.envrc.example .envrc                         # per-machine .envrc, gitignored
+direnv allow                                               # load the .envrc at the repo root
 ```
 
-Source `scripts/load-env.sh` in the shell where `/spec` and `/build` run, so the
-PR Opener and the GitHub MCP server see the variables. Pre-existing exported
-variables are never clobbered; if the real file is missing but the example
-exists the loader fails loudly with the copy-fill step.
+The repo-root `.envrc` is direnv's per-directory source of truth: its
+`dotenv_if_exists` lines load the committed model defaults, the per-machine
+override, then `config/agent.local.env` — so the shell where `/spec` and
+`/build` run (and every shell spawned from it) sees the credentials. A dotenv
+line clobbers pre-existing exported variables; later lines win.
 
 **Never commit `config/agent.local.env`.** That rule is structural, not
 advisory: `.gitignore` covers it, `scripts/guard-env.sh` refuses to commit it
