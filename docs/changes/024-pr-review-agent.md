@@ -28,7 +28,7 @@ code each PR" — a reviewer of record in CI, not an author.
    (improve), ask-the-PR, title/summary rewriting, auto-merge, pushing commits.
    This is enforced in the agent's config, not just its prompt.
 
-3. **Model: `opencode-go/kimi-k3` only.** The PR review agent uses Kimi K3 via
+3. **Model: `opencode-zen/kimi-k3` only.** The PR review agent uses Kimi K3 via
    the OpenCode Zen endpoint (`https://opencode.ai/zen/go/v1`), authenticated with
    `OPENCODE_API_KEY`. No other model is used by this agent. The model id is
    pinned in the agent config.
@@ -66,7 +66,7 @@ code each PR" — a reviewer of record in CI, not an author.
   this standards repo that runs the PR review agent on PRs, comment-only.
 - AC-002: the agent is scoped to review + suggest fixes only — describe,
   improve, auto-apply, title/summary editing, and merge are disabled in config.
-- AC-003: the review agent's model is pinned to `opencode-go/kimi-k3`; the
+- AC-003: the review agent's model is pinned to `opencode-zen/kimi-k3`; the
   endpoint is `https://opencode.ai/zen/go/v1`; auth is `OPENCODE_API_KEY`.
 - AC-004: `scripts/init-ci.sh` gains an opt-in flag (e.g. `--with-pr-review`)
   that wires the shared workflow + the `OPENCODE_API_KEY` secret into a child
@@ -121,7 +121,7 @@ the OpenCode Zen provider so the pinned model resolves.
 What the task must do:
 
 - `agents/pr-review.md` with frontmatter: `description`, `mode: subagent`, and a **literal**
-  `model: opencode-go/kimi-k3` (pinned in the agent config per the informal spec — no
+  `model: opencode-zen/kimi-k3` (pinned in the agent config per the informal spec — no
   `{env:...}` indirection; this is the one deliberate exception to the "agents ship without
   `model:`" convention in `docs/SPEC_PIPELINE.md §Model configuration`).
 - `permission` block enforcing the scope lock **in config, not just the prompt**: `edit`
@@ -149,7 +149,7 @@ Acceptance criteria (checkable by reading code):
 - [AC-002] `agents/pr-review.md` exists; `mode: subagent`; the prompt's first directive states the agent reviews the PR diff and posts findings with suggested fixes only.
 - [AC-002] The frontmatter `permission` block denies `edit` for all paths, and no allowed `bash` pattern matches `git push`, `git commit`, `gh pr merge`, `gh pr edit`, or any file-writing command.
 - [AC-002] The prompt contains literal forbidden-operation strings: `describe`, `improve`, `auto-apply`, `title`/`summary` rewriting, `auto-merge`, `push`.
-- [AC-003] `model:` in `agents/pr-review.md` frontmatter is exactly `opencode-go/kimi-k3` (literal, not an env reference).
+- [AC-003] `model:` in `agents/pr-review.md` frontmatter is exactly `opencode-zen/kimi-k3` (literal, not an env reference).
 - [AC-003] `opencode.json` `provider.opencode-go` defines base URL exactly `https://opencode.ai/zen/go/v1`, `env: ["OPENCODE_API_KEY"]`, and model `kimi-k3`; no other model id appears in the agent file or provider block.
 - [AC-003] `bash scripts/check-model-env.sh` still exits 0 after the `opencode.json` change.
 - [AC-002/6] The prompt requires each finding to include `file:line`, what is wrong, why, and a suggested fix; requires grounding in the diff and the repo standards; forbids cosmetic-only nitpicks; forbids security findings without evidence.
@@ -263,7 +263,7 @@ What the task must do:
 
 - New section in `docs/CI_CD.md` (e.g. `## PR Review Agent`) documenting: the scope lock
   (review + suggest fixes only; the disabled operations list), the pinned model
-  `opencode-go/kimi-k3`, the endpoint `https://opencode.ai/zen/go/v1`, secret handling
+  `opencode-zen/kimi-k3`, the endpoint `https://opencode.ai/zen/go/v1`, secret handling
   (`OPENCODE_API_KEY` from a GitHub secret, never committed — consistent with
   `docs/SECURITY.md §Secrets Management`), child-repo opt-in via
   `./.standards/scripts/init-ci.sh --with-pr-review` (additive, no-op boundary for children
@@ -279,7 +279,7 @@ Satisfies: AC-006, informal item 8 (cost guidance documented).
 
 Acceptance criteria (checkable by reading docs):
 
-- [AC-006] `docs/CI_CD.md` contains a PR review agent section that mentions: the scope lock with the disabled operations, `opencode-go/kimi-k3`, `https://opencode.ai/zen/go/v1`, `OPENCODE_API_KEY` sourced from a GitHub secret (never committed), `init-ci.sh --with-pr-review` child-repo opt-in, and the cost/bounds rules (latest-head debounce, early exit when reviewed-and-green).
+- [AC-006] `docs/CI_CD.md` contains a PR review agent section that mentions: the scope lock with the disabled operations, `opencode-zen/kimi-k3`, `https://opencode.ai/zen/go/v1`, `OPENCODE_API_KEY` sourced from a GitHub secret (never committed), `init-ci.sh --with-pr-review` child-repo opt-in, and the cost/bounds rules (latest-head debounce, early exit when reviewed-and-green).
 - [AC-006] The `Required Secrets` table lists `OPENCODE_API_KEY`; the architecture tree lists `shared/pr-review.yml`.
 - [AC-006] `docs/SPEC_PIPELINE.md` contains a "Using OpenCode Zen" section cross-referencing the CI_CD.md PR review section.
 - [AC-006] No doc contains a literal key value — only the name `OPENCODE_API_KEY`.
@@ -287,7 +287,7 @@ Acceptance criteria (checkable by reading docs):
 ## Acceptance scenarios
 
 ## AC-024-01-01 — Agent file exists with review-only scope
-## AC-024-01-02 — Model pinned to opencode-go/kimi-k3 in the agent config
+## AC-024-01-02 — Model pinned to opencode-zen/kimi-k3 in the agent config
 ## AC-024-01-03 — Zen provider wired to endpoint and auth
 ## AC-024-01-04 — No other model id in the reviewer's config
 ## AC-024-01-05 — Write operations disabled in the permission config
@@ -394,13 +394,13 @@ Checking PR review agent deliverables in: /tmp/mesh-review
 PASS AC-024-01-01: 'mode: subagent' present in agents/pr-review.md
 PASS AC-024-01-01: 'review the PR diff' present in agents/pr-review.md first directive
 PASS AC-024-01-01: 'suggested fixes' present in agents/pr-review.md first directive
-PASS AC-024-01-02: frontmatter model: is exactly opencode-go/kimi-k3 (literal)
+PASS AC-024-01-02: frontmatter model: is exactly opencode-zen/kimi-k3 (literal)
 PASS AC-024-01-02: model value is not an {env:...} reference
 PASS AC-024-01-03: '"opencode-go"' present in opencode.json provider block
 PASS AC-024-01-03: 'https://opencode.ai/zen/go/v1' present in opencode.json provider block
 PASS AC-024-01-03: '"OPENCODE_API_KEY"' present in opencode.json provider block
 PASS AC-024-01-03: 'kimi-k3' present in opencode.json provider block
-PASS AC-024-01-04: only model id in agents/pr-review.md is opencode-go/kimi-k3
+PASS AC-024-01-04: only model id in agents/pr-review.md is opencode-zen/kimi-k3
 PASS AC-024-01-04: opencode.json carries no provider-qualified model pin
 PASS AC-024-01-05: 'edit:' present in agents/pr-review.md frontmatter
 PASS AC-024-01-05: '"*": deny' present in agents/pr-review.md frontmatter
@@ -460,7 +460,7 @@ PASS AC-024-05-01: 'improve' present in docs/CI_CD.md PR Review Agent section
 PASS AC-024-05-01: 'auto-apply' present in docs/CI_CD.md PR Review Agent section
 PASS AC-024-05-01: 'auto-merge' present in docs/CI_CD.md PR Review Agent section
 PASS AC-024-05-01: 'push' present in docs/CI_CD.md PR Review Agent section
-PASS AC-024-05-01: 'opencode-go/kimi-k3' present in docs/CI_CD.md PR Review Agent section
+PASS AC-024-05-01: 'opencode-zen/kimi-k3' present in docs/CI_CD.md PR Review Agent section
 PASS AC-024-05-01: 'https://opencode.ai/zen/go/v1' present in docs/CI_CD.md PR Review Agent section
 PASS AC-024-05-01: 'OPENCODE_API_KEY' present in docs/CI_CD.md PR Review Agent section
 PASS AC-024-05-01: 'never committed' present in docs/CI_CD.md PR Review Agent section
@@ -474,7 +474,7 @@ PASS AC-024-05-02: Required Secrets table lists OPENCODE_API_KEY as opt-in
 PASS AC-024-05-03: 'pr-review.yml' present in docs/CI_CD.md Architecture tree
 PASS AC-024-05-04: 'https://opencode.ai/zen/go/v1' present in docs/SPEC_PIPELINE.md Using OpenCode Zen section
 PASS AC-024-05-04: 'OPENCODE_API_KEY' present in docs/SPEC_PIPELINE.md Using OpenCode Zen section
-PASS AC-024-05-04: 'opencode-go/kimi-k3' present in docs/SPEC_PIPELINE.md Using OpenCode Zen section
+PASS AC-024-05-04: 'opencode-zen/kimi-k3' present in docs/SPEC_PIPELINE.md Using OpenCode Zen section
 PASS AC-024-05-04: 'CI_CD.md §PR Review Agent' present in docs/SPEC_PIPELINE.md Using OpenCode Zen section
 PASS AC-024-05-05: no key-shaped value in docs/CI_CD.md
 PASS AC-024-05-05: no key-shaped value in docs/SPEC_PIPELINE.md
@@ -540,7 +540,7 @@ PASS AC-020-07-03 SPEC_PIPELINE.md cites check-model-env.sh and the self-ci pinn
 
 selftest: 31 passed, 0 failed
 ✔ model-env.selftest: all cases pass.
-(Including the updated AC-020-01-01 carve-out asserting the pr-review agent carries the literal `model: opencode-go/kimi-k3` pin.)
+(Including the updated AC-020-01-01 carve-out asserting the pr-review agent carries the literal `model: opencode-zen/kimi-k3` pin.)
 
 ## Evidence: full test suite
 
@@ -674,14 +674,14 @@ command: manual code inspection of two acceptance scenarios against the actual g
 exit: 0
 at: 2026-08-19T15:09:00Z
 
-### AC-024-01-02 — Model pinned to opencode-go/kimi-k3 (from AC-024-01)
+### AC-024-01-02 — Model pinned to opencode-zen/kimi-k3 (from AC-024-01)
 
-Scenario G/W/T: `model` key in agents/pr-review.md frontmatter is exactly `opencode-go/kimi-k3`, literal, not `{env:...}`.
+Scenario G/W/T: `model` key in agents/pr-review.md frontmatter is exactly `opencode-zen/kimi-k3`, literal, not `{env:...}`.
 
 Actual code read:
-- `agents/pr-review.md` line 4: `model: opencode-go/kimi-k3` — literal. Line 5-17 permission block: `edit: "*": deny`; bash allow-list only `git diff/show/log/status` + `gh pr view/diff/checks/comment`; everything else `ask`. No pattern matches `git push`, `git commit`, `gh pr merge/edit` or file-writing commands.
+- `agents/pr-review.md` line 4: `model: opencode-zen/kimi-k3` — literal. Line 5-17 permission block: `edit: "*": deny`; bash allow-list only `git diff/show/log/status` + `gh pr view/diff/checks/comment`; everything else `ask`. No pattern matches `git push`, `git commit`, `gh pr merge/edit` or file-writing commands.
 - `opencode.json` provider block: `"opencode-go": { "env": ["OPENCODE_API_KEY"], "options": { "baseURL": "https://opencode.ai/zen/go/v1" }, "models": { "kimi-k3": {} } }`.
-- Gate assertions (check-pr-review.sh): `grep -q '^model: opencode-go/kimi-k3$'` + `verify_absent 'model:[[:space:]]*\{env:'` + provider-block string checks + model-id uniqueness check (only `opencode-go/kimi-k3` in the agent file, no provider-qualified pin in opencode.json) + a real `scripts/check-model-env.sh` run (AC-024-01-11). The gate asserts the scenario's actual claims, not just the ID. Confirmed by my own re-read of the files + the gate's 5 PASS lines for AC-024-01-02/03/04/11.
+- Gate assertions (check-pr-review.sh): `grep -q '^model: opencode-zen/kimi-k3$'` + `verify_absent 'model:[[:space:]]*\{env:'` + provider-block string checks + model-id uniqueness check (only `opencode-zen/kimi-k3` in the agent file, no provider-qualified pin in opencode.json) + a real `scripts/check-model-env.sh` run (AC-024-01-11). The gate asserts the scenario's actual claims, not just the ID. Confirmed by my own re-read of the files + the gate's 5 PASS lines for AC-024-01-02/03/04/11.
 
 ### AC-024-02-09/10/11 — Early exit when head already reviewed and CI green (from AC-024-02)
 
@@ -716,7 +716,7 @@ The shared workflow resolves `bash scripts/install-opencode.sh` (line 60) and `s
 
 finding: model pin / endpoint consistency (human changed these from the original spec draft)
 
-- Model id: `opencode-go/kimi-k3` — 17 occurrences in the change set, all `kimi-k3`; no other provider-qualified id appears. Present in `agents/pr-review.md` frontmatter (literal), `opencode.json` provider block (`models: { "kimi-k3": {} }`), `docs/CI_CD.md §PR Review Agent`, `docs/SPEC_PIPELINE.md §Using OpenCode Zen` + `§Model configuration` carve-out.
+- Model id: `opencode-zen/kimi-k3` — 17 occurrences in the change set, all `kimi-k3`; no other provider-qualified id appears. Present in `agents/pr-review.md` frontmatter (literal), `opencode.json` provider block (`models: { "kimi-k3": {} }`), `docs/CI_CD.md §PR Review Agent`, `docs/SPEC_PIPELINE.md §Using OpenCode Zen` + `§Model configuration` carve-out.
 - Endpoint: `https://opencode.ai/zen/go/v1` — 6 occurrences, the only base URL in the change set. Present in `opencode.json` provider block and both docs.
 - Auth: `OPENCODE_API_KEY` env var — provider `env` array, workflow secret mapping, docs; no literal key value anywhere (check-no-hardcoded-secrets exit 0; per-file key-shape scans PASS).
 - check-model-env.sh stays green with the provider block present (exit 0, re-run above).
@@ -869,7 +869,7 @@ at: 2026-08-19T15:12:44Z
 
 PASS check-model-env: all model values are {env:SPEC_*_MODEL} references, no tracked real
 env file, example wired. selftest: 31 passed, 0 failed (incl. the AC-020-01-01 carve-out
-for the pr-review agent's literal `opencode-go/kimi-k3` pin).
+for the pr-review agent's literal `opencode-zen/kimi-k3` pin).
 
 ## Evidence: final test status — orchestration
 

@@ -498,7 +498,7 @@ not a loud failure.
 **Structural enforcement**: `scripts/check-model-env.sh` is the gate — every
 `agent.*.model` in the `agent` block must be an `{env:SPEC_*_MODEL}` reference
 (no literal model id in the agent block; the pr-review agent's pinned
-`opencode-go/kimi-k3` model and the OpenCode Zen provider block are the
+`opencode-zen/kimi-k3` model and the OpenCode Zen provider block are the
 deliberate exceptions, see `§Using OpenCode Zen` below), `config/model.local.env`
 and `config/agent.local.env` must never be tracked by git, and the example must
 define exactly the referenced vars. Self-ci additionally runs
@@ -530,7 +530,7 @@ submodule update to pull in changes; it will not overwrite or merge your edits.
   `OPENCODE_API_KEY` GitHub Actions secret and is never committed.
 
 **The one deliberate model pin**: `agents/pr-review.md` (the PR review agent,
-spec 024) carries a literal `model: opencode-go/kimi-k3` in its frontmatter —
+spec 024) carries a literal `model: opencode-zen/kimi-k3` in its frontmatter —
 not an `{env:...}` reference. This is the exception to the "agents ship without
 `model:`" convention: the PR review agent is a standalone, PR-time reviewer
 unrelated to the spec-pipeline stages, and its model must not be per-machine

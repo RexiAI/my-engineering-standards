@@ -490,7 +490,7 @@ only `contents: read` + `pull-requests: write` (comment-only).
 
 ### Model, endpoint, and auth
 
-- **Pinned model**: `opencode-go/kimi-k3` — pinned literally in the agent's
+- **Pinned model**: `opencode-zen/kimi-k3` — pinned literally in the agent's
   frontmatter (`agents/pr-review.md`), the one deliberate exception to the
   "agents ship without `model:`" convention in `docs/SPEC_PIPELINE.md §Model
   configuration`.
