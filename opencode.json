@@ -11,7 +11,7 @@
     "spec-pipeline": { "model": "{env:SPEC_PIPELINE_MODEL}" }
   },
   "provider": {
-    "opencode-go": {
+    "opencode-zen": {
       "env": ["OPENCODE_API_KEY"],
       "options": { "baseURL": "https://opencode.ai/zen/go/v1" },
       "models": { "kimi-k3": {} }

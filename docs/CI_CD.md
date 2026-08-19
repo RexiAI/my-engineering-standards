@@ -495,9 +495,9 @@ only `contents: read` + `pull-requests: write` (comment-only).
   "agents ship without `model:`" convention in `docs/SPEC_PIPELINE.md §Model
   configuration`.
 - **Endpoint**: `https://opencode.ai/zen/go/v1` — the OpenCode Zen base URL,
-  wired as the `opencode-go` provider block in `opencode.json`.
+  wired as the `opencode-zen` provider block in `opencode.json`.
 - **Auth**: the `OPENCODE_API_KEY` GitHub Actions secret, exported to the
-  review run as the `OPENCODE_API_KEY` env var that the `opencode-go` provider
+  review run as the `OPENCODE_API_KEY` env var that the `opencode-zen` provider
   reads. The value is **never committed** — only the secret name appears in
   committed files, consistent with `docs/SECURITY.md §Secrets Management`.
 

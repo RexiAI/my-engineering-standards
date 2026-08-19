@@ -24,7 +24,7 @@ on:
         type: string
     secrets:
       OPENCODE_API_KEY:
-        description: OpenCode Zen API key for the pinned opencode-go provider
+        description: OpenCode Zen API key for the pinned opencode-zen provider
         required: false
 
 permissions:

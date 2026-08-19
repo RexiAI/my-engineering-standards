@@ -137,7 +137,7 @@ What the task must do:
   "security" finding without evidence; (c) comment mechanics — post findings as a PR review
   comment via `gh`, and end the comment with a machine-readable marker line
   `Reviewed-SHA: <head sha>` (consumed by T2's early-exit step).
-- `opencode.json` gains a `provider` block named `opencode-go` with base URL
+- `opencode.json` gains a `provider` block named `opencode-zen` with base URL
   `https://opencode.ai/zen/go/v1`, `env: ["OPENCODE_API_KEY"]`, and model `kimi-k3`. Nothing is
   added to the `agent` block (would trip `scripts/check-model-env.sh`).
 
@@ -150,7 +150,7 @@ Acceptance criteria (checkable by reading code):
 - [AC-002] The frontmatter `permission` block denies `edit` for all paths, and no allowed `bash` pattern matches `git push`, `git commit`, `gh pr merge`, `gh pr edit`, or any file-writing command.
 - [AC-002] The prompt contains literal forbidden-operation strings: `describe`, `improve`, `auto-apply`, `title`/`summary` rewriting, `auto-merge`, `push`.
 - [AC-003] `model:` in `agents/pr-review.md` frontmatter is exactly `opencode-zen/kimi-k3` (literal, not an env reference).
-- [AC-003] `opencode.json` `provider.opencode-go` defines base URL exactly `https://opencode.ai/zen/go/v1`, `env: ["OPENCODE_API_KEY"]`, and model `kimi-k3`; no other model id appears in the agent file or provider block.
+- [AC-003] `opencode.json` `provider.opencode-zen` defines base URL exactly `https://opencode.ai/zen/go/v1`, `env: ["OPENCODE_API_KEY"]`, and model `kimi-k3`; no other model id appears in the agent file or provider block.
 - [AC-003] `bash scripts/check-model-env.sh` still exits 0 after the `opencode.json` change.
 - [AC-002/6] The prompt requires each finding to include `file:line`, what is wrong, why, and a suggested fix; requires grounding in the diff and the repo standards; forbids cosmetic-only nitpicks; forbids security findings without evidence.
 - [informal 8] The prompt requires the review comment to end with `Reviewed-SHA: <head sha>`.
@@ -396,7 +396,7 @@ PASS AC-024-01-01: 'review the PR diff' present in agents/pr-review.md first dir
 PASS AC-024-01-01: 'suggested fixes' present in agents/pr-review.md first directive
 PASS AC-024-01-02: frontmatter model: is exactly opencode-zen/kimi-k3 (literal)
 PASS AC-024-01-02: model value is not an {env:...} reference
-PASS AC-024-01-03: '"opencode-go"' present in opencode.json provider block
+PASS AC-024-01-03: '"opencode-zen"' present in opencode.json provider block
 PASS AC-024-01-03: 'https://opencode.ai/zen/go/v1' present in opencode.json provider block
 PASS AC-024-01-03: '"OPENCODE_API_KEY"' present in opencode.json provider block
 PASS AC-024-01-03: 'kimi-k3' present in opencode.json provider block
@@ -680,7 +680,7 @@ Scenario G/W/T: `model` key in agents/pr-review.md frontmatter is exactly `openc
 
 Actual code read:
 - `agents/pr-review.md` line 4: `model: opencode-zen/kimi-k3` — literal. Line 5-17 permission block: `edit: "*": deny`; bash allow-list only `git diff/show/log/status` + `gh pr view/diff/checks/comment`; everything else `ask`. No pattern matches `git push`, `git commit`, `gh pr merge/edit` or file-writing commands.
-- `opencode.json` provider block: `"opencode-go": { "env": ["OPENCODE_API_KEY"], "options": { "baseURL": "https://opencode.ai/zen/go/v1" }, "models": { "kimi-k3": {} } }`.
+- `opencode.json` provider block: `"opencode-zen": { "env": ["OPENCODE_API_KEY"], "options": { "baseURL": "https://opencode.ai/zen/go/v1" }, "models": { "kimi-k3": {} } }`.
 - Gate assertions (check-pr-review.sh): `grep -q '^model: opencode-zen/kimi-k3$'` + `verify_absent 'model:[[:space:]]*\{env:'` + provider-block string checks + model-id uniqueness check (only `opencode-zen/kimi-k3` in the agent file, no provider-qualified pin in opencode.json) + a real `scripts/check-model-env.sh` run (AC-024-01-11). The gate asserts the scenario's actual claims, not just the ID. Confirmed by my own re-read of the files + the gate's 5 PASS lines for AC-024-01-02/03/04/11.
 
 ### AC-024-02-09/10/11 — Early exit when head already reviewed and CI green (from AC-024-02)

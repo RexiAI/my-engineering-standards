@@ -205,7 +205,7 @@ echo ""
 # AC-024-01-03 — Zen provider wired to endpoint and auth
 if [ -f "$OPENCODE_JSON" ]; then
   PROVIDER_SEC="$(sed -n '/"provider"/,$p' "$OPENCODE_JSON")"
-  str_contains AC-024-01-03 'opencode.json provider block' "$PROVIDER_SEC" '"opencode-go"'
+  str_contains AC-024-01-03 'opencode.json provider block' "$PROVIDER_SEC" '"opencode-zen"'
   str_contains AC-024-01-03 'opencode.json provider block' "$PROVIDER_SEC" 'https://opencode.ai/zen/go/v1'
   str_contains AC-024-01-03 'opencode.json provider block' "$PROVIDER_SEC" '"OPENCODE_API_KEY"'
   str_contains AC-024-01-03 'opencode.json provider block' "$PROVIDER_SEC" 'kimi-k3'

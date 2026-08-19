@@ -519,7 +519,7 @@ submodule update to pull in changes; it will not overwrite or merge your edits.
 [OpenCode Zen](https://opencode.ai/docs/zen) is the provider behind the
 `opencode-go/*` model ids used across this repo. It is wired in two places:
 
-- **Provider config** — `opencode.json` carries a `provider.opencode-go` block:
+- **Provider config** — `opencode.json` carries a `provider.opencode-zen` block:
   base URL `https://opencode.ai/zen/go/v1`, auth env var `OPENCODE_API_KEY`, and
   the model ids available to it. The spec-pipeline agents still resolve their
   models from `{env:SPEC_*_MODEL}` references (see `§Model configuration`); the

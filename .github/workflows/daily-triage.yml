@@ -19,7 +19,7 @@
 # Provider credentials: the headless opencode run needs an API key for the
 # models pinned in opencode.json (opencode-go/*). It is supplied as a GitHub
 # Actions repository secret `OPENCODE_API_KEY`, exposed to the run as the
-# `OPENCODE_API_KEY` env var that the opencode-go provider reads. The human
+# `OPENCODE_API_KEY` env var that the opencode-zen provider reads. The human
 # must add this secret. When it is absent the workflow exits 0 with a
 # "not configured" message instead of failing the branch.
 name: Daily Triage
