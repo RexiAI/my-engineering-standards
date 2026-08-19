@@ -1,3 +1,10 @@
+# [1.24.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.23.0...v1.24.0) (2026-08-19)
+
+
+### Features
+
+* **spec 019:** daily triage loop (L1 report-only) ([#38](https://github.com/RexiAI/my-engineering-standards/issues/38)) ([ee2ac72](https://github.com/RexiAI/my-engineering-standards/commit/ee2ac72a16c5230a9c224151f7eb5cf72f3c5db1))
+
 # [1.23.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.22.0...v1.23.0) (2026-08-19)
 
 
