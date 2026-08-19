@@ -85,8 +85,27 @@ re-fix.
   equivalent adopted before adding one — these are optional per
   `language-specific/go/SKILL.md`, not default.
 
+# CI-failure fix mode (phase 2)
+
+You may be re-invoked by the orchestrator to fix a CI failure surfaced after the
+PR opened. In that mode:
+
+- Fix only the failing check's cause as diagnosed in
+  `specs/NNN-slug/25-verification.md` — do not touch anything else.
+- Re-run the local test suite (and any check named in the diagnosis) to confirm
+  the fix before reporting done.
+- The round count is the orchestrator's, capped at 3; if you cannot fix the
+  cause, report what you found and stop — do not re-fix endlessly.
+- You never push: the re-push is the PR Opener's job.
+- Your information-barrier rule is unchanged: you must not read `00-informal.md`.
+
 # Output
 
-End your turn with: tasks completed, test count added, and confirmation the full
-suite is green (`dotnet test` / `mvn test` / `go test ./...` / `npm test` —
-whichever applies).
+End your turn with: tasks completed, test count added, the exact build/test
+commands you ran with each command's exit code (e.g. `bash -n
+scripts/check-audit-trail.sh` → 0, `./scripts/check-audit-trail.sh --selftest`
+→ 0), and confirmation the full suite is green (`dotnet test` / `mvn test` /
+`go test ./...` / `npm test` — whichever applies). You leave no report artifact;
+the commands and exit codes you list here are the audit trail for your stage,
+re-recorded by the Verifier in `25-verification.md` (see
+`docs/SPEC_PIPELINE.md §Audit contract`).
