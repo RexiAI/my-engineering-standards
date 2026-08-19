@@ -23,11 +23,12 @@ set -euo pipefail
 #              GH_TOKEN prompt + summary, .releaserc.json coupling)
 #   AC-022-04  self-CI gates green (make lint / validate-all, orchestration,
 #              skills, bash -n, no CRLF, scoped git status)
-#   AC-024-01  docs/CI_CD.md §PR Review Agent + init-ci.sh --with-pr-review
-#              flag wiring (AC-024-04-01/02/03: flag parse, pr-review job
-#              emission, byte-compatible default; AC-024-04-04/05: secret
-#              prompt gated on the flag; AC-024-04-06: summary lists
-#              OPENCODE_API_KEY; AC-024-04-07/08: GitLab warning no-op)
+#   AC-024-04-01/02/03  init-ci.sh --with-pr-review flag parse (usage line),
+#                       pr-review job emission into ci.yml, byte-compatible
+#                       default output without the flag
+#   AC-024-04-04/05     OPENCODE_API_KEY secret prompt gated on the flag
+#   AC-024-04-06        summary lists OPENCODE_API_KEY
+#   AC-024-04-07/08     GitLab warning no-op / both-platforms emission
 # ──────────────────────────────────────────────
 
 RED='\033[0;31m'

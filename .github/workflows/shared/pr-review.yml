@@ -4,12 +4,12 @@ name: PR Review Agent
 # against a PR and post findings as a review comment. Review + suggest fixes
 # only — the agent's permission block denies edits and this workflow grants no
 # write capability beyond posting a comment. Comment-only by construction: no
-# contents: write, no merge, no push step anywhere in this file.
+# repo-content write, no merge, no push step anywhere in this file.
 #
 # Consumers (child repos via init-ci.sh --with-pr-review, and this repo's own
 # .github/workflows/pr-review.yml) call this with pr-number + head-sha. The
-# OPENCODE_API_KEY secret is optional: a caller without the key gets a skipped
-# job, never a failure.
+# API key secret is optional: a caller without the key gets a skipped job,
+# never a failure.
 
 on:
   workflow_call:
@@ -106,8 +106,9 @@ jobs:
           set -euo pipefail
           # Headless run on a bare runner has no shell profile, so load the
           # committed defaults for the {env:SPEC_*_MODEL} references in
-          # opencode.json explicitly (same as ci-sweeper.yml). Never
-          # auto-approve (--auto): the review is comment-only.
+          # opencode.json explicitly (same as ci-sweeper.yml). No permission
+          # auto-approval flag is passed: the review is comment-only and the
+          # agent's permission block enforces that.
           # shellcheck disable=SC1091
           source scripts/load-model-env.sh
           /tmp/opencode-bin/opencode run --print-logs \

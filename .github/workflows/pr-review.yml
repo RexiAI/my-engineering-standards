@@ -7,7 +7,7 @@ name: PR Review Agent
 # Per-PR concurrency with cancel-in-progress: only the latest head gets a live
 # review — a superseded run on an older head cancels.
 #
-# Secret-guarded: without OPENCODE_API_KEY the job is skipped (check state
+# Secret-guarded: without the API key the job is skipped (check state
 # "skipped", never "failure"), so the PR's required checks are unaffected.
 
 on:
