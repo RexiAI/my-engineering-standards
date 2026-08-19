@@ -1,3 +1,10 @@
+# [1.19.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.18.0...v1.19.0) (2026-08-19)
+
+
+### Features
+
+* **spec 013:** per-machine agent local env (secrets via loader + guards) ([#39](https://github.com/RexiAI/my-engineering-standards/issues/39)) ([2628df2](https://github.com/RexiAI/my-engineering-standards/commit/2628df238bc95214c3b08bee691d99884bf1e2cc))
+
 # [1.18.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.17.0...v1.18.0) (2026-08-19)
 
 
