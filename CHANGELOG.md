@@ -1,3 +1,10 @@
+# [1.22.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.21.0...v1.22.0) (2026-08-19)
+
+
+### Features
+
+* **spec 017:** CI sweeper loop — triage failing Self CI runs, report-only at L1 ([#32](https://github.com/RexiAI/my-engineering-standards/issues/32)) ([943c226](https://github.com/RexiAI/my-engineering-standards/commit/943c226e49b8c4cce4e3492a9ceabe12296f62ce))
+
 # [1.21.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.20.0...v1.21.0) (2026-08-19)
 
 
