@@ -1,0 +1,120 @@
+#!/bin/bash
+# check-scenario-traceability.selftest.sh — Hermetic regression net for
+# scripts/check-scenario-traceability.sh: proves both checks work in both
+# directions (a traced scenario passes, an orphaned scenario is caught, a
+# dangling test reference is caught). Fixtures live in `mktemp -d` scratch
+# (never inside the repo), cleaned up by a trap.
+#
+# Covers (scenario traceability: the AC-012-02-NN IDs below are the tests for
+# the 20-acceptance scenarios in specs/012-gate-selftests-telemetry/):
+#   AC-012-02-01  a traced scenario passes
+#   AC-012-02-02  an orphaned scenario is caught
+#   AC-012-02-03  a dangling test reference is caught (and the traced one still passes)
+#   AC-012-02-04  selftest passes only when all three cases assert correctly
+#
+# Invokes the checker as `bash "$CHECKER" "$SPECS_DIR" "$SOURCE_DIR"` (positional
+# form — it has no flags today; 007's --checks scoped flag is not required here).
+# Exits 0 only if all three cases produce their expected exit code and message;
+# otherwise names the failing case and exits 1.
+#
+# Usage:
+#   bash scripts/check-scenario-traceability.selftest.sh
+# Exit codes:
+#   0 — pass/orphan/dangle all assert correctly
+#   1 — at least one case failed
+set -euo pipefail
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CHECKER="$ROOT/scripts/check-scenario-traceability.sh"
+
+PASS_COUNT=0
+FAIL_COUNT=0
+
+ok() { PASS_COUNT=$((PASS_COUNT + 1)); echo -e "${GREEN}PASS${NC} $1"; }
+bad() { FAIL_COUNT=$((FAIL_COUNT + 1)); echo -e "${RED}FAIL${NC} $1"; }
+
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+# run_case NAME — runs the checker against $TMP/$NAME (with specs/ and src/ as
+# sibling directories so the source scan never includes the specs dir), checks
+# the expected exit code and that the output contains every required message.
+run_case() {
+  local name="$1" expected_rc="$2"
+  shift 2
+  local out="$TMP/$name.out" missing=0 msg
+  set +e
+  bash "$CHECKER" "$TMP/$name/specs" "$TMP/$name/src" >"$out" 2>&1
+  local rc=$?
+  set -e
+  if [ "$rc" -ne "$expected_rc" ]; then
+    bad "AC-012-02-04 $name: expected exit $expected_rc, got $rc"
+    show_out "$out"
+    return 1
+  fi
+  for msg in "$@"; do
+    if ! grep -q "$msg" "$out"; then
+      bad "AC-012-02-04 $name: output missing '$msg'"
+      show_out "$out"
+      return 1
+    fi
+  done
+  ok "AC-012-02-04 $name: exit $expected_rc, all expected messages present"
+  return 0
+}
+
+show_out() {
+  echo "  actual output:"
+  sed 's/^/    /' "$1" 2>/dev/null | head -20 || true
+}
+
+# ── pass: heading + test referencing it (AC-012-02-01) ───────────────────────
+# Self-trip constraint (same pattern as model-env.selftest.sh): the fixture
+# scenario IDs are constructed at runtime, never inlined as literals — the
+# traceability checker scans this file's source, and a literal fixture ID would
+# read as a dangling reference with no matching heading.
+trace_id() { printf 'AC-%03d-%02d' "$1" "$2"; }
+PASS_ID="$(trace_id 999 01)"
+ORPHAN_ID="$(trace_id 999 02)"
+DANGLE_ID="$(trace_id 999 03)"
+BOGUS_ID="$(trace_id 888 88)"
+
+mkdir -p "$TMP/pass/specs/999-slug/20-acceptance" "$TMP/pass/src"
+printf '## %s — widget renders\nGiven a widget\nWhen it renders\nThen it shows\n' "$PASS_ID" \
+  > "$TMP/pass/specs/999-slug/20-acceptance/${PASS_ID}-traced.md"
+printf 'func TestWidget_%s(t *testing.T) {}\n' "$(printf '%s' "$PASS_ID" | tr '-' '_')" \
+  > "$TMP/pass/src/widget_test.go"
+
+# ── orphan: heading with no reference anywhere in src (AC-012-02-02) ─────────
+mkdir -p "$TMP/orphan/specs/999-slug/20-acceptance" "$TMP/orphan/src"
+printf '## %s — orphaned scenario\nGiven a scenario\nWhen nothing references it\nThen it is caught\n' "$ORPHAN_ID" \
+  > "$TMP/orphan/specs/999-slug/20-acceptance/${ORPHAN_ID}-missing.md"
+cat > "$TMP/orphan/src/widget.go" <<'EOF'
+package widget
+func Render() string { return "hi" }
+EOF
+
+# ── dangle: traced heading plus a test citing a bogus ID (AC-012-02-03) ──────
+mkdir -p "$TMP/dangle/specs/999-slug/20-acceptance" "$TMP/dangle/src"
+printf '## %s — traced scenario\nGiven a widget\nWhen it renders\nThen it shows\n' "$DANGLE_ID" \
+  > "$TMP/dangle/specs/999-slug/20-acceptance/${DANGLE_ID}-dangle.md"
+printf 'func TestWidget_%s(t *testing.T) {}\nfunc TestBogus_%s(t *testing.T) {}\n' \
+  "$(printf '%s' "$DANGLE_ID" | tr '-' '_')" "$(printf '%s' "$BOGUS_ID" | tr '-' '_')" \
+  > "$TMP/dangle/src/widget_test.go"
+
+# ── Run ──────────────────────────────────────────────────────────────────────
+echo "== AC-012-02 traceability selftest =="
+run_case pass 0 "$PASS_ID — traced to a test"
+run_case orphan 1 "no test references it"
+run_case dangle 1 "no matching scenario heading exists" "$DANGLE_ID — traced to a test"
+
+echo ""
+if [ "$FAIL_COUNT" -gt 0 ]; then
+  echo -e "${RED}✘ check-scenario-traceability selftest: $FAIL_COUNT case(s) failed, $PASS_COUNT passed.${NC}"
+  exit 1
+fi
+echo -e "${GREEN}✔ check-scenario-traceability selftest: $PASS_COUNT cases passed.${NC}"
