@@ -1,3 +1,10 @@
+# [1.17.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.16.0...v1.17.0) (2026-08-19)
+
+
+### Features
+
+* **spec 011:** blame scoping for design-gate findings + configurable blocking set ([#28](https://github.com/RexiAI/my-engineering-standards/issues/28)) ([f9392f5](https://github.com/RexiAI/my-engineering-standards/commit/f9392f54bf2b30855211084074ba37727420dc2f))
+
 # [1.16.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.15.0...v1.16.0) (2026-08-19)
 
 
