@@ -1,3 +1,10 @@
+# [1.26.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.25.1...v1.26.0) (2026-08-19)
+
+
+### Features
+
+* **spec 024:** self-hosted PR review agent ([#42](https://github.com/RexiAI/my-engineering-standards/issues/42)) ([06427a9](https://github.com/RexiAI/my-engineering-standards/commit/06427a9dec49c39b61236a92e3cffbd9f0374942))
+
 ## [1.25.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.25.0...v1.25.1) (2026-08-19)
 
 
