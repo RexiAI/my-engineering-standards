@@ -21,8 +21,8 @@ you: resolve every condition listed there per the matrix, never by improvisation
 The shell you run in already has the per-machine agent env loaded per the setup
 in `AGENTS.md` (§Per-machine agent environment) — `/spec` and `/build` inherit
 it, so the pipeline does no per-agent credential sourcing. The only defensive
-re-source is the PR Opener's: it sources `scripts/load-env.sh` before its
-commit/push step.
+re-source is the PR Opener's: it sources the env loader (`load-env.sh`, see the
+PR Opener prompt) before its commit/push step.
 
 You are invoked in one of two ways:
 
@@ -56,6 +56,20 @@ You are invoked in one of two ways:
   stage reports it cannot proceed (ambiguous scenario, failing gate), stop and
   relay exactly what it said — do not paper over it or attempt the stage
   yourself.
+
+After the PR Opener reports the PR URL, run the phase-2 loop: check CI → fix →
+re-push → re-check, up to 3 rounds (counter independent of Phase 1, capped at
+max 3, per spec 008's remediation-budget section). Invoke `spec-verifier` for the
+post-PR CI check; on FAIL route the diagnosed fix to `spec-coder` (behavior) or
+`spec-refactorer` (structural/complexity); re-invoke `spec-pr-opener` to commit
+and push the fix round — each re-push re-triggers the Self CI workflow; re-invoke
+`spec-verifier` for a scoped re-check that waits for the re-triggered run. On the
+3rd FAIL the pipeline stops: relay the failing check IDs and the last log
+evidence from `25-verification.md` verbatim and escalate to the human — no 4th round.
+A CI failure is never reported as green without a fixing round having
+passed; the outcome is recorded per round in `25-verification.md`. You never run
+the `gh` queries or commit/push yourself — the Verifier queries and the PR Opener
+pushes.
 
 Before delegating to `spec-verifier`, export the loop/retry context for the
 telemetry record (spec 008 budgets, spec 012): `SPEC_LOOP_COUNT`,

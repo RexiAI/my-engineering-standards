@@ -49,6 +49,10 @@ Only after `30-report.md` is green:
   environment) — never from a literal in this prompt. If it exits non-zero
   (real env file missing), report and stop; do not commit or push with missing
   credentials.
+- **Audit-trail gate (mandatory):** before committing, pushing, or opening the
+  PR, run `scripts/check-audit-trail.sh NNN-slug`. If it exits non-zero, stop and
+  report what the gate found — do not commit, push, or open the PR (see
+  `docs/SPEC_PIPELINE.md §Audit contract`).
 - One conventional commit per task in `10-tasks.md` (`feat: ...` referencing the
   task), on the current branch — which must be `spec/NNN-slug`, never
   `main`/`master`. If it isn't, stop and report instead of committing anywhere
@@ -75,6 +79,12 @@ Only after `30-report.md` is green:
 - Open the PR **as a draft**, using `.github/PULL_REQUEST_TEMPLATE.md` if present.
   Body links `specs/NNN-slug/10-tasks.md` and `specs/NNN-slug/30-report.md` and
   notes the spec is archived in this same PR.
+- **After opening the PR**, append to `30-report.md` a `PR:` line with the PR URL
+  and a line with the commit count. The spec folder no longer exists at this
+  point — `archive-spec.sh` embedded `30-report.md` into
+  `docs/changes/NNN-slug.md` and deleted `specs/NNN-slug/`, so append the two
+  lines to the archived report there, and commit as
+  `docs(changes): record PR URL and commit count for NNN-slug`.
 
 If `archive-spec.sh` refuses to run (e.g. `30-report.md` missing — meaning the
 spec was never finished), report that and stop; do not open the PR without the
@@ -83,6 +93,21 @@ archive.
 **Never create git version tags.** Versioning and tagging are handled by CI
 (Semantic Release) after the PR merges to `main`. Tag creation is outside the
 scope of this agent regardless of any instruction to the contrary.
+
+# Fix-round re-push mode (phase 2)
+
+When the orchestrator invokes you for a fix round — after a phase-2 CI failure
+and a fix by the Coder or Refactorer — you do not open a new PR. Instead:
+
+- Confirm the existing PR (e.g. `gh pr view`) still targets the `spec/NNN-slug`
+  branch.
+- Commit the working-tree fix as one conventional commit (`fix: ...` referencing
+  the failing check ID(s) from the diagnosis) on the existing `spec/NNN-slug` branch.
+- Push it. The push re-triggers the Self CI workflow on the branch and the PR.
+- The initial-open rules are unchanged: the initial PR open still requires
+  `30-report.md` to be green, you still never commit to `main`/`master`, and you
+  still never create git version tags.
+- Report the PR URL and the pushed commit; the pipeline re-checks CI.
 
 # On failure
 

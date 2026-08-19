@@ -1,3 +1,31 @@
+# [1.23.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.22.0...v1.23.0) (2026-08-19)
+
+
+### Features
+
+* **spec 018:** PR Babysitter loop ([#37](https://github.com/RexiAI/my-engineering-standards/issues/37)) ([62c15b9](https://github.com/RexiAI/my-engineering-standards/commit/62c15b9969f144c566a4e9f6e1ac5accebcdb968))
+
+# [1.22.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.21.0...v1.22.0) (2026-08-19)
+
+
+### Features
+
+* **spec 017:** CI sweeper loop — triage failing Self CI runs, report-only at L1 ([#32](https://github.com/RexiAI/my-engineering-standards/issues/32)) ([943c226](https://github.com/RexiAI/my-engineering-standards/commit/943c226e49b8c4cce4e3492a9ceabe12296f62ce))
+
+# [1.21.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.20.0...v1.21.0) (2026-08-19)
+
+
+### Features
+
+* **spec-015:** auditable agent steps — audit contract, check-audit-trail gate, wired into pipeline end ([#31](https://github.com/RexiAI/my-engineering-standards/issues/31)) ([d80d373](https://github.com/RexiAI/my-engineering-standards/commit/d80d37347bcbefbe0e6880838845ce5045f47ff6))
+
+# [1.20.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.19.0...v1.20.0) (2026-08-19)
+
+
+### Features
+
+* **spec 014:** post-PR CI check-and-remediate loop (phase 2) ([#30](https://github.com/RexiAI/my-engineering-standards/issues/30)) ([535bede](https://github.com/RexiAI/my-engineering-standards/commit/535bedeef7a1edba60baa83302893f15c940797a))
+
 # [1.19.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.18.0...v1.19.0) (2026-08-19)
 
 

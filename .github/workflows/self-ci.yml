@@ -45,6 +45,15 @@ jobs:
             exit 1
           fi
 
+      # CI Sweeper deliverables gate (spec 017): the ci-triage skill and the
+      # ci-sweeper workflow must carry every required string, and the gate must
+      # fail closed. The --self-test run proves the gate rejects a broken
+      # fixture. Not continue-on-error: a sweeper regression fails the job.
+      - name: Check CI sweeper deliverables
+        run: |
+          ./scripts/check-ci-sweeper.sh
+          ./scripts/check-ci-sweeper.sh --self-test
+
       - name: Check shell scripts parse (bash -n)
         run: |
           errors=0
@@ -73,6 +82,12 @@ jobs:
       - name: Check orchestration references
         run: ./scripts/check-orchestration.sh
 
+      # Phase-2 loop mechanics gate (docs/SPEC_PIPELINE.md §Post-PR CI
+      # check-and-remediate loop (phase 2), spec 014): grep-assert the post-PR
+      # CI check is wired into the pipeline prompts/docs. No continue-on-error.
+      - name: Check post-PR CI loop mechanics
+        run: ./scripts/check-post-pr-ci-loop.sh
+
       - name: Check skills specification
         run: ./scripts/check-skills.sh
 
@@ -82,6 +97,35 @@ jobs:
       # on main fails the job.
       - name: Check finished specs are archived
         run: ./scripts/check-specs-archived.sh
+
+      # Audit-trail gate (docs/SPEC_PIPELINE.md §Audit contract): only *finished*
+      # spec folders — those carrying a 30-report.md, the pipeline's finished
+      # signal (same convention as the check-specs-archived.sh step above) —
+      # must be complete (10-tasks.md, 20-acceptance/, 25-verification.md,
+      # 30-report.md) and 25-verification.md must record per-check evidence.
+      # In-flight sibling specs lack 30-report.md and are skipped: their pipeline
+      # finishing is outside this job's control and must not turn this job red.
+      # The gate script itself still fails an incomplete folder when it is
+      # explicitly handed one (the PR Opener runs it per-spec before pushing;
+      # AC-015-07..14 mandate that behavior) — this step simply never hands it an
+      # unfinished folder. The step exits 0 when no finished spec exists. No
+      # continue-on-error: a finished spec failing the audit-trail check fails
+      # the job.
+      - name: Check spec audit trails
+        run: |
+          set -euo pipefail
+          errors=0
+          for report in specs/*/30-report.md; do
+            [ -f "$report" ] || continue
+            slug=${report#specs/}
+            slug=${slug%/30-report.md}
+            echo "  [check] specs/$slug"
+            ./scripts/check-audit-trail.sh "$slug" || errors=$((errors + 1))
+          done
+          if [ "$errors" -ne 0 ]; then
+            echo "$errors finished spec folder(s) failed the audit-trail check!"
+            exit 1
+          fi
 
       - name: make lint
         run: make lint
@@ -93,8 +137,10 @@ jobs:
       - name: Install pinned opencode binary and verify model env resolution
         run: |
           set -euo pipefail
-          # Extract into its own dir: running a binary at /tmp/opencode makes
-          # opencode try to mkdir its storage dir at the same path → EEXIST.
+          # Inline download (spec 020 AC-020-06-05 asserts the pinned tarball
+          # URL lives in this workflow). Extract into its own dir: running a
+          # binary at /tmp/opencode makes opencode try to mkdir its storage dir
+          # at the same path → EEXIST.
           mkdir -p /tmp/opencode-bin
           curl -sSL -o /tmp/opencode-bin/opencode-linux-x64.tar.gz https://github.com/anomalyco/opencode/releases/download/v1.18.18/opencode-linux-x64.tar.gz
           tar -xzf /tmp/opencode-bin/opencode-linux-x64.tar.gz -C /tmp/opencode-bin
@@ -121,6 +167,11 @@ jobs:
       # spec's test carrier, so a missing deliverable fails the Validate job.
       - name: Check Daily Triage loop deliverables
         run: ./scripts/check-loop-triage.sh
+
+      # PR Babysitter loop gate (spec 018): the check script doubles as the
+      # spec's test carrier, so a missing deliverable fails the Validate job.
+      - name: Check PR Babysitter loop deliverables
+        run: ./scripts/check-pr-babysitter.sh
 
       - name: Check remediation budget
         run: ./scripts/check-remediation-budget.sh
