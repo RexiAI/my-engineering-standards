@@ -62,6 +62,94 @@ docs/changes/NNN-slug.md                 ← long-lived, on main, written by sta
 
 `NNN` is a zero-padded 3-digit sequence, e.g. `001-discount-system`.
 
+## Audit contract
+
+Every pipeline stage leaves a specific, machine-checkable trace behind, in the
+artifact the layout above already defines — no new spec-folder artifacts. An
+artifact may assert anything, but the assertion is only as good as the evidence
+recorded with it. This section is that contract; `scripts/check-audit-trail.sh`
+enforces it mechanically at pipeline end (see §The gate below).
+
+### What each stage leaves behind
+
+| Stage | Evidence artifact(s) | What it must record |
+|---|---|---|
+| Specifier | `10-tasks.md` + `20-acceptance/` | Task acceptance criteria and scenario IDs (`AC-NNN-NN`) |
+| Coder | the tests in the project suite carrying `AC-NNN-NN` IDs | Leaves no report artifact — the build/test commands it ran and their exit codes are re-recorded by the Verifier in `25-verification.md` |
+| Refactorer | gates re-run by the Verifier | The gates it applied (complexity, duplication, property tests) with before/after measurements — re-recorded by the Verifier; the complexity summary is carried into `30-report.md` |
+| Verifier | `25-verification.md` | Per check: the exact command, its real output, its exit code, and a timestamp |
+| Mutation Runner | `30-report.md` | Mutation score (or skip reason), equivalent mutants, final test status |
+| PR Opener | `30-report.md` | PR URL and commit count, appended after the PR opens |
+
+The Coder and Refactorer deliberately leave no report artifact. Their claims
+become auditable not because they write them down, but because the Verifier
+re-executes every claim and records the command and exit code in
+`25-verification.md` — a claim that was never re-run is a gap in the audit
+trail, and the gate fails the folder for it.
+
+### The five Verifier checks
+
+`25-verification.md` must record evidence for the five runnable Verifier checks:
+
+1. scenario traceability
+2. full test suite
+3. complexity gate
+4. design-principles gate
+5. scenario-to-behavior spot check
+
+The "no unaccounted behavior" skim is not a runnable check: it is recorded as a
+finding line, not as a command.
+
+### Machine-readable rule
+
+Machine-readable evidence (gate-script output, CI query, deploy check) is
+recorded with an ISO-8601 UTC timestamp (`YYYY-MM-DDTHH:MM:SSZ`, i.e.
+`date -u +%Y-%m-%dT%H:%M:%SZ`) as raw output or exit code — never as a prose
+paraphrase. The timestamp is pinned to UTC so the gate can verify the format
+deterministically.
+
+### Evidence block format
+
+In `25-verification.md`, each of the five checks carries one evidence block: a
+`## Evidence: <check name>` heading, three marker lines, then the raw output.
+Worked example:
+
+```
+## Evidence: scenario traceability
+
+command: scripts/check-scenario-traceability.sh
+exit: 0
+at: 2026-08-15T10:00:00Z
+
+Scenario IDs found: 16
+Scenario traceability check: every scenario traced, every reference resolves.
+```
+
+- `command:` — the exact command as run.
+- `exit:` — the command's exit code.
+- `at:` — when it ran, in `YYYY-MM-DDTHH:MM:SSZ`.
+- everything after the markers — the raw output, verbatim (or a representative
+  excerpt for very long output), never a paraphrase.
+
+The design-principles gate's exit code and every FAIL / WARN line must be kept
+verbatim. `30-report.md` uses the same block style for its machine-readable
+rows (mutation score, final test status) plus the `PR:` line appended by the PR
+Opener.
+
+### The gate
+
+`scripts/check-audit-trail.sh <slug>` verifies the folder is complete
+(`10-tasks.md`, `20-acceptance/` with a scenario heading, `25-verification.md`,
+`30-report.md`, and `15-design.md` when present — a zero-byte `15-design.md` is
+a failure) and that `25-verification.md` records evidence for all five checks.
+It exits 0 only when both hold, and is a no-op when the folder does not exist.
+The PR Opener runs it before pushing; self-ci runs it for every spec folder
+carrying a `30-report.md` — the pipeline's finished signal, the same
+convention as the archive gate (`§Archive in the PR`). In-flight folders
+without `30-report.md` are skipped: their pipeline finishing is outside the
+job's control and must not fail CI. A finished-but-incomplete spec still
+fails the gate — the step never hands the script an unfinished folder.
+
 ## Archive in the PR
 
 The `specs/NNN-slug/` folder is pipeline scratch. It belongs on the PR branch
@@ -263,6 +351,38 @@ Before exhaustion, a gate failure is a re-delegation signal, not a stop.
 `30-report.md` records which phase and attempt count each BLOCK was resolved
 at, carried forward from the verifier's `25-verification.md` attempt entries,
 so budget exhaustion is auditable.
+
+## Post-PR CI check-and-remediate loop (phase 2)
+
+After the PR Opener opens the draft PR (stage 5b), the pipeline checks the PR's
+CI status and, on FAIL, runs a bounded fix-and-repush loop. The budget *policy*
+for this loop — at most 3 rounds, counter **independent of Phase 1** — comes from
+spec 008's remediation-budget section (`008-remediation-budget`, "Phase 2 —
+Post-PR loop"); this section defines only the *mechanics*, and is valid only once
+008's section exists.
+
+The repo's CI on a feature-branch PR is the **Self CI** workflow
+(`.github/workflows/self-ci.yml`, GitHub Actions). Immediately after the PR is
+opened, the Verifier queries its checks and records PASS/FAIL per check:
+
+- Status query: `gh pr checks <PR_NUMBER> --json name,state,bucket,workflow,link`.
+  The `bucket` field (`pass`/`fail`/`pending`) is the PASS/FAIL parse rule.
+- Pending checks are polled until terminal (`gh pr checks --watch` or a bounded
+  re-query); `pending` is neither a pass nor a fail.
+- On FAIL, failing check IDs are captured from the checks API
+  (`gh api repos/RexiAI/my-engineering-standards/commits/<head_sha>/check-runs`,
+  `conclusion == "failure"`, record `name` + `id`), the failing job logs are read
+  (`gh run list --branch spec/NNN-slug --workflow "Self CI"` then
+  `gh run view <RUN-ID> --log-failed`), and the concrete failure reason is
+  recorded in `25-verification.md`.
+- The CI outcome is recorded per check and per round in `25-verification.md`.
+
+On FAIL the orchestrator routes the diagnosed fix to the Coder (behavior) or the
+Refactorer (structure), the PR Opener commits and pushes the fix round — each
+re-push re-triggers CI — and the Verifier re-checks. The loop runs at most 3
+fix-and-repush rounds (counter independent of Phase 1). On exhaustion the pipeline
+stops and escalates to the human with the failing check IDs and the last log evidence
+— never a silent green.
 
 ## Conformance tiers
 

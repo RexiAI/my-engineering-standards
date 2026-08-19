@@ -1,3 +1,10 @@
+# [1.20.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.19.0...v1.20.0) (2026-08-19)
+
+
+### Features
+
+* **spec 014:** post-PR CI check-and-remediate loop (phase 2) ([#30](https://github.com/RexiAI/my-engineering-standards/issues/30)) ([535bede](https://github.com/RexiAI/my-engineering-standards/commit/535bedeef7a1edba60baa83302893f15c940797a))
+
 # [1.19.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.18.0...v1.19.0) (2026-08-19)
 
 

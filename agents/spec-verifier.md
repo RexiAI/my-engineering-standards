@@ -135,16 +135,35 @@ report that as a warning in the record/write-up; never fabricate a record.
 
 # Report
 
-Write `specs/NNN-slug/25-verification.md`:
+Write `specs/NNN-slug/25-verification.md`. Every one of the five contract checks
+above — scenario traceability, full test suite, complexity gate, design-principles
+gate, and scenario-to-behavior spot check — must carry an evidence block in the
+uniform format defined by `docs/SPEC_PIPELINE.md §Audit contract`: a
+`## Evidence: <check name>` heading followed by the exact `command:` as run, the
+real output (or a representative excerpt), the `exit:` code, and an `at:`
+timestamp in `YYYY-MM-DDTHH:MM:SSZ` (i.e. `date -u +%Y-%m-%dT%H:%M:%SZ`). The raw
+output goes verbatim, never as a paraphrase — the audit-trail gate
+(`scripts/check-audit-trail.sh`) parses these blocks, so a missing marker or a
+paraphrased output fails the gate.
 
-- Each check above: PASS/FAIL/BLOCK, each with an evidence block recording the
-  exact `command:` run, the real output (or a representative excerpt — never a
+- Every one of the five contract checks carries an evidence block in the uniform
+  format defined above (`docs/SPEC_PIPELINE.md §Audit contract`): the exact
+  `command:` as run, its real output (or a representative excerpt — never a
   paraphrase), the `exit:` code, and an `at:` timestamp in
   `YYYY-MM-DDTHH:MM:SSZ` (UTC), so every verdict is auditable to the exact
   invocation, its exit code, and when it ran.
-- Design-principles gate: the `check-code-principles.sh` exit code and every FAIL /
-  WARN line, verbatim.
-- Spot-check results: which scenarios you checked, what you found.
+- Each check is reported PASS/FAIL/BLOCK with the actual command run and its real
+  output, not a paraphrase:
+  - Scenario traceability: `command: scripts/check-scenario-traceability.sh`, its
+    output, exit code, timestamp.
+  - Full test suite: the project's real test command, its output, exit code,
+    timestamp.
+  - Complexity gate: the real linter, its output, exit code, timestamp.
+  - Design-principles gate: the `check-code-principles.sh` exit code and every FAIL /
+    WARN line, verbatim, plus the timestamp.
+  - Scenario-to-behavior spot check: which scenarios you checked, what you found,
+    plus the timestamp.
+- No unaccounted behavior: a finding line (not a command).
 - Overall verdict, one of three — the verdict is transcribed from the gate's exit
   code and its output, never from your reading of the diff:
   - **PASS** — every gate ran and produced no findings (Architect may proceed).
@@ -158,6 +177,32 @@ Write `specs/NNN-slug/25-verification.md`:
 - For the two script gates, the transcription is
   `scripts/check-code-principles.sh` and `scripts/check-scenario-traceability.sh`
   with the exit code and JSON/output reproduced, not paraphrased.
+
+# Post-PR CI check (phase 2)
+
+When the orchestrator invokes you for the post-PR CI check — after the PR Opener
+reports the PR URL — run the real CI query against the PR's checks and record the
+verdict:
+
+1. Query the PR's checks: `gh pr checks <PR_NUMBER> --json name,state,bucket,workflow,link`
+   (add `--repo RexiAI/my-engineering-standards` if the remote is not inferred).
+   Record PASS/FAIL per check from the `bucket` field.
+2. Poll pending checks until terminal (`gh pr checks --watch` or a bounded
+   re-query) — `pending` is neither a pass nor a fail, so do not treat it as
+   either.
+3. On any FAIL, capture the failing check IDs via
+   `gh api repos/RexiAI/my-engineering-standards/commits/<head_sha>/check-runs`,
+   selecting `conclusion == "failure"` and recording `name` + `id`. Read the
+   failing job logs: `gh run list --branch spec/NNN-slug --workflow "Self CI"`
+   then `gh run view <RUN-ID> --log-failed`. Record the concrete failure reason.
+4. Record a **Post-PR CI check** section in `specs/NNN-slug/25-verification.md`
+   — per round: the round index, each check's PASS/FAIL, the failing check IDs,
+   and the last log excerpt.
+5. Hand the diagnosis back to the orchestrator, which routes the fix — do not
+   fix anything yourself, and do not commit or push.
+6. On a re-trigger (a later round), read your prior `25-verification.md` for the
+   failing check IDs and re-check only the previously-failing checks — a scoped
+   re-check — then record the round's outcome the same way.
 
 # On failure
 
