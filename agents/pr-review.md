@@ -61,6 +61,6 @@ stdin:
 
 The `<pr-number>` and the head SHA are exported as `PR_NUMBER` and `HEAD_SHA`.
 End the comment with a machine-readable marker line (consumed by the
-early-exit step in `.github/workflows/shared/pr-review.yml`):
+early-exit step in `.github/workflows/ci-pr-review.yml`):
 
     Reviewed-SHA: <head sha>

@@ -139,9 +139,14 @@ jobs:
   sonar:
     name: SonarQube Analysis
     needs: [resolve-version, unit-test, integration-test]
-    if: github.event_name == 'pull_request' && inputs.sonar-enabled && secrets.SONAR_TOKEN != ''
+    if: github.event_name == 'pull_request' && inputs.sonar-enabled
     runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
+      - name: Skip if SONAR_TOKEN is not set
+        if: ${{ env.SONAR_TOKEN == '' }}
+        run: echo "::warning::SONAR_TOKEN not set — skipping SonarQube analysis"
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -151,8 +156,9 @@ jobs:
           java-version: ${{ needs.resolve-version.outputs.java-version }}
           cache: maven
       - run: mvn sonar:sonar -B -Dsonar.host.url=${{ inputs.sonar-host-url }}
+        if: ${{ env.SONAR_TOKEN != '' }}
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
 
   deploy:
     name: Deploy to GitHub Packages

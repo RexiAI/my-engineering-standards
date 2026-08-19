@@ -12,7 +12,7 @@ on:
 
 jobs:
   ci:
-    uses: RexiAI/my-engineering-standards/.github/workflows/backend/ci-node.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-node.yml@main
     with:
       node-version: "22"
       deploy-on-main: true

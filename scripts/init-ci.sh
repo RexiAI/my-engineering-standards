@@ -350,7 +350,7 @@ EOF
   for lang in "${BACKEND[@]}"; do
     cat >> "$target" << EOF
   backend-ci-${lang}:
-    uses: RexiAI/my-engineering-standards/.github/workflows/backend/ci-${lang}.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-${lang}.yml@main
     with:
       docker-registry: $registry
     secrets:
@@ -389,7 +389,7 @@ _gh_deploy_job() {
   deploy:
     needs: [$(_gh_deploy_needs)]
     if: \${{ github.event_name == 'push' && github.ref_name == github.event.repository.default_branch }}
-    uses: RexiAI/my-engineering-standards/.github/workflows/shared/ci-deploy-${DEPLOY_TOOL}.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-deploy-${DEPLOY_TOOL}.yml@main
     with:
       service-name: ""
       docker-registry: \$registry
@@ -418,7 +418,7 @@ _gh_release_job() {
 
   release:
     if: \${{ github.event_name == 'push' && github.ref_name == github.event.repository.default_branch }}
-    uses: RexiAI/my-engineering-standards/.github/workflows/shared/ci-release.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-release.yml@main
     secrets:
       GH_TOKEN: \${{ secrets.GH_TOKEN }}
 EOF
@@ -444,7 +444,7 @@ _gh_pr_review_job() {
 
   pr-review:
     if: \${{ github.event_name == 'pull_request' && secrets.OPENCODE_API_KEY != '' }}
-    uses: RexiAI/my-engineering-standards/.github/workflows/shared/pr-review.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-pr-review.yml@main
     with:
       pr-number: \${{ github.event.pull_request.number }}
       head-sha: \${{ github.event.pull_request.head.sha }}
@@ -462,11 +462,11 @@ _gh_frontend_job() {
   local registry="$2"
   [ -z "$FRONTEND" ] && return 0
 
-  local workflow="frontend/ci-${FRONTEND}.yml"
+  local workflow="ci-${FRONTEND}.yml"
   local with_block="      docker-registry: $registry"
   local secrets_block="       GHCR_TOKEN: \${{ secrets.GHCR_TOKEN }}"
   if [ "$FRONTEND" = "react-native" ]; then
-    workflow="frontend/ci-react-native.yml"
+    workflow="ci-react-native.yml"
     with_block="      node-version: \"22\""
     secrets_block="      EXPO_TOKEN: \${{ secrets.EXPO_TOKEN }}"
   fi

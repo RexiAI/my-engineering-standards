@@ -74,7 +74,7 @@ Each project has a `docker-compose.yml` defining the E2E test infrastructure:
 
 ## Artifact Management
 
-All Maven artifacts are published to GitHub Packages (Maven repository, `server-id: github` in `.github/workflows/backend/ci-java.yml`), authenticated via `MAVEN_USERNAME`/`MAVEN_PASSWORD` secrets. Docker images are pushed to GHCR. See docs/CI_CD.md for the exact `deploy`/`docker` job definitions.
+All Maven artifacts are published to GitHub Packages (Maven repository, `server-id: github` in `.github/workflows/ci-java.yml`), authenticated via `MAVEN_USERNAME`/`MAVEN_PASSWORD` secrets. Docker images are pushed to GHCR. See docs/CI_CD.md for the exact `deploy`/`docker` job definitions.
 
 Maven repositories are configured in the parent POM. Developers should never commit repository passwords.
 
@@ -223,7 +223,7 @@ kamal setup
 ```yaml
 jobs:
   backend-ci:
-    uses: RexiAI/my-engineering-standards/.github/workflows/backend/ci-go.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-go.yml@main
     with:
       docker-registry: ghcr.io
     secrets:
@@ -232,7 +232,7 @@ jobs:
   deploy:
     needs: [backend-ci]
     if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
-    uses: RexiAI/my-engineering-standards/.github/workflows/shared/ci-deploy-kamal.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-deploy-kamal.yml@main
     with:
       service-name: my-api
       docker-registry: ghcr.io
@@ -342,7 +342,7 @@ ssh root@<VPS_IP> "dokku letsencrypt:enable my-api"
 ```yaml
 jobs:
   backend-ci:
-    uses: RexiAI/my-engineering-standards/.github/workflows/backend/ci-go.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-go.yml@main
     with:
       docker-registry: ghcr.io
     secrets:
@@ -351,7 +351,7 @@ jobs:
   deploy:
     needs: [backend-ci]
     if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
-    uses: RexiAI/my-engineering-standards/.github/workflows/shared/ci-deploy-dokku.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-deploy-dokku.yml@main
     with:
       service-name: my-api
       dokku-app-name: my-api
@@ -445,7 +445,7 @@ ssh root@<VM_IP> \
 ```yaml
 jobs:
   backend-ci:
-    uses: RexiAI/my-engineering-standards/.github/workflows/backend/ci-go.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-go.yml@main
     with:
       docker-registry: ghcr.io
     secrets:
@@ -454,7 +454,7 @@ jobs:
   deploy:
     needs: [backend-ci]
     if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
-    uses: RexiAI/my-engineering-standards/.github/workflows/shared/ci-deploy-ssh.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-deploy-ssh.yml@main
     with:
       service-name: my-api
       docker-registry: ghcr.io

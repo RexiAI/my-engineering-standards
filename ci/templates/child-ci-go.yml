@@ -12,7 +12,7 @@ on:
 
 jobs:
   ci:
-    uses: RexiAI/my-engineering-standards/.github/workflows/backend/ci-go.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-go.yml@main
     with:
       go-version: "1.26"
       deploy-on-main: true

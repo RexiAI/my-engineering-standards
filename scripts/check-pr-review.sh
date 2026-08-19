@@ -4,7 +4,7 @@
 #
 # The PR review agent (spec 024) ships: an agent config (agents/pr-review.md),
 # a Zen provider block in opencode.json, a shared reusable workflow
-# (.github/workflows/shared/pr-review.yml), a self-hosted trigger
+# (.github/workflows/ci-pr-review.yml), a self-hosted trigger
 # (.github/workflows/pr-review.yml), an init-ci.sh --with-pr-review flag, and
 # documentation. There is no application code and no test suite in the usual
 # sense — this script is the spec's test carrier: every AC-024-NN-NN scenario
@@ -84,7 +84,7 @@ pass() { echo -e "${GREEN}PASS${NC} $*"; }
 
 AGENT="$ROOT_DIR/agents/pr-review.md"
 OPENCODE_JSON="$ROOT_DIR/opencode.json"
-SHARED_WF="$ROOT_DIR/.github/workflows/shared/pr-review.yml"
+SHARED_WF="$ROOT_DIR/.github/workflows/ci-pr-review.yml"
 TRIGGER_WF="$ROOT_DIR/.github/workflows/pr-review.yml"
 INIT_CI="$ROOT_DIR/scripts/init-ci.sh"
 SELF_CI="$ROOT_DIR/.github/workflows/self-ci.yml"
@@ -140,14 +140,16 @@ str_contains() {
 
 # verify_secret_name_only <AC-ID> <file> <label>
 #   The OPENCODE_API_KEY token may appear only as the secret-name reference
-#   (secrets.OPENCODE_API_KEY or the "key:" line); any other form is a
-#   violation. Shared by the shared-workflow and trigger-workflow checks
-#   (AC-024-02-04 / AC-024-03-06) — the same rule, one implementation.
+#   (secrets.OPENCODE_API_KEY, the "key:" line, or the env-var mapped from it
+#   as env.OPENCODE_API_KEY); any other form is a violation. Shared by the
+#   shared-workflow and trigger-workflow checks (AC-024-02-04 / AC-024-03-06)
+#   — the same rule, one implementation.
 verify_secret_name_only() {
   local acid="$1" file="$2" label="$3"
   if grep 'OPENCODE_API_KEY' "$file" \
      | grep -v 'secrets.OPENCODE_API_KEY' \
-     | grep -v 'OPENCODE_API_KEY:' | grep -q .; then
+     | grep -v 'OPENCODE_API_KEY:' \
+     | grep -v 'env.OPENCODE_API_KEY' | grep -q .; then
     fail "$acid: OPENCODE_API_KEY appears in $label in a form other than the secret name reference"
   else
     pass "$acid: OPENCODE_API_KEY appears in $label only as the secret name"
@@ -351,7 +353,7 @@ if [ -f "$SHARED_WF" ]; then
   verify_grep AC-024-02-01 "$SHARED_WF" "shared workflow is a workflow_call reusable" \
     "workflow_call" "pr-number" "head-sha" "OPENCODE_API_KEY"
 else
-  fail "AC-024-02-01: .github/workflows/shared/pr-review.yml is missing"
+  fail "AC-024-02-01: .github/workflows/ci-pr-review.yml is missing"
 fi
 
 echo ""
@@ -375,8 +377,11 @@ if [ -f "$SHARED_WF" ]; then
   else
     pass "AC-024-02-03: OPENCODE_API_KEY is declared without required: true"
   fi
+  # Empty-key guard (AC-024-02-03): secrets is not a legal context in an if:
+  # at any scope, so the guard must gate on the mapped job env var. Verify
+  # the job env maps the secret and a step guards on env.OPENCODE_API_KEY.
   verify_grep AC-024-02-03 "$SHARED_WF" "review job guarded by the empty-key check" \
-    "secrets.OPENCODE_API_KEY != ''"
+    "env.OPENCODE_API_KEY != ''"
 fi
 
 echo ""
@@ -472,7 +477,7 @@ echo ""
 # AC-024-03-03 — Calls the shared workflow with PR context
 if [ -f "$TRIGGER_WF" ]; then
   verify_grep AC-024-03-03 "$TRIGGER_WF" "job calls the shared pr-review workflow@main" \
-    "RexiAI/my-engineering-standards/.github/workflows/shared/pr-review.yml@main"
+    "RexiAI/my-engineering-standards/.github/workflows/ci-pr-review.yml@main"
   verify_grep AC-024-03-03 "$TRIGGER_WF" "pr-number and head-sha passed from the PR event" \
     "pr-number: \${{ github.event.pull_request.number }}" \
     "head-sha: \${{ github.event.pull_request.head.sha }}"
@@ -488,10 +493,13 @@ fi
 
 echo ""
 
-# AC-024-03-05 — No key: job skipped, never a required-check failure
+# AC-024-03-05 — No key: job skipped, never a required-check failure.
+# The trigger job has no if:-level secrets guard (illegal in GitHub Actions);
+# the no-key skip is guaranteed by the shared reusable workflow it calls,
+# which gates its review step on env.OPENCODE_API_KEY.
 if [ -f "$TRIGGER_WF" ]; then
-  verify_grep AC-024-03-05 "$TRIGGER_WF" "job guarded by the empty-key check" \
-    "secrets.OPENCODE_API_KEY != ''"
+  verify_grep AC-024-03-05 "$TRIGGER_WF" "trigger delegates to the self-guarding shared workflow" \
+    "ci-pr-review.yml"
 fi
 
 echo ""
@@ -506,11 +514,11 @@ echo ""
 
 # AC-024-03-07 — Self-hosting wiring is identical to child wiring
 if [ -f "$TRIGGER_WF" ] && [ -f "$INIT_CI" ]; then
-  SHARED_URL='RexiAI/my-engineering-standards/.github/workflows/shared/pr-review.yml@main'
+  SHARED_URL='RexiAI/my-engineering-standards/.github/workflows/ci-pr-review.yml@main'
   if grep -qF -- "$SHARED_URL" "$TRIGGER_WF" && grep -qF -- "$SHARED_URL" "$INIT_CI"; then
     pass "AC-024-03-07: trigger workflow and init-ci.sh emit the same shared pr-review workflow@main"
   else
-    fail "AC-024-03-07: trigger workflow and init-ci.sh must reference the same shared/pr-review.yml@main"
+    fail "AC-024-03-07: trigger workflow and init-ci.sh must reference the same ci-pr-review.yml@main"
   fi
 fi
 
@@ -541,7 +549,7 @@ if [ -f "$INIT_CI" ]; then
        --with-pr-review --platform github --backend go < /dev/null > /dev/null 2>&1 ); then
     if [ -f "$FIX/.github/workflows/ci.yml" ]; then
       verify_grep AC-024-04-02 "$FIX/.github/workflows/ci.yml" "generated ci.yml carries the pr-review job" \
-        "pr-review:" "RexiAI/my-engineering-standards/.github/workflows/shared/pr-review.yml@main" \
+        "pr-review:" "RexiAI/my-engineering-standards/.github/workflows/ci-pr-review.yml@main" \
         "OPENCODE_API_KEY: \${{ secrets.OPENCODE_API_KEY }}"
     else
       fail "AC-024-04-02: init-ci.sh did not generate .github/workflows/ci.yml"
