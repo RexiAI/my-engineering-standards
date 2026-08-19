@@ -222,7 +222,7 @@ log(c);
 } }
 EOF
 
-# yagni-single-impl: interface + exactly one implementation (FAIL)
+# yagni-single-impl: interface + exactly one implementation (WARN — spec 011 demoted YAGNI single-impl from FAIL)
 mkdir -p "$TMP/yagni-single-impl"
 cat > "$TMP/yagni-single-impl/Greeter.java" <<'EOF'
 public interface Greeter { void greet(); }
@@ -241,7 +241,7 @@ public class EmptyBody {
 EOF
 
 # solid: srp (16 non-empty methods), ocp (4-case switch), lsp (3 instanceof),
-# isp (7-method interface) WARN; dip (domain/ importing repository) FAIL.
+# isp (7-method interface) WARN; dip (domain/ importing repository) WARN — spec 011 demoted DIP from FAIL.
 # SRP/OCP fixtures avoid empty `{ }` bodies so they don't cross-trigger the
 # YAGNI empty-body WARN.
 mkdir -p "$TMP/srp"
@@ -330,7 +330,7 @@ assert_finding "dry-bad" "dry" "Possible duplication" warn
 assert_clean "dry-clean" "dry" "Possible duplication"
 
 echo "== AC-012-01 YAGNI =="
-assert_finding "yagni-single-impl" "yagni" "has exactly one implementation" fail
+assert_finding "yagni-single-impl" "yagni" "has exactly one implementation" warn
 assert_finding "yagni-empty-body" "yagni" "Empty method body" warn
 
 echo "== AC-012-01 SOLID =="
@@ -338,7 +338,7 @@ assert_finding "srp" "solid" "SRP: possible god file" warn
 assert_finding "ocp" "solid" "OCP: type-dispatch switch" warn
 assert_finding "lsp" "solid" "LSP:" warn
 assert_finding "isp" "solid" "ISP: fat interface" warn
-assert_finding "dip" "solid" "DIP: domain/engine code imports" fail
+assert_finding "dip" "solid" "DIP: domain/engine code imports" warn
 # srp/ocp fixtures must not additionally produce an empty-body WARN
 run_capture "$TMP/srp.out" "$TMP/srp.err" bash "$CHECKER" --gates solid "$TMP/srp"
 if grep -q "Empty method body" "$TMP/srp.out"; then
