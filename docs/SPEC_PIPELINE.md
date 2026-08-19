@@ -62,6 +62,94 @@ docs/changes/NNN-slug.md                 ← long-lived, on main, written by sta
 
 `NNN` is a zero-padded 3-digit sequence, e.g. `001-discount-system`.
 
+## Audit contract
+
+Every pipeline stage leaves a specific, machine-checkable trace behind, in the
+artifact the layout above already defines — no new spec-folder artifacts. An
+artifact may assert anything, but the assertion is only as good as the evidence
+recorded with it. This section is that contract; `scripts/check-audit-trail.sh`
+enforces it mechanically at pipeline end (see §The gate below).
+
+### What each stage leaves behind
+
+| Stage | Evidence artifact(s) | What it must record |
+|---|---|---|
+| Specifier | `10-tasks.md` + `20-acceptance/` | Task acceptance criteria and scenario IDs (`AC-NNN-NN`) |
+| Coder | the tests in the project suite carrying `AC-NNN-NN` IDs | Leaves no report artifact — the build/test commands it ran and their exit codes are re-recorded by the Verifier in `25-verification.md` |
+| Refactorer | gates re-run by the Verifier | The gates it applied (complexity, duplication, property tests) with before/after measurements — re-recorded by the Verifier; the complexity summary is carried into `30-report.md` |
+| Verifier | `25-verification.md` | Per check: the exact command, its real output, its exit code, and a timestamp |
+| Mutation Runner | `30-report.md` | Mutation score (or skip reason), equivalent mutants, final test status |
+| PR Opener | `30-report.md` | PR URL and commit count, appended after the PR opens |
+
+The Coder and Refactorer deliberately leave no report artifact. Their claims
+become auditable not because they write them down, but because the Verifier
+re-executes every claim and records the command and exit code in
+`25-verification.md` — a claim that was never re-run is a gap in the audit
+trail, and the gate fails the folder for it.
+
+### The five Verifier checks
+
+`25-verification.md` must record evidence for the five runnable Verifier checks:
+
+1. scenario traceability
+2. full test suite
+3. complexity gate
+4. design-principles gate
+5. scenario-to-behavior spot check
+
+The "no unaccounted behavior" skim is not a runnable check: it is recorded as a
+finding line, not as a command.
+
+### Machine-readable rule
+
+Machine-readable evidence (gate-script output, CI query, deploy check) is
+recorded with an ISO-8601 UTC timestamp (`YYYY-MM-DDTHH:MM:SSZ`, i.e.
+`date -u +%Y-%m-%dT%H:%M:%SZ`) as raw output or exit code — never as a prose
+paraphrase. The timestamp is pinned to UTC so the gate can verify the format
+deterministically.
+
+### Evidence block format
+
+In `25-verification.md`, each of the five checks carries one evidence block: a
+`## Evidence: <check name>` heading, three marker lines, then the raw output.
+Worked example:
+
+```
+## Evidence: scenario traceability
+
+command: scripts/check-scenario-traceability.sh
+exit: 0
+at: 2026-08-15T10:00:00Z
+
+Scenario IDs found: 16
+Scenario traceability check: every scenario traced, every reference resolves.
+```
+
+- `command:` — the exact command as run.
+- `exit:` — the command's exit code.
+- `at:` — when it ran, in `YYYY-MM-DDTHH:MM:SSZ`.
+- everything after the markers — the raw output, verbatim (or a representative
+  excerpt for very long output), never a paraphrase.
+
+The design-principles gate's exit code and every FAIL / WARN line must be kept
+verbatim. `30-report.md` uses the same block style for its machine-readable
+rows (mutation score, final test status) plus the `PR:` line appended by the PR
+Opener.
+
+### The gate
+
+`scripts/check-audit-trail.sh <slug>` verifies the folder is complete
+(`10-tasks.md`, `20-acceptance/` with a scenario heading, `25-verification.md`,
+`30-report.md`, and `15-design.md` when present — a zero-byte `15-design.md` is
+a failure) and that `25-verification.md` records evidence for all five checks.
+It exits 0 only when both hold, and is a no-op when the folder does not exist.
+The PR Opener runs it before pushing; self-ci runs it for every spec folder
+carrying a `30-report.md` — the pipeline's finished signal, the same
+convention as the archive gate (`§Archive in the PR`). In-flight folders
+without `30-report.md` are skipped: their pipeline finishing is outside the
+job's control and must not fail CI. A finished-but-incomplete spec still
+fails the gate — the step never hands the script an unfinished folder.
+
 ## Archive in the PR
 
 The `specs/NNN-slug/` folder is pipeline scratch. It belongs on the PR branch

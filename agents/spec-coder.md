@@ -101,6 +101,11 @@ PR opened. In that mode:
 
 # Output
 
-End your turn with: tasks completed, test count added, and confirmation the full
-suite is green (`dotnet test` / `mvn test` / `go test ./...` / `npm test` —
-whichever applies).
+End your turn with: tasks completed, test count added, the exact build/test
+commands you ran with each command's exit code (e.g. `bash -n
+scripts/check-audit-trail.sh` → 0, `./scripts/check-audit-trail.sh --selftest`
+→ 0), and confirmation the full suite is green (`dotnet test` / `mvn test` /
+`go test ./...` / `npm test` — whichever applies). You leave no report artifact;
+the commands and exit codes you list here are the audit trail for your stage,
+re-recorded by the Verifier in `25-verification.md` (see
+`docs/SPEC_PIPELINE.md §Audit contract`).
