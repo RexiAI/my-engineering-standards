@@ -76,7 +76,7 @@ File operations, PRs, issues, code search. Uses the official `@modelcontextproto
 **Auth**: Requires `GITHUB_TOKEN` env var (personal access token with `repo` scope).
 
 ```bash
-export GITHUB_TOKEN=ghp_...
+export GITHUB_TOKEN=<your-github-personal-access-token>
 ```
 
 **Uses**: PR review, issue triage, commit inspection, code search across repos.
