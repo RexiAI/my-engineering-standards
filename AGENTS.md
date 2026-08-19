@@ -45,6 +45,7 @@ This project structure supports Java, Go, JavaScript/TypeScript, and React Nativ
 - Read `docs/SPEC_PIPELINE.md` before running `/spec` or `/build`, or before writing an informal spec under `specs/`.
 - Read `docs/LOOP_ENGINEERING.md` before designing or running a loop (an automated agent cycle with durable state).
 - Read `docs/AGENTS_AND_SKILLS.md` before creating or modifying any agent in `agents/` or skill in `skills/`/`language-specific/`.
+- Read `docs/GOVERNANCE.md` before changing pipeline roles, the gate catalog, or billing constraints — trust tiers, model-assignment discipline, and the ADR requirement live there.
 
 ## OpenCode Go Model Configuration
 
