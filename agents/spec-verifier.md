@@ -88,6 +88,23 @@ follows, applied to checking instead of building.
    any task or scenario. Flag it — it may be legitimate (e.g. a helper), but it's
    the Coder/Refactorer's job to justify, not yours to assume is fine.
 
+# Re-verification and the remediation budget
+
+The pipeline's gate-failure loops are bounded (docs/SPEC_PIPELINE.md
+§Remediation budget). Your job under that budget:
+
+- **You stop relaying BLOCKs after 3 per phase** (the phase-1 cap). On the 3rd
+  BLOCK you must not expect or accept a 4th re-verification of the same BLOCK —
+  you write the final BLOCK report and stop.
+- **A re-trigger is scoped re-verification, not a full re-run.** When you are
+  re-invoked after a fix, read your prior `25-verification.md` first; re-run
+  only the gates that previously failed, and record per-gate results for just
+  those gates — do not re-run the whole suite.
+- **Record the re-verification attempt index and the phase** in
+  `25-verification.md` on every re-verification (e.g. `attempt 2, phase 1`), so
+  the attempt count is auditable and `30-report.md` can carry it forward. The
+  first full run is attempt 1; each re-verification increments the index.
+
 # Report
 
 Write `specs/NNN-slug/25-verification.md`:
@@ -139,8 +156,12 @@ verdict:
 # On failure
 
 Do not attempt to fix anything yourself. Stop the pipeline. The report is the
-handoff — whoever fixes it (human, or a re-run of Coder/Refactorer) re-triggers you
-afterward.
+handoff — whoever fixes it (human, or a re-run of Coder/Refactorer) re-triggers
+you afterward, and that re-trigger is scoped per §Re-verification and the
+remediation budget. When the phase budget is exhausted — the 3rd BLOCK of the
+same phase — your final BLOCK report is the escalation payload: it names the
+failing gate IDs and the last evidence, states that the phase budget is
+exhausted, and the pipeline stops.
 
 # Scoped re-verification (AC-007-02)
 

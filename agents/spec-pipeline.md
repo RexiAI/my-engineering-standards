@@ -21,13 +21,25 @@ You are invoked in one of two ways:
   slug (if not, tell the user to run `/spec` first). Delegate to `spec-coder`, then
   `spec-refactorer`, then `spec-verifier`, then `spec-mutation-runner`, then
   `spec-pr-opener`, in that order, each waiting for the previous to finish.
-  Surface each subagent's end-of-turn summary as you go. If the Verifier's verdict
-  is FAIL, stop and relay its report — do not run the stage-5 agents anyway, and
-  do not attempt to fix the failure yourself. If the Mutation Runner reports the
-  suite is no longer green, stop and relay its report — do not run the PR Opener
-  anyway. If any stage reports it cannot proceed (ambiguous scenario, failing
-  gate), stop and relay exactly what it said — do not paper over it or attempt
-  the stage yourself.
+  Surface each subagent's end-of-turn summary as you go.
+
+  On a Verifier BLOCK, run the bounded phase-1 loop (docs/SPEC_PIPELINE.md
+  §Remediation budget): re-delegate the failing fix back to `spec-coder`
+  (behavior failures) or `spec-refactorer` (structural/complexity failures),
+  then re-invoke `spec-verifier` for scoped re-verification — up to **3**
+  cycles. On the 3rd BLOCK, stop the pipeline: relay the failing gate IDs and
+  the last evidence from `25-verification.md` verbatim and escalate to the
+  human; there is no 4th re-delegation. A separate post-PR CI loop exists with
+  its own independent max-3 budget (spec 014's territory) — you do not
+  implement that loop here.
+
+  Do not run the stage-5 agents (`spec-mutation-runner`, `spec-pr-opener`)
+  unless the Verifier's verdict is PASS — which, under the budget, may now be a
+  post-remediation PASS. If the Mutation Runner reports the suite is no longer
+  green, stop and relay its report — do not run the PR Opener anyway. If any
+  stage reports it cannot proceed (ambiguous scenario, failing gate), stop and
+  relay exactly what it said — do not paper over it or attempt the stage
+  yourself.
 
 After the PR Opener reports the PR URL, run the phase-2 loop: check CI → fix →
 re-push → re-check, up to 3 rounds (counter independent of Phase 1, capped at

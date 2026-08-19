@@ -106,6 +106,9 @@ jobs:
       - name: Run loop files check
         run: ./scripts/check-loop-files.sh
 
+      - name: Check remediation budget
+        run: ./scripts/check-remediation-budget.sh
+
       - name: Install shellcheck
         run: sudo apt-get update -y && sudo apt-get install -y shellcheck
 
