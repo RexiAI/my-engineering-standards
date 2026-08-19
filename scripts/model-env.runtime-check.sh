@@ -2,29 +2,30 @@
 # model-env.runtime-check.sh — Prove real opencode resolution of
 # {env:SPEC_*_MODEL} references end-to-end, using a pinned opencode binary
 # against a scratch project outside the repo checkout. This is what makes
-# AC-003/AC-004 CI-verified instead of dev-only.
+# AC-025-06-07..09 CI-verified instead of dev-only.
 #
 # Scenario traceability:
-#   AC-020-01-02  local env value overrides the committed default, no commit
-#   AC-020-01-03  no local env file still resolves to the committed defaults
-#   AC-020-06-04  real opencode resolution in three cases
+#   AC-025-06-07  example loaded (dotenv-equivalent) -> every agent resolves
+#                 to the fixture example default, none empty
+#   AC-025-06-08  example + config/model.local.env overriding one var + a
+#                 pre-exported env var for a var absent from all files -> the
+#                 file override wins, the pre-exported var survives, the rest
+#                 stay at defaults (later dotenv line wins; vars no file
+#                 defines are untouched)
+#   AC-025-06-09  nothing loaded -> every agent resolves to null/empty,
+#                 proving the committed example is what carries the defaults
 #
-# Three cases, each in a subshell with all 8 SPEC_*_MODEL vars unset first so
-# the result is independent of the invoking environment:
-#   1. loader sourced, no local file          → every agent's resolved model
-#      equals the fixture example default (none null/empty)
-#   2. loader sourced, local file overriding one var and a pre-set env var
-#      overriding another                     → overrides win, rest at defaults
-#   3. loader NOT sourced                     → every agent's model resolves to
-#      null/empty — proves the loader is what carries the defaults
+# The dotenv-equivalent load mirrors the .envrc's first dotenv_if_exists line:
+#   set -a; . config/model.local.env.example; set +a
 #
 # Self-trip constraint: every fixture model id is constructed at runtime
-# (string concatenation) — no inline literal model-id values in fixtures.
+# (string concatenation) — no inline literal model-id values in fixtures, and
+# no loader-name/emit-flag strings (scripts/ is in the purge scan scope).
 #
 # Usage:
 #   scripts/model-env.runtime-check.sh [OPENCODE_BIN]
 # OPENCODE_BIN defaults to "opencode" on PATH. Pass the pinned binary, e.g.
-#   bash scripts/model-env.runtime-check.sh /tmp/opencode
+#   bash scripts/model-env.runtime-check.sh /tmp/opencode-bin/opencode
 #
 # Exit codes:
 #   0 — all three cases behave as expected
@@ -36,7 +37,6 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-LOADER="$ROOT/scripts/load-model-env.sh"
 BIN="${1:-opencode}"
 
 # Shared roster (MODEL_ENV_VARS, MODEL_ENV_AGENTS, MODEL_ENV_PLUS_AGENTS).
@@ -55,7 +55,7 @@ FAST="$provider/""fast""$RANDOM""$RANDOM"
 PLUS="$provider/""plus""$RANDOM""$RANDOM"
 
 # resolved_model PROJ AGENT — prints the resolved "provider/model" string, or
-# nothing when the model key is absent (env var unset ⇒ resolves to empty).
+# nothing when the model key is absent (env var unset resolves to empty).
 resolved_model() {
   local proj="$1" agent="$2"
   ( cd "$proj" && "$BIN" debug agent "$agent" --pure 2>/dev/null \
@@ -76,11 +76,25 @@ expected_for() {
   echo "$FAST"
 }
 
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
-PROJ="$TMP/proj"
-mkdir -p "$PROJ/config"
-cat > "$PROJ/opencode.json" <<'EOF'
+# write_example DIR FAST PLUS — fixture example defining all 8 vars
+write_example() {
+  mkdir -p "$1/config"
+  {
+    printf 'SPEC_SPECIFIER_MODEL=%s\n' "$2"
+    printf 'SPEC_UX_MODEL=%s\n' "$2"
+    printf 'SPEC_VERIFIER_MODEL=%s\n' "$3"
+    printf 'SPEC_MUTATION_RUNNER_MODEL=%s\n' "$3"
+    printf 'SPEC_PR_OPENER_MODEL=%s\n' "$3"
+    printf 'SPEC_CODER_MODEL=%s\n' "$2"
+    printf 'SPEC_REFACTORER_MODEL=%s\n' "$2"
+    printf 'SPEC_PIPELINE_MODEL=%s\n' "$2"
+  } > "$1/config/model.local.env.example"
+}
+
+# write_refs PROJ — fixture opencode.json with 8 {env:...} references
+write_refs() {
+  mkdir -p "$1/config"
+  cat > "$1/opencode.json" <<'EOF'
 {
   "$schema": "https://opencode.ai/config.json",
   "agent": {
@@ -95,34 +109,31 @@ cat > "$PROJ/opencode.json" <<'EOF'
   }
 }
 EOF
-{
-  printf 'SPEC_SPECIFIER_MODEL=%s\n' "$FAST"
-  printf 'SPEC_UX_MODEL=%s\n' "$FAST"
-  printf 'SPEC_VERIFIER_MODEL=%s\n' "$PLUS"
-  printf 'SPEC_MUTATION_RUNNER_MODEL=%s\n' "$PLUS"
-  printf 'SPEC_PR_OPENER_MODEL=%s\n' "$PLUS"
-  printf 'SPEC_CODER_MODEL=%s\n' "$FAST"
-  printf 'SPEC_REFACTORER_MODEL=%s\n' "$FAST"
-  printf 'SPEC_PIPELINE_MODEL=%s\n' "$FAST"
-} > "$PROJ/config/model.local.env.example"
+}
+
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+PROJ="$TMP/proj"
+write_refs "$PROJ"
+write_example "$PROJ" "$FAST" "$PLUS"
 
 echo "pinned opencode binary: $BIN"
 if "$BIN" --version >/dev/null 2>&1; then
-  ok "AC-020-06-04 opencode binary runs (--version)"
+  ok "AC-025-06-07 opencode binary runs (--version)"
 else
-  bad "AC-020-06-04 opencode binary runs (--version) — is '$BIN' the pinned v1.18.18 binary?"
+  bad "AC-025-06-07 opencode binary runs (--version) — is '$BIN' the pinned binary?"
   echo ""
   echo "runtime-check: $PASS_COUNT passed, $FAIL_COUNT failed"
   exit 1
 fi
 
-# ── Case 1: loader sourced, no local file → example defaults (AC-020-06-04,
-#    AC-020-01-03) ────────────────────────────────────────────────────────────
+# ── Case 1 (AC-025-06-07): example loaded via the dotenv-equivalent -> every
+#    agent resolves to the fixture example default, none empty ────────────────
 case1_ok=1
 (
   for v in "${MODEL_ENV_VARS[@]}"; do unset "$v"; done
-  # shellcheck disable=SC1090
-  source "$LOADER" "$PROJ"
+  # shellcheck disable=SC1091
+  set -a; . "$PROJ/config/model.local.env.example"; set +a
   for agent in "${MODEL_ENV_AGENTS[@]}"; do
     got="$(resolved_model "$PROJ" "$agent")"
     want="$(expected_for "$agent")"
@@ -133,22 +144,27 @@ case1_ok=1
   done
 ) && case1_ok=0
 if [ "$case1_ok" -eq 0 ]; then
-  ok "AC-020-06-04 case 1: loader sourced, no local file — all 8 agents resolve to the fixture example defaults"
+  ok "AC-025-06-07 case 1: example loaded — all 8 agents resolve to the fixture example defaults, none empty"
 else
-  bad "AC-020-06-04 case 1: loader sourced, no local file — all 8 agents resolve to the fixture example defaults"
+  bad "AC-025-06-07 case 1: example loaded — all 8 agents resolve to the fixture example defaults, none empty"
 fi
 
-# ── Case 2: local file overrides one var, pre-set env var overrides another
-#    (AC-020-06-04, AC-020-01-02) ────────────────────────────────────────────
+# ── Case 2 (AC-025-06-08): example (minus SPEC_UX_MODEL) + local file
+#    overriding SPEC_SPECIFIER_MODEL + SPEC_UX_MODEL pre-exported (a var no
+#    file defines) -> file override wins, pre-exported var survives, rest stay
+#    at defaults ──────────────────────────────────────────────────────────────
 OVERRIDE_LOCAL="$provider/""local-override""$RANDOM"
 OVERRIDE_ENV="$provider/""env-override""$RANDOM"
+grep -v '^SPEC_UX_MODEL=' "$PROJ/config/model.local.env.example" > "$PROJ/config/model.local.env.example.tmp"
+mv "$PROJ/config/model.local.env.example.tmp" "$PROJ/config/model.local.env.example"
 printf 'SPEC_SPECIFIER_MODEL=%s\n' "$OVERRIDE_LOCAL" > "$PROJ/config/model.local.env"
 case2_ok=1
 (
   for v in "${MODEL_ENV_VARS[@]}"; do unset "$v"; done
   export SPEC_UX_MODEL="$OVERRIDE_ENV"
-  # shellcheck disable=SC1090
-  source "$LOADER" "$PROJ"
+  # shellcheck disable=SC1091
+  set -a; . "$PROJ/config/model.local.env.example"; set +a
+  set -a; . "$PROJ/config/model.local.env"; set +a
   for agent in "${MODEL_ENV_AGENTS[@]}"; do
     got="$(resolved_model "$PROJ" "$agent")"
     case "$agent" in
@@ -163,13 +179,13 @@ case2_ok=1
   done
 ) && case2_ok=0
 if [ "$case2_ok" -eq 0 ]; then
-  ok "AC-020-06-04 case 2: local-file override and pre-set env override win, remaining agents stay at defaults"
+  ok "AC-025-06-08 case 2: later dotenv line wins for spec-specifier; spec-ux keeps its pre-exported value; rest stay at defaults"
 else
-  bad "AC-020-06-04 case 2: local-file override and pre-set env override win, remaining agents stay at defaults"
+  bad "AC-025-06-08 case 2: later dotenv line wins for spec-specifier; spec-ux keeps its pre-exported value; rest stay at defaults"
 fi
-rm -f "$PROJ/config/model.local.env"
 
-# ── Case 3: loader NOT sourced → model resolves empty (AC-020-06-04) ────────
+# ── Case 3 (AC-025-06-09): nothing loaded -> every agent resolves to
+#    null/empty, proving the committed example is what carries the defaults ───
 case3_ok=1
 (
   for v in "${MODEL_ENV_VARS[@]}"; do unset "$v"; done
@@ -182,9 +198,9 @@ case3_ok=1
   done
 ) && case3_ok=0
 if [ "$case3_ok" -eq 0 ]; then
-  ok "AC-020-06-04 case 3: loader not sourced — every agent resolves to null/empty, proving the loader carries the defaults"
+  ok "AC-025-06-09 case 3: nothing loaded — every agent resolves to null/empty, proving the example carries the defaults"
 else
-  bad "AC-020-06-04 case 3: loader not sourced — every agent resolves to null/empty, proving the loader carries the defaults"
+  bad "AC-025-06-09 case 3: nothing loaded — every agent resolves to null/empty, proving the example carries the defaults"
 fi
 
 echo ""
