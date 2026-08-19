@@ -1,3 +1,10 @@
+## [1.25.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.25.0...v1.25.1) (2026-08-19)
+
+
+### Bug Fixes
+
+* remove secrets context from job-level if in eas-build ([#43](https://github.com/RexiAI/my-engineering-standards/issues/43)) ([24f4d46](https://github.com/RexiAI/my-engineering-standards/commit/24f4d46985c0ff130e7a33543f48d1a9870316c1))
+
 # [1.25.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.24.0...v1.25.0) (2026-08-19)
 
 
