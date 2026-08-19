@@ -1,0 +1,34 @@
+name: PR Review Agent
+
+# This repo's own trigger for the shared PR review workflow (spec 024,
+# self-hosting proof): the same reusable workflow child repos opt into via
+# init-ci.sh --with-pr-review runs on this repo's PRs.
+#
+# Per-PR concurrency with cancel-in-progress: only the latest head gets a live
+# review — a superseded run on an older head cancels.
+#
+# Secret-guarded: without OPENCODE_API_KEY the job is skipped (check state
+# "skipped", never "failure"), so the PR's required checks are unaffected.
+
+on:
+  pull_request:
+    types: [opened, ready_for_review, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: pr-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Review PR
+    if: ${{ secrets.OPENCODE_API_KEY != '' }}
+    uses: RexiAI/my-engineering-standards/.github/workflows/shared/pr-review.yml@main
+    with:
+      pr-number: ${{ github.event.pull_request.number }}
+      head-sha: ${{ github.event.pull_request.head.sha }}
+    secrets:
+      OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
