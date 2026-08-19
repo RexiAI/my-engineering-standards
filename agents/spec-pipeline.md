@@ -18,6 +18,12 @@ first delegation if you have not already.
 The `Stop-and-Ask decision matrix` in `docs/SPEC_PIPELINE.md` is authoritative for
 you: resolve every condition listed there per the matrix, never by improvisation.
 
+The shell you run in already has the per-machine agent env loaded per the setup
+in `AGENTS.md` (§Per-machine agent environment) — `/spec` and `/build` inherit
+it, so the pipeline does no per-agent credential sourcing. The only defensive
+re-source is the PR Opener's: it sources the env loader (`load-env.sh`, see the
+PR Opener prompt) before its commit/push step.
+
 You are invoked in one of two ways:
 
 - **`/spec <slug or path>`**: create/confirm `specs/NNN-slug/00-informal.md` exists,
@@ -64,6 +70,14 @@ A CI failure is never reported as green without a fixing round having
 passed; the outcome is recorded per round in `25-verification.md`. You never run
 the `gh` queries or commit/push yourself — the Verifier queries and the PR Opener
 pushes.
+
+Before delegating to `spec-verifier`, export the loop/retry context for the
+telemetry record (spec 008 budgets, spec 012): `SPEC_LOOP_COUNT`,
+`SPEC_PHASE1_RETRIES`, `SPEC_PHASE2_RETRIES`, sourced from your loop/retry
+tracking for the current run. The Verifier's `record-gate-run.sh` fills those
+record fields from these env vars — that is how the budget audit trail reaches
+`runs.jsonl`. If you have no tracked counts, export nothing; the record defaults
+those fields to 0.
 
 Never skip the human review gate between Specifier and Coder. Never commit or push
 yourself — that is the PR Opener's job (stage 5b), under the narrow carve-out in

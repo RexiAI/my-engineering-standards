@@ -108,11 +108,40 @@ The pipeline's gate-failure loops are bounded (docs/SPEC_PIPELINE.md
   the attempt count is auditable and `30-report.md` can carry it forward. The
   first full run is attempt 1; each re-verification increments the index.
 
+# Telemetry (spec 012)
+
+After your checks complete — on every completed run, regardless of whether the
+verdict is PASS, FAIL, or BLOCK — append exactly one record to the repo's
+`runs.jsonl` by invoking `scripts/record-gate-run.sh` via bash. No
+`permission.edit` change is needed: the append happens through the helper's bash
+execution, which preserves the "verifier writes nothing but the report + scratch"
+discipline. Compose the record from your own run:
+
+- `specSlug`: the `specs/NNN-slug` directory you are verifying (omit `jiraKey`).
+- `gatesFailed`: the gate IDs for every check that FAILed or BLOCKed — from
+  `traceability`, `test-suite`, `complexity`, `design-principles`, `spot-check`,
+  `unaccounted`.
+- `warnings`: WARN findings (design-principles WARNs, spot-check notes).
+- `durationSec`: wall-clock time of your verification phase.
+- `outcome`: `block` if any gate BLOCKed, else `fail` if any FAILed, else `pass`.
+- `runId`: omit it — `record-gate-run.sh` generates it.
+- `loopCount` / `phase1Retries` / `phase2Retries`: omit them — the orchestrator
+  exports `SPEC_LOOP_COUNT` / `SPEC_PHASE1_RETRIES` / `SPEC_PHASE2_RETRIES`
+  (spec 008 budget audit trail), and the script defaults them to 0.
+
+The step runs even when the verdict is FAIL or BLOCK — a failed verification
+still records, it never silently skips telemetry. If the append itself fails,
+report that as a warning in the record/write-up; never fabricate a record.
+
 # Report
 
 Write `specs/NNN-slug/25-verification.md`:
 
-- Each check above: PASS/FAIL/BLOCK with the actual command run and its real output, not a paraphrase.
+- Each check above: PASS/FAIL/BLOCK, each with an evidence block recording the
+  exact `command:` run, the real output (or a representative excerpt — never a
+  paraphrase), the `exit:` code, and an `at:` timestamp in
+  `YYYY-MM-DDTHH:MM:SSZ` (UTC), so every verdict is auditable to the exact
+  invocation, its exit code, and when it ran.
 - Design-principles gate: the `check-code-principles.sh` exit code and every FAIL /
   WARN line, verbatim.
 - Spot-check results: which scenarios you checked, what you found.

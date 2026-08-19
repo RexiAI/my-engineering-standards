@@ -35,7 +35,8 @@
 #
 # Usage:
 #   .standards/scripts/check-code-principles.sh [SOURCE_DIR] [--tier mvp|production|multi-service]
-#       [-BaseRef <ref>] [--blocking <gates>] [--warn-as-error] [--gates <list>] [--json]
+#                                           [--gates <list>] [--warn-as-error] [--json]
+#                                           [-ReportPath <file>] [-BaseRef <ref>] [--blocking <gates>]
 #
 # SOURCE_DIR defaults to the current directory. --tier overrides auto-detection
 # from the project's AGENTS_*.md "Conformance tier:" declaration (see
@@ -46,6 +47,8 @@
 # --json prints a single JSON object { "tier", "gates", "fails", "warns" }
 # carrying the same findings as the human output, for transcription into
 # specs/NNN-slug/25-verification.md (AC-007-03-05, AC-007-03-06).
+# -ReportPath <file> additionally writes the machine-readable JSON report
+# (tier, gates, fails, warns) atomically to <file> — stdout is unchanged.
 #
 # Blame scoping (-BaseRef <ref>): judge only the change — the diff of the
 # working tree against <ref>, scoped to the source files this script audits.
@@ -76,12 +79,12 @@
 #   1 — at least one FAIL (or a WARN with --warn-as-error)
 #   2 — could not perform the check for a non-finding reason: a required tool
 #       (find/xargs/awk/grep/sed/tr/sort/wc/head/mktemp/rm) is missing, the
-#       source directory is unusable, a usage error (unknown option, unknown
-#       --gates name, empty --gates value, bad/empty --blocking value), an
-#       unresolvable -BaseRef ref, or not a git repository. A missing tool is a
-#       tooling failure, never a false PASS — the `|| true` swallows on the
-#       tooling paths are preflighted so a gate that could not run exits 2
-#       (AC-007-03-07).
+#       source directory is unusable, or a usage error (unknown option, unknown
+#       --gates name, empty --gates value, bad/empty --blocking value, or
+#       -ReportPath with a missing/empty value), an unresolvable -BaseRef ref,
+#       or not a git repository. A missing tool is a tooling failure, never a
+#       false PASS — the `|| true` swallows on the tooling paths are
+#       preflighted so a gate that could not run exits 2 (AC-007-03-07).
 #
 # Standards reference:
 #   docs/CODING_CONVENTIONS.md §Design Principles
@@ -91,6 +94,11 @@
 #   agents/spec-verifier.md (script-is-authority / BLOCK discipline)
 set -euo pipefail
 
+# Shared -ReportPath machinery (strip_dashes/json_escape/json_array/
+# emit_json_report) — see scripts/gate-report-lib.sh. json_escape comes from
+# this lib; check-common.sh's copy is guarded so it does not redefine it.
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/gate-report-lib.sh"
+# Shared 007 helpers (require_tools / finish_clean / guarded json_escape).
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/check-common.sh"
 
 RED='\033[0;31m'
@@ -101,21 +109,34 @@ NC='\033[0m'
 FAILS=0
 WARNS=0
 WARN_AS_ERROR=false
+REPORT_PATH=""
+FAILS_LIST=()
+WARNS_LIST=()
 
+# fail/pass/warn feed all three outputs: human stdout (unless --json), the
+# --json transcript (FAILS_JSON/WARNS_JSON, file/line triplets), and the
+# -ReportPath file report (FAILS_LIST/WARNS_LIST). Blame scoping (011) routes
+# findings through emit -> classify/classify_blame, which keep the same
+# fail/pass/warn entry points.
 BASE_REF=""
 BASE_REF_SET=false
 BLOCKING_ARG=""
 BLOCKING_ARG_SET=false
 BLOCKING_SET="complexity property-tests"
-
 fail() { # fail <message> [file] [line]
+  local msg="$1" loc=""
+  [ -n "${2:-}" ] && loc=" ($2${3:+:$3})"
   FAILS=$((FAILS + 1))
-  if [ "$JSON" = true ]; then FAILS_JSON+=("$1" "${2:-}" "${3:-}"); else echo -e "${RED}FAIL${NC} $1"; fi
+  if [ "$JSON" = true ]; then FAILS_JSON+=("$msg" "${2:-}" "${3:-}"); else echo -e "${RED}FAIL${NC} $msg"; fi
+  FAILS_LIST+=("$msg$loc")
 }
 pass() { [ "$JSON" = false ] && echo -e "${GREEN}PASS${NC} $*"; return 0; }
 warn() { # warn <message> [file] [line]
+  local msg="$1" loc=""
+  [ -n "${2:-}" ] && loc=" ($2${3:+:$3})"
   WARNS=$((WARNS + 1))
-  if [ "$JSON" = true ]; then WARNS_JSON+=("$1" "${2:-}" "${3:-}"); else echo -e "${YELLOW}WARN${NC} $1"; fi
+  if [ "$JSON" = true ]; then WARNS_JSON+=("$msg" "${2:-}" "${3:-}"); else echo -e "${YELLOW}WARN${NC} $msg"; fi
+  WARNS_LIST+=("$msg$loc")
 }
 say() { [ "$JSON" = false ] && echo "$@"; return 0; }
 
@@ -143,17 +164,29 @@ TIER=""
 GATES=""
 GATES_SET=false
 JSON=false
+# One parser for both flag styles (see gate-report-lib.sh): double-dash flags
+# (--tier, --warn-as-error, --gates, --json from 007, --blocking from 011) and
+# single-dash flags (-BaseRef from 011, -ReportPath from 012). strip_dashes
+# makes the styles coexist without two parsers.
 while [ $# -gt 0 ]; do
-  case "$1" in
-    --tier) TIER="${2:-}"; shift $(( $# > 1 ? 2 : 1 )) ;;
-    --warn-as-error) WARN_AS_ERROR=true; shift ;;
-    --blocking) BLOCKING_ARG="${2:-}"; BLOCKING_ARG_SET=true; shift 2 ;;
-    -BaseRef) BASE_REF="${2:-}"; BASE_REF_SET=true; shift 2 ;;
-    --gates) GATES_SET=true; GATES="${2:-}"; shift $(( $# > 1 ? 2 : 1 )) ;;
-    --json) JSON=true; shift ;;
-    -*) echo "Unknown option: $1" >&2; exit 2 ;;
-    *) SOURCE_DIR="$1"; shift ;;
-  esac
+  if [ "${1#-}" != "$1" ]; then
+    name="$(strip_dashes "$1")"
+    case "$name" in
+      tier) TIER="${2:-}"; shift $(( $# > 1 ? 2 : 1 )) ;;
+      warn-as-error) WARN_AS_ERROR=true; shift ;;
+      blocking) BLOCKING_ARG="${2:-}"; BLOCKING_ARG_SET=true; shift $(( $# > 1 ? 2 : 1 )) ;;
+      BaseRef) BASE_REF="${2:-}"; BASE_REF_SET=true; shift $(( $# > 1 ? 2 : 1 )) ;;
+      gates) GATES_SET=true; GATES="${2:-}"; shift $(( $# > 1 ? 2 : 1 )) ;;
+      json) JSON=true; shift ;;
+      ReportPath)
+        REPORT_PATH="${2:-}"
+        [ -n "$REPORT_PATH" ] || { echo "Error: -ReportPath requires a non-empty file path" >&2; exit 2; }
+        shift $(( $# > 1 ? 2 : 1 )) ;;
+      *) echo "Unknown option: $1" >&2; exit 2 ;;
+    esac
+  else
+    SOURCE_DIR="$1"; shift
+  fi
 done
 
 if [ "$BASE_REF_SET" = true ] && [ -z "$BASE_REF" ]; then
@@ -732,6 +765,25 @@ check_property_tests() {
   esac
 }
 
+# ── JSON report (-ReportPath, telemetry) ─────────────────────────────────────
+# -ReportPath <file> writes the machine-readable report (same fields as the
+# --json stdout mode: tier, gates, fails, warns) atomically to <file> (spec 012).
+# gates reflects the categories actually run — all five by default, or the
+# 007 --gates subset when the run was scoped (AC-007-03-01).
+# json_escape / json_array / emit_json_report come from gate-report-lib.sh.
+emit_report() {
+  [ -n "$REPORT_PATH" ] || return 0
+  local json fails_json warns_json gates_json
+  fails_json=""
+  warns_json=""
+  gates_json="$(json_array "${SELECTED_GATES[@]}")"
+  [ "${#FAILS_LIST[@]}" -gt 0 ] && fails_json="$(json_array "${FAILS_LIST[@]}")"
+  [ "${#WARNS_LIST[@]}" -gt 0 ] && warns_json="$(json_array "${WARNS_LIST[@]}")"
+  json="{\"tier\":\"$(json_escape "$TIER")\","
+  json="${json}\"gates\":[${gates_json}],\"fails\":[${fails_json}],\"warns\":[${warns_json}]}"
+  emit_json_report "$REPORT_PATH" "$json"
+}
+
 # ── Blame scoping helpers (-BaseRef) ─────────────────────────────────────────
 # Classification contract:
 #   -BaseRef unset: a gate in the blocking set keeps its legacy per-finding
@@ -940,6 +992,7 @@ GATE_SUMMARY=""
 [ "${#SELECTED_GATES[@]}" -lt 5 ] && GATE_SUMMARY="(gates: $(IFS=,; echo "${SELECTED_GATES[*]}"))"
 
 say "---------------------------------------------"
+emit_report
 if [ "$TOTAL" -gt 0 ]; then
   say -e "${RED}✘ Design-principles check${GATE_SUMMARY:+ }${GATE_SUMMARY}: ${FAILS} FAIL(s), ${WARNS} WARN(s).${NC}"
   say "  Reference: docs/CODING_CONVENTIONS.md §Design Principles, docs/ARCHITECTURE.md, docs/TESTING.md"
