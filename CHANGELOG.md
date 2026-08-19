@@ -1,3 +1,24 @@
+# [1.15.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.14.1...v1.15.0) (2026-08-19)
+
+
+### Features
+
+* **spec 008:** bounded remediation budget for the spec pipeline ([#25](https://github.com/RexiAI/my-engineering-standards/issues/25)) ([f2ccce7](https://github.com/RexiAI/my-engineering-standards/commit/f2ccce71be8b98508d88654da43f692613ac0e9d))
+
+## [1.14.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.14.0...v1.14.1) (2026-08-16)
+
+
+### Bug Fixes
+
+* **scripts:** make init-ci.sh and bootstrap.sh executable; exclude .standards from traceability scan ([#33](https://github.com/RexiAI/my-engineering-standards/issues/33)) ([2ccb653](https://github.com/RexiAI/my-engineering-standards/commit/2ccb65344c255fdf36f805515eda76a764d685c8))
+
+# [1.14.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.13.0...v1.14.0) (2026-08-15)
+
+
+### Features
+
+* **spec 022:** child repos opt into semantic-release via init-ci.sh --with-release ([#23](https://github.com/RexiAI/my-engineering-standards/issues/23)) ([3013d8d](https://github.com/RexiAI/my-engineering-standards/commit/3013d8d1465d4e863db829180ea6cc7ffd9c0343))
+
 # [1.13.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.12.0...v1.13.0) (2026-08-14)
 
 
