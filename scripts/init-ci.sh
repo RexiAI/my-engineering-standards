@@ -23,6 +23,11 @@ set -euo pipefail
 #              GH_TOKEN prompt + summary, .releaserc.json coupling)
 #   AC-022-04  self-CI gates green (make lint / validate-all, orchestration,
 #              skills, bash -n, no CRLF, scoped git status)
+#   AC-024-01  docs/CI_CD.md §PR Review Agent + init-ci.sh --with-pr-review
+#              flag wiring (AC-024-04-01/02/03: flag parse, pr-review job
+#              emission, byte-compatible default; AC-024-04-04/05: secret
+#              prompt gated on the flag; AC-024-04-06: summary lists
+#              OPENCODE_API_KEY; AC-024-04-07/08: GitLab warning no-op)
 # ──────────────────────────────────────────────
 
 RED='\033[0;31m'
@@ -44,6 +49,7 @@ REGISTRY_FLAG=""
 WITH_SAGA_FLAG=""
 WITH_DEPLOY_FLAG=""
 WITH_RELEASE_FLAG=""
+WITH_PR_REVIEW_FLAG=""
 DEPLOY_TOOL="kamal"
 
 while [[ $# -gt 0 ]]; do
@@ -79,6 +85,14 @@ while [[ $# -gt 0 ]]; do
       WITH_RELEASE_FLAG="true"
       shift
       ;;
+    --with-pr-review)
+      # Opt-in PR review agent wiring (AC-024-04-01): emits the pr-review job
+      # calling the shared reusable workflow, prompts for OPENCODE_API_KEY, and
+      # lists the secret in the GitHub next steps. GitHub Actions-only — on
+      # GitLab the flag prints a warning and emits nothing (AC-024-04-07).
+      WITH_PR_REVIEW_FLAG="true"
+      shift
+      ;;
     --deploy-tool)
       DEPLOY_TOOL="$2"
       WITH_DEPLOY_FLAG="true"
@@ -86,7 +100,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     *)
       err "Unknown flag: $1"
-      echo "Usage: $0 [--platform github|gitlab|both] [--backend java,go,node] [--frontend nextjs,react,angular,react-native,static] [--registry ghcr.io] [--with-saga] [--with-deploy] [--deploy-tool kamal|dokku|ssh] [--with-release]"
+      echo "Usage: $0 [--platform github|gitlab|both] [--backend java,go,node] [--frontend nextjs,react,angular,react-native,static] [--registry ghcr.io] [--with-saga] [--with-deploy] [--deploy-tool kamal|dokku|ssh] [--with-release] [--with-pr-review]"
       exit 1
       ;;
   esac
@@ -251,7 +265,7 @@ fi
 
 # ── Step 3: Ask for secrets ───────────────────
 collect_secrets() {
-  GHCR_TOKEN=""; MAVEN_USERNAME=""; MAVEN_PASSWORD=""; NPM_TOKEN=""; EXPO_TOKEN=""; SONAR_TOKEN=""; PACT_BROKER_URL=""; GH_TOKEN=""
+  GHCR_TOKEN=""; MAVEN_USERNAME=""; MAVEN_PASSWORD=""; NPM_TOKEN=""; EXPO_TOKEN=""; SONAR_TOKEN=""; PACT_BROKER_URL=""; GH_TOKEN=""; OPENCODE_API_KEY=""
 
   if [ ! -t 0 ]; then
     info "Non-interactive stdin — skipping secrets prompt (add secrets manually later)."
@@ -290,6 +304,11 @@ _prompt_secrets() {
     # Release is opt-in (AC-022-03-05): GH_TOKEN is only prompted when the
     # flag is set — a child that never opts in has no required secret.
     read -rp "  GH_TOKEN (Semantic Release, opt-in): " GH_TOKEN
+  fi
+  if [ "$WITH_PR_REVIEW_FLAG" = "true" ]; then
+    # PR review is opt-in (AC-024-04-04/05): OPENCODE_API_KEY is only prompted
+    # when the flag is set — a child that never opts in has no required secret.
+    read -rp "  OPENCODE_API_KEY (PR review agent, opt-in): " OPENCODE_API_KEY
   fi
 }
 
@@ -344,6 +363,8 @@ EOF
   _gh_deploy_job "$target"
 
   _gh_release_job "$target"
+
+  _gh_pr_review_job "$target"
 
   ok "Generated: .github/workflows/ci.yml"
 
@@ -402,6 +423,35 @@ _gh_release_job() {
 EOF
   ok "Added release job to ci.yml (Semantic Release, default-branch push)"
   info "Set the GH_TOKEN secret (contents: write) in GitHub → Settings → Secrets and variables → Actions"
+}
+
+# PR review job for the pr-review agent, appended only when --with-pr-review is
+# set. The job calls the shared reusable workflow; reviews are per-PR, so there
+# is no default-branch gate — but the job must not run on push events (where
+# github.event.pull_request is empty), hence the event_name guard. The job is
+# secret-guarded: a child without OPENCODE_API_KEY gets a skipped job, never a
+# failure. GitHub Actions-only (AC-024-04-07): on GitLab the flag prints a
+# warning and emits nothing.
+_gh_pr_review_job() {
+  local target="$1"
+  # Regression guard (AC-024-04-03): without --with-pr-review the default
+  # output is byte-compatible with today — no pr-review job, no
+  # OPENCODE_API_KEY line.
+  [ "$WITH_PR_REVIEW_FLAG" != "true" ] && return 0
+
+  cat >> "$target" << EOF
+
+  pr-review:
+    if: \${{ github.event_name == 'pull_request' && secrets.OPENCODE_API_KEY != '' }}
+    uses: RexiAI/my-engineering-standards/.github/workflows/shared/pr-review.yml@main
+    with:
+      pr-number: \${{ github.event.pull_request.number }}
+      head-sha: \${{ github.event.pull_request.head.sha }}
+    secrets:
+      OPENCODE_API_KEY: \${{ secrets.OPENCODE_API_KEY }}
+EOF
+  ok "Added pr-review job to ci.yml (PR review agent, per-PR)"
+  info "Set the OPENCODE_API_KEY secret (OpenCode Zen) in GitHub → Settings → Secrets and variables → Actions"
 }
 
 # Frontend job block: react-native swaps the docker-registry/GHCR pair for a
@@ -497,6 +547,12 @@ generate_gitlab() {
   local target="$PROJECT_ROOT/.gitlab-ci.yml"
   local registry="${REGISTRY_FLAG:-ghcr.io}"
   local saga_enabled="${WITH_SAGA_FLAG:-false}"
+
+  if [ "$WITH_PR_REVIEW_FLAG" = "true" ]; then
+    # GitHub-only feature (AC-024-04-07): warn on GitLab and emit nothing —
+    # the shared pr-review workflow has no GitLab template.
+    warn "PR review (--with-pr-review) is a GitHub Actions feature — nothing emitted into .gitlab-ci.yml"
+  fi
 
   cat > "$target" << EOF
 include:
@@ -797,6 +853,7 @@ print_summary() {
   _print_saga_note
   _print_deploy_note
   _print_release_note
+  _print_pr_review_note
   echo ""
 }
 
@@ -836,6 +893,17 @@ _print_release_note() {
   echo "  • Reference: docs/CI_CD.md §Release Process"
 }
 
+_print_pr_review_note() {
+  # PR review note (AC-024-04-06): lists OPENCODE_API_KEY with a pointer to
+  # the PR review docs when the flag is set.
+  [ "${WITH_PR_REVIEW_FLAG:-}" != "true" ] && return 0
+  echo ""
+  echo "PR review agent (opt-in):"
+  echo "  • pr-review job added to ci.yml (per-PR, review + suggested fixes only)"
+  echo "  • Set secret: OPENCODE_API_KEY (OpenCode Zen — never commit the value)"
+  echo "  • Reference: docs/CI_CD.md §PR Review Agent"
+}
+
 _print_generated_files() {
   [ -f .github/workflows/ci.yml ] && echo "  • .github/workflows/ci.yml (backend: ${BACKEND[*]}, frontend: ${FRONTEND:-none})"
   [ -f .github/dependabot.yml ]   && echo "  • .github/dependabot.yml"
@@ -858,6 +926,7 @@ EXPO_TOKEN EXPO_TOKEN (Expo/EAS build, merge-to-main only)
 SONAR_TOKEN SONAR_TOKEN (optional)
 PACT_BROKER_URL PACT_BROKER_URL (optional)
 GH_TOKEN GH_TOKEN (Semantic Release, opt-in only)
+OPENCODE_API_KEY OPENCODE_API_KEY (PR review agent, opt-in only)
 EOF
   true
 }
