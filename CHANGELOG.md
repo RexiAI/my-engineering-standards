@@ -1,3 +1,10 @@
+# [1.21.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.20.0...v1.21.0) (2026-08-19)
+
+
+### Features
+
+* **spec-015:** auditable agent steps — audit contract, check-audit-trail gate, wired into pipeline end ([#31](https://github.com/RexiAI/my-engineering-standards/issues/31)) ([d80d373](https://github.com/RexiAI/my-engineering-standards/commit/d80d37347bcbefbe0e6880838845ce5045f47ff6))
+
 # [1.20.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.19.0...v1.20.0) (2026-08-19)
 
 
