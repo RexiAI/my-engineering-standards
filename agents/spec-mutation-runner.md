@@ -65,7 +65,7 @@ Write `specs/NNN-slug/30-report.md` (the contract is `docs/SPEC_PIPELINE.md
 §Audit contract`). Include, as explicit rows:
 
 - Verifier's verdict (carried forward).
-- Mutation score if run, or the explicit skip reason `skipped — <tier> tier`.
+- Mutation score if run, or "skipped — `<tier>` tier".
 - Complexity summary carried from the Refactorer.
 - Every equivalent mutant named and why it is un-killable.
 - Final test status (the full suite, one final time, and its result).
