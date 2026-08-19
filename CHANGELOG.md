@@ -1,3 +1,17 @@
+# [1.17.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.16.0...v1.17.0) (2026-08-19)
+
+
+### Features
+
+* **spec 011:** blame scoping for design-gate findings + configurable blocking set ([#28](https://github.com/RexiAI/my-engineering-standards/issues/28)) ([f9392f5](https://github.com/RexiAI/my-engineering-standards/commit/f9392f54bf2b30855211084074ba37727420dc2f))
+
+# [1.16.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.15.0...v1.16.0) (2026-08-19)
+
+
+### Features
+
+* **gov:** governance document + trust tiers (spec 010) ([#27](https://github.com/RexiAI/my-engineering-standards/issues/27)) ([978443d](https://github.com/RexiAI/my-engineering-standards/commit/978443d8c38b10b51300d08a788515a17884aad1))
+
 # [1.15.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.14.1...v1.15.0) (2026-08-19)
 
 
