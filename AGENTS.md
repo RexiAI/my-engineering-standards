@@ -45,6 +45,7 @@ This project structure supports Java, Go, JavaScript/TypeScript, and React Nativ
 - Read `docs/SPEC_PIPELINE.md` before running `/spec` or `/build`, or before writing an informal spec under `specs/`.
 - Read `docs/LOOP_ENGINEERING.md` before designing or running a loop (an automated agent cycle with durable state).
 - Read `docs/AGENTS_AND_SKILLS.md` before creating or modifying any agent in `agents/` or skill in `skills/`/`language-specific/`.
+- Read `docs/GOVERNANCE.md` before changing pipeline roles, the gate catalog, or billing constraints — trust tiers, model-assignment discipline, and the ADR requirement live there.
 
 ## OpenCode Go Model Configuration
 
@@ -77,6 +78,36 @@ configuration` for the full mechanism and precedence.
 **Provider fallback**: OpenCode Go falls back to Zen balance if "Use balance" is enabled in console. Otherwise requests error → plugin catches and switches model.
 
 To replicate on another machine: configure the same per-agent entries in `~/.config/opencode/model-fallback.json` (see plugin docs).
+
+## Per-machine agent environment (credentials)
+
+Pipeline agents consume two GitHub credentials per machine — neither is ever
+committed:
+
+- `GITHUB_TOKEN` — GitHub MCP server auth (`okf/mcp-server-connection.md`) and
+  PR diagnostic comments (`docs/TESTING.md`); fine-grained PAT with `repo` scope.
+- `GH_TOKEN` — `gh` CLI / release automation (`docs/CI_CD.md` §Release Process);
+  the spec PR Opener uses it when pushing the spec branch and opening the draft PR.
+
+One-time setup per machine:
+
+```bash
+cp config/agent.local.env.example config/agent.local.env   # committed template → gitignored real file
+# edit config/agent.local.env — fill in the real values
+source scripts/load-env.sh
+```
+
+Source `scripts/load-env.sh` in the shell where `/spec` and `/build` run, so the
+PR Opener and the GitHub MCP server see the variables. Pre-existing exported
+variables are never clobbered; if the real file is missing but the example
+exists the loader fails loudly with the copy-fill step.
+
+**Never commit `config/agent.local.env`.** That rule is structural, not
+advisory: `.gitignore` covers it, `scripts/guard-env.sh` refuses to commit it
+(self-ci + the file child repos wire into `.githooks/pre-commit` per
+`docs/GIT_WORKFLOW.md` §Git Hooks), and `scripts/check-no-hardcoded-secrets.sh`
+scans `agents/`, `commands/`, `scripts/`, `docs/` for literal credential values
+on every push/PR.
 
 ## CI/CD Quality Gates (Saga & Outbox)
 

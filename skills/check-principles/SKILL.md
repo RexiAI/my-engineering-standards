@@ -27,7 +27,37 @@ Run from the repo root (child repos use the submodule path):
 
 # Treat every WARN as a failure (strict gate)
 ./.standards/scripts/check-code-principles.sh --warn-as-error
+
+# Blame scoping: judge only the change against the diff vs <ref>
+./.standards/scripts/check-code-principles.sh -BaseRef <base-ref>
+
+# Restrict which gates may emit FAIL (see severity table below)
+./.standards/scripts/check-code-principles.sh --blocking complexity,property-tests,dry
 ```
+
+# Severity and blocking set
+
+The script runs five gate categories: `complexity` (cyclomatic CC + KISS size
+findings), `dry`, `yagni`, `solid` (SRP/OCP/LSP/ISP/DIP as one unit), and
+`property-tests`. Only the gates in the **blocking set** may emit FAIL; every
+other gate is warn-only — a judgment call that never blocks, with or without
+`-BaseRef`.
+
+| Gate | Default severity | Notes |
+|---|---|---|
+| complexity | **FAIL** (blocking) | CC>6 and KISS size findings. Blame-scoped with `-BaseRef` |
+| property-tests | **FAIL** at `production`+ tier (blocking) | Presence check — never blame-scoped |
+| dry | WARN | Judgment |
+| yagni | WARN | Judgment (single-implementation interfaces are no longer FAIL) |
+| solid | WARN | Judgment (DIP is no longer FAIL) |
+
+Default blocking set: `complexity,property-tests` (the objective gates).
+Override with `--blocking <comma-list>` or the `PRINCIPLES_BLOCKING_GATES`
+environment variable — flag wins over env over default; an unknown gate name or
+an empty value exits 2. With `-BaseRef <ref>`, only files present in the diff
+are evaluated: a blocking-gate finding whose line range overlaps an added line
+is FAIL, pre-existing debt in a touched file is WARN, and findings in untouched
+files are not reported.
 
 # What the script does
 

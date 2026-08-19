@@ -1,0 +1,67 @@
+name: CI Sweeper
+
+# The CI Sweeper loop (spec 017): react to a failing Self CI run, triage it with
+# the ci-triage skill, and at L1 (report-only) report or escalate. The loop body
+# lives in skills/ci-triage/SKILL.md.
+#
+# Activation constraint: a workflow_run-triggered workflow activates only after merging to `main` — the sweeper's first effective run is post-merge, once this
+# file ships. Readiness: the loop runs report-only (L1) — until spec 016's loop
+# foundation lands it must not auto-fix unattended; the ci-triage skill holds
+# the flake rule (never auto-fix) and the infra/config-not-defects rules.
+on:
+  workflow_run:
+    workflows: ["Self CI"]
+    types: [completed]
+
+# Least-privilege (AGENTS.md + docs/LOOP_ENGINEERING.md §Safety): read the repo
+# and the failing run's logs, write issues for escalation only. No broader scope
+# is granted — no push, no merge, no tag creation anywhere in this file, and no
+# merge step exists below.
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+jobs:
+  sweep:
+    name: Sweep failing run
+    runs-on: ubuntu-latest
+    # Early exit when CI is green: the loop reacts only to failures. A green run
+    # is skipped as a no-op — no tokens are spent on a healthy workflow.
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Sweep the exact commit that failed, not the branch head.
+          ref: ${{ github.event.workflow_run.head_sha }}
+          # No credentials in the working tree: the sweeper never pushes, and gh
+          # uses the workflow's GITHUB_TOKEN rather than git credentials.
+          persist-credentials: false
+
+      - name: Install pinned opencode binary
+        run: |
+          set -euo pipefail
+          # Pin lives in scripts/install-opencode.sh — shared with self-ci's
+          # model-env step so both workflows run the same opencode release.
+          bash scripts/install-opencode.sh
+
+      - name: Sweep the failing run with the ci-triage skill
+        env:
+          SWEEPER_RUN_ID: ${{ github.event.workflow_run.id }}
+          SWEEPER_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          SWEEPER_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          # Make the repo's skills discoverable to opencode (bootstrap step 3c
+          # shape): project skills load from .opencode/skills.
+          mkdir -p .opencode
+          ln -sfn ../skills .opencode/skills
+          # Headless run on a bare runner has no shell profile, so load the
+          # committed defaults for the {env:SPEC_*_MODEL} references in
+          # opencode.json explicitly. Never auto-approve (--auto): the sweep is
+          # L1 report-only.
+          # shellcheck disable=SC1091
+          source scripts/load-model-env.sh
+          /tmp/opencode-bin/opencode run --print-logs \
+            --title "CI Sweeper: Self CI run ${SWEEPER_RUN_ID}" \
+            "Self CI run ${SWEEPER_RUN_ID} on branch ${SWEEPER_HEAD_BRANCH} at ${SWEEPER_HEAD_SHA} failed. Load the ci-triage skill and sweep the failing run: triage the failure, and at L1 report-only report or escalate per the skill."
