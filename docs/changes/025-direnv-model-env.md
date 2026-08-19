@@ -851,3 +851,6 @@ Every acceptance scenario (48/48 AC-025-* sub-IDs, zero dangling) is cited and g
 ## Remediation record
 
 None. No BLOCK occurred during this Mutation Runner run. `25-verification.md` contains no re-verification attempt entries (no phase/attempt counts to carry forward), so per the agent contract the record is `none` rather than a fabricated phase and attempt count. The pre-existing baseline findings (ci/templates complexity FAILs, archived-spec traceability citations) were flagged to the Architect by the Verifier as remediation items, not BLOCKs of this run.
+
+PR: https://github.com/RexiAI/my-engineering-standards/pull/41
+Commits: 7
