@@ -117,6 +117,28 @@ else
     echo "[SKIP] PR template already exists"
 fi
 
+# 4b. direnv — .envrc for spec-pipeline model config + agent credentials
+# (see docs/SPEC_PIPELINE.md §Model configuration). The child .envrc inherits
+# the parent standards repo's committed model defaults and loads this child's
+# own gitignored overrides/credentials.
+echo ""
+echo "--- direnv (.envrc) ---"
+if [ ! -f "$REPO_ROOT/.envrc" ]; then
+    cp "$STANDARDS_DIR/templates/.envrc.child" "$REPO_ROOT/.envrc"
+    echo "[COPY] templates/.envrc.child -> .envrc"
+    echo "  Allow it once: cd . && direnv allow"
+else
+    echo "[SKIP] .envrc already exists"
+fi
+# Ensure the per-machine env files are gitignored in the child repo.
+if [ ! -f "$REPO_ROOT/config/.gitignore" ]; then
+    mkdir -p "$REPO_ROOT/config"
+    printf 'model.local.env\nagent.local.env\n' > "$REPO_ROOT/config/.gitignore"
+    echo "[WRITE] config/.gitignore (model.local.env, agent.local.env)"
+else
+    echo "[SKIP] config/.gitignore already exists"
+fi
+
 # 4. Detect project type and copy language-specific configs
 LANG_DETECTED=""
 if [ -f "$REPO_ROOT/pom.xml" ]; then
@@ -229,8 +251,11 @@ echo ""
 echo "=== Bootstrap complete ==="
 echo "Next steps:"
 echo "  1. Review and commit the new files:"
-echo "     git add .standards AGENTS.md opencode.json okf .github/ Makefile"
-echo "  2. OpenCode will auto-discover AGENTS.md and load instructions from .standards/"
-echo "  3. Run session hygiene check: ./session-start-check.sh"
-echo "  4. Push and verify CI pipeline runs"
-echo "  5. Read OKF practices: open okf/index.md (after commit, markdown render)"
+echo "     git add .standards AGENTS.md opencode.json okf .github/ Makefile .envrc config/"
+echo "  2. Allow and load the env (model config + credentials):"
+echo "     eval \"\$(direnv hook bash)\"    # one-time, if not already in your shell profile"
+echo "     direnv allow"
+echo "  3. OpenCode will auto-discover AGENTS.md and load instructions from .standards/"
+echo "  4. Run session hygiene check: ./session-start-check.sh"
+echo "  5. Push and verify CI pipeline runs"
+echo "  6. Read OKF practices: open okf/index.md (after commit, markdown render)"

@@ -1,0 +1,25 @@
+# direnv — child repo: inherit the parent engineering-standards model config,
+# then apply per-child overrides.
+#
+# Model config: defaults to the standards repo's COMMITTED model assignments
+# via the submodule loader. The .standards/ submodule never carries gitignored
+# per-machine files, so parent overrides do NOT propagate — "default to the
+# parent" means the committed defaults.
+#   Per-child override (gitignored) — copy the parent example and edit any
+#   SPEC_*_MODEL lines you want to change:
+#     cp .standards/config/model.local.env.example config/model.local.env
+#
+# Agent credentials: this child's own gitignored config/agent.local.env
+# (GITHUB_TOKEN, GH_TOKEN). Copy the template and fill in real values:
+#     cp .standards/config/agent.local.env.example config/agent.local.env
+#
+# One-time per-machine setup:
+#   eval "$(direnv hook bash)"          # or: eval "$(direnv hook zsh)"
+#   direnv allow                        # trust this file the first time
+#
+# --emit: run the loader in a clean subshell and eval its export lines
+# (sourcing it here is unsafe — its unsets collide with direnv's shell state).
+# `bash <script>` runs it without needing the +x bit (it is source-oriented).
+eval "$(bash .standards/scripts/load-model-env.sh --emit)"
+dotenv_if_exists config/model.local.env
+dotenv_if_exists config/agent.local.env

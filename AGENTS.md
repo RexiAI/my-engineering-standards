@@ -64,14 +64,15 @@ This repo's spec pipeline agents are configured to use OpenCode Go subscription 
 
 Per-machine values come from the gitignored `config/model.local.env` (falling
 back to the committed `config/model.local.env.example` defaults) via
-`scripts/load-model-env.sh`, wired into your shell profile once
-(`source <repo>/scripts/load-model-env.sh`). Switching a model means editing
-`config/model.local.env` and restarting opencode — **no commit, no PR**.
-`scripts/check-model-env.sh` enforces structurally that `opencode.json` keeps no
-literal model id and the real env file is never tracked; self-ci additionally
-downloads a pinned opencode binary and runs `scripts/model-env.runtime-check.sh`
-to verify the resolution behavior. See `docs/SPEC_PIPELINE.md §Model
-configuration` for the full mechanism and precedence.
+`scripts/load-model-env.sh`, loaded by direnv from the repo-root `.envrc`
+(`eval "$(direnv hook bash)"` once, then `direnv allow`). Switching a model
+means editing `config/model.local.env` and restarting opencode — **no commit,
+no PR**. `scripts/check-model-env.sh` enforces structurally that `opencode.json`
+keeps no literal model id and the real env file is never tracked; self-ci
+additionally downloads a pinned opencode binary and runs
+`scripts/model-env.runtime-check.sh` to verify the resolution behavior. See
+`docs/SPEC_PIPELINE.md §Model configuration` for the full mechanism and
+precedence.
 
 **Plugin triggers**: `rate_limit`, `quota_exceeded`, `5xx`, `timeout`, `overloaded`. Cooldown: 5 min; retry original after 15 min; max depth: 3.
 
@@ -92,15 +93,18 @@ committed:
 One-time setup per machine:
 
 ```bash
-cp config/agent.local.env.example config/agent.local.env   # committed template → gitignored real file
+eval "$(direnv hook bash)"                                # once, if not already in your shell profile
+cp config/agent.local.env.example config/agent.local.env  # committed template → gitignored real file
 # edit config/agent.local.env — fill in the real values
-source scripts/load-env.sh
+direnv allow
 ```
 
-Source `scripts/load-env.sh` in the shell where `/spec` and `/build` run, so the
-PR Opener and the GitHub MCP server see the variables. Pre-existing exported
-variables are never clobbered; if the real file is missing but the example
-exists the loader fails loudly with the copy-fill step.
+The repo-root `.envrc` sources `scripts/load-env.sh`, so any shell that `cd`'s
+into the repo — where `/spec` and `/build` run — has the variables loaded by
+direnv. Pre-existing exported variables are never clobbered; if the real file
+is missing but the example exists the loader fails loudly with the copy-fill
+step. Child repos get the same behavior from their own `.envrc` (see
+`docs/SPEC_PIPELINE.md §Model configuration`).
 
 **Never commit `config/agent.local.env`.** That rule is structural, not
 advisory: `.gitignore` covers it, `scripts/guard-env.sh` refuses to commit it

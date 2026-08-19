@@ -432,19 +432,26 @@ not as literals in `opencode.json`.
 
 ### One-time setup (per machine)
 
-1. **Wire the loader into your shell profile once** so every shell exports the
-   model vars automatically before opencode launches:
+1. **Install direnv and wire its shell hook once** so every shell that `cd`'s
+   into this repo loads the model vars before opencode launches:
 
    ```bash
-   echo 'source <repo>/scripts/load-model-env.sh' >> ~/.bashrc   # or ~/.zshrc
+   eval "$(direnv hook bash)"   # or: eval "$(direnv hook zsh)"
    ```
 
-   The loader is never sourced per-launch by hand — the profile wiring is the
-   mechanism. It exports the 8 `SPEC_*_MODEL` vars with the committed defaults
+2. **Allow this repo's `.envrc`** (committed at the repo root). It sources
+   `scripts/load-model-env.sh`, which is never invoked by hand — direnv is the
+   trigger:
+
+   ```bash
+   direnv allow
+   ```
+
+   The loader exports the 8 `SPEC_*_MODEL` vars with the committed defaults
    when no override file exists, so the steady state (no env file present)
    resolves to the defaults with no empty-string breakage.
 
-2. **Only if you want to override a model** (otherwise skip this entirely):
+3. **Only if you want to override a model** (otherwise skip this entirely):
 
    ```bash
    cp config/model.local.env.example config/model.local.env
@@ -455,6 +462,17 @@ not as literals in `opencode.json`.
    required after any change. **No commit, no PR** — `config/model.local.env`
    is gitignored and can never be committed.
 
+**Child repos** (repos that consume this repo as a `.standards/` submodule):
+`scripts/bootstrap.sh` copies `templates/.envrc.child` to the child root. The
+child's `.envrc` sources `.standards/scripts/load-model-env.sh`, so a child
+defaults to the parent's **committed** model assignments. The `.standards/`
+submodule never carries gitignored per-machine files, so a parent's
+`config/model.local.env` override does **not** propagate to children — that is
+intended. Per-child, per-machine overrides go in the child's own gitignored
+`config/model.local.env` (and credentials in `config/agent.local.env`), which
+the child's `.envrc` loads after the loader so they win over the parent
+defaults.
+
 **Precedence** (per var, first non-empty source wins): a pre-existing exported
 env var > the gitignored `config/model.local.env` when present > the committed
 defaults in `config/model.local.env.example`. The profile wiring is what
@@ -463,12 +481,13 @@ empty — this opencode build has **no default syntax** (`{env:VAR:-default}`,
 `{env:VAR|default}`, and `{env:VAR=default}` all resolve to `""` when unset),
 so the defaults must arrive via the loader.
 
-**Boundary, honestly documented**: the supported launch path is shell-launched
-opencode — interactive shells, and shells spawned from them (`opencode run`,
-`/spec`, `/build`, subagents), all inherit the exported vars. A GUI or
-daemon-launched opencode that spawns no interactive shell will not have the
-vars; the loader's fail-loudly branch (exit 1, naming the var) surfaces that
-state instead of silently shipping empty models.
+**Boundary, honestly documented**: the supported launch path is opencode
+launched from a direnv-loaded shell — interactive shells with `.envrc` allowed,
+and shells spawned from them (`opencode run`, `/spec`, `/build`, subagents),
+all inherit the exported vars. A GUI or daemon-launched opencode that spawns no
+interactive shell (or a shell whose `.envrc` was not `direnv allow`-ed) will not
+have the vars; the loader's fail-loudly branch (exit 1, naming the var)
+surfaces that state instead of silently shipping empty models.
 
 **Structural enforcement**: `scripts/check-model-env.sh` is the gate — every
 `agent.*.model` must be an `{env:SPEC_*_MODEL}` reference (no literal model id

@@ -190,10 +190,10 @@ fi
 header="$ROOT/config/model.local.env.example"
 if grep -q 'load-model-env.sh' "$header" && grep -q 'config/model.local.env' "$header" \
    && grep -qi 'restart' "$header" && grep -qi 'never commit' "$header" \
-   && grep -qi 'shell profile' "$header"; then
-  ok "AC-020-02-04 header documents profile wiring, optional copy, restart, never commit"
+   && grep -qi 'direnv' "$header"; then
+  ok "AC-020-02-04 header documents direnv wiring, optional copy, restart, never commit"
 else
-  bad "AC-020-02-04 header documents profile wiring, optional copy, restart, never commit"
+  bad "AC-020-02-04 header documents direnv wiring, optional copy, restart, never commit"
 fi
 
 echo "== AC-020-03 gitignore =="

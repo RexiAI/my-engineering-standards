@@ -9,13 +9,16 @@
 #   2. config/model.local.env         (gitignored per-machine override),
 #   3. config/model.local.env.example (committed defaults).
 #
-# Default mechanism — source it from your shell profile once:
-#   echo 'source <repo>/scripts/load-model-env.sh' >> ~/.bashrc   # or ~/.zshrc
-# Every shell then exports the vars automatically before opencode launches.
-# It is never intended to be sourced per-launch by hand.
+# Two consumption modes:
+#   source scripts/load-model-env.sh [PROJECT_ROOT]   # export in-place (profile-era)
+#   eval "$(scripts/load-model-env.sh --emit [PROJECT_ROOT])"   # direnv .envrc
 #
-# Usage:
-#   source scripts/load-model-env.sh [PROJECT_ROOT]
+# --emit prints `export VAR=value` lines to stdout instead of exporting
+# in-place, so a direnv .envrc can run the loader in a clean subshell (command
+# substitution) and eval the output. Sourcing inside direnv is unsafe: the
+# loader's "leave no trace" unsets collide with direnv's function-wrapped shell
+# state. --emit keeps the loader as the single resolution engine for both
+# trigger mechanisms.
 #
 # PROJECT_ROOT is the directory whose config/ holds the env files. It defaults
 # to the repo root, derived from this script's own location (the parent of the
@@ -76,8 +79,12 @@ _model_env_resolve() {
 }
 
 model_env_main() {
-  local root="${1:-}"
-  local script_dir local_lines example_lines var value unresolved=0
+  local emit=0 root script_dir local_lines example_lines var value unresolved=0
+  if [ "$#" -gt 0 ] && [ "$1" = "--emit" ]; then
+    emit=1
+    shift
+  fi
+  root="${1:-}"
 
   if [ -z "$root" ]; then
     script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -92,6 +99,8 @@ model_env_main() {
     if [ -z "$value" ]; then
       echo "ERROR: $var resolves from no source (process env, config/model.local.env, config/model.local.env.example). Export it or fix config/model.local.env.example." >&2
       unresolved=1
+    elif [ "$emit" -eq 1 ]; then
+      printf 'export %s=%q\n' "$var" "$value"
     else
       export "$var=$value"
     fi

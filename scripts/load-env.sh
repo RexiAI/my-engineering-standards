@@ -14,10 +14,16 @@
 # (exit 0) — a repo with nothing configured runs fine.
 #
 # Usage:
-#   source scripts/load-env.sh [PROJECT_ROOT]    # or run: bash scripts/load-env.sh [PROJECT_ROOT]
-# PROJECT_ROOT is the directory whose config/ holds the env files. It defaults
-# to the repo root (parent of scripts/). Pass it explicitly to run against
-# scratch fixtures (selftest).
+#   source scripts/load-env.sh [PROJECT_ROOT]    # export in-place (profile-era)
+#   eval "$(scripts/load-env.sh --emit [PROJECT_ROOT])"   # direnv .envrc
+#
+# --emit prints `export KEY=value` lines to stdout instead of exporting
+# in-place, so a direnv .envrc can run the loader in a clean subshell (command
+# substitution) and eval the output. Sourcing inside direnv is unsafe (the
+# loader's unsets collide with direnv's shell state). PROJECT_ROOT is the
+# directory whose config/ holds the env files. It defaults to the repo root
+# (parent of scripts/). Pass it explicitly to run against scratch fixtures
+# (selftest).
 #
 #
 # Exit codes:
@@ -30,7 +36,7 @@ set -euo pipefail
 # variables never clobbered. Always returns 0 — the caller decides how to treat
 # presence/absence.
 _load_env_export() {
-  local file="$1" line var
+  local file="$1" emit="$2" line var
   while IFS= read -r line; do
     case "$line" in
       '' | \#*) continue ;;
@@ -41,8 +47,10 @@ _load_env_export() {
         var="${line%%=*}"
         case "$var" in
           [A-Za-z_][A-Za-z0-9_]*)
-            # No-clobber: only export when not already set (non-empty).
-            if [ -z "${!var:-}" ]; then
+            if [ "$emit" -eq 1 ]; then
+              printf 'export %q\n' "$line"
+            elif [ -z "${!var:-}" ]; then
+              # No-clobber: only export when not already set (non-empty).
               export "$line"
             fi
             ;;
@@ -53,8 +61,12 @@ _load_env_export() {
 }
 
 load_env_main() {
-  local root="${1:-}"
-  local script_dir real example rc=0
+  local emit=0 root script_dir real example rc=0
+  if [ "$#" -gt 0 ] && [ "$1" = "--emit" ]; then
+    emit=1
+    shift
+  fi
+  root="${1:-}"
   if [ -z "$root" ]; then
     script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     root="$(dirname "$script_dir")"
@@ -63,7 +75,7 @@ load_env_main() {
   example="$root/config/agent.local.env.example"
 
   if [ -f "$real" ]; then
-    _load_env_export "$real"
+    _load_env_export "$real" "$emit"
   elif [ -f "$example" ]; then
     echo "ERROR: $real not found, but $example exists. Copy it and fill in real values:" >&2
     echo "  cp config/agent.local.env.example config/agent.local.env" >&2
