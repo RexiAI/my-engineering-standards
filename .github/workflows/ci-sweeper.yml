@@ -58,10 +58,11 @@ jobs:
           ln -sfn ../skills .opencode/skills
           # Headless run on a bare runner has no shell profile, so load the
           # committed defaults for the {env:SPEC_*_MODEL} references in
-          # opencode.json explicitly. Never auto-approve (--auto): the sweep is
-          # L1 report-only.
+          # opencode.json explicitly with the dotenv-equivalent (the same
+          # effect as the .envrc's first dotenv_if_exists line). Never
+          # auto-approve (--auto): the sweep is L1 report-only.
           # shellcheck disable=SC1091
-          source scripts/load-model-env.sh
+          set -a; . config/model.local.env.example; set +a
           /tmp/opencode-bin/opencode run --print-logs \
             --title "CI Sweeper: Self CI run ${SWEEPER_RUN_ID}" \
             "Self CI run ${SWEEPER_RUN_ID} on branch ${SWEEPER_HEAD_BRANCH} at ${SWEEPER_HEAD_SHA} failed. Load the ci-triage skill and sweep the failing run: triage the failure, and at L1 report-only report or escalate per the skill."

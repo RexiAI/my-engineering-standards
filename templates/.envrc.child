@@ -1,0 +1,24 @@
+# Per-machine direnv environment for a child repo consuming this repo as a
+# .standards/ submodule (spec 025).
+#
+# ONE-TIME SETUP:
+#   1. Install direnv (https://direnv.net) and wire the hook once in your
+#      shell profile:
+#        eval "$(direnv hook bash)"   # or your shell's hook
+#   2. This file is written for you by ./.standards/scripts/bootstrap.sh
+#      (a copy of templates/.envrc.child). If you created it by hand instead,
+#      run `direnv allow` at the child repo root. The child .envrc is
+#      PER-MACHINE and gitignored — NEVER commit it.
+#
+# WHAT EACH LINE LOADS (later lines win: a dotenv line clobbers any
+# pre-existing value — the .envrc is the per-directory source of truth):
+#   1. .standards/config/model.local.env.example — the PARENT.s committed defaults for
+#      the 8 SPEC_*_MODEL vars. The submodule never carries
+#      gitignored files, so a parent's per-machine override never propagates;
+#      this line always resolves against the committed example only.
+#   2. config/model.local.env — this child's gitignored per-machine override.
+#   3. config/agent.local.env — this child's gitignored per-machine
+#      credentials (GITHUB_TOKEN, GH_TOKEN).
+dotenv_if_exists .standards/config/model.local.env.example
+dotenv_if_exists config/model.local.env
+dotenv_if_exists config/agent.local.env

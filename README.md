@@ -11,15 +11,17 @@ git submodule add git@github.com:RexiAI/my-engineering-standards.git .standards
 
 ## Model Configuration (one-time setup)
 
-The `spec-*` agents resolve their model from `{env:SPEC_*_MODEL}` references. Per-machine values come from the gitignored `config/model.local.env` (falling back to the committed `config/model.local.env.example` defaults) via `scripts/load-model-env.sh`.
+The `spec-*` agents resolve their model from `{env:SPEC_*_MODEL}` references. Per-machine values arrive via the gitignored repo-root `.envrc` (direnv), which loads the committed `config/model.local.env.example` defaults, then the gitignored `config/model.local.env` override, then `config/agent.local.env` credentials — each via a `dotenv_if_exists` line (later lines win).
 
-Wire the loader into your shell profile **once** so every shell exports the vars before OpenCode launches:
+One-time setup per machine:
 
 ```bash
-echo 'source <repo>/scripts/load-model-env.sh' >> ~/.bashrc   # or ~/.zshrc
+eval "$(direnv hook bash)"          # wire the hook once in your shell profile
+cp templates/.envrc.example .envrc  # per-machine copy, gitignored
+direnv allow                        # load it at the repo root
 ```
 
-Switching a model means editing `config/model.local.env` and restarting OpenCode — no commit, no PR. See `docs/SPEC_PIPELINE.md` for details.
+Switching a model means editing the gitignored `config/model.local.env` and restarting OpenCode — no commit, no PR. See `docs/SPEC_PIPELINE.md` for details.
 
 ## OKF — Operational Knowledge Framework
 
