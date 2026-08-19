@@ -52,10 +52,18 @@ else
   # Strip $schema lines before the whole-file literal scan so the schema URL's
   # slashes cannot false-positive; then flag any remaining provider/model-style
   # token (X/Y) — a literal model id anywhere in the file is a violation.
-  scan="$(sed -E 's/"[[:space:]]*\$schema[[:space:]]*"[[:space:]]*:[[:space:]]*"[^"]*"[[:space:]]*,?//' "$OPENCODE_JSON")"
+  # The pr-review provider block (spec 024) is carved out before the scan: it
+  # legitimately carries the OpenCode Zen endpoint URL and the provider-side
+  # model name, neither of which is an agent model id. The scan's job is to
+  # keep the *agent block* env-reference-only — the pr-review agent's model pin
+  # lives in agents/pr-review.md frontmatter (the one deliberate exception,
+  # spec 024), not in opencode.json. The provider block is the last top-level
+  # key, so deleting from its opening line to EOF is sufficient.
+  scan="$(sed -E 's/"[[:space:]]*\$schema[[:space:]]*"[[:space:]]*:[[:space:]]*"[^"]*"[[:space:]]*[,]?//' "$OPENCODE_JSON")"
+  scan="$(sed -E '/^[[:space:]]*"provider"[[:space:]]*:/,$d' <<< "$scan")"
   literal_line="$(printf '%s\n' "$scan" | grep -nE '[A-Za-z0-9._-]+/[A-Za-z0-9._-]+' | head -1 || true)"
   if [ -n "$literal_line" ]; then
-    fail "literal provider/model id found in opencode.json (line $literal_line) — every agent.*.model must be an {env:SPEC_*_MODEL} reference"
+    fail "literal provider/model id found in opencode.json agent block (line $literal_line) — every agent.*.model must be an {env:SPEC_*_MODEL} reference"
   fi
 
   # Per-agent exact-match on model values; one agent per line.

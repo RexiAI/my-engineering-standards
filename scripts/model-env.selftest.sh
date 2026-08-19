@@ -130,10 +130,23 @@ if [ "$RUN_RC" -eq 0 ]; then
 else
   bad "AC-020-01-01 check-model-env passes on the real repo (rc=$RUN_RC): $(tr '\n' ' ' < "$TMP/o")"
 fi
-if grep -rqE '^model:[[:space:]]' "$ROOT/agents" 2>/dev/null; then
-  bad "AC-020-01-01 no shipped agent file declares a model: key"
+# The pr-review agent (spec 024) is the one deliberate exception to "shipped
+# agents ship without model:": its frontmatter carries a literal
+# `model: opencode-go/kimi-k3` pin (AC-024-01-02) that must NOT be an
+# {env:...} reference, and it lives in the agent file, not in opencode.json
+# (which check-model-env.sh's env-reference rule governs). Every other shipped
+# agent must still ship without a model: key — a second pinned agent would
+# silently beat its {env:...} reference and break the per-machine override.
+if grep -rqE '^model:[[:space:]]' "$ROOT/agents" --exclude='pr-review.md' 2>/dev/null; then
+  bad "AC-020-01-01 every shipped agent except agents/pr-review.md ships without a model: key (agent-file model would beat the {env:...} reference)"
 else
-  ok "AC-020-01-01 no shipped agent file declares a model: key (agent-file model would beat the {env:...} reference)"
+  ok "AC-020-01-01 every shipped agent except agents/pr-review.md ships without a model: key"
+fi
+if [ -f "$ROOT/agents/pr-review.md" ] \
+   && grep -q '^model: opencode-go/kimi-k3$' "$ROOT/agents/pr-review.md"; then
+  ok "AC-020-01-01 the pr-review agent carries the deliberate literal model: pin opencode-go/kimi-k3 (spec 024)"
+else
+  bad "AC-020-01-01 the pr-review agent must carry the literal model: pin opencode-go/kimi-k3"
 fi
 
 echo "== AC-020-02 committed example template =="
