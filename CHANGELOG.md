@@ -1,3 +1,10 @@
+# [1.16.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.15.0...v1.16.0) (2026-08-19)
+
+
+### Features
+
+* **gov:** governance document + trust tiers (spec 010) ([#27](https://github.com/RexiAI/my-engineering-standards/issues/27)) ([978443d](https://github.com/RexiAI/my-engineering-standards/commit/978443d8c38b10b51300d08a788515a17884aad1))
+
 # [1.15.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.14.1...v1.15.0) (2026-08-19)
 
 
