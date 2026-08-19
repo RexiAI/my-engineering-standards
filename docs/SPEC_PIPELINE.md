@@ -471,19 +471,46 @@ vars; the loader's fail-loudly branch (exit 1, naming the var) surfaces that
 state instead of silently shipping empty models.
 
 **Structural enforcement**: `scripts/check-model-env.sh` is the gate — every
-`agent.*.model` must be an `{env:SPEC_*_MODEL}` reference (no literal model id
-anywhere in `opencode.json`), `config/model.local.env` must never be tracked by
-git, and the example must define exactly the referenced vars. Self-ci
-additionally downloads a pinned opencode binary and runs
-`scripts/model-env.runtime-check.sh` against a scratch project to verify the
-actual resolution behavior in three cases (defaults via loader, overrides win,
-loader absent → empty).
+`agent.*.model` in the `agent` block must be an `{env:SPEC_*_MODEL}` reference
+(no literal model id in the agent block; the pr-review agent's pinned
+`opencode-go/kimi-k3` model and the OpenCode Zen provider block are the
+deliberate exceptions, see `§Using OpenCode Zen` below), `config/model.local.env`
+must never be tracked by git, and the example must define exactly the
+referenced vars. Self-ci additionally downloads a pinned opencode binary and
+runs `scripts/model-env.runtime-check.sh` against a scratch project to verify
+the actual resolution behavior in three cases (defaults via loader, overrides
+win, loader absent → empty).
 
 If you need to customize an agent's prompt or permissions, not just its model, run
 `./scripts/bootstrap.sh --copy-agents` (or `make init-ai COPY_AGENTS=1`) to get real,
 editable files in `.opencode/agents/` and `.opencode/commands/` instead of a
 symlink. You own the copies after that — re-run with the same flag after a
 submodule update to pull in changes; it will not overwrite or merge your edits.
+
+## Using OpenCode Zen
+
+[OpenCode Zen](https://opencode.ai/docs/zen) is the provider behind the
+`opencode-go/*` model ids used across this repo. It is wired in two places:
+
+- **Provider config** — `opencode.json` carries a `provider.opencode-go` block:
+  base URL `https://opencode.ai/zen/go/v1`, auth env var `OPENCODE_API_KEY`, and
+  the model ids available to it. The spec-pipeline agents still resolve their
+  models from `{env:SPEC_*_MODEL}` references (see `§Model configuration`); the
+  provider block is what those references point at.
+- **Auth** — the provider reads the `OPENCODE_API_KEY` env var (verified
+  against the pinned binary's provider registry, see `docs/changes/019`). Locally
+  the var is exported by your shell profile; in CI it arrives from the
+  `OPENCODE_API_KEY` GitHub Actions secret and is never committed.
+
+**The one deliberate model pin**: `agents/pr-review.md` (the PR review agent,
+spec 024) carries a literal `model: opencode-go/kimi-k3` in its frontmatter —
+not an `{env:...}` reference. This is the exception to the "agents ship without
+`model:`" convention: the PR review agent is a standalone, PR-time reviewer
+unrelated to the spec-pipeline stages, and its model must not be per-machine
+overridable through `agent.*.model` in `opencode.json`. Everything about that
+agent — scope lock, permissions, endpoint, secret handling, cost bounds — is
+documented in `docs/CI_CD.md §PR Review Agent`, which is the authoritative
+reference for wiring it into child repos (`init-ci.sh --with-pr-review`).
 
 ## Tooling by language
 
