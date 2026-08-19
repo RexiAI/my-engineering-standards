@@ -12,6 +12,10 @@
 #      not a placeholder (<...>), not a variable reference (${...} or \${...}),
 #      not a quoted string, and not the word PLACEHOLDER or a YOUR_* hint.
 #
+# docs/changes/ is excluded: archived spec one-pagers embed the 30-report, which
+# legitimately quotes token-prefix patterns and selftest fixtures as
+# documentation — historical records, not live credentials.
+#
 # Prints each match as file:line and exits 1 on any match. The pattern
 # definitions are assembled at runtime by string concatenation so scanning
 # this file — and the selftest under scripts/, both in scope — stays clean; a
@@ -77,7 +81,7 @@ scan_root() {
         if is_ignored_rhs "$rhs"; then continue; fi
         report_hit "$file" "${hit%%:*}" "secret-style assignment: $text"
       done < <(grep -nE "$ASSIGN_RE" "$file" || true)
-    done < <(find "$root/$dir" -type f -print0 2>/dev/null || true)
+    done < <(find "$root/$dir" -type f -not -path "*/docs/changes/*" -print0 2>/dev/null || true)
   done
 }
 
