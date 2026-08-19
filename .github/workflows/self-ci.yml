@@ -163,6 +163,11 @@ jobs:
       - name: Run loop files check
         run: ./scripts/check-loop-files.sh
 
+      # Daily Triage loop gate (spec 019): the check script doubles as the
+      # spec's test carrier, so a missing deliverable fails the Validate job.
+      - name: Check Daily Triage loop deliverables
+        run: ./scripts/check-loop-triage.sh
+
       # PR Babysitter loop gate (spec 018): the check script doubles as the
       # spec's test carrier, so a missing deliverable fails the Validate job.
       - name: Check PR Babysitter loop deliverables
