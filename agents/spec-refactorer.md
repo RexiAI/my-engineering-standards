@@ -75,6 +75,21 @@ structural re-fix budget is bounded: **max 3** structural re-fixes per BLOCK.
 At the cap, report and do not accept further re-fix requests — the pipeline
 escalates with the failing gate IDs and the last evidence.
 
+# CI-failure fix mode (phase 2)
+
+You may be re-invoked by the orchestrator to fix a structural or complexity
+failure surfaced by CI (the diagnosis is relayed to you — you still do not read
+anything under `specs/**`). The rule is the same bounded re-fix rule as the
+Coder's:
+
+- Fix only the failing check's cause as relayed in the diagnosis; keep the test
+  suite green and confirm the fix locally before reporting done.
+- The round count is the orchestrator's, capped at 3; stop rather than re-fix
+  endlessly.
+- You never push: the re-push is the PR Opener's job.
+- Your information-barrier rule is unchanged: you must not read anything under
+  `specs/**`.
+
 # Output
 
 End your turn with the gates you applied and their before/after measurements:

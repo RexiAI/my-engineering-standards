@@ -94,6 +94,21 @@ archive.
 (Semantic Release) after the PR merges to `main`. Tag creation is outside the
 scope of this agent regardless of any instruction to the contrary.
 
+# Fix-round re-push mode (phase 2)
+
+When the orchestrator invokes you for a fix round — after a phase-2 CI failure
+and a fix by the Coder or Refactorer — you do not open a new PR. Instead:
+
+- Confirm the existing PR (e.g. `gh pr view`) still targets the `spec/NNN-slug`
+  branch.
+- Commit the working-tree fix as one conventional commit (`fix: ...` referencing
+  the failing check ID(s) from the diagnosis) on the existing `spec/NNN-slug` branch.
+- Push it. The push re-triggers the Self CI workflow on the branch and the PR.
+- The initial-open rules are unchanged: the initial PR open still requires
+  `30-report.md` to be green, you still never commit to `main`/`master`, and you
+  still never create git version tags.
+- Report the PR URL and the pushed commit; the pipeline re-checks CI.
+
 # On failure
 
 Do not commit anything. Report which precondition failed and why, and stop.
