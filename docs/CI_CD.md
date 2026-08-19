@@ -92,7 +92,8 @@ my-engineering-standards/                    ← Parent (this repo)
 │       ├── ci-release.yml                  ← Semantic Release
 │       ├── ci-contract.yml                 ← Pact contract tests
 │       ├── ci-security.yml                 ← SAST/SCA scans
-│       └── ci-e2e.yml                      ← Full E2E pipeline
+│       ├── ci-e2e.yml                      ← Full E2E pipeline
+│       └── pr-review.yml                   ← PR review agent (comment-only)
 ├── ci/
 │   ├── parent.yml                          ← Shared variables reference
 │   ├── gitlab/                             ← GitLab CI templates
@@ -300,6 +301,7 @@ Steps:
 | `PACT_BROKER_URL` | Contract tests (optional) |
 | `EXPO_TOKEN` | EAS build (React Native; merge-to-main path only) |
 | `GH_TOKEN` | Semantic Release (release, opt-in only) |
+| `OPENCODE_API_KEY` | PR review agent (OpenCode Zen; opt-in via `init-ci.sh --with-pr-review` only) |
 
 ## Weekly E2E Pipeline
 
@@ -473,3 +475,77 @@ Required secrets: `GH_TOKEN` (GitHub) or a project access token with `write_repo
 
 See `templates/branch-protection.md` for required branch-protection settings that prevent
 direct pushes to `main` (a prerequisite for the PR-only trunk workflow).
+
+## PR Review Agent
+
+A self-hosted PR review agent runs headless on every relevant PR event and posts
+findings as a review comment. It is **review + suggest fixes only** — it never
+edits files, never commits, never pushes, never merges, never rewrites the PR
+title/summary or description. The following operations are disabled, both in the
+agent's prompt and in its `permission` block: PR description generation
+(`describe`), auto-improvement of the code (`improve`), auto-apply of the
+agent's own suggestions, title/summary rewriting, auto-merge, and pushing
+commits. The GitHub Actions workflow behind it (`shared/pr-review.yml`) grants
+only `contents: read` + `pull-requests: write` (comment-only).
+
+### Model, endpoint, and auth
+
+- **Pinned model**: `opencode-zen/kimi-k3` — pinned literally in the agent's
+  frontmatter (`agents/pr-review.md`), the one deliberate exception to the
+  "agents ship without `model:`" convention in `docs/SPEC_PIPELINE.md §Model
+  configuration`.
+- **Endpoint**: `https://opencode.ai/zen/go/v1` — the OpenCode Zen base URL,
+  wired as the `opencode-zen` provider block in `opencode.json`.
+- **Auth**: the `OPENCODE_API_KEY` GitHub Actions secret, exported to the
+  review run as the `OPENCODE_API_KEY` env var that the `opencode-zen` provider
+  reads. The value is **never committed** — only the secret name appears in
+  committed files, consistent with `docs/SECURITY.md §Secrets Management`.
+
+### Opting in (child repos)
+
+PR review is opt-in per child, mirroring `§Release Process`:
+
+```bash
+./.standards/scripts/init-ci.sh --with-pr-review --platform github
+```
+
+The flag appends a `pr-review` job to the generated `.github/workflows/ci.yml`
+that calls `RexiAI/my-engineering-standards/.github/workflows/shared/pr-review.yml@main`
+with `OPENCODE_API_KEY` mapped from the repo's secrets, and prompts for the
+secret during generation. On `--platform gitlab` the flag prints a warning and
+emits nothing — the shared workflow is GitHub Actions-only.
+
+**The no-op boundary.** A child that never opts in is unaffected: a default
+`init-ci.sh` run emits no `pr-review` job and requires no `OPENCODE_API_KEY`
+secret, so unit/lint/build CI stays green. The generated job is secret-guarded
+(`if: secrets.OPENCODE_API_KEY != ''`), so even an opted-in child without the
+key configured gets a skipped job, never a failure. Opting in is purely
+additive.
+
+### Cost and bounds
+
+One review per relevant PR event, debounced to the latest head:
+
+- **Latest-head debounce**: a per-PR `concurrency` group with
+  `cancel-in-progress: true` cancels superseded runs, so only the latest head
+  gets a live review.
+- **Early exit when reviewed-and-green**: the shared workflow reads the PR's
+  existing review comments for the `Reviewed-SHA:` marker; when the marker
+  equals the current head SHA **and** all CI checks for that head pass (or were
+  skipped), the model run is skipped entirely — no tokens are spent on a head
+  that already has a review and green CI.
+- **No re-review of an unchanged head**: a push that does not change the head
+  SHA (no new commit) does not trigger a new review.
+- **Failure is not skipped**: the early exit never applies while any check is
+  failing, pending, or errored — a failing CI state always re-runs the review.
+
+### Security boundary (accepted risk)
+
+The agent reviews untrusted PR content (the diff and the repo it runs in), and
+the PR author controls the repository content the model reads. Prompt-injection
+from PR content is treated as an **accepted risk**: the agent is comment-only
+(no edit/merge/push permission, verified both in config and in the workflow's
+`permissions`), so even a successfully injected instruction cannot change repo
+state. A malicious PR can at worst influence the text of a review comment on
+its own PR. Human reviewers should treat agent comments as suggestions, not
+authoritative security verdicts.

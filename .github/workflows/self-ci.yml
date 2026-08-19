@@ -173,6 +173,13 @@ jobs:
       - name: Check PR Babysitter loop deliverables
         run: ./scripts/check-pr-babysitter.sh
 
+      # PR review agent gate (spec 024): the check script doubles as the
+      # spec's test carrier, so a missing deliverable fails the Validate job.
+      - name: Check PR review agent deliverables
+        run: |
+          ./scripts/check-pr-review.sh
+          ./scripts/check-pr-review.selftest.sh
+
       - name: Check remediation budget
         run: ./scripts/check-remediation-budget.sh
 

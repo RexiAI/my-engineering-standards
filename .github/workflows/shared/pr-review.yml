@@ -1,0 +1,118 @@
+name: PR Review Agent
+
+# Shared PR review workflow (spec 024): run the pr-review agent headless
+# against a PR and post findings as a review comment. Review + suggest fixes
+# only — the agent's permission block denies edits and this workflow grants no
+# write capability beyond posting a comment. Comment-only by construction: no
+# repo-content write, no merge, no push step anywhere in this file.
+#
+# Consumers (child repos via init-ci.sh --with-pr-review, and this repo's own
+# .github/workflows/pr-review.yml) call this with pr-number + head-sha. The
+# API key secret is optional: a caller without the key gets a skipped job,
+# never a failure.
+
+on:
+  workflow_call:
+    inputs:
+      pr-number:
+        description: Pull request number to review
+        required: true
+        type: number
+      head-sha:
+        description: Head commit SHA of the pull request to review
+        required: true
+        type: string
+    secrets:
+      OPENCODE_API_KEY:
+        description: OpenCode Zen API key for the pinned opencode-zen provider
+        required: false
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    name: Review PR
+    runs-on: ubuntu-latest
+    # Empty-key guard (AC-024-02-03): an absent key yields a skipped job,
+    # never a failure — the PR's required checks are unaffected.
+    if: ${{ secrets.OPENCODE_API_KEY != '' }}
+    env:
+      OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+      PR_NUMBER: ${{ inputs.pr-number }}
+      HEAD_SHA: ${{ inputs.head-sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The calling repository, including its .standards submodule (child
+          # repos resolve the agent from .standards/agents/). No credentials in
+          # the working tree: the reviewer never pushes, and gh uses the
+          # workflow's GITHUB_TOKEN rather than git credentials.
+          submodules: true
+          persist-credentials: false
+
+      - name: Install pinned opencode binary
+        run: |
+          set -euo pipefail
+          # Pin lives in scripts/install-opencode.sh — shared with self-ci and
+          # ci-sweeper so every workflow runs the same opencode release.
+          bash scripts/install-opencode.sh
+
+      - name: Make the pr-review agent discoverable to opencode
+        run: |
+          set -euo pipefail
+          mkdir -p .opencode/agents
+          if [ -f agents/pr-review.md ]; then
+            ln -sfn ../../agents/pr-review.md .opencode/agents/pr-review.md
+          elif [ -f .standards/agents/pr-review.md ]; then
+            ln -sfn ../../.standards/agents/pr-review.md .opencode/agents/pr-review.md
+          else
+            echo "pr-review agent not found (checked agents/pr-review.md and .standards/agents/pr-review.md)" >&2
+            exit 1
+          fi
+
+      # Debounce + early-exit (spec 024): skip the model run when this head was
+      # already reviewed (Reviewed-SHA: marker from a prior comment) and every
+      # CI check for the head passes or was skipped (skipped jobs are not
+      # failures — a skipped run must not re-trigger the review on the next
+      # event). The run proceeds when the head changed or any check fails,
+      # errors, or is pending. Any gh read failure (e.g. restricted token) is
+      # treated as "not all green" — conservative, never a silent skip.
+      - name: Early exit when head already reviewed and CI green
+        id: early-exit
+        run: |
+          set -euo pipefail
+          reviewed_sha=""
+          while IFS= read -r line; do
+            case "$line" in
+              Reviewed-SHA:*)
+                reviewed_sha="${line#Reviewed-SHA: }"
+                ;;
+            esac
+          done < <(gh pr view "${PR_NUMBER}" --json comments --jq '.comments[].body' 2>/dev/null || true)
+          skip="false"
+          if [ -n "$reviewed_sha" ] && [ "$reviewed_sha" = "${HEAD_SHA}" ]; then
+            if gh pr checks "${PR_NUMBER}" --json state --jq 'all(.state == "SUCCESS" or .state == "SKIPPED")' >/dev/null 2>&1; then
+              echo "Head ${HEAD_SHA} already reviewed and all CI checks green — skipping the model run."
+              skip="true"
+            fi
+          fi
+          echo "skip=${skip}" >> "$GITHUB_OUTPUT"
+
+      - name: Review the PR with the pr-review agent
+        if: steps.early-exit.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          # Headless run on a bare runner has no shell profile, so load the
+          # committed defaults for the {env:SPEC_*_MODEL} references in
+          # opencode.json explicitly with the dotenv-equivalent (the same
+          # effect as the .envrc's first dotenv_if_exists line, and the same
+          # pattern as ci-sweeper.yml). No permission auto-approval flag is
+          # passed: the review is comment-only and the agent's permission
+          # block enforces that.
+          # shellcheck disable=SC1091
+          set -a; . config/model.local.env.example; set +a
+          /tmp/opencode-bin/opencode run --print-logs \
+            --agent pr-review \
+            "Review PR ${PR_NUMBER} at head ${HEAD_SHA}: review the PR diff and post findings with concrete suggested fixes only, ending the comment with the Reviewed-SHA marker."

@@ -184,6 +184,26 @@ else
   bad "AC-025-01-01 .envrc on disk: git ls-files non-zero, git check-ignore exit 0"
 fi
 
+# ── AC-020-01 pr-review agent model pin (spec 024) ───────────────────────────
+# The pr-review agent (spec 024) is the one deliberate exception to "shipped
+# agents ship without model:": its frontmatter carries a literal
+# `model: opencode-zen/kimi-k3` pin (AC-024-01-02) that must NOT be an
+# {env:...} reference, and it lives in the agent file, not in opencode.json
+# (which check-model-env.sh's env-reference rule governs). Every other shipped
+# agent must still ship without a model: key — a second pinned agent would
+# silently beat its {env:...} reference and break the per-machine override.
+if grep -rqE '^model:[[:space:]]' "$ROOT/agents" --exclude='pr-review.md' 2>/dev/null; then
+  bad "AC-020-01-01 every shipped agent except agents/pr-review.md ships without a model: key (agent-file model would beat the {env:...} reference)"
+else
+  ok "AC-020-01-01 every shipped agent except agents/pr-review.md ships without a model: key"
+fi
+if [ -f "$ROOT/agents/pr-review.md" ] \
+   && grep -q '^model: opencode-zen/kimi-k3$' "$ROOT/agents/pr-review.md"; then
+  ok "AC-020-01-01 the pr-review agent carries the deliberate literal model: pin opencode-zen/kimi-k3 (spec 024)"
+else
+  bad "AC-020-01-01 the pr-review agent must carry the literal model: pin opencode-zen/kimi-k3"
+fi
+
 # 01-02 / 01-03: template shapes — exactly three dotenv_if_exists lines, in
 # order, no loader words in the executable lines; tracked-or-committable
 for tpl in "$PARENT_TPL" "$CHILD_TPL"; do
