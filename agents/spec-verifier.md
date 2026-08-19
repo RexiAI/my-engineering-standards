@@ -159,6 +159,32 @@ Write `specs/NNN-slug/25-verification.md`:
   `scripts/check-code-principles.sh` and `scripts/check-scenario-traceability.sh`
   with the exit code and JSON/output reproduced, not paraphrased.
 
+# Post-PR CI check (phase 2)
+
+When the orchestrator invokes you for the post-PR CI check — after the PR Opener
+reports the PR URL — run the real CI query against the PR's checks and record the
+verdict:
+
+1. Query the PR's checks: `gh pr checks <PR_NUMBER> --json name,state,bucket,workflow,link`
+   (add `--repo RexiAI/my-engineering-standards` if the remote is not inferred).
+   Record PASS/FAIL per check from the `bucket` field.
+2. Poll pending checks until terminal (`gh pr checks --watch` or a bounded
+   re-query) — `pending` is neither a pass nor a fail, so do not treat it as
+   either.
+3. On any FAIL, capture the failing check IDs via
+   `gh api repos/RexiAI/my-engineering-standards/commits/<head_sha>/check-runs`,
+   selecting `conclusion == "failure"` and recording `name` + `id`. Read the
+   failing job logs: `gh run list --branch spec/NNN-slug --workflow "Self CI"`
+   then `gh run view <RUN-ID> --log-failed`. Record the concrete failure reason.
+4. Record a **Post-PR CI check** section in `specs/NNN-slug/25-verification.md`
+   — per round: the round index, each check's PASS/FAIL, the failing check IDs,
+   and the last log excerpt.
+5. Hand the diagnosis back to the orchestrator, which routes the fix — do not
+   fix anything yourself, and do not commit or push.
+6. On a re-trigger (a later round), read your prior `25-verification.md` for the
+   failing check IDs and re-check only the previously-failing checks — a scoped
+   re-check — then record the round's outcome the same way.
+
 # On failure
 
 Do not attempt to fix anything yourself. Stop the pipeline. The report is the
