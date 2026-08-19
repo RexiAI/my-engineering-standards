@@ -1,3 +1,10 @@
+## [1.26.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.26.0...v1.26.1) (2026-08-19)
+
+
+### Bug Fixes
+
+* move reusable workflows to top-level .github/workflows/ ([#44](https://github.com/RexiAI/my-engineering-standards/issues/44)) ([9919779](https://github.com/RexiAI/my-engineering-standards/commit/9919779e9e2b22bbc8559ea7fe82c4784b72d774))
+
 # [1.26.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.25.1...v1.26.0) (2026-08-19)
 
 
