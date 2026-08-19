@@ -55,7 +55,7 @@ specs/NNN-slug/                          ← PR branch only, gone on main
   20-acceptance/
     AC-NNN-name.md      specifier: Given/When/Then scenarios, one file per task
   25-verification.md    verifier: independent re-check results, PASS/FAIL verdict
-  30-report.md          architect: mutation score, complexity, gate results
+  30-report.md          architect: mutation score, complexity, gate results, remediation record
 
 docs/changes/NNN-slug.md                 ← long-lived, on main, written by stage 5b via archive-spec.sh
 ```
@@ -214,6 +214,36 @@ a narrow, stated exception:
   explains what failed.
 - The PR body links `10-tasks.md` and `30-report.md`. CI gates are the reviewer of
   record; you review the diff same as any other PR.
+
+## Remediation budget
+
+Every gate-failure loop in the spec pipeline is bounded. The budget has two
+phases, each with its own counter, and each capped at **max 3**. The exact
+phrasing `re-run until green is forbidden phrasing`: no gate is ever re-run
+"until green" — every re-run is a counted attempt under one of the two
+budgets.
+
+**Phase 1 — Pre-PR loop.** The local gates and the design gates, run before
+anything is pushed. On a Verifier BLOCK the pipeline hands the failing fix
+back to the Coder (behavior failures) or the Refactorer (structural/complexity
+failures), then re-invokes the Verifier for **scoped re-verification**: it
+re-runs only the failing gates, not the whole suite. The Phase 1 budget is
+**max 3**.
+
+**Phase 2 — Post-PR loop.** The CI gates that run after the push. Its budget
+is **max 3**, and its counter is independent of **Phase 1** — a Phase 1
+exhaustion does not consume Phase 2 budget or vice versa. This section states
+the policy; the loop's mechanics are spec 014's territory, not this document's.
+
+Exhausting either budget stops the pipeline: the stop emits the failing gate
+IDs and the last evidence, and escalates to the human. This is the halt the
+"Commit and push carve-out" describes — a gate failure triggers remediation up
+to the cap, and only the post-exhaustion stop is the halt that wording means.
+Before exhaustion, a gate failure is a re-delegation signal, not a stop.
+
+`30-report.md` records which phase and attempt count each BLOCK was resolved
+at, carried forward from the verifier's `25-verification.md` attempt entries,
+so budget exhaustion is auditable.
 
 ## Conformance tiers
 
