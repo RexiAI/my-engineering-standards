@@ -43,6 +43,12 @@ the original prose adds nothing to that and risks scope creep.
 
 Only after `30-report.md` is green:
 
+- **Load credentials first (defensive):** source `scripts/load-env.sh` before
+  the first commit or push. It exports `$GITHUB_TOKEN` / `$GH_TOKEN` from the
+  per-machine `config/agent.local.env` (see `AGENTS.md` §Per-machine agent
+  environment) — never from a literal in this prompt. If it exits non-zero
+  (real env file missing), report and stop; do not commit or push with missing
+  credentials.
 - **Audit-trail gate (mandatory):** before committing, pushing, or opening the
   PR, run `scripts/check-audit-trail.sh NNN-slug`. If it exits non-zero, stop and
   report what the gate found — do not commit, push, or open the PR (see

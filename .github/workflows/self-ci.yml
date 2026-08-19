@@ -132,6 +132,17 @@ jobs:
           bash scripts/model-env.selftest.sh
           bash scripts/model-env.runtime-check.sh /tmp/opencode-bin/opencode
 
+      # Agent local-env gates (spec 013): the guard refuses to track
+      # config/agent.local.env, the hardcoded-secrets check scans the four
+      # dirs, and the selftest proves loader/guard/check fire. No
+      # continue-on-error: a committed secret or a gate regression fails the job.
+      - name: Check agent env guard and hardcoded secrets
+        run: |
+          set -euo pipefail
+          bash scripts/guard-env.sh
+          bash scripts/check-no-hardcoded-secrets.sh
+          bash scripts/agent-env.selftest.sh
+
       - name: Run loop files check
         run: ./scripts/check-loop-files.sh
 
@@ -145,6 +156,19 @@ jobs:
         continue-on-error: true
         run: |
           shellcheck scripts/*.sh templates/*.sh
+
+      # Gate self-tests (spec 012): one deliberately-bad fixture per gate
+      # proving each gate fires with the right severity, plus the traceability
+      # and telemetry regression nets. No continue-on-error: a gate regression
+      # (e.g. the complexity threshold raised so a fixture no longer fires)
+      # fails the job. The principles selftest fail-fasts with a clear message
+      # if 007's --gates flag is not yet merged — 012 lands in the same batch.
+      - name: Run gate selftests
+        run: |
+          set -euo pipefail
+          bash scripts/check-code-principles.selftest.sh
+          bash scripts/check-scenario-traceability.selftest.sh
+          bash scripts/tests/gate-telemetry.selftest.sh
 
       # Note: this intentionally mirrors `make lint`'s YAML scope (.github + ci),
       # not full-repo. Expanding scope belongs in the Makefile, not here.

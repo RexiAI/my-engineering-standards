@@ -1,0 +1,31 @@
+# gate-stats-weekly.yml — surfaces the pipeline drift signal weekly (spec 012).
+# Runs scripts/gate-stats.sh against the committed runs.jsonl (the trend is the
+# point — record-gate-run.sh appends one record per pipeline run and it survives
+# merges), and uploads the report as a `gate-stats` artifact. Read-only:
+# contents: read, no write token.
+name: Gate stats weekly
+
+on:
+  schedule:
+    # Monday 06:00 UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gate-stats:
+    name: Gate stats
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run gate stats
+        run: bash scripts/gate-stats.sh > gate-stats-report.txt
+
+      - name: Upload gate-stats report
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-stats
+          path: gate-stats-report.txt

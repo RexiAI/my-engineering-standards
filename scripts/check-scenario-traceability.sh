@@ -18,17 +18,22 @@
 # (AC-007-04-06): BLOCK, not PASS.
 #
 # Usage:
-#   .standards/scripts/check-scenario-traceability.sh [--checks 1|2|1,2] [--json] [SPECS_DIR] [SOURCE_DIR]
+#   .standards/scripts/check-scenario-traceability.sh [--checks 1|2|1,2] [--json] [-ReportPath <file>] [SPECS_DIR] [SOURCE_DIR]
 #   defaults: SPECS_DIR=specs  SOURCE_DIR=.
 #   --checks selects which checks run (default: both); --json prints a single
 #   JSON object { "checks": [...], "passes": [...], "fails": [...] } instead of
 #   the human output, with the same exit code.
 #
+# -ReportPath <file> additionally writes the machine-readable JSON report
+# (passes, fails) atomically to <file> — stdout is unchanged.
+#
 # Exit codes:
 #   0 — every scenario traced, every test ID resolves (or nothing to check)
 #   1 — orphaned scenario or dangling test reference
 #   2 — could not perform the check for a non-finding reason (missing tool such
-#       as grep/sed, unreadable source directory, or usage error)
+#       as grep/sed, unreadable source directory, or usage error — unknown
+#       option, bad/empty --checks value, or -ReportPath with a missing/empty
+#       value)
 #
 # Standards reference:
 #   docs/SPEC_PIPELINE.md §Scenario format
@@ -36,6 +41,11 @@
 #   agents/spec-verifier.md (script-is-authority / BLOCK discipline)
 set -euo pipefail
 
+# Shared -ReportPath machinery (strip_dashes/json_escape/json_array/
+# emit_json_report) — see scripts/gate-report-lib.sh. json_escape comes from
+# this lib; check-common.sh's copy is guarded so it does not redefine it.
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/gate-report-lib.sh"
+# Shared 007 helpers (require_tools / finish_clean / guarded json_escape).
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/check-common.sh"
 
 RED='\033[0;31m'
@@ -43,17 +53,31 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 VIOLATIONS=0
+REPORT_PATH=""
+VIOLATIONS_LIST=()
+PASSED_IDS=()
 CHECKS="1,2"
 JSON=false
 POSITIONAL=()
 
+# One parser for both flag styles (see gate-report-lib.sh): 007's double-dash
+# flags (--checks, --json) and 012's single-dash -ReportPath. strip_dashes
+# makes the styles coexist without two parsers.
 while [ $# -gt 0 ]; do
-  case "$1" in
-    --checks) CHECKS="${2:-}"; shift $(( $# > 1 ? 2 : 1 )) ;;
-    --json) JSON=true; shift ;;
-    -*) echo "Unknown option: $1" >&2; exit 2 ;;
-    *) POSITIONAL+=("$1"); shift ;;
-  esac
+  if [ "${1#-}" != "$1" ]; then
+    name="$(strip_dashes "$1")"
+    case "$name" in
+      checks) CHECKS="${2:-}"; shift $(( $# > 1 ? 2 : 1 )) ;;
+      json) JSON=true; shift ;;
+      ReportPath)
+        REPORT_PATH="${2:-}"
+        [ -n "$REPORT_PATH" ] || { echo "Error: -ReportPath requires a non-empty file path" >&2; exit 2; }
+        shift $(( $# > 1 ? 2 : 1 )) ;;
+      *) echo "Unknown option: $1" >&2; exit 2 ;;
+    esac
+  else
+    POSITIONAL+=("$1"); shift
+  fi
 done
 
 SPECS_DIR="${POSITIONAL[0]:-specs}"
@@ -82,9 +106,13 @@ contains() { # contains 1|2
   return 1
 }
 
-fail() { # human fail line, recorded for --json
+# fail/pass feed all three outputs: human stdout (unless --json), the --json
+# transcript (PASSES_JSON/FAILS_JSON), and the -ReportPath file report
+# (PASSED_IDS / VIOLATIONS_LIST).
+fail() { # human fail line, recorded for --json and -ReportPath
   VIOLATIONS=$((VIOLATIONS + 1))
   if [ "$JSON" = true ]; then FAILS_JSON+=("$*"); else echo -e "${RED}FAIL${NC} $*"; fi
+  VIOLATIONS_LIST+=("$*")
 }
 pass() { # human pass line, recorded for --json
   if [ "$JSON" = true ]; then PASSES_JSON+=("$*"); else echo -e "${GREEN}PASS${NC} $*"; fi
@@ -139,6 +167,7 @@ if contains 1; then
   for id in $SCENARIO_IDS; do
     if echo "$REFERENCED_IDS" | grep -qx "$id"; then
       pass "$id — traced to a test"
+      PASSED_IDS+=("$id")
     else
       fail "$id — scenario defined in $SPECS_DIR/*/20-acceptance/ but no test references it. " \
            "Add a test named after this ID, or confirm with 10-tasks.md that it's obsolete " \
@@ -168,6 +197,21 @@ fi
 if [ "$JSON" = true ]; then
   emit_json
 fi
+
+# ── JSON report (-ReportPath, telemetry) ─────────────────────────────────────
+# json_escape / json_array / emit_json_report come from gate-report-lib.sh.
+emit_report() {
+  [ -n "$REPORT_PATH" ] || return 0
+  local json passes_json fails_json
+  passes_json=""
+  fails_json=""
+  [ "${#PASSED_IDS[@]}" -gt 0 ] && passes_json="$(json_array "${PASSED_IDS[@]}")"
+  [ "${#VIOLATIONS_LIST[@]}" -gt 0 ] && fails_json="$(json_array "${VIOLATIONS_LIST[@]}")"
+  json="{\"passes\":[${passes_json}],\"fails\":[${fails_json}]}"
+  emit_json_report "$REPORT_PATH" "$json"
+}
+
+emit_report
 
 if [ "$VIOLATIONS" -gt 0 ]; then
   exit 1
