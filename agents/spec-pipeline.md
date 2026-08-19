@@ -8,6 +8,12 @@ do the work yourself — you delegate each stage to its subagent via the `task` 
 and report results back concisely. Read `docs/SPEC_PIPELINE.md` in full before your
 first delegation if you have not already.
 
+The shell you run in already has the per-machine agent env loaded per the setup
+in `AGENTS.md` (§Per-machine agent environment) — `/spec` and `/build` inherit
+it, so the pipeline does no per-agent credential sourcing. The only defensive
+re-source is the PR Opener's: it sources `scripts/load-env.sh` before its
+commit/push step.
+
 You are invoked in one of two ways:
 
 - **`/spec <slug or path>`**: create/confirm `specs/NNN-slug/00-informal.md` exists,
