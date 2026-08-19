@@ -138,6 +138,22 @@ str_contains() {
   fi
 }
 
+# verify_secret_name_only <AC-ID> <file> <label>
+#   The OPENCODE_API_KEY token may appear only as the secret-name reference
+#   (secrets.OPENCODE_API_KEY or the "key:" line); any other form is a
+#   violation. Shared by the shared-workflow and trigger-workflow checks
+#   (AC-024-02-04 / AC-024-03-06) — the same rule, one implementation.
+verify_secret_name_only() {
+  local acid="$1" file="$2" label="$3"
+  if grep 'OPENCODE_API_KEY' "$file" \
+     | grep -v 'secrets.OPENCODE_API_KEY' \
+     | grep -v 'OPENCODE_API_KEY:' | grep -q .; then
+    fail "$acid: OPENCODE_API_KEY appears in $label in a form other than the secret name reference"
+  else
+    pass "$acid: OPENCODE_API_KEY appears in $label only as the secret name"
+  fi
+}
+
 # Key-shaped strings that must never appear in committed files: only the
 # secret NAME (OPENCODE_API_KEY) is allowed, never a value. The prefix
 # fragments below are assembled by runtime string concatenation (mirroring
@@ -368,13 +384,7 @@ echo ""
 # AC-024-02-04 — No literal key in the workflow
 if [ -f "$SHARED_WF" ]; then
   verify_absent AC-024-02-04 "$SHARED_WF" "no key-shaped value in the workflow" "$KEY_SHAPE"
-  if grep 'OPENCODE_API_KEY' "$SHARED_WF" \
-     | grep -v 'secrets.OPENCODE_API_KEY' \
-     | grep -v 'OPENCODE_API_KEY:' | grep -q .; then
-    fail "AC-024-02-04: OPENCODE_API_KEY appears in a form other than the secret name reference"
-  else
-    pass "AC-024-02-04: OPENCODE_API_KEY appears only as the secret name"
-  fi
+  verify_secret_name_only AC-024-02-04 "$SHARED_WF" "the shared workflow"
 fi
 
 echo ""
@@ -489,13 +499,7 @@ echo ""
 # AC-024-03-06 — No literal key in the trigger workflow
 if [ -f "$TRIGGER_WF" ]; then
   verify_absent AC-024-03-06 "$TRIGGER_WF" "no key-shaped value in the trigger workflow" "$KEY_SHAPE"
-  if grep 'OPENCODE_API_KEY' "$TRIGGER_WF" \
-     | grep -v 'secrets.OPENCODE_API_KEY' \
-     | grep -v 'OPENCODE_API_KEY:' | grep -q .; then
-    fail "AC-024-03-06: OPENCODE_API_KEY appears in a form other than the secret name reference"
-  else
-    pass "AC-024-03-06: OPENCODE_API_KEY appears only as the secret name"
-  fi
+  verify_secret_name_only AC-024-03-06 "$TRIGGER_WF" "the trigger workflow"
 fi
 
 echo ""
