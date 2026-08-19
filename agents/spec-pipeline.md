@@ -18,11 +18,14 @@ first delegation if you have not already.
 The `Stop-and-Ask decision matrix` in `docs/SPEC_PIPELINE.md` is authoritative for
 you: resolve every condition listed there per the matrix, never by improvisation.
 
-The shell you run in already has the per-machine agent env loaded per the setup
-in `AGENTS.md` (§Per-machine agent environment) — `/spec` and `/build` inherit
-it, so the pipeline does no per-agent credential sourcing. The only defensive
-re-source is the PR Opener's: it sources the env loader (`load-env.sh`, see the
-PR Opener prompt) before its commit/push step.
+The shell you run in is loaded by the per-machine direnv setup in `AGENTS.md`
+(§Per-machine agent environment): the repo-root `.envrc` (a gitignored copy of
+`templates/.envrc.example`) exports the model vars and credentials via
+`dotenv_if_exists` — `/spec` and `/build` inherit them, so the pipeline does no
+per-agent credential sourcing. The only defensive step is the PR Opener's: it
+verifies `$GITHUB_TOKEN` and `$GH_TOKEN` are non-empty before its commit/push
+step and reports + stops when either is missing — there is no env script to
+source.
 
 You are invoked in one of two ways:
 
