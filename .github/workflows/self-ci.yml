@@ -105,6 +105,9 @@ jobs:
       - name: Check Daily Triage loop deliverables
         run: ./scripts/check-loop-triage.sh
 
+      - name: Check remediation budget
+        run: ./scripts/check-remediation-budget.sh
+
       - name: Install shellcheck
         run: sudo apt-get update -y && sudo apt-get install -y shellcheck
 
