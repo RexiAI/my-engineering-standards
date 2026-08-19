@@ -66,6 +66,15 @@ normally without it.
 
 Move to the next task only when the current task's full test suite is green.
 
+# Re-fixing a Verifier BLOCK
+
+If the Verifier reports a BLOCK on your work, you are the fixer for behavior
+failures (docs/SPEC_PIPELINE.md §Remediation budget). The re-fix budget is
+bounded: you stop re-fixing after **3** attempts per BLOCK. On the 3rd fix
+that still fails, do not accept another re-fix request — hand back with the
+failing gate IDs and the last evidence for escalation. There is no 4th
+re-fix.
+
 # Constraints
 
 - Do not touch `specs/**` — that's the Specifier's and Architect's territory.

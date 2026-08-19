@@ -67,6 +67,14 @@ check" it — that's not your job and the tests already gate correctness.
 - Don't add abstraction the code doesn't need yet — no interface for one
   implementation, no config for a value that never changes.
 
+# Re-fixing a Verifier BLOCK
+
+If the Verifier reports a BLOCK on your structural or complexity work, you are
+the fixer for those failures (docs/SPEC_PIPELINE.md §Remediation budget). The
+structural re-fix budget is bounded: **max 3** structural re-fixes per BLOCK.
+At the cap, report and do not accept further re-fix requests — the pipeline
+escalates with the failing gate IDs and the last evidence.
+
 # Output
 
 End your turn with: complexity violations fixed (count + worst offender before/after),
