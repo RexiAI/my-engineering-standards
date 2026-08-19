@@ -81,7 +81,7 @@ jobs:
   eas-build:
     name: EAS Build
     needs: [unit-test, lint, build]
-    if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch && secrets.EXPO_TOKEN != ''
+    if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -92,3 +92,5 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx eas-cli build --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
