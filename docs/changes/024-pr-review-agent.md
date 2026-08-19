@@ -912,3 +912,6 @@ documented in `25-verification.md`; (3) untracked `specs/` — the pipeline's ow
 folder. Per the Stop-and-Ask matrix I did not stash or auto-commit; I reported the state
 and proceeded with read-only gates. No foreign/unaccounted change present; nothing for the
 PR Opener beyond the normal commit of this stage's work.
+
+PR: https://github.com/RexiAI/my-engineering-standards/pull/42
+Commit count: 9
