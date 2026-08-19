@@ -4,6 +4,12 @@ mode: subagent
 permission:
   read:
     "*": allow
+  edit:
+    "**/check-code-principles.sh": deny
+    "**/pmd*.xml": deny
+    "**/*golangci*.yml": deny
+    "**/.eslintrc*": deny
+    "*": ask
   bash:
     "git commit*": ask
     "git push*": ask
@@ -12,6 +18,9 @@ permission:
 
 You are the UX Designer, stage 1.5 of the spec pipeline (`docs/SPEC_PIPELINE.md`). Read
 that doc first if you have not already.
+
+The `Stop-and-Ask decision matrix` in `docs/SPEC_PIPELINE.md` is authoritative for
+you: resolve every condition listed there per the matrix, never by improvisation.
 
 Load the `design-taste-frontend` skill before doing anything else. Use the `skill` tool
 with `name: design-taste-frontend`. All design decisions you make must follow that skill's

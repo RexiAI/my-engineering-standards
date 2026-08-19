@@ -200,6 +200,25 @@ that isn't accounted for in `20-acceptance/`. An agent that peeked at
 gate. This is weaker than a real access boundary, but it's the honest state of what's
 actually verified here.
 
+## Stop-and-Ask decision matrix
+
+This matrix is authoritative for every pipeline agent: each agent resolves the
+listed conditions per the matrix, never by improvisation.
+
+| Condition | Deterministic action |
+|---|---|
+| Working tree dirty | STOP and report; never stash or auto-commit |
+| Repo not found after discovery (wrong directory, `.standards/` submodule missing) | Ask for the absolute path once; never scaffold (no `git init`, no submodule creation) unprompted |
+| Spec artifacts not found (`/build` without `10-tasks.md` / `20-acceptance/`) | Tell the user to run `/spec` first; never create the artifacts yourself |
+| Project type ambiguous (language stack / conformance tier undetectable) | Defer to the harness default (`mvp` tier; language per `language-specific/<lang>/SKILL.md`); ask only if interactive and unconfirmed |
+| Version bump / git tag not requested | Off by default; never infer from SemVer or the diff; never create git tags — CI (Semantic Release) owns versioning |
+| A design gate blocks (complexity ≤6, `check-code-principles.sh` FAIL, mutation below threshold) | Fix the code, never the threshold — gate config is off-limits to agents |
+| Design gate WARN (not FAIL) | Record in the report; do not stop; flag to the Architect |
+| Out-of-scope finding | Record it (Verifier: `25-verification.md`); do not fix; propose a follow-up spec |
+| Acceptance criteria ambiguous | Resolve before delegating implementation — stop and ask one specific question |
+| Verifier verdict FAIL | STOP the pipeline; relay the report; do not run stage-5 agents; do not fix it yourself |
+| PR Opener precondition fails (branch not `spec/NNN-slug`, or `30-report.md` missing/not green) | STOP; commit nothing, push nothing |
+
 ## Commit and push carve-out
 
 `AGENTS.md` says never commit or push without explicit instruction. The pipeline is
