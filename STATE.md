@@ -7,15 +7,29 @@ this run). Every loop checks this line at the start of each run.
 
 ## High Priority
 
-- [ ] [item the loop is currently working toward]
+- [ ] `.github/workflows/daily-triage.yml` provides no `GH_TOKEN`/`GITHUB_TOKEN`
+  to the "Run daily triage loop" step, so every `gh` call the skill mandates
+  (label check, PR list, CI runs, issue create) fails as configured. The
+  2026-08-20-064701 run recovered the job token from actions/checkout's
+  persisted git credentials to complete pre-flight and triage. Human decision:
+  wire `GH_TOKEN: ${{ github.token }}` into that step explicitly, or document
+  the reliance on checkout's `persist-credentials` (which a security-hardening
+  pass could disable, silently breaking the kill-switch label check).
 
 ## Watch List
 
-- [ ] [low-priority item, tracked but not acted on yet]
+- [ ] None this run. (Zero open PRs; no `specs/` directory on `main`; no open
+  issues.)
 
 ## Recent Noise
 
-- [ ] [recently resolved item]
+- [ ] RESOLVED 2026-08-20: two self-ci failures on
+  `fix/reusable-workflows-top-level` (2026-08-19T18:11Z, runs 32285901783 /
+  32285931672) were superseded by green runs on the same branch
+  (2026-08-19T18:19–18:20Z); `main` green at 2026-08-19T18:22:58Z.
+- [ ] RESOLVED 2026-08-20: one cancelled self-ci run on
+  `spec/023-pr-review-agent` (2026-08-19T16:40:18Z) superseded by a success on
+  the same branch at the same minute; not a failure.
 
 Resolved items are pruned each run, not carried forever.
 
