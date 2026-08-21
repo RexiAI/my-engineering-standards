@@ -75,7 +75,7 @@ MIN_FILL_RATIO=0.8
 # enough that turn 1 + the short turn-2 follow-up still fit the window).
 FILL_RATIO=0.85
 # Approximate characters per token for the filler prose (qwen3 tokenizer).
-CHARS_PER_TOKEN=4.5
+CHARS_PER_TOK=4.5
 FILLER='The quick brown fox jumps over the lazy dog near the river bank while the moon rises slowly above the silent forest. '
 
 usage() {
@@ -260,7 +260,7 @@ PY
 # (marker first, then filler padding targeting 0.85 x num_ctx tokens).
 build_prompt() {
   local n="$1" marker="$2" pf="$3" chars
-  chars=$(awk -v t="$n" -v r="$FILL_RATIO" -v c="$CHARS_PER_TOKEN" 'BEGIN { printf "%d", t*r*c }')
+  chars=$(awk -v t="$n" -v r="$FILL_RATIO" -v c="$CHARS_PER_TOK" 'BEGIN { printf "%d", t*r*c }')
   {
     printf '%s ' "$marker"
     printf 'This is filler prose used to fill the context window for the retention probe. '
@@ -346,7 +346,7 @@ under_filled() {
 grow_padding() {
   local pf="$1" have="$2" n="$3"
   local more_chars
-  more_chars=$(awk -v n="$n" -v have="$have" -v r="$FILL_RATIO" -v c="$CHARS_PER_TOKEN" \
+  more_chars=$(awk -v n="$n" -v have="$have" -v r="$FILL_RATIO" -v c="$CHARS_PER_TOK" \
     'BEGIN { need=n*r-have; if (need<0) need=0; printf "%d", need*c }')
   cp "$pf" "$pf.grow"
   yes "$FILLER" | head -c "$more_chars" | tr -d '\n' >> "$pf.grow" || true
