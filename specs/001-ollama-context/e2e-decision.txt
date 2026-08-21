@@ -1,0 +1,2 @@
+LOCAL_STAGES=spec-specifier spec-ux spec-verifier spec-mutation-runner spec-pr-opener spec-coder spec-refactorer spec-pipeline
+CLOUD_FALLBACK_STAGES=

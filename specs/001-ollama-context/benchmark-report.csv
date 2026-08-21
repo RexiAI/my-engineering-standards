@@ -1,0 +1,13 @@
+# ollama_version=0.32.13
+# flash_attention=off
+# kv_cache_type=f16
+# model=qwen3.8:27b
+# min_tok_s=15
+# vram_headroom_gib=0.3
+# vram_total_gib=16.3
+num_ctx,size_vram_gib,tokens_per_sec,prompt_tokens,context_loaded,probe_result
+16384,11.53,21.5,13722,16384,PASS
+32768,11.53,18.7,8194,16384,INVALID
+49152,11.53,257228.1,8194,16384,INVALID
+65536,11.53,246463.3,8194,16384,INVALID
+summary,selected=16384,min_tok_s=15,vram_headroom_gib=0.3
