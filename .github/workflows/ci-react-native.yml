@@ -76,6 +76,8 @@ jobs:
           node-version-file: ${{ inputs.node-version-file }}
           cache: npm
       - run: npm ci
+      - run: npm ci
+        working-directory: app
       - run: npx expo export
         working-directory: app
 
