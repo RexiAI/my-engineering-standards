@@ -1,3 +1,10 @@
+## [1.26.3](https://github.com/RexiAI/my-engineering-standards/compare/v1.26.2...v1.26.3) (2026-08-21)
+
+
+### Bug Fixes
+
+* **ci:** install app/ deps before expo export in ci-react-native ([#47](https://github.com/RexiAI/my-engineering-standards/issues/47)) ([6a992bf](https://github.com/RexiAI/my-engineering-standards/commit/6a992bfea529897db8ea87b3ac86c99a2f85bd88))
+
 ## [1.26.2](https://github.com/RexiAI/my-engineering-standards/compare/v1.26.1...v1.26.2) (2026-08-21)
 
 
