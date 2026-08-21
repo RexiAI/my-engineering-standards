@@ -1,3 +1,10 @@
+## [1.26.2](https://github.com/RexiAI/my-engineering-standards/compare/v1.26.1...v1.26.2) (2026-08-21)
+
+
+### Bug Fixes
+
+* **ci:** add working-directory: app for expo export in monorepo ([1a461f3](https://github.com/RexiAI/my-engineering-standards/commit/1a461f3a956bda2b96e751f92d505d4217daf21e))
+
 ## [1.26.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.26.0...v1.26.1) (2026-08-19)
 
 
