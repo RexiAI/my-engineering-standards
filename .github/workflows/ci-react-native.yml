@@ -24,6 +24,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  structural-checks:
+    name: Structural Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/ci-smoke-test.sh --phase 1
+
   unit-test:
     name: Unit Tests
     runs-on: ubuntu-latest

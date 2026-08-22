@@ -102,6 +102,9 @@ jobs:
         # never a failure — the PR's required checks are unaffected. secrets is
         # not a legal context in an if: at any scope, so gate on the job env
         # (the secret is mapped into the env in the job env block).
+        # Empty-model guard: when PR_REVIEW_MODEL is unset (child repo does not
+        # override it in config/model.local.env), the step skips — repos that
+        # do not use the pr-review agent get a green CI without the review.
         if: ${{ steps.early-exit.outputs.skip != 'true' && env.OPENCODE_API_KEY != '' }}
         run: |
           set -euo pipefail
@@ -114,6 +117,48 @@ jobs:
           # block enforces that.
           # shellcheck disable=SC1091
           set -a; . config/model.local.env.example; set +a
-          /tmp/opencode-bin/opencode run --print-logs \
-            --agent pr-review \
-            "Review PR ${PR_NUMBER} at head ${HEAD_SHA}: review the PR diff and post findings with concrete suggested fixes only, ending the comment with the Reviewed-SHA marker."
+
+          # Model override (optional): when PR_REVIEW_MODEL is set in the
+          # caller's environment, override the agent's hardcoded model pin.
+          # When unset, the agent's frontmatter `model: opencode-zen/kimi-k3`
+          # pin takes effect — repos that do not set PR_REVIEW_MODEL get the
+          # default without any configuration.
+          model_flag=""
+          if [ -n "${PR_REVIEW_MODEL:-}" ]; then
+            model_flag="--model ${PR_REVIEW_MODEL}"
+          fi
+
+          # Billing/quota guard: capture output so we can detect provider
+          # errors (spending limit, quota, rate limit) and skip gracefully.
+          # A billing issue is not a code defect — fail the step only if the
+          # error is something else.
+          #
+          # pr-review is declared as mode: subagent, so --agent is rejected
+          # by opencode. Embed the agent's instructions directly in the
+          # prompt instead (same pattern as ci-sweeper.yml).
+          #
+          # The subshell + set +e wrapper is required because set -euo
+          # pipefail (line 110) would exit the script before review_rc=$?
+          # is reached when opencode returns non-zero.
+          agent_instructions="$(cat agents/pr-review.md | sed '/^---$/,/^---$/d')"
+          prompt="You are the PR review agent. Review PR ${PR_NUMBER} at head ${HEAD_SHA}.
+
+${agent_instructions}
+
+Post your findings as one PR review comment via gh. End the comment with:
+Reviewed-SHA: ${HEAD_SHA}"
+
+          review_output=$(set +e; /tmp/opencode-bin/opencode run --print-logs \
+            ${model_flag} \
+            "${prompt}" 2>&1) && review_rc=0 || review_rc=$?
+
+          if [ "$review_rc" -ne 0 ]; then
+            if echo "$review_output" | sed 's/\x1b\[[0-9;]*m//g' | grep -qiE 'spending limit|quota exceeded|billing|rate.limit|429|402|insufficient balance'; then
+              echo "::warning::Review skipped — billing/quota error from model provider (exit ${review_rc}). Not a code defect."
+              exit 0
+            fi
+            echo "$review_output"
+            exit "$review_rc"
+          fi
+
+          echo "$review_output"
