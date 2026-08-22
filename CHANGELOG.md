@@ -1,3 +1,10 @@
+## [1.26.4](https://github.com/RexiAI/my-engineering-standards/compare/v1.26.3...v1.26.4) (2026-08-22)
+
+
+### Bug Fixes
+
+* **ci:** add --platform web to EAS build command ([#48](https://github.com/RexiAI/my-engineering-standards/issues/48)) ([3f504ee](https://github.com/RexiAI/my-engineering-standards/commit/3f504eebe15eb06d833fe32d8f452d4c4df93cec))
+
 ## [1.26.3](https://github.com/RexiAI/my-engineering-standards/compare/v1.26.2...v1.26.3) (2026-08-21)
 
 
