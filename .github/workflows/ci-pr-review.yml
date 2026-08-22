@@ -105,7 +105,7 @@ jobs:
         # Empty-model guard: when PR_REVIEW_MODEL is unset (child repo does not
         # override it in config/model.local.env), the step skips — repos that
         # do not use the pr-review agent get a green CI without the review.
-        if: ${{ steps.early-exit.outputs.skip != 'true' && env.OPENCODE_API_KEY != '' && env.PR_REVIEW_MODEL != '' }}
+        if: ${{ steps.early-exit.outputs.skip != 'true' && env.OPENCODE_API_KEY != '' }}
         run: |
           set -euo pipefail
           # Headless run on a bare runner has no shell profile, so load the
@@ -118,12 +118,22 @@ jobs:
           # shellcheck disable=SC1091
           set -a; . config/model.local.env.example; set +a
 
+          # Model override (optional): when PR_REVIEW_MODEL is set in the
+          # caller's environment, override the agent's hardcoded model pin.
+          # When unset, the agent's frontmatter `model: opencode-zen/kimi-k3`
+          # pin takes effect — repos that do not set PR_REVIEW_MODEL get the
+          # default without any configuration.
+          model_flag=""
+          if [ -n "${PR_REVIEW_MODEL:-}" ]; then
+            model_flag="--model ${PR_REVIEW_MODEL}"
+          fi
+
           # Billing/quota guard: capture output so we can detect provider
           # errors (spending limit, quota, rate limit) and skip gracefully.
           # A billing issue is not a code defect — fail the step only if the
           # error is something else.
           review_output=$(/tmp/opencode-bin/opencode run --print-logs \
-            --model "${PR_REVIEW_MODEL}" \
+            ${model_flag} \
             --agent pr-review \
             "Review PR ${PR_NUMBER} at head ${HEAD_SHA}: review the PR diff and post findings with concrete suggested fixes only, ending the comment with the Reviewed-SHA marker." 2>&1) && review_rc=0 || review_rc=$?
 
