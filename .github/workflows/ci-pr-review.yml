@@ -102,7 +102,10 @@ jobs:
         # never a failure — the PR's required checks are unaffected. secrets is
         # not a legal context in an if: at any scope, so gate on the job env
         # (the secret is mapped into the env in the job env block).
-        if: ${{ steps.early-exit.outputs.skip != 'true' && env.OPENCODE_API_KEY != '' }}
+        # Empty-model guard: when PR_REVIEW_MODEL is unset (child repo does not
+        # override it in config/model.local.env), the step skips — repos that
+        # do not use the pr-review agent get a green CI without the review.
+        if: ${{ steps.early-exit.outputs.skip != 'true' && env.OPENCODE_API_KEY != '' && env.PR_REVIEW_MODEL != '' }}
         run: |
           set -euo pipefail
           # Headless run on a bare runner has no shell profile, so load the
@@ -114,6 +117,23 @@ jobs:
           # block enforces that.
           # shellcheck disable=SC1091
           set -a; . config/model.local.env.example; set +a
-          /tmp/opencode-bin/opencode run --print-logs \
+
+          # Billing/quota guard: capture output so we can detect provider
+          # errors (spending limit, quota, rate limit) and skip gracefully.
+          # A billing issue is not a code defect — fail the step only if the
+          # error is something else.
+          review_output=$(/tmp/opencode-bin/opencode run --print-logs \
+            --model "${PR_REVIEW_MODEL}" \
             --agent pr-review \
-            "Review PR ${PR_NUMBER} at head ${HEAD_SHA}: review the PR diff and post findings with concrete suggested fixes only, ending the comment with the Reviewed-SHA marker."
+            "Review PR ${PR_NUMBER} at head ${HEAD_SHA}: review the PR diff and post findings with concrete suggested fixes only, ending the comment with the Reviewed-SHA marker." 2>&1) && review_rc=0 || review_rc=$?
+
+          if [ "$review_rc" -ne 0 ]; then
+            if echo "$review_output" | grep -qiE 'spending limit|quota exceeded|billing|rate.limit|429|402|insufficient balance'; then
+              echo "::warning::Review skipped — billing/quota error from model provider (exit ${review_rc}). Not a code defect."
+              exit 0
+            fi
+            echo "$review_output"
+            exit "$review_rc"
+          fi
+
+          echo "$review_output"

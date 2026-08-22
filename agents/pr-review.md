@@ -1,7 +1,6 @@
 ---
 description: Reviews a pull request's diff and posts findings with concrete suggested fixes only. Runs headless from GitHub Actions on PR events (spec 024). Never edits files, never merges, never pushes.
 mode: subagent
-model: opencode-zen/kimi-k3
 permission:
   edit:
     "*": deny
