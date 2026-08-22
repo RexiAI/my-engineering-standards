@@ -1,3 +1,10 @@
+# [1.27.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.26.4...v1.27.0) (2026-08-22)
+
+
+### Features
+
+* **ci:** add structural-checks job to ci-react-native ([#49](https://github.com/RexiAI/my-engineering-standards/issues/49)) ([a865929](https://github.com/RexiAI/my-engineering-standards/commit/a86592916b5d499360a0bdc62e61170e717946c7)), closes [#9](https://github.com/RexiAI/my-engineering-standards/issues/9)
+
 ## [1.26.4](https://github.com/RexiAI/my-engineering-standards/compare/v1.26.3...v1.26.4) (2026-08-22)
 
 
