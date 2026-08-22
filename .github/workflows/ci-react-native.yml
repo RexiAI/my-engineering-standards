@@ -94,6 +94,6 @@ jobs:
           node-version-file: ${{ inputs.node-version-file }}
           cache: npm
       - run: npm ci
-      - run: npx eas-cli build --non-interactive
+      - run: npx eas-cli build --non-interactive --platform web
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
