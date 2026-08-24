@@ -47,20 +47,20 @@ This project structure supports Java, Go, JavaScript/TypeScript, and React Nativ
 - Read `docs/AGENTS_AND_SKILLS.md` before creating or modifying any agent in `agents/` or skill in `skills/`/`language-specific/`.
 - Read `docs/GOVERNANCE.md` before changing pipeline roles, the gate catalog, or billing constraints — trust tiers, model-assignment discipline, and the ADR requirement live there.
 
-## OpenCode Go Model Configuration
+## Model Configuration
 
-This repo's spec pipeline agents are configured to use OpenCode Go subscription models via `opencode.json` `{env:SPEC_*_MODEL}` references:
+This repo's spec pipeline agents are configured to use models via `opencode.json` `{env:SPEC_*_MODEL}` references. Per-machine overrides in `config/model.local.env` route all 8 agents:
 
-| Agent | Primary Model | Fallback Chain (via `@smart-coders-hq/opencode-model-fallback` plugin) |
-|---|---|---|
-| spec-specifier | `opencode-go/deepseek-v4-flash` | `glm-5.2` → `kimi-k2.7-code` |
-| spec-ux | `opencode-go/deepseek-v4-flash` | `glm-5.2` → `kimi-k2.7-code` |
-| spec-verifier | `opencode-go/qwen3.7-plus` | `glm-5.2` → `kimi-k2.7-code` |
-| spec-mutation-runner | `opencode-go/qwen3.7-plus` | `glm-5.2` → `kimi-k2.7-code` |
-| spec-pr-opener | `opencode-go/qwen3.7-plus` | `glm-5.2` → `kimi-k2.7-code` |
-| spec-coder | `opencode-go/deepseek-v4-flash` | `kimi-k2.7-code` → `glm-5.1` |
-| spec-refactorer | `opencode-go/deepseek-v4-flash` | `kimi-k2.7-code` → `glm-5.1` |
-| spec-pipeline | `opencode-go/deepseek-v4-flash` | `kimi-k2.7-code` → `glm-5.1` |
+| Agent | Model |
+|---|---|
+| spec-specifier | `ANY_SUBSCRIPTION`
+| spec-ux | `ANY_SUBSCRIPTION`
+| spec-verifier | `ANY_SUBSCRIPTION`
+| spec-mutation-runner | `ANY_SUBSCRIPTION`
+| spec-pr-opener | `ANY_SUBSCRIPTION`
+| spec-coder | `ANY_SUBSCRIPTION`
+| spec-refactorer | `ANY_SUBSCRIPTION`
+| spec-pipeline | `ANY_SUBSCRIPTION`
 
 Per-machine values arrive via the gitignored repo-root `.envrc` (direnv). It
 loads the committed `config/model.local.env.example` defaults, then the
@@ -80,9 +80,7 @@ configuration` for the full mechanism and precedence.
 
 **Plugin triggers**: `rate_limit`, `quota_exceeded`, `5xx`, `timeout`, `overloaded`. Cooldown: 5 min; retry original after 15 min; max depth: 3.
 
-**Provider fallback**: OpenCode Go falls back to Zen balance if "Use balance" is enabled in console. Otherwise requests error → plugin catches and switches model.
-
-To replicate on another machine: configure the same per-agent entries in `~/.config/opencode/model-fallback.json` (see plugin docs).
+**Provider fallback**: To be defined
 
 ## Per-machine agent environment (credentials)
 
