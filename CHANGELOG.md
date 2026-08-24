@@ -1,3 +1,10 @@
+## [1.27.3](https://github.com/RexiAI/my-engineering-standards/compare/v1.27.2...v1.27.3) (2026-08-24)
+
+
+### Bug Fixes
+
+* **ci:** smoke gate secrets-in-if check false-positives on needs.*secrets.outputs ([#53](https://github.com/RexiAI/my-engineering-standards/issues/53)) ([65f5592](https://github.com/RexiAI/my-engineering-standards/commit/65f5592e0fc944f94868b9a82aa105c2987bcdbf))
+
 ## [1.27.2](https://github.com/RexiAI/my-engineering-standards/compare/v1.27.1...v1.27.2) (2026-08-24)
 
 
