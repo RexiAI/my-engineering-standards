@@ -75,9 +75,11 @@ run_phase1() {
   done
 
   # --- No secrets in if: conditions ---
+  # Match the secrets CONTEXT only: [^A-Za-z-] before "secrets." keeps
+  # needs.check-secrets.outputs from false-positive tripping the gate.
   for wf in .github/workflows/*.yml; do
     [[ -f "$wf" ]] || continue
-    if grep -E '^\s+if:.*secrets\.' "$wf" 2>/dev/null | grep -v '#' >/dev/null; then
+    if grep -E '^[[:space:]]*(-[[:space:]]+)?if:.*[^A-Za-z-]secrets\.[A-Za-z_]+' "$wf" 2>/dev/null | grep -v '[[:space:]]#' >/dev/null; then
       fail "Secrets reference in if: condition in $(basename "$wf") (illegal per GitHub)"
     fi
   done
