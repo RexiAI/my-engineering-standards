@@ -41,6 +41,9 @@
 .react-native-eas:
   extends: [.node-setup, .node-cache]
   script:
-    - npx eas-cli build --non-interactive
+    # Only meaningful when the project actually uses EAS (app/eas.json);
+    # non-interactive mode requires an explicit platform.
+    - test -f app/eas.json || exit 0
+    - npx eas-cli build --non-interactive --platform all
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $EXPO_TOKEN != null
