@@ -102,12 +102,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Honest skip when the project does not use EAS: eas build without an
+      # app/eas.json project config cannot succeed, and modern eas-cli
+      # rejects --platform web outright. Gate lives at step level because
+      # hashFiles/file checks are unavailable in job-level if:.
+      - name: Detect EAS configuration
+        id: gate
+        run: |
+          echo "eas-configured=$([ -f app/eas.json ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@v4
+        if: steps.gate.outputs.eas-configured == 'true'
         with:
           node-version: ${{ inputs.node-version-file == '' && inputs.node-version || '' }}
           node-version-file: ${{ inputs.node-version-file }}
           cache: npm
       - run: npm ci
-      - run: npx eas-cli build --non-interactive --platform web
+        if: steps.gate.outputs.eas-configured == 'true'
+      - run: npm ci
+        if: steps.gate.outputs.eas-configured == 'true'
+        working-directory: app
+      - run: npx eas-cli build --non-interactive --platform all
+        if: steps.gate.outputs.eas-configured == 'true'
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
