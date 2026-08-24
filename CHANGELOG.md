@@ -1,3 +1,10 @@
+## [1.27.4](https://github.com/RexiAI/my-engineering-standards/compare/v1.27.3...v1.27.4) (2026-08-24)
+
+
+### Bug Fixes
+
+* **ci:** skip EAS Build when project has no app/eas.json ([#54](https://github.com/RexiAI/my-engineering-standards/issues/54)) ([199f7d3](https://github.com/RexiAI/my-engineering-standards/commit/199f7d344247e3b5f9f1f3d1cebdff18dcd097b7))
+
 ## [1.27.3](https://github.com/RexiAI/my-engineering-standards/compare/v1.27.2...v1.27.3) (2026-08-24)
 
 
