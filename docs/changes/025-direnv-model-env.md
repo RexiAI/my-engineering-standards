@@ -460,6 +460,11 @@ Scenarios: `20-acceptance/AC-025-07-docs-adr.md`
 ## AC-025-06-10 — Direnv-requiring cases skip cleanly when direnv is absent
 ## AC-025-07-01 — SPEC_PIPELINE.md §Model configuration documents the dotenv flow
 ## AC-025-07-02 — AGENTS.md describes the gitignored `.envrc` mechanism
+
+> Amendment (post-spec, ADR 0002): originally asserted the AGENTS.md
+> model-table values stay unchanged. Per owner decision the project's general
+> docs are CLI/provider-agnostic; the assertion is inverted — AGENTS.md must
+> document the dotenv flow and carry NO model or provider ids.
 ## AC-025-07-03 — README.md §Model Configuration describes the direnv flow
 ## AC-025-07-04 — ADR 0001 records the dotenv decision with status Accepted
 ## AC-025-07-05 — ADR index reflects the updated status

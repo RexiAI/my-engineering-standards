@@ -831,16 +831,16 @@ else
   bad "AC-025-07-01 SPEC_PIPELINE.md §Model configuration documents the full dotenv flow"
 fi
 
-# 07-02: AGENTS.md describes the gitignored .envrc mechanism; table unchanged
+# 07-02: AGENTS.md documents the dotenv flow and carries NO model or provider
+# ids (amended post-spec per ADR 0002: general docs are CLI/provider-agnostic)
 if grep -q 'dotenv_if_exists' "$ROOT/AGENTS.md" \
    && grep -q '\.envrc' "$ROOT/AGENTS.md" \
    && grep -q 'config/model.local.env.example' "$ROOT/AGENTS.md" \
-   && grep -q 'opencode-go/deepseek-v4-flash' "$ROOT/AGENTS.md" \
-   && grep -q 'opencode-go/qwen3.7-plus' "$ROOT/AGENTS.md" \
+   && ! grep -qiE 'opencode-(go|zen)|deepseek|qwen|kimi|glm-[0-9]|ANY_SUBSCRIPTION' "$ROOT/AGENTS.md" \
    && ! grep -q "$LOADENV\|$LOADMODELENV" "$ROOT/AGENTS.md"; then
-  ok "AC-025-07-02 AGENTS.md describes the gitignored .envrc mechanism; model-table values unchanged"
+  ok "AC-025-07-02 AGENTS.md describes the gitignored .envrc mechanism; carries no model or provider ids"
 else
-  bad "AC-025-07-02 AGENTS.md describes the gitignored .envrc mechanism; model-table values unchanged"
+  bad "AC-025-07-02 AGENTS.md describes the gitignored .envrc mechanism; carries no model or provider ids"
 fi
 
 # 07-03: README.md §Model Configuration describes the direnv flow

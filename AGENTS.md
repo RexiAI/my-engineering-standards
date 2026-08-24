@@ -20,7 +20,7 @@ Before coding in any child repo, read the relevant docs from this submodule. The
 - Use conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`.
 - Never commit or push changes unless the user explicitly instructs it. Commits and pushes require manual confirmation. **Exception**: the spec pipeline's PR Opener stage (`agents/spec-pr-opener.md`) may commit, push, and open a draft PR unattended, but only on a `spec/NNN-slug` branch and only after every configured quality gate is green (including a green Mutation Runner report) — see `docs/SPEC_PIPELINE.md §Commit and push carve-out`. The Mutation Runner (`agents/spec-mutation-runner.md`) never commits or pushes. No other agent or workflow gets this exception.
 - **All changes reach `main` via pull request. Direct push to `main` or `master` is forbidden — for humans and agents alike, with no exceptions.** This applies to this repo and every child repo. See `docs/GIT_WORKFLOW.md §Strategy: Trunk-Based Development` and `templates/branch-protection.md`.
-- **Never create git version tags.** Tags are created automatically by CI (Semantic Release) after a PR merges to `main`. See `docs/GIT_WORKFLOW.md §Versioning` and `docs/CI_CD.md §Release Process`.
+- **Never create git version tags.** Tags are created automatically by CI (Semantic Release) after a PR merges to `main`. See `docs/GIT_WORKFLOW.md §Versioning` and `docs/CI_CD.md.md §Release Process`.
 - In plan mode, every plan must state whether the agent should auto-commit after completing the work or wait for user confirmation.
 - Loops never skip L1 (report) on a production repo — see `docs/LOOP_ENGINEERING.md §Readiness levels`.
 - Verify agent-delivered work against the live system before calling it done — a diff that compiles and a diff that works are different claims. For an API change, that means actually calling the endpoint (curl, a test client, whatever's fastest) and checking the response, not just reading the code and reasoning that it should work. Field-name mismatches, wrong status codes, and auth-header mistakes are exactly the class of bug that "looks right" in a diff and fails on the first real request.
@@ -47,20 +47,9 @@ This project structure supports Java, Go, JavaScript/TypeScript, and React Nativ
 - Read `docs/AGENTS_AND_SKILLS.md` before creating or modifying any agent in `agents/` or skill in `skills/`/`language-specific/`.
 - Read `docs/GOVERNANCE.md` before changing pipeline roles, the gate catalog, or billing constraints — trust tiers, model-assignment discipline, and the ADR requirement live there.
 
-## OpenCode Go Model Configuration
+## Model Configuration
 
-This repo's spec pipeline agents are configured to use OpenCode Go subscription models via `opencode.json` `{env:SPEC_*_MODEL}` references:
-
-| Agent | Primary Model | Fallback Chain (via `@smart-coders-hq/opencode-model-fallback` plugin) |
-|---|---|---|
-| spec-specifier | `opencode-go/deepseek-v4-flash` | `glm-5.2` → `kimi-k2.7-code` |
-| spec-ux | `opencode-go/deepseek-v4-flash` | `glm-5.2` → `kimi-k2.7-code` |
-| spec-verifier | `opencode-go/qwen3.7-plus` | `glm-5.2` → `kimi-k2.7-code` |
-| spec-mutation-runner | `opencode-go/qwen3.7-plus` | `glm-5.2` → `kimi-k2.7-code` |
-| spec-pr-opener | `opencode-go/qwen3.7-plus` | `glm-5.2` → `kimi-k2.7-code` |
-| spec-coder | `opencode-go/deepseek-v4-flash` | `kimi-k2.7-code` → `glm-5.1` |
-| spec-refactorer | `opencode-go/deepseek-v4-flash` | `kimi-k2.7-code` → `glm-5.1` |
-| spec-pipeline | `opencode-go/deepseek-v4-flash` | `kimi-k2.7-code` → `glm-5.1` |
+This repo's spec pipeline agents are configured to use models via `opencode.json` `{env:SPEC_*_MODEL}` references. Concrete default model ids are defined only in `config/model.local.env.example`; per-machine overrides live in the gitignored `config/model.local.env`. Docs intentionally carry no model or provider ids — switch models by editing your local override, never tracked files.
 
 Per-machine values arrive via the gitignored repo-root `.envrc` (direnv). It
 loads the committed `config/model.local.env.example` defaults, then the
@@ -79,10 +68,6 @@ to verify the resolution behavior. See `docs/SPEC_PIPELINE.md §Model
 configuration` for the full mechanism and precedence.
 
 **Plugin triggers**: `rate_limit`, `quota_exceeded`, `5xx`, `timeout`, `overloaded`. Cooldown: 5 min; retry original after 15 min; max depth: 3.
-
-**Provider fallback**: OpenCode Go falls back to Zen balance if "Use balance" is enabled in console. Otherwise requests error → plugin catches and switches model.
-
-To replicate on another machine: configure the same per-agent entries in `~/.config/opencode/model-fallback.json` (see plugin docs).
 
 ## Per-machine agent environment (credentials)
 

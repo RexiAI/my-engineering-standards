@@ -497,9 +497,9 @@ not a loud failure.
 
 **Structural enforcement**: `scripts/check-model-env.sh` is the gate — every
 `agent.*.model` in the `agent` block must be an `{env:SPEC_*_MODEL}` reference
-(no literal model id in the agent block; the pr-review agent's pinned
-`opencode-zen/kimi-k3` model and the OpenCode Zen provider block are the
-deliberate exceptions, see `§Using OpenCode Zen` below), `config/model.local.env`
+(no literal model id in the agent block; the standalone PR-review agent's
+deliberate literal model pin is the one exception, see `§Using OpenCode Zen`
+below), `config/model.local.env`
 and `config/agent.local.env` must never be tracked by git, and the example must
 define exactly the referenced vars. Self-ci additionally runs
 `scripts/model-env.selftest.sh` (hermetic dotenv-emulation regressions) and

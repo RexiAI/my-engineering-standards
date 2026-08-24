@@ -21,10 +21,11 @@
 #              assignment), derives tiers from permission frontmatter, and
 #              records the spec-pipeline gap.
 #   AC-010-04  the Model-Assignment Discipline section names opencode.json as
-#              the single authoritative model source, the AGENTS.md table as a
-#              mirror, the same-commit rule, the no-frontmatter-model rule,
-#              and a conformance note tying the rule to the observed
-#              spec-architect drift.
+#              the single authoritative model source, states general docs
+#              carry no concrete model/provider ids (no-docs-mirror rule),
+#              keeps the no-frontmatter-model rule with its pr-review
+#              exception, and a conformance note tying the rule to observed
+#              drift (spec-architect, provider-id broadcast).
 #   AC-010-05  the ADR Requirement section states the review-blocking rule for
 #              pipeline-role / gate-catalog / billing changes and references
 #              templates/ADR.md + docs/adr/; docs/adr/README.md exists as the
@@ -308,15 +309,15 @@ expect "AC-010-04-02" MODEL_OK MODEL_AUTH_OK "$MODEL_SECTION" \
 
 # AC-010-04-03 — the AGENTS.md table is a mirror, not a second source of truth.
 expect "AC-010-04-03" MODEL_OK - "$MODEL_SECTION" \
-  "AGENTS.md model table stated as a mirror of opencode.json, not a second source of truth" \
-  "section must state the AGENTS.md model table is a mirror of opencode.json, not a second source of truth" \
-  'AGENTS.md' 'mirror' 'not a second source of truth'
+  "general docs stated as carrying no concrete model/provider ids, not a second source of truth" \
+  "section must state that general docs (AGENTS.md, GOVERNANCE.md) carry no concrete model or provider ids and are not a second source of truth (ADR 0002)" \
+  'carry no concrete model or provider ids' 'not a second source of truth'
 
 # AC-010-04-04 — the same-commit rule is stated.
 expect "AC-010-04-04" MODEL_OK - "$MODEL_SECTION" \
-  "same-commit rule stated: opencode.json and the AGENTS.md mirror table change in the same commit" \
-  "section must state the same-commit rule (edit opencode.json AND the AGENTS.md mirror table in the same commit; never one without the other)" \
-  'same commit' 'Never edit one without the other'
+  "no-docs-mirror rule stated: switching models is a local config edit, never a docs edit" \
+  "section must state the no-docs-mirror rule (switching a model is a local config edit; never reintroduce a model table or provider ids into general docs)" \
+  'local config edit' 'never a docs edit'
 
 # AC-010-04-05 — agent frontmatter must not pin models.
 expect "AC-010-04-05" MODEL_OK - "$MODEL_SECTION" \
