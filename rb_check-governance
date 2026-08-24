@@ -1,0 +1,44 @@
+[0;32mPASS[0m AC-010-01-01 — docs/GOVERNANCE.md exists
+[0;32mPASS[0m AC-010-01-02 — exactly the three required headings present, no other top-level ## heading
+[0;32mPASS[0m AC-010-01-03 — sections in order: Trust Tiers, Model-Assignment Discipline, ADR Requirement
+[0;32mPASS[0m AC-010-01-04 — opening paragraph declares governance separated from operations and points at docs/SPEC_PIPELINE.md
+
+[0;32mPASS[0m AC-010-02-01 — '## Trust Tiers' section exists
+[0;32mPASS[0m AC-010-02-02 — tier row present: | T0 | Autonomous | reads, gates, Jira/Confluence read, Jira comment |
+[0;32mPASS[0m AC-010-02-03 — tier row present: | T1 | Local write | edit, commit, local branch |
+[0;32mPASS[0m AC-010-02-04 — tier row present: | T2 | Confirm (human-triggered) | push, PR, Confluence publish, Jira transition |
+[0;32mPASS[0m AC-010-02-05 — tier row present: | T3 | Forbidden | push to main, force-push, destructive infra |
+[0;32mPASS[0m AC-010-02-06 — T3 stated as universal: applies to every agent with no exceptions
+[0;32mPASS[0m AC-010-02-07 — sole carve-out named: spec-pr-opener may push spec/NNN-slug and open a draft PR once gates are green
+
+[0;32mPASS[0m AC-010-03-01 — all 8 real pipeline agents present in the mapping table
+[0;32mPASS[0m AC-010-03-02 — spec-verifier mapped to T0
+[0;32mPASS[0m AC-010-03-03 — spec-pr-opener mapped to T2
+[0;32mPASS[0m AC-010-03-04 — no agent row assigns trust tier T3
+[0;32mPASS[0m AC-010-03-05 — tier basis stated: highest granted action class per permission frontmatter; T3 prohibitions apply regardless of tier
+[0;32mPASS[0m AC-010-03-06 — spec-pipeline row records its missing permission frontmatter (gap, not papered over)
+
+[0;32mPASS[0m AC-010-04-01 — '## Model-Assignment Discipline' section exists
+[0;32mPASS[0m AC-010-04-02 — opencode.json (agent.<name>.model) named as the single authoritative model source (AC-010-06-06 failure mode)
+[0;32mPASS[0m AC-010-04-03 — general docs stated as carrying no concrete model/provider ids, not a second source of truth
+[0;32mPASS[0m AC-010-04-04 — no-docs-mirror rule stated: switching models is a local config edit, never a docs edit
+[0;32mPASS[0m AC-010-04-05 — agent files must not pin a model: key (a pinned frontmatter model silently overrides opencode.json)
+[0;32mPASS[0m AC-010-04-06 — conformance note ties the same-commit rule to the observed spec-architect drift (governance defect)
+
+[0;32mPASS[0m AC-010-05-01 — '## ADR Requirement' section exists
+[0;32mPASS[0m AC-010-05-02 — pipeline role, gate catalog, and billing changes all require an ADR
+[0;32mPASS[0m AC-010-05-03 — ADR requirement is review-blocking: a PR without an accompanying ADR cannot merge
+[0;32mPASS[0m AC-010-05-04 — section references templates/ADR.md (mandated template) and docs/adr/ (ADR location)
+[0;32mPASS[0m AC-010-05-05 — docs/adr/README.md exists, indexes one ADR per file, and references templates/ADR.md (AC-010-06-07 failure mode)
+[0;32mPASS[0m AC-010-05-06 — index lists at least one recorded ADR with an Accepted status row
+
+[0;32mPASS[0m AC-010-06-01 — scripts/check-governance.sh exists and is executable
+[0;32mPASS[0m AC-010-06-03 — missing docs/GOVERNANCE.md FAILs with exit 1, naming the file
+[0;32mPASS[0m AC-010-06-04 — missing required heading FAILs with exit 1, naming the heading
+[0;32mPASS[0m AC-010-06-05 — missing agent row FAILs with exit 1, naming the agent (spec-verifier)
+[0;32mPASS[0m AC-010-06-06 — missing authoritative-source statement FAILs with exit 1, naming the statement
+[0;32mPASS[0m AC-010-06-07 — missing docs/adr/README.md FAILs with exit 1, naming the file
+[0;32mPASS[0m AC-010-06-08 — every AC-010-NN-NN scenario ID is cited in this output (see PASS/FAIL lines)
+
+[0;32mPASS[0m AC-010-06-02 — compliant repo passes all checks (exit 0)
+[0;32m✔ Governance check: every governance requirement verified.[0m

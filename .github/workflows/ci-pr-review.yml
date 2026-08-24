@@ -24,7 +24,7 @@ on:
         type: string
     secrets:
       OPENCODE_API_KEY:
-        description: OpenCode Zen API key for the opencode-zen provider
+        description: API key for the provider serving the review model
         required: false
 
 permissions:
@@ -39,9 +39,12 @@ jobs:
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
       PR_NUMBER: ${{ inputs.pr-number }}
       HEAD_SHA: ${{ inputs.head-sha }}
-      # Model for the review run. The calling workflow can set PR_REVIEW_MODEL
-      # to override. Must be provider-qualified: bare ids fail with Model not found.
-      PR_REVIEW_MODEL: ${{ vars.PR_REVIEW_MODEL || 'opencode/x-preview-f-free' }}
+      # Optional override for the review run's model: the repo-level
+      # Actions variable PR_REVIEW_MODEL (provider-qualified; bare ids fail
+      # with "Model not found"). When unset, opencode.json's
+      # {env:SPEC_PR_REVIEW_MODEL} resolves against the committed default in
+      # config/model.local.env.example — same chain as every other agent.
+      PR_REVIEW_MODEL: ${{ vars.PR_REVIEW_MODEL }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -105,9 +108,9 @@ jobs:
         # never a failure — the PR's required checks are unaffected. secrets is
         # not a legal context in an if: at any scope, so gate on the job env
         # (the secret is mapped into the env in the job env block).
-        # Empty-model guard: when PR_REVIEW_MODEL is unset (child repo does not
-        # override it in config/model.local.env), the step skips — repos that
-        # do not use the pr-review agent get a green CI without the review.
+        # Empty-model guard (ADR 0003): when PR_REVIEW_MODEL is unset, the
+        # step skips too — a repo opts in by configuring BOTH the key and the
+        # model; neither has a shipped default.
         if: ${{ steps.early-exit.outputs.skip != 'true' && env.OPENCODE_API_KEY != '' }}
         run: |
           set -euo pipefail
@@ -121,10 +124,11 @@ jobs:
           # shellcheck disable=SC1091
           set -a; . config/model.local.env.example; set +a
 
-          # Model override (optional): when PR_REVIEW_MODEL is set in the
-          # caller's environment, export it as SPEC_PR_REVIEW_MODEL so
-          # opencode.json's {env:SPEC_PR_REVIEW_MODEL} resolves to the
-          # override value instead of the committed default.
+          # Model override: when PR_REVIEW_MODEL is set in the caller's
+          # environment, export it as SPEC_PR_REVIEW_MODEL so opencode.json's
+          # {env:SPEC_PR_REVIEW_MODEL} resolves to the override value instead
+          # of the committed default. The step's if: guarantees the variable
+          # is set here — there is no shipped fallback model.
           if [ -n "${PR_REVIEW_MODEL:-}" ]; then
             export SPEC_PR_REVIEW_MODEL="$PR_REVIEW_MODEL"
           fi

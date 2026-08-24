@@ -1,0 +1,2 @@
+
+[0;32mPASS[0m check-model-env: all model values are {env:SPEC_*_MODEL} references, no tracked real env files, example wired.

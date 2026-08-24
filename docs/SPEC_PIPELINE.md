@@ -497,8 +497,9 @@ not a loud failure.
 
 **Structural enforcement**: `scripts/check-model-env.sh` is the gate — every
 `agent.*.model` in the `agent` block must be an `{env:SPEC_*_MODEL}` reference
-(no literal model id in the agent block; the OpenCode Zen provider block is
-registered separately, see `§Using OpenCode Zen` below), `config/model.local.env`
+(no literal model id anywhere outside provider blocks; every agent — the
+standalone reviewer included — resolves through the `{env:SPEC_*_MODEL}`
+roster, see `§PR review model wiring` below), `config/model.local.env`
 and `config/agent.local.env` must never be tracked by git, and the example must
 define exactly the referenced vars. Self-ci additionally runs
 `scripts/model-env.selftest.sh` (hermetic dotenv-emulation regressions) and
@@ -513,28 +514,29 @@ editable files in `.opencode/agents/` and `.opencode/commands/` instead of a
 symlink. You own the copies after that — re-run with the same flag after a
 submodule update to pull in changes; it will not overwrite or merge your edits.
 
-## Using OpenCode Zen
+## PR review model wiring
 
-[OpenCode Zen](https://opencode.ai/docs/zen) is the provider behind the
-`opencode-go/*` model ids used across this repo. It is wired in two places:
+No agent pins a model in tracked files (ADR 0003). The spec-pipeline agents
+resolve `{env:SPEC_*_MODEL}` references via `§Model configuration`; the
+standalone PR-review agent gets its runtime model per repo instead:
 
-- **Provider config** — `opencode.json` carries a `provider.opencode-zen` block:
-  base URL `https://opencode.ai/zen/go/v1`, auth env var `OPENCODE_API_KEY`, and
-  the model ids available to it. The spec-pipeline agents still resolve their
-  models from `{env:SPEC_*_MODEL}` references (see `§Model configuration`); the
-  provider block is what those references point at.
-- **Auth** — the provider reads the `OPENCODE_API_KEY` env var (verified
-  against the pinned binary's provider registry, see `docs/changes/019`). Locally
-  the var is exported by your shell profile; in CI it arrives from the
-  `OPENCODE_API_KEY` GitHub Actions secret and is never committed.
+- **Provider config** — `opencode.json` may carry provider blocks (base URL,
+  auth env var, available models). That is operator configuration, not
+  documentation: which providers appear there is each machine's/repo's own
+  decision.
+- **Model selection** — the shared review workflow takes its model from the
+  `PR_REVIEW_MODEL` repository variable and its key from the
+  `OPENCODE_API_KEY` secret. Either unset ⇒ the review skips cleanly (green
+  CI, no review); there is no shipped default model.
 
 **PR review agent model**: `agents/pr-review.md` (the PR review agent,
 spec 024) ships without a `model:` key, same as every other agent. Its model
-is resolved through `{env:SPEC_PR_REVIEW_MODEL}` in `opencode.json`, with the
-committed default `opencode/x-preview-f-free` in `config/model.local.env.example`.
-The agent's scope lock, permissions, endpoint, secret handling, and cost bounds
-are documented in `docs/CI_CD.md §PR Review Agent`, which is the authoritative
-reference for wiring it into child repos (`init-ci.sh --with-pr-review`).
+resolves through `{env:SPEC_PR_REVIEW_MODEL}` in `opencode.json`, with the
+committed default in `config/model.local.env.example` and an optional
+per-repo `PR_REVIEW_MODEL` override in the shared workflow. The agent's scope
+lock, permissions, secret handling, and cost bounds are documented in
+`docs/CI_CD.md §PR Review Agent`, the authoritative reference for wiring it
+into child repos (`init-ci.sh --with-pr-review`).
 
 ## Tooling by language
 

@@ -369,11 +369,13 @@ else
     'templates/ADR.md' 'one per file'
 fi
 
-# AC-010-05-06 — the index records that no ADR exists yet.
+# AC-010-05-06 — the index records recorded ADRs with status (amended: ADRs
+# 0001-0003 exist now; the original "no ADRs are recorded yet" assertion broke
+# the moment the first ADR landed and is replaced by an index-integrity check).
 expect "AC-010-05-06" ADR_INDEX_OK - "$ADR_INDEX_TEXT" \
-  "index records that no ADRs are recorded yet" \
-  "index must state that no ADRs are recorded yet" \
-  'No ADRs are recorded yet'
+  "index lists at least one recorded ADR with an Accepted status row" \
+  "index must list at least one recorded ADR (| NNNN | ... | Accepted |) — it may not claim 'No ADRs are recorded yet' once ADRs exist" \
+  '| 0001 |' 'Accepted'
 
 echo ""
 

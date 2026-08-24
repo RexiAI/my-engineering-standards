@@ -452,7 +452,7 @@ _gh_pr_review_job() {
       OPENCODE_API_KEY: \${{ secrets.OPENCODE_API_KEY }}
 EOF
   ok "Added pr-review job to ci.yml (PR review agent, per-PR)"
-  info "Set the OPENCODE_API_KEY secret (OpenCode Zen) in GitHub → Settings → Secrets and variables → Actions"
+  info "Set the OPENCODE_API_KEY secret (provider API key) in GitHub → Settings → Secrets and variables → Actions"
 }
 
 # Frontend job block: react-native swaps the docker-registry/GHCR pair for a
@@ -901,7 +901,7 @@ _print_pr_review_note() {
   echo ""
   echo "PR review agent (opt-in):"
   echo "  • pr-review job added to ci.yml (per-PR, review + suggested fixes only)"
-  echo "  • Set secret: OPENCODE_API_KEY (OpenCode Zen — never commit the value)"
+  echo "  • Set secret: OPENCODE_API_KEY (provider API key — never commit the value)"
   echo "  • Reference: docs/CI_CD.md §PR Review Agent"
 }
 
