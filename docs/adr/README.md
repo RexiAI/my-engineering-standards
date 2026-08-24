@@ -9,3 +9,4 @@ Proposed → Accepted → Deprecated → Superseded.
 | ADR | Title | Status |
 |-----|-------|--------|
 | 0001 | [Pure direnv dotenv for spec-pipeline model configuration and credentials](0001-direnv-model-env.md) | Accepted |
+| 0002 | [Provider-agnostic general documentation](0002-provider-agnostic-docs.md) | Accepted |

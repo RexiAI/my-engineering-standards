@@ -56,25 +56,26 @@ Model assignments for the spec pipeline live in exactly one authoritative
 place: `opencode.json`, under the `agent.<name>.model` key. `opencode.json` is
 the single authoritative source of which model runs each pipeline stage.
 
-The `AGENTS.md` model table (`AGENTS.md §OpenCode Go Model Configuration`) is a
-**mirror** of that source, for humans and for the model-fallback plugin's
-documentation. It is not a second source of truth: only its fallback-chain
-column carries information `opencode.json` does not, and that column must not be
-edited to reflect a primary model change without the `opencode.json` change
-landing in the same commit.
+General docs (`AGENTS.md`, this file) carry no concrete model or provider ids
+and are **not a second source of truth**: they document the resolution
+mechanism only. Switching a model is always a local config edit
+(`config/model.local.env`) or an example-defaults edit — never a docs edit,
+and never a tracked-docs edit at all for per-machine choices.
 
-**Same-commit rule:** change a model only by editing `opencode.json` **and** the
-`AGENTS.md` mirror table in the same commit. Never edit one without the other.
+**No-docs-mirror rule:** do not reintroduce a model table or provider ids into
+general documentation. Concrete ids belong only in config files
+(`config/model.local.env.example`, `opencode.json` provider blocks) and in the
+scoped operator sections for opt-in integrations.
 
 **Frontmatter rule:** agent files must not pin a `model:` key (per
-`docs/SPEC_PIPELINE.md §Model configuration` — a pinned `.md` model silently overrides
-`opencode.json`). If a child repo pins a model in frontmatter anyway,
-that edit must land in the same commit as the mirror table edit.
+`docs/SPEC_PIPELINE.md §Model configuration`) — a pinned `.md` model
+silently overrides `opencode.json`. The standalone PR-review agent is the
+one deliberate exception, documented in `docs/SPEC_PIPELINE.md §Using OpenCode Zen`.
 
-**Conformance note:** violating the same-commit rule is a governance defect — a
-review blocker, same class as the ADR rule. The drift observed in this repo (a
-model entry pointing at a nonexistent agent, `spec-architect`) is exactly what
-this rule exists to prevent.
+**Conformance note:** violating the no-docs-mirror rule is a governance defect —
+a review blocker, same class as the ADR rule. The drift observed in this repo
+(a model entry pointing at a nonexistent agent, `spec-architect`, and provider
+ids broadcast through `AGENTS.md`) is exactly what this rule exists to prevent.
 
 ## ADR Requirement
 
