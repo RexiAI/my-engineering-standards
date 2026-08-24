@@ -24,7 +24,7 @@ on:
         type: string
     secrets:
       OPENCODE_API_KEY:
-        description: OpenCode Zen API key for the pinned opencode-zen provider
+        description: OpenCode Zen API key for the opencode-zen provider
         required: false
 
 permissions:
@@ -39,9 +39,8 @@ jobs:
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
       PR_NUMBER: ${{ inputs.pr-number }}
       HEAD_SHA: ${{ inputs.head-sha }}
-      # Default model for the review run; a repo-level Actions variable
-      # PR_REVIEW_MODEL overrides it without touching this file.
-      # Must be provider-qualified: bare ids fail with Model not found.
+      # Model for the review run. The calling workflow can set PR_REVIEW_MODEL
+      # to override. Must be provider-qualified: bare ids fail with Model not found.
       PR_REVIEW_MODEL: ${{ vars.PR_REVIEW_MODEL || 'opencode/x-preview-f-free' }}
     steps:
       - uses: actions/checkout@v4
@@ -123,13 +122,11 @@ jobs:
           set -a; . config/model.local.env.example; set +a
 
           # Model override (optional): when PR_REVIEW_MODEL is set in the
-          # caller's environment, override the agent's hardcoded model pin.
-          # When unset, the agent's frontmatter `model: opencode-zen/kimi-k3`
-          # pin takes effect — repos that do not set PR_REVIEW_MODEL get the
-          # default without any configuration.
-          model_flag=""
+          # caller's environment, export it as SPEC_PR_REVIEW_MODEL so
+          # opencode.json's {env:SPEC_PR_REVIEW_MODEL} resolves to the
+          # override value instead of the committed default.
           if [ -n "${PR_REVIEW_MODEL:-}" ]; then
-            model_flag="--model ${PR_REVIEW_MODEL}"
+            export SPEC_PR_REVIEW_MODEL="$PR_REVIEW_MODEL"
           fi
 
           # Billing/quota guard: capture output so we can detect provider
@@ -152,7 +149,6 @@ jobs:
           prompt="$(printf 'You are the PR review agent. Review PR %s at head %s.\n\n%s\n\nPost your findings as one PR review comment via gh. End the comment with:\nReviewed-SHA: %s' "${PR_NUMBER}" "${HEAD_SHA}" "${agent_instructions}" "${HEAD_SHA}")"
 
           review_output=$(set +e; /tmp/opencode-bin/opencode run --print-logs \
-            ${model_flag} \
             "${prompt}" 2>&1) && review_rc=0 || review_rc=$?
 
           if [ "$review_rc" -ne 0 ]; then

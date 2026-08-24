@@ -76,7 +76,7 @@ expected_for() {
   echo "$FAST"
 }
 
-# write_example DIR FAST PLUS — fixture example defining all 8 vars
+# write_example DIR FAST PLUS — fixture example defining all 9 vars
 write_example() {
   mkdir -p "$1/config"
   {
@@ -88,10 +88,11 @@ write_example() {
     printf 'SPEC_CODER_MODEL=%s\n' "$2"
     printf 'SPEC_REFACTORER_MODEL=%s\n' "$2"
     printf 'SPEC_PIPELINE_MODEL=%s\n' "$2"
+    printf 'SPEC_PR_REVIEW_MODEL=%s\n' "$2"
   } > "$1/config/model.local.env.example"
 }
 
-# write_refs PROJ — fixture opencode.json with 8 {env:...} references
+# write_refs PROJ — fixture opencode.json with 9 {env:...} references
 write_refs() {
   mkdir -p "$1/config"
   cat > "$1/opencode.json" <<'EOF'
@@ -105,7 +106,8 @@ write_refs() {
     "spec-pr-opener": { "model": "{env:SPEC_PR_OPENER_MODEL}" },
     "spec-coder": { "model": "{env:SPEC_CODER_MODEL}" },
     "spec-refactorer": { "model": "{env:SPEC_REFACTORER_MODEL}" },
-    "spec-pipeline": { "model": "{env:SPEC_PIPELINE_MODEL}" }
+    "spec-pipeline": { "model": "{env:SPEC_PIPELINE_MODEL}" },
+    "pr-review": { "model": "{env:SPEC_PR_REVIEW_MODEL}" }
   }
 }
 EOF

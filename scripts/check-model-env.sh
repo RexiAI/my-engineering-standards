@@ -53,13 +53,11 @@ else
   # Strip $schema lines before the whole-file literal scan so the schema URL's
   # slashes cannot false-positive; then flag any remaining provider/model-style
   # token (X/Y) — a literal model id anywhere in the file is a violation.
-  # The pr-review provider block (spec 024) is carved out before the scan: it
-  # legitimately carries the OpenCode Zen endpoint URL and the provider-side
-  # model name, neither of which is an agent model id. The scan's job is to
-  # keep the *agent block* env-reference-only — the pr-review agent's model pin
-  # lives in agents/pr-review.md frontmatter (the one deliberate exception,
-  # spec 024), not in opencode.json. The provider block is the last top-level
-  # key, so deleting from its opening line to EOF is sufficient.
+  # The provider block is carved out before the scan: it legitimately carries
+  # the OpenCode Zen endpoint URL and the provider-side model names, neither
+  # of which are agent model ids. The scan's job is to keep the *agent block*
+  # env-reference-only. The provider block is the last top-level key, so
+  # deleting from its opening line to EOF is sufficient.
   scan="$(sed -E 's/"[[:space:]]*\$schema[[:space:]]*"[[:space:]]*:[[:space:]]*"[^"]*"[[:space:]]*[,]?//' "$OPENCODE_JSON")"
   scan="$(sed -E '/^[[:space:]]*"provider"[[:space:]]*:/,$d' <<< "$scan")"
   literal_line="$(printf '%s\n' "$scan" | grep -nE '[A-Za-z0-9._-]+/[A-Za-z0-9._-]+' | head -1 || true)"
@@ -77,7 +75,7 @@ else
     value="$(printf '%s' "$line" | sed -nE 's/.*"model"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/p')"
     expected="$(model_env_var_for_agent "$agent")"
     if [ -z "$expected" ]; then
-      fail "agent $agent in opencode.json is not one of the 8 spec agents"
+      fail "agent $agent in opencode.json is not one of the 9 configured agents"
     elif [ "$value" != "{env:$expected}" ]; then
       fail "agent $agent: model value '$value' is not an {env:$expected} reference"
     fi

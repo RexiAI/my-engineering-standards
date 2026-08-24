@@ -497,9 +497,8 @@ not a loud failure.
 
 **Structural enforcement**: `scripts/check-model-env.sh` is the gate — every
 `agent.*.model` in the `agent` block must be an `{env:SPEC_*_MODEL}` reference
-(no literal model id in the agent block; the standalone PR-review agent's
-deliberate literal model pin is the one exception, see `§Using OpenCode Zen`
-below), `config/model.local.env`
+(no literal model id in the agent block; the OpenCode Zen provider block is
+registered separately, see `§Using OpenCode Zen` below), `config/model.local.env`
 and `config/agent.local.env` must never be tracked by git, and the example must
 define exactly the referenced vars. Self-ci additionally runs
 `scripts/model-env.selftest.sh` (hermetic dotenv-emulation regressions) and
@@ -529,14 +528,12 @@ submodule update to pull in changes; it will not overwrite or merge your edits.
   the var is exported by your shell profile; in CI it arrives from the
   `OPENCODE_API_KEY` GitHub Actions secret and is never committed.
 
-**The one deliberate model pin**: `agents/pr-review.md` (the PR review agent,
-spec 024) carries a literal `model: opencode-zen/kimi-k3` in its frontmatter —
-not an `{env:...}` reference. This is the exception to the "agents ship without
-`model:`" convention: the PR review agent is a standalone, PR-time reviewer
-unrelated to the spec-pipeline stages, and its model must not be per-machine
-overridable through `agent.*.model` in `opencode.json`. Everything about that
-agent — scope lock, permissions, endpoint, secret handling, cost bounds — is
-documented in `docs/CI_CD.md §PR Review Agent`, which is the authoritative
+**PR review agent model**: `agents/pr-review.md` (the PR review agent,
+spec 024) ships without a `model:` key, same as every other agent. Its model
+is resolved through `{env:SPEC_PR_REVIEW_MODEL}` in `opencode.json`, with the
+committed default `opencode/x-preview-f-free` in `config/model.local.env.example`.
+The agent's scope lock, permissions, endpoint, secret handling, and cost bounds
+are documented in `docs/CI_CD.md §PR Review Agent`, which is the authoritative
 reference for wiring it into child repos (`init-ci.sh --with-pr-review`).
 
 ## Tooling by language

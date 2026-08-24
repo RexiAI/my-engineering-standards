@@ -14,7 +14,7 @@
 #
 # Checks (one block per acceptance scenario):
 #   AC-024-01-01  agent file exists, mode: subagent, review-only first directive
-#   AC-024-01-02  model pinned literally to opencode-zen/kimi-k3 in frontmatter
+#   AC-024-01-02  model resolved via {env:SPEC_PR_REVIEW_MODEL} in opencode.json
 #   AC-024-01-03  Zen provider block: endpoint, env, model in opencode.json
 #   AC-024-01-04  no other model id in the agent file or provider block
 #   AC-024-01-05  edit denied; no allowed bash pattern matches write ops
@@ -191,15 +191,13 @@ fi
 
 echo ""
 
-# AC-024-01-02 — Model pinned to opencode-zen/kimi-k3 in the agent config
+# AC-024-01-02 — Model resolved via env var in opencode.json, no frontmatter pin
 if [ -f "$AGENT" ]; then
-  if grep -q '^model: opencode-zen/kimi-k3$' "$AGENT"; then
-    pass "AC-024-01-02: frontmatter model: is exactly opencode-zen/kimi-k3 (literal)"
+  if grep -qE '^model:[[:space:]]' "$AGENT"; then
+    fail "AC-024-01-02: agents/pr-review.md must not carry a model: key (model is resolved via {env:SPEC_PR_REVIEW_MODEL} in opencode.json)"
   else
-    fail "AC-024-01-02: frontmatter must carry the literal 'model: opencode-zen/kimi-k3'"
+    pass "AC-024-01-02: agents/pr-review.md ships without a model: key (env-driven)"
   fi
-  verify_absent AC-024-01-02 "$AGENT" "model value is not an {env:...} reference" \
-    'model:[[:space:]]*\{env:'
 fi
 
 echo ""
@@ -210,29 +208,24 @@ if [ -f "$OPENCODE_JSON" ]; then
   str_contains AC-024-01-03 'opencode.json provider block' "$PROVIDER_SEC" '"opencode-zen"'
   str_contains AC-024-01-03 'opencode.json provider block' "$PROVIDER_SEC" 'https://opencode.ai/zen/go/v1'
   str_contains AC-024-01-03 'opencode.json provider block' "$PROVIDER_SEC" '"OPENCODE_API_KEY"'
-  str_contains AC-024-01-03 'opencode.json provider block' "$PROVIDER_SEC" 'kimi-k3'
+  str_contains AC-024-01-03 'opencode.json provider block' "$PROVIDER_SEC" 'x-preview-f-free'
 else
   fail "AC-024-01-03: opencode.json is missing"
 fi
 
 echo ""
 
-# AC-024-01-04 — No other model id in the reviewer's config
-if [ -f "$AGENT" ] && [ -f "$OPENCODE_JSON" ]; then
+# AC-024-01-04 — No provider-qualified model id in the reviewer's agent file
+if [ -f "$AGENT" ]; then
   # Model ids are provider/model tokens. The prompt also cites backticked
   # repo paths (.github/workflows/…, docs/…, shared/…) — those are not model
   # ids and are filtered out before the comparison.
   AGENT_MODEL_IDS="$(grep -oE '[A-Za-z0-9._-]+/[A-Za-z0-9._-]+' "$AGENT" \
     | grep -vE '^(\.github|docs|shared|language)/' | sort -u || true)"
-  if [ "$AGENT_MODEL_IDS" = "opencode-zen/kimi-k3" ]; then
-    pass "AC-024-01-04: only model id in agents/pr-review.md is opencode-zen/kimi-k3"
+  if [ -z "$AGENT_MODEL_IDS" ]; then
+    pass "AC-024-01-04: agents/pr-review.md carries no provider-qualified model id (model is resolved via env var)"
   else
     fail "AC-024-01-04: agents/pr-review.md carries unexpected model ids: $(echo "$AGENT_MODEL_IDS" | tr '\n' ' ')"
-  fi
-  if grep -qE 'opencode-go/[A-Za-z0-9._-]+' "$OPENCODE_JSON"; then
-    fail "AC-024-01-04: opencode.json must not carry the provider-qualified pin (it lives in the agent frontmatter)"
-  else
-    pass "AC-024-01-04: opencode.json carries no provider-qualified model pin"
   fi
 fi
 
@@ -658,7 +651,7 @@ if [ -f "$CI_CD" ]; then
   str_contains AC-024-05-01 'docs/CI_CD.md PR Review Agent section' "$PR_SECTION" 'auto-apply'
   str_contains AC-024-05-01 'docs/CI_CD.md PR Review Agent section' "$PR_SECTION" 'auto-merge'
   str_contains AC-024-05-01 'docs/CI_CD.md PR Review Agent section' "$PR_SECTION" 'push'
-  str_contains AC-024-05-01 'docs/CI_CD.md PR Review Agent section' "$PR_SECTION" 'opencode-zen/kimi-k3'
+  str_contains AC-024-05-01 'docs/CI_CD.md PR Review Agent section' "$PR_SECTION" 'x-preview-f-free'
   str_contains AC-024-05-01 'docs/CI_CD.md PR Review Agent section' "$PR_SECTION" 'https://opencode.ai/zen/go/v1'
   str_contains AC-024-05-01 'docs/CI_CD.md PR Review Agent section' "$PR_SECTION" 'OPENCODE_API_KEY'
   str_contains AC-024-05-01 'docs/CI_CD.md PR Review Agent section' "$PR_SECTION" 'never committed'
@@ -703,7 +696,7 @@ if [ -f "$SPEC_PIPE" ]; then
   ZEN_SEC="$(awk '$0=="## Using OpenCode Zen"{f=1;next} /^## /{if(f)exit} f' "$SPEC_PIPE")"
   str_contains AC-024-05-04 'docs/SPEC_PIPELINE.md Using OpenCode Zen section' "$ZEN_SEC" 'https://opencode.ai/zen/go/v1'
   str_contains AC-024-05-04 'docs/SPEC_PIPELINE.md Using OpenCode Zen section' "$ZEN_SEC" 'OPENCODE_API_KEY'
-  str_contains AC-024-05-04 'docs/SPEC_PIPELINE.md Using OpenCode Zen section' "$ZEN_SEC" 'opencode-zen/kimi-k3'
+  str_contains AC-024-05-04 'docs/SPEC_PIPELINE.md Using OpenCode Zen section' "$ZEN_SEC" 'x-preview-f-free'
   str_contains AC-024-05-04 'docs/SPEC_PIPELINE.md Using OpenCode Zen section' "$ZEN_SEC" 'CI_CD.md §PR Review Agent'
 else
   fail "AC-024-05-04: docs/SPEC_PIPELINE.md is missing"

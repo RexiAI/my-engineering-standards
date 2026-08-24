@@ -499,10 +499,10 @@ only `contents: read` + `pull-requests: write` (comment-only).
 
 ### Model, endpoint, and auth
 
-- **Pinned model**: `opencode-zen/kimi-k3` — pinned literally in the agent's
-  frontmatter (`agents/pr-review.md`), the one deliberate exception to the
-  "agents ship without `model:`" convention in `docs/SPEC_PIPELINE.md §Model
-  configuration`.
+- **Model**: `opencode-zen/x-preview-f-free` (default) — resolved via the
+  `{env:SPEC_PR_REVIEW_MODEL}` env var in `opencode.json`, with the committed
+  default in `config/model.local.env.example`. Same override chain as every
+  other agent: `agent.local.env` > `model.local.env` > committed example.
 - **Endpoint**: `https://opencode.ai/zen/go/v1` — the OpenCode Zen base URL,
   wired as the `opencode-zen` provider block in `opencode.json`.
 - **Auth**: the `OPENCODE_API_KEY` GitHub Actions secret, exported to the

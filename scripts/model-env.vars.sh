@@ -13,7 +13,7 @@
 # Sourced files do not set shell flags; the sourcing script's own
 # `set -euo pipefail` governs. Defines only names, no exported state.
 
-# The 8 SPEC_*_MODEL vars opencode.json interpolates, in agent-table order.
+# The 9 SPEC_*_MODEL vars opencode.json interpolates, in agent-table order.
 MODEL_ENV_VARS=(
   SPEC_SPECIFIER_MODEL
   SPEC_UX_MODEL
@@ -23,9 +23,10 @@ MODEL_ENV_VARS=(
   SPEC_CODER_MODEL
   SPEC_REFACTORER_MODEL
   SPEC_PIPELINE_MODEL
+  SPEC_PR_REVIEW_MODEL
 )
 
-# The 8 spec agents that carry a model, in the same order as MODEL_ENV_VARS.
+# The 9 agents that carry a model, in the same order as MODEL_ENV_VARS.
 MODEL_ENV_AGENTS=(
   spec-specifier
   spec-ux
@@ -35,6 +36,7 @@ MODEL_ENV_AGENTS=(
   spec-coder
   spec-refactorer
   spec-pipeline
+  pr-review
 )
 
 # Agents whose committed default is the "plus" model tier; every other agent
@@ -48,14 +50,15 @@ MODEL_ENV_PLUS_AGENTS=(
 # agent -> expected env var, one per modelable spec agent; "" for anything else.
 model_env_var_for_agent() {
   case "$1" in
-    spec-specifier)       echo SPEC_SPECIFIER_MODEL ;;
-    spec-ux)              echo SPEC_UX_MODEL ;;
-    spec-verifier)        echo SPEC_VERIFIER_MODEL ;;
-    spec-mutation-runner) echo SPEC_MUTATION_RUNNER_MODEL ;;
-    spec-pr-opener)       echo SPEC_PR_OPENER_MODEL ;;
-    spec-coder)           echo SPEC_CODER_MODEL ;;
-    spec-refactorer)      echo SPEC_REFACTORER_MODEL ;;
-    spec-pipeline)        echo SPEC_PIPELINE_MODEL ;;
-    *) echo "" ;;
+    spec-specifier)   echo "SPEC_SPECIFIER_MODEL" ;;
+    spec-ux)          echo "SPEC_UX_MODEL" ;;
+    spec-verifier)    echo "SPEC_VERIFIER_MODEL" ;;
+    spec-mutation-runner) echo "SPEC_MUTATION_RUNNER_MODEL" ;;
+    spec-pr-opener)   echo "SPEC_PR_OPENER_MODEL" ;;
+    spec-coder)       echo "SPEC_CODER_MODEL" ;;
+    spec-refactorer)  echo "SPEC_REFACTORER_MODEL" ;;
+    spec-pipeline)    echo "SPEC_PIPELINE_MODEL" ;;
+    pr-review)        echo "SPEC_PR_REVIEW_MODEL" ;;
+    *)                echo "" ;;
   esac
 }

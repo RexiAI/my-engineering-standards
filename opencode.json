@@ -8,13 +8,14 @@
     "spec-pr-opener": { "model": "{env:SPEC_PR_OPENER_MODEL}" },
     "spec-coder": { "model": "{env:SPEC_CODER_MODEL}" },
     "spec-refactorer": { "model": "{env:SPEC_REFACTORER_MODEL}" },
-    "spec-pipeline": { "model": "{env:SPEC_PIPELINE_MODEL}" }
+    "spec-pipeline": { "model": "{env:SPEC_PIPELINE_MODEL}" },
+    "pr-review": { "model": "{env:SPEC_PR_REVIEW_MODEL}" }
   },
   "provider": {
     "opencode-zen": {
       "env": ["OPENCODE_API_KEY"],
       "options": { "baseURL": "https://opencode.ai/zen/go/v1" },
-      "models": { "kimi-k3": {} }
+      "models": { "kimi-k3": {}, "x-preview-f-free": {} }
     }
   }
 }
