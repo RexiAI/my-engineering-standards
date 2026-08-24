@@ -24,7 +24,7 @@ on:
         type: string
     secrets:
       OPENCODE_API_KEY:
-        description: API key for the provider serving the review model
+        description: OpenCode Zen API key for the pinned opencode provider
         required: false
 
 permissions:
@@ -39,12 +39,9 @@ jobs:
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
       PR_NUMBER: ${{ inputs.pr-number }}
       HEAD_SHA: ${{ inputs.head-sha }}
-      # Optional override for the review run's model: the repo-level
-      # Actions variable PR_REVIEW_MODEL (provider-qualified; bare ids fail
-      # with "Model not found"). When unset, opencode.json's
-      # {env:SPEC_PR_REVIEW_MODEL} resolves against the committed default in
-      # config/model.local.env.example — same chain as every other agent.
-      PR_REVIEW_MODEL: ${{ vars.PR_REVIEW_MODEL }}
+      # Default model for the review run; a repo-level Actions variable
+      # PR_REVIEW_MODEL overrides it without touching this file.
+      PR_REVIEW_MODEL: ${{ vars.PR_REVIEW_MODEL || 'opencode/mimo-v2.5-free' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -108,9 +105,9 @@ jobs:
         # never a failure — the PR's required checks are unaffected. secrets is
         # not a legal context in an if: at any scope, so gate on the job env
         # (the secret is mapped into the env in the job env block).
-        # Empty-model guard (ADR 0003): when PR_REVIEW_MODEL is unset, the
-        # step skips too — a repo opts in by configuring BOTH the key and the
-        # model; neither has a shipped default.
+        # Empty-model guard: when PR_REVIEW_MODEL is unset (child repo does not
+        # override it in config/model.local.env), the step skips — repos that
+        # do not use the pr-review agent get a green CI without the review.
         if: ${{ steps.early-exit.outputs.skip != 'true' && env.OPENCODE_API_KEY != '' }}
         run: |
           set -euo pipefail
@@ -124,13 +121,14 @@ jobs:
           # shellcheck disable=SC1091
           set -a; . config/model.local.env.example; set +a
 
-          # Model override: when PR_REVIEW_MODEL is set in the caller's
-          # environment, export it as SPEC_PR_REVIEW_MODEL so opencode.json's
-          # {env:SPEC_PR_REVIEW_MODEL} resolves to the override value instead
-          # of the committed default. The step's if: guarantees the variable
-          # is set here — there is no shipped fallback model.
+          # Model override (optional): when PR_REVIEW_MODEL is set in the
+          # caller's environment, pass it via --model to the opencode run
+          # command. The agent's frontmatter model pin is stripped when the
+          # agent file is embedded as a prompt, so --model is the only way
+          # to set the model in CI.
+          model_flag=""
           if [ -n "${PR_REVIEW_MODEL:-}" ]; then
-            export SPEC_PR_REVIEW_MODEL="$PR_REVIEW_MODEL"
+            model_flag="--model ${PR_REVIEW_MODEL}"
           fi
 
           # Billing/quota guard: capture output so we can detect provider
@@ -153,6 +151,7 @@ jobs:
           prompt="$(printf 'You are the PR review agent. Review PR %s at head %s.\n\n%s\n\nPost your findings as one PR review comment via gh. End the comment with:\nReviewed-SHA: %s' "${PR_NUMBER}" "${HEAD_SHA}" "${agent_instructions}" "${HEAD_SHA}")"
 
           review_output=$(set +e; /tmp/opencode-bin/opencode run --print-logs \
+            ${model_flag} \
             "${prompt}" 2>&1) && review_rc=0 || review_rc=$?
 
           if [ "$review_rc" -ne 0 ]; then

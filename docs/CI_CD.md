@@ -310,7 +310,7 @@ Steps:
 | `PACT_BROKER_URL` | Contract tests (optional) |
 | `EXPO_TOKEN` | EAS build (React Native; merge-to-main path only) |
 | `GH_TOKEN` | Semantic Release (release, opt-in only) |
-| `OPENCODE_API_KEY` | API key for the PR review agent's provider (opt-in via `init-ci.sh --with-pr-review` only) |
+| `OPENCODE_API_KEY` | PR review agent (OpenCode Zen; opt-in via `init-ci.sh --with-pr-review` only) |
 
 ## Weekly E2E Pipeline
 
@@ -497,22 +497,18 @@ agent's own suggestions, title/summary rewriting, auto-merge, and pushing
 commits. The GitHub Actions workflow behind it (`shared/pr-review.yml`) grants
 only `contents: read` + `pull-requests: write` (comment-only).
 
-### Model and auth
+### Model, endpoint, and auth
 
-- **Model**: the reviewer is part of the standard `{env:SPEC_*_MODEL}` roster
-  (ADR 0003) — `opencode.json` resolves `{env:SPEC_PR_REVIEW_MODEL}` against
-  the committed default in `config/model.local.env.example`, same override
-  chain as every other agent (`agent.local.env` > `model.local.env` >
-  committed example). The shared workflow additionally honors the
-  `PR_REVIEW_MODEL` repository variable as an explicit per-repo override.
-- **Endpoint**: provider base URLs live in the provider blocks of
-  `opencode.json` — operator configuration, not documentation.
+- **Pinned model**: `opencode/mimo-v2.5-free` — pinned literally in the agent's
+  frontmatter (`agents/pr-review.md`), the one deliberate exception to the
+  "agents ship without `model:`" convention in `docs/SPEC_PIPELINE.md §Model
+  configuration`.
+- **Endpoint**: `https://opencode.ai/zen/v1` — the OpenCode Zen base URL,
+  wired as the `opencode` provider block in `opencode.json`.
 - **Auth**: the `OPENCODE_API_KEY` GitHub Actions secret, exported to the
-  review run as the `OPENCODE_API_KEY` env var that the configured provider
-  block(s) in `opencode.json` declare. The value is **never committed** — only
-  the secret name appears in committed files, consistent with
-  `docs/SECURITY.md §Secrets Management`. Provider endpoints and model lists
-  live in those provider blocks: config, not docs.
+  review run as the `OPENCODE_API_KEY` env var that the `opencode` provider
+  reads. The value is **never committed** — only the secret name appears in
+  committed files, consistent with `docs/SECURITY.md §Secrets Management`.
 
 ### Opting in (child repos)
 

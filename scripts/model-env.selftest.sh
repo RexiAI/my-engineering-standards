@@ -59,11 +59,10 @@ RUN_RC=0
 ok() { PASS_COUNT=$((PASS_COUNT + 1)); echo -e "${GREEN}PASS${NC} $1"; }
 bad() { FAIL_COUNT=$((FAIL_COUNT + 1)); echo -e "${RED}FAIL${NC} $1"; }
 
-# Fixture model ids — arbitrary provider/model-shaped tokens; fixtures prove
-# resolution and tier-differentiation mechanics, never real vendors.
-provider="fixture"
-DEFAULT_FAST="$provider/""fast-model"
-DEFAULT_PLUS="$provider/""plus-model"
+# Runtime-built model ids (no inline literal model-id values anywhere below).
+provider="opencode-""go"
+DEFAULT_FAST="$provider/""deepseek-v4-flash"
+DEFAULT_PLUS="$provider/""qwen3.7-plus"
 
 # Banned-name patterns assembled at runtime — this file never contains the
 # contiguous strings the purge greps for.
@@ -78,7 +77,7 @@ run_capture() {
   if "$@" >"$out" 2>"$err"; then RUN_RC=0; else RUN_RC=$?; fi
 }
 
-# write_refs_opencode ROOT — fixture opencode.json with 9 {env:...} references
+# write_refs_opencode ROOT — fixture opencode.json with 8 {env:...} references
 write_refs_opencode() {
   mkdir -p "$1/config"
   cat > "$1/opencode.json" <<'EOF'
@@ -92,14 +91,13 @@ write_refs_opencode() {
     "spec-pr-opener": { "model": "{env:SPEC_PR_OPENER_MODEL}" },
     "spec-coder": { "model": "{env:SPEC_CODER_MODEL}" },
     "spec-refactorer": { "model": "{env:SPEC_REFACTORER_MODEL}" },
-    "spec-pipeline": { "model": "{env:SPEC_PIPELINE_MODEL}" },
-    "pr-review": { "model": "{env:SPEC_PR_REVIEW_MODEL}" }
+    "spec-pipeline": { "model": "{env:SPEC_PIPELINE_MODEL}" }
   }
 }
 EOF
 }
 
-# write_example ROOT FAST PLUS — fixture example defining all 9 vars at
+# write_example ROOT FAST PLUS — fixture example defining all 8 vars at
 # differentiated values (plus tier for verifier/mutation-runner/pr-opener)
 write_example() {
   mkdir -p "$1/config"
@@ -112,7 +110,6 @@ write_example() {
     printf 'SPEC_CODER_MODEL=%s\n' "$2"
     printf 'SPEC_REFACTORER_MODEL=%s\n' "$2"
     printf 'SPEC_PIPELINE_MODEL=%s\n' "$2"
-    printf 'SPEC_PR_REVIEW_MODEL=%s\n' "$2"
   } > "$1/config/model.local.env.example"
 }
 
@@ -187,15 +184,24 @@ else
   bad "AC-025-01-01 .envrc on disk: git ls-files non-zero, git check-ignore exit 0"
 fi
 
-# ── AC-020-01 shipped agents ship without model: (all env-driven, ADR 0003) ──
-# Every shipped agent — the standalone pr-review agent included — ships
-# without a model: key. A pinned agent-file model would silently beat its
-# {env:...} reference in opencode.json and break the per-machine override;
-# model selection lives in opencode.json via {env:SPEC_*_MODEL} vars only.
-if grep -rqE '^model:[[:space:]]' "$ROOT/agents" 2>/dev/null; then
-  bad "AC-020-01-01 every shipped agent ships without a model: key (agent-file model would beat the {env:...} reference)"
+# ── AC-020-01 pr-review agent model pin (spec 024) ───────────────────────────
+# The pr-review agent (spec 024) is the one deliberate exception to "shipped
+# agents ship without model:": its frontmatter carries a literal
+# `model: opencode/mimo-v2.5-free` pin (AC-024-01-02) that must NOT be an
+# {env:...} reference, and it lives in the agent file, not in opencode.json
+# (which check-model-env.sh's env-reference rule governs). Every other shipped
+# agent must still ship without a model: key — a second pinned agent would
+# silently beat its {env:...} reference and break the per-machine override.
+if grep -rqE '^model:[[:space:]]' "$ROOT/agents" --exclude='pr-review.md' 2>/dev/null; then
+  bad "AC-020-01-01 every shipped agent except agents/pr-review.md ships without a model: key (agent-file model would beat the {env:...} reference)"
 else
-  ok "AC-020-01-01 every shipped agent including agents/pr-review.md ships without a model: key"
+  ok "AC-020-01-01 every shipped agent except agents/pr-review.md ships without a model: key"
+fi
+if [ -f "$ROOT/agents/pr-review.md" ] \
+   && grep -q '^model: opencode/mimo-v2.5-free$' "$ROOT/agents/pr-review.md"; then
+  ok "AC-020-01-01 the pr-review agent carries the deliberate literal model: pin opencode/mimo-v2.5-free (spec 024)"
+else
+  bad "AC-020-01-01 the pr-review agent must carry the literal model: pin opencode/mimo-v2.5-free"
 fi
 
 # 01-02 / 01-03: template shapes — exactly three dotenv_if_exists lines, in
@@ -311,7 +317,7 @@ if [ "$RUN_RC" -eq 0 ] \
    && snapshot_has "$snap" SPEC_CODER_MODEL "$DEFAULT_FAST" \
    && snapshot_has "$snap" SPEC_REFACTORER_MODEL "$DEFAULT_FAST" \
    && snapshot_has "$snap" SPEC_PIPELINE_MODEL "$DEFAULT_FAST" \
-   && [ "$(snapshot_count "$snap")" -eq 9 ]; then
+   && [ "$(snapshot_count "$snap")" -eq 8 ]; then
   ok "AC-025-02-01 AC-025-06-03 example alone: all 8 vars non-empty, plus-tier -> plus, fast-tier -> fast, exit 0"
 else
   bad "AC-025-02-01 AC-025-06-03 example alone: all 8 vars non-empty, differentiated (rc=$RUN_RC, snap=$(tr '\n' ' ' <<< "$snap"))"
@@ -327,7 +333,7 @@ snap="$(cat "$TMP/s0202")"
 if snapshot_has "$snap" SPEC_SPECIFIER_MODEL "$override_val" \
    && snapshot_has "$snap" SPEC_VERIFIER_MODEL "$DEFAULT_PLUS" \
    && snapshot_has "$snap" SPEC_CODER_MODEL "$DEFAULT_FAST" \
-   && [ "$(snapshot_count "$snap")" -eq 9 ] && [ "$RUN_RC" -eq 0 ]; then
+   && [ "$(snapshot_count "$snap")" -eq 8 ] && [ "$RUN_RC" -eq 0 ]; then
   ok "AC-025-02-02 AC-025-06-03 override file: SPEC_SPECIFIER_MODEL wins, other 7 keep defaults, exit 0"
 else
   bad "AC-025-02-02 AC-025-06-03 override file: SPEC_SPECIFIER_MODEL wins, other 7 keep defaults (rc=$RUN_RC)"
@@ -356,7 +362,7 @@ if snapshot_has "$snap" GITHUB_TOKEN "$tok_t" \
    && snapshot_has "$snap" GH_TOKEN "$tok_g" \
    && snapshot_has "$snap" SPEC_SPECIFIER_MODEL "$DEFAULT_FAST" \
    && snapshot_has "$snap" SPEC_VERIFIER_MODEL "$DEFAULT_PLUS" \
-    && [ "$(snapshot_count "$snap")" -eq 9 ]; then
+    && [ "$(snapshot_count "$snap")" -eq 8 ]; then
   ok "AC-025-02-04 AC-025-06-03 credentials: GITHUB_TOKEN + GH_TOKEN load from the third line, model vars intact"
 else
   bad "AC-025-02-04 AC-025-06-03 credentials: GITHUB_TOKEN + GH_TOKEN load from the third line (snap=$(tr '\n' ' ' <<< "$snap"))"
@@ -429,7 +435,7 @@ if [ "$RUN_RC" -eq 0 ] \
    && snapshot_has "$snap" SPEC_UX_MODEL "$DEFAULT_FAST" \
    && snapshot_has "$snap" SPEC_REFACTORER_MODEL "$DEFAULT_FAST" \
    && snapshot_has "$snap" SPEC_PIPELINE_MODEL "$DEFAULT_FAST" \
-   && [ "$(snapshot_count "$snap")" -eq 9 ]; then
+   && [ "$(snapshot_count "$snap")" -eq 8 ]; then
   ok "AC-025-03-01 AC-025-06-04 no child files: all 8 vars resolve to the parent's committed defaults, exit 0"
 else
   bad "AC-025-03-01 AC-025-06-04 no child files: all 8 vars resolve to the parent's committed defaults (rc=$RUN_RC)"
@@ -446,7 +452,7 @@ snap="$(cat "$TMP/s0302")"
 if snapshot_has "$snap" SPEC_CODER_MODEL "$child_val" \
    && snapshot_has "$snap" SPEC_VERIFIER_MODEL "$DEFAULT_PLUS" \
    && snapshot_has "$snap" SPEC_SPECIFIER_MODEL "$DEFAULT_FAST" \
-   && [ "$(snapshot_count "$snap")" -eq 9 ] && [ "$RUN_RC" -eq 0 ]; then
+   && [ "$(snapshot_count "$snap")" -eq 8 ] && [ "$RUN_RC" -eq 0 ]; then
   ok "AC-025-03-02 AC-025-06-04 child override: SPEC_CODER_MODEL wins, other 7 keep parent defaults, exit 0"
 else
   bad "AC-025-03-02 AC-025-06-04 child override: SPEC_CODER_MODEL wins, other 7 keep parent defaults (rc=$RUN_RC)"
@@ -485,7 +491,7 @@ snap="$(cat "$TMP/s0304")"
 if snapshot_has "$snap" GITHUB_TOKEN "$tok_t" \
    && snapshot_has "$snap" GH_TOKEN "$tok_g" \
    && snapshot_has "$snap" SPEC_CODER_MODEL "$DEFAULT_FAST" \
-    && [ "$(snapshot_count "$snap")" -eq 9 ]; then
+    && [ "$(snapshot_count "$snap")" -eq 8 ]; then
   ok "AC-025-03-04 AC-025-06-04 child credentials: GITHUB_TOKEN + GH_TOKEN from the child's own file"
 else
   bad "AC-025-03-04 AC-025-06-04 child credentials: GITHUB_TOKEN + GH_TOKEN from the child's own file (snap=$(tr '\n' ' ' <<< "$snap"))"
@@ -825,16 +831,16 @@ else
   bad "AC-025-07-01 SPEC_PIPELINE.md §Model configuration documents the full dotenv flow"
 fi
 
-# 07-02: AGENTS.md documents the dotenv flow and carries NO model or provider
-# ids (amended post-spec per ADR 0002: general docs are CLI/provider-agnostic)
+# 07-02: AGENTS.md describes the gitignored .envrc mechanism; table unchanged
 if grep -q 'dotenv_if_exists' "$ROOT/AGENTS.md" \
    && grep -q '\.envrc' "$ROOT/AGENTS.md" \
    && grep -q 'config/model.local.env.example' "$ROOT/AGENTS.md" \
-   && ! grep -qiE 'opencode-(go|zen)|deepseek|qwen|kimi|glm-[0-9]|ANY_SUBSCRIPTION' "$ROOT/AGENTS.md" \
+   && grep -q 'opencode-go/deepseek-v4-flash' "$ROOT/AGENTS.md" \
+   && grep -q 'opencode-go/qwen3.7-plus' "$ROOT/AGENTS.md" \
    && ! grep -q "$LOADENV\|$LOADMODELENV" "$ROOT/AGENTS.md"; then
-  ok "AC-025-07-02 AGENTS.md describes the gitignored .envrc mechanism; carries no model or provider ids"
+  ok "AC-025-07-02 AGENTS.md describes the gitignored .envrc mechanism; model-table values unchanged"
 else
-  bad "AC-025-07-02 AGENTS.md describes the gitignored .envrc mechanism; carries no model or provider ids"
+  bad "AC-025-07-02 AGENTS.md describes the gitignored .envrc mechanism; model-table values unchanged"
 fi
 
 # 07-03: README.md §Model Configuration describes the direnv flow
