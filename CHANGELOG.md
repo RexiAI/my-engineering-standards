@@ -1,3 +1,10 @@
+## [1.27.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.27.0...v1.27.1) (2026-08-24)
+
+
+### Bug Fixes
+
+* **ci:** repair YAML in pr-review prompt, default model to ox-alpha-free ([#50](https://github.com/RexiAI/my-engineering-standards/issues/50)) ([2c78116](https://github.com/RexiAI/my-engineering-standards/commit/2c78116fab0404aaac9761d41f1dee2ce0c55ffc))
+
 # [1.27.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.26.4...v1.27.0) (2026-08-22)
 
 
