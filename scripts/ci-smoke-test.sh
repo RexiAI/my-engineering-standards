@@ -20,7 +20,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Scan the consuming repo, not the script's home: children run this via
+# .standards/scripts/, and the checks must target THEIR .github/workflows.
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$REPO_ROOT"
 
 ERRORS=()
