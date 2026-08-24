@@ -67,10 +67,11 @@ general documentation. Concrete ids belong only in config files
 (`config/model.local.env.example`, `opencode.json` provider blocks) and in the
 scoped operator sections for opt-in integrations.
 
-**Frontmatter rule:** agent files must not pin a `model:` key (per
+**Frontmatter rule:** every agent file — including the standalone PR-review
+agent (ADR 0003) — must not pin a `model:` key (per
 `docs/SPEC_PIPELINE.md §Model configuration`) — a pinned `.md` model
-silently overrides `opencode.json`. The standalone PR-review agent is the
-one deliberate exception, documented in `docs/SPEC_PIPELINE.md §Using OpenCode Zen`.
+silently overrides `opencode.json`; the reviewer's runtime model is wired
+per repo instead (`docs/SPEC_PIPELINE.md §PR review model wiring`).
 
 **Conformance note:** violating the no-docs-mirror rule is a governance defect —
 a review blocker, same class as the ADR rule. The drift observed in this repo

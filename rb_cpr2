@@ -1,0 +1,127 @@
+Checking PR review agent deliverables in: /tmp/opencode/pr53
+
+[0;32mPASS[0m AC-024-01-01: 'mode: subagent' present in agents/pr-review.md
+[0;32mPASS[0m AC-024-01-01: 'review the PR diff' present in agents/pr-review.md first directive
+[0;32mPASS[0m AC-024-01-01: 'suggested fixes' present in agents/pr-review.md first directive
+
+[0;32mPASS[0m AC-024-01-02: agents/pr-review.md ships without a model: key (env-driven)
+
+[0;32mPASS[0m AC-024-01-03: '"OPENCODE_API_KEY"' present in opencode.json provider block
+[0;32mPASS[0m AC-024-01-03: pr-review present in the opencode.json agent block (env-driven)
+
+[0;32mPASS[0m AC-024-01-04: agents/pr-review.md carries no model ids
+
+[0;32mPASS[0m AC-024-01-05: 'edit:' present in agents/pr-review.md frontmatter
+[0;32mPASS[0m AC-024-01-05: '"*": deny' present in agents/pr-review.md frontmatter
+[0;32mPASS[0m AC-024-01-05: no allowed bash pattern matches git push/commit/add/checkout/reset/worktree, gh pr merge/edit, or file editors
+
+[0;32mPASS[0m AC-024-01-06: forbidden operations named in the prompt
+
+[0;32mPASS[0m AC-024-01-07: finding format requires file:line, what, why, fix
+
+[0;32mPASS[0m AC-024-01-08: review discipline forbids nitpicks and un-evidenced security findings
+
+[0;32mPASS[0m AC-024-01-09: findings grounded in the diff and the repo standards
+
+[0;32mPASS[0m AC-024-01-10: review comment ends with the Reviewed-SHA marker
+
+[0;32mPASS[0m AC-024-01-11: scripts/check-model-env.sh exits 0 with the provider block present
+
+[0;32mPASS[0m AC-024-01-12: exactly the 8 spec-pipeline agents exist under agents/, none added
+[0;32mPASS[0m AC-024-01-12: no agents/spec-*.md file is modified in the change set
+
+[0;32mPASS[0m AC-024-02-01: shared workflow is a workflow_call reusable
+
+[0;32mPASS[0m AC-024-02-02: permissions grant exactly contents: read + pull-requests: write
+[0;32mPASS[0m AC-024-02-02: no broader permission, no content-modifying step
+
+[0;32mPASS[0m AC-024-02-03: 'OPENCODE_API_KEY:' present in workflow_call secrets block
+[0;32mPASS[0m AC-024-02-03: OPENCODE_API_KEY is declared without required: true
+[0;32mPASS[0m AC-024-02-03: review job guarded by the empty-key check
+
+[0;32mPASS[0m AC-024-02-04: no key-shaped value in the workflow
+[0;32mPASS[0m AC-024-02-04: OPENCODE_API_KEY appears in the shared workflow only as the secret name
+
+[0;32mPASS[0m AC-024-02-05: checkout checks out the caller with submodules and no persisted credentials
+[0;32mPASS[0m AC-024-02-05: run step passes pr-number and head-sha into the invocation
+
+[0;32mPASS[0m AC-024-02-06: pinned binary installed, headless --print-logs run
+
+[0;32mPASS[0m AC-024-02-07: agent symlinked into .opencode/agents from agents/ or .standards/agents/
+
+[0;32mPASS[0m AC-024-02-08: run command passes no auto-approve or skip-permissions flag
+
+[0;32mPASS[0m AC-024-02-09: early-exit extracts the Reviewed-SHA marker from prior comments
+[0;32mPASS[0m AC-024-02-09: early-exit compares the marker to the current head-sha
+[0;32mPASS[0m AC-024-02-09: early-exit requires gh pr checks all green
+[0;32mPASS[0m AC-024-02-09: model-run step is conditional on the early-exit output
+[0;32mPASS[0m AC-024-02-10: skip requires marker == head-sha; a changed head proceeds
+[0;32mPASS[0m AC-024-02-11: a non-green check keeps skip=false, so the run proceeds
+
+[0;32mPASS[0m AC-024-03-01: trigger is pull_request
+[0;32mPASS[0m AC-024-03-01: types list has exactly 4 entries
+[0;32mPASS[0m AC-024-03-01: no extra pull_request types
+
+[0;32mPASS[0m AC-024-03-02: concurrency keyed on the PR number with cancel-in-progress
+
+[0;32mPASS[0m AC-024-03-03: job calls the shared pr-review workflow@main
+[0;32mPASS[0m AC-024-03-03: pr-number and head-sha passed from the PR event
+
+[0;32mPASS[0m AC-024-03-04: OPENCODE_API_KEY mapped from secrets
+
+[0;32mPASS[0m AC-024-03-05: trigger delegates to the self-guarding shared workflow
+
+[0;32mPASS[0m AC-024-03-06: no key-shaped value in the trigger workflow
+[0;32mPASS[0m AC-024-03-06: OPENCODE_API_KEY appears in the trigger workflow only as the secret name
+
+[0;32mPASS[0m AC-024-03-07: trigger workflow and init-ci.sh emit the same shared pr-review workflow@main
+
+[0;32mPASS[0m AC-024-04-01: usage line lists --with-pr-review
+[0;32mPASS[0m AC-024-04-01: --with-pr-review parsed into WITH_PR_REVIEW_FLAG
+
+[0;32mPASS[0m AC-024-04-02: generated ci.yml carries the pr-review job
+[0;32mPASS[0m AC-024-04-03: default ci.yml has no pr-review job and no OPENCODE_API_KEY line
+[0;32mPASS[0m AC-024-04-07: --platform gitlab with the flag exits 0
+[0;32mPASS[0m AC-024-04-07: GitLab run prints the GitHub-only warning
+[0;32mPASS[0m AC-024-04-07: nothing PR-review-related emitted into .gitlab-ci.yml
+[0;32mPASS[0m AC-024-04-08: --platform both emits the GitHub pr-review job and warns on GitLab
+
+[0;32mPASS[0m AC-024-04-04: OPENCODE_API_KEY prompt is gated on WITH_PR_REVIEW_FLAG
+[0;32mPASS[0m AC-024-04-05: exactly one OPENCODE_API_KEY prompt exists, and it is flag-gated (never prompted without the flag)
+
+[0;32mPASS[0m AC-024-04-06: summary's GitHub next steps list OPENCODE_API_KEY
+
+[0;32mPASS[0m AC-024-05-01: 'review + suggest fixes only' present in docs/CI_CD.md PR Review Agent section
+[0;32mPASS[0m AC-024-05-01: 'describe' present in docs/CI_CD.md PR Review Agent section
+[0;32mPASS[0m AC-024-05-01: 'improve' present in docs/CI_CD.md PR Review Agent section
+[0;32mPASS[0m AC-024-05-01: 'auto-apply' present in docs/CI_CD.md PR Review Agent section
+[0;32mPASS[0m AC-024-05-01: 'auto-merge' present in docs/CI_CD.md PR Review Agent section
+[0;32mPASS[0m AC-024-05-01: 'push' present in docs/CI_CD.md PR Review Agent section
+[0;32mPASS[0m AC-024-05-01: 'PR_REVIEW_MODEL' present in docs/CI_CD.md PR Review Agent section
+[0;32mPASS[0m AC-024-05-01: '{env:SPEC_PR_REVIEW_MODEL}' present in docs/CI_CD.md PR Review Agent section
+[0;32mPASS[0m AC-024-05-01: 'OPENCODE_API_KEY' present in docs/CI_CD.md PR Review Agent section
+[0;32mPASS[0m AC-024-05-01: 'never committed' present in docs/CI_CD.md PR Review Agent section
+[0;32mPASS[0m AC-024-05-01: 'init-ci.sh --with-pr-review' present in docs/CI_CD.md PR Review Agent section
+[0;32mPASS[0m AC-024-05-01: 'never opts in' present in docs/CI_CD.md PR Review Agent section
+[0;32mPASS[0m AC-024-05-01: 'latest head' present in docs/CI_CD.md PR Review Agent section
+[0;32mPASS[0m AC-024-05-01: 'Early exit' present in docs/CI_CD.md PR Review Agent section
+[0;32mPASS[0m AC-024-05-01: 'Reviewed-SHA' present in docs/CI_CD.md PR Review Agent section
+[0;32mPASS[0m AC-024-05-01: 'One review per relevant PR event' present in docs/CI_CD.md PR Review Agent section
+
+[0;32mPASS[0m AC-024-05-02: Required Secrets table lists OPENCODE_API_KEY as opt-in
+
+[0;32mPASS[0m AC-024-05-03: 'pr-review.yml' present in docs/CI_CD.md Architecture tree
+
+[0;32mPASS[0m AC-024-05-04: 'PR_REVIEW_MODEL' present in docs/SPEC_PIPELINE.md PR review model wiring section
+[0;32mPASS[0m AC-024-05-04: '{env:SPEC_PR_REVIEW_MODEL}' present in docs/SPEC_PIPELINE.md PR review model wiring section
+[0;32mPASS[0m AC-024-05-04: 'OPENCODE_API_KEY' present in docs/SPEC_PIPELINE.md PR review model wiring section
+[0;32mPASS[0m AC-024-05-04: 'CI_CD.md §PR Review Agent' present in docs/SPEC_PIPELINE.md PR review model wiring section
+
+[0;32mPASS[0m AC-024-05-05: no key-shaped value in docs/CI_CD.md
+[0;32mPASS[0m AC-024-05-05: no key-shaped value in docs/SPEC_PIPELINE.md
+
+[0;32mPASS[0m self-citation: every AC-024-NN-NN scenario ID is cited by this script
+[0;32mPASS[0m self-citation: every AC-024 reference inside the script resolves to a scenario ID
+[0;32mPASS[0m self-ci: .github/workflows/self-ci.yml runs check-pr-review.sh in the Validate job
+
+[0;32m✔ PR review agent check: every check passed.[0m

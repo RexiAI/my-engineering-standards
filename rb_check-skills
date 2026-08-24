@@ -1,0 +1,4 @@
+Checking SKILL.md files...
+[WARN] skills/hallmark/SKILL.md — Body has 562 lines (>500 limit recommended by Agent Skills spec; move details to references/)
+
+All SKILL.md files valid (1 warning(s)).

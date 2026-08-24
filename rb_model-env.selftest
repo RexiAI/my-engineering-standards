@@ -1,0 +1,89 @@
+== AC-025-01 .envrc gitignored + dotenv templates ==
+[0;32mPASS[0m AC-025-01-01 root .gitignore contains a line matching ^.envrc$
+[0;32mPASS[0m AC-025-01-01 .envrc on disk: git ls-files non-zero, git check-ignore exit 0
+[0;32mPASS[0m AC-020-01-01 every shipped agent including agents/pr-review.md ships without a model: key
+[0;32mPASS[0m AC-025-01-02 AC-025-01-03 .envrc.example tracked (or committable pre-commit)
+[0;32mPASS[0m AC-025-01-02 AC-025-01-03 .envrc.child tracked (or committable pre-commit)
+[0;32mPASS[0m AC-025-01-02 templates/.envrc.example has exactly three dotenv_if_exists lines
+[0;32mPASS[0m AC-025-01-02 example line order: committed example -> per-machine override -> credentials
+[0;32mPASS[0m AC-025-01-02 no eval / bash invocation / source / . / emit flag in executable lines
+[0;32mPASS[0m AC-025-01-03 templates/.envrc.child has exactly three dotenv_if_exists lines
+[0;32mPASS[0m AC-025-01-03 child line order: .standards committed example -> child override -> child credentials
+[0;32mPASS[0m AC-025-01-03 no eval / bash invocation / source / . / emit flag in executable lines
+[0;32mPASS[0m AC-025-01-04 no .envrc path outside templates/ (tracked or committable)
+[0;32mPASS[0m AC-025-01-05 git check-ignore exits 0 for both real env files
+[0;32mPASS[0m AC-025-01-05 examples are not ignored (templates stay trackable)
+[0;32mPASS[0m AC-025-01-06 .envrc.example header documents direnv allow, the three file roles, never-commit
+[0;32mPASS[0m AC-025-01-06 .envrc.child header documents direnv allow, the three file roles, never-commit
+== AC-025-02 parent .envrc semantics ==
+[0;32mPASS[0m AC-025-02-01 AC-025-06-03 example alone: all 8 vars non-empty, plus-tier -> plus, fast-tier -> fast, exit 0
+[0;32mPASS[0m AC-025-02-02 AC-025-06-03 override file: SPEC_SPECIFIER_MODEL wins, other 7 keep defaults, exit 0
+[0;32mPASS[0m AC-025-02-03 AC-025-06-03 clobber: example value wins over the pre-exported var (dotenv line clobbers)
+[0;32mPASS[0m AC-025-02-04 AC-025-06-03 credentials: GITHUB_TOKEN + GH_TOKEN load from the third line, model vars intact
+[0;32mPASS[0m AC-025-02-04 credentials line executes after the model-var lines
+[0;32mPASS[0m AC-025-02-05 missing override/credential files: no-op, no error, exit 0
+[0;32mPASS[0m AC-025-02-05 no files at all: exit 0, nothing exported
+[0;32mPASS[0m AC-025-02-06 no root .envrc on disk — stale-copy guard trivially satisfied
+[0;32mPASS[0m AC-025-02-07 live direnv: SPEC_SPECIFIER_MODEL resolves non-empty after allow
+== AC-025-03 child template + bootstrap ==
+[0;32mPASS[0m AC-025-03-01 AC-025-06-04 no child files: all 8 vars resolve to the parent's committed defaults, exit 0
+[0;32mPASS[0m AC-025-03-02 AC-025-06-04 child override: SPEC_CODER_MODEL wins, other 7 keep parent defaults, exit 0
+[0;32mPASS[0m AC-025-03-03 standards git index lists neither real env file
+[0;32mPASS[0m AC-025-03-03 .standards-relative line resolves against the committed example only; defaults still resolve
+[0;32mPASS[0m AC-025-03-04 AC-025-06-04 child credentials: GITHUB_TOKEN + GH_TOKEN from the child's own file
+[0;32mPASS[0m AC-025-03-05 bootstrap writes .envrc as a copy of templates/.envrc.child
+[0;32mPASS[0m AC-025-03-05 bootstrap appends .envrc to the child root .gitignore
+[0;32mPASS[0m AC-025-03-05 child config/.gitignore covers model.local.env and agent.local.env
+[0;32mPASS[0m AC-025-03-05 next-steps git add list does not name .envrc
+[0;32mPASS[0m AC-025-03-05 re-run: bootstrap prints a skip message and does not overwrite .envrc
+[0;32mPASS[0m AC-025-03-06 live direnv: bootstrapped child resolves the parent's committed default (spec-verifier)
+[0;32mPASS[0m AC-025-03-06 live direnv: child override wins after adding config/model.local.env
+== AC-025-04 loaders removed + purge ==
+[0;32mPASS[0m AC-025-04-01 the loader scripts are deleted (index + worktree)
+[0;32mPASS[0m AC-025-04-02 no emit-flag string in any live surface
+[0;32mPASS[0m AC-025-04-03 no loader-name string in any live surface
+[0;32mPASS[0m AC-025-04-04 agents/spec-pipeline.md and spec-pr-opener.md cite no loader
+[0;32mPASS[0m AC-025-04-04 PR Opener verifies GITHUB_TOKEN + GH_TOKEN non-empty, reports + stops when missing, sources nothing
+[0;32mPASS[0m AC-025-04-05 ci-sweeper.yml cites no loader
+[0;32mPASS[0m AC-025-04-05 ci-sweeper headless run loads committed defaults via the dotenv-equivalent
+[0;32mPASS[0m AC-025-04-06 model.local.env.example header documents the direnv dotenv_if_exists flow
+[0;32mPASS[0m AC-025-04-06 agent.local.env.example header documents the direnv dotenv_if_exists flow
+[0;32mPASS[0m AC-025-04-07 check-orchestration.sh exits 0 (scripts/ paths in agents/, commands/, AGENTS.md resolve)
+== AC-025-05 check-model-env branches ==
+[0;32mPASS[0m AC-025-05-01 check-model-env exits 0 on the real repo with a PASS line
+[0;32mPASS[0m AC-025-05-02 literal model id: exit 1, output names the offending agent (spec-coder)
+warning: in the working copy of 'config/model.local.env', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'config/model.local.env.example', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'opencode.json', LF will be replaced by CRLF the next time Git touches it
+pre-commit: no repo-local hook and no convention entrypoint found — skipping (nothing enforced here)
+[0;32mPASS[0m AC-025-05-03 AC-025-06-05 tracked config/model.local.env: exit 1, output names the path
+warning: in the working copy of 'config/agent.local.env', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'config/model.local.env.example', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'opencode.json', LF will be replaced by CRLF the next time Git touches it
+pre-commit: no repo-local hook and no convention entrypoint found — skipping (nothing enforced here)
+[0;32mPASS[0m AC-025-05-04 AC-025-06-05 tracked config/agent.local.env: exit 1, output names the path
+[0;32mPASS[0m AC-025-05-05 reference with no example default: exit 1, output names SPEC_CODER_MODEL
+[0;32mPASS[0m AC-025-05-06 example var with no reference: exit 1, output names SPEC_UNUSED_MODEL
+warning: in the working copy of 'config/model.local.env.example', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'opencode.json', LF will be replaced by CRLF the next time Git touches it
+pre-commit: no repo-local hook and no convention entrypoint found — skipping (nothing enforced here)
+[0;32mPASS[0m AC-025-05-07 clean fixture: exit 0 with a PASS line
+== AC-025-06 selftest + runtime self-assertions ==
+[0;32mPASS[0m AC-025-06-02 every AC-025-* scenario ID cited by the selftest or the runtime check
+[0;32mPASS[0m AC-025-06-05 structural invariants held: templates shape, .envrc gitignored/untracked, purge clean, gate branches proven
+[0;32mPASS[0m AC-025-06-06 AC-025-07-01 SPEC_PIPELINE.md documents the dotenv flow with no loader reference
+[0;32mPASS[0m AC-025-06-06 AC-025-07-02 AGENTS.md documents the dotenv flow with no loader reference
+[0;32mPASS[0m AC-025-06-06 self-ci validate job runs check-model-env, the selftest, and the runtime check
+[0;32mPASS[0m AC-025-06-06 AC-025-06-10 no continue-on-error on the model-env steps — a regression must fail the job
+[0;32mPASS[0m AC-025-06-07 cited by the runtime check
+[0;32mPASS[0m AC-025-06-08 cited by the runtime check
+[0;32mPASS[0m AC-025-06-09 cited by the runtime check
+== AC-025-07 docs + ADR ==
+[0;32mPASS[0m AC-025-07-01 SPEC_PIPELINE.md §Model configuration documents setup, parent/child flow, precedence, safety, boundary, enforcement
+[0;32mPASS[0m AC-025-07-02 AGENTS.md describes the gitignored .envrc mechanism; carries no model or provider ids
+[0;32mPASS[0m AC-025-07-03 README.md §Model Configuration describes copy template, direnv allow, edit, restart
+[0;32mPASS[0m AC-025-07-04 ADR 0001: status Accepted, dotenv decision, rejected alternatives (shell-profile, loader design), compliance
+[0;32mPASS[0m AC-025-07-05 docs/adr/README.md lists ADR 0001 with status Accepted
+
+selftest: 68 passed, 0 failed
+[0;32m✔ model-env.selftest: all cases pass.[0m

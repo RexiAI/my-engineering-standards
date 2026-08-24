@@ -5,7 +5,7 @@
 # Checks:
 #   1. Every agent.*.model value in opencode.json is exactly an
 #      {env:SPEC_*_MODEL} reference with the mapped var name; any literal model
-#      id (e.g. opencode-go/deepseek-v4-flash) anywhere in the file fails,
+#      id (any provider/model token) above the provider blocks fails,
 #      naming the offending agent. All 8 spec agents must be present.
 #   2. config/model.local.env and config/agent.local.env are not tracked by
 #      git (git ls-files) — a forced-added or previously-committed real file
@@ -52,12 +52,13 @@ if [ ! -f "$OPENCODE_JSON" ]; then
 else
   # Strip $schema lines before the whole-file literal scan so the schema URL's
   # slashes cannot false-positive; then flag any remaining provider/model-style
-  # token (X/Y) — a literal model id anywhere in the file is a violation.
-  # The provider block is carved out before the scan: it legitimately carries
-  # the OpenCode Zen endpoint URL and the provider-side model names, neither
-  # of which are agent model ids. The scan's job is to keep the *agent block*
-  # env-reference-only. The provider block is the last top-level key, so
-  # deleting from its opening line to EOF is sufficient.
+  # token (X/Y) — a literal model id above the provider blocks is a violation.
+  # Provider blocks are carved out before the scan (ADR 0002/0003): they
+  # legitimately carry endpoint URLs and provider-side model names — operator
+  # configuration, none of which is an agent model id. The scan's job is to
+  # keep the *agent block* env-reference-only. The provider block(s) sit at
+  # the end of the file, so deleting from the first "provider": line to EOF
+  # is sufficient.
   scan="$(sed -E 's/"[[:space:]]*\$schema[[:space:]]*"[[:space:]]*:[[:space:]]*"[^"]*"[[:space:]]*[,]?//' "$OPENCODE_JSON")"
   scan="$(sed -E '/^[[:space:]]*"provider"[[:space:]]*:/,$d' <<< "$scan")"
   literal_line="$(printf '%s\n' "$scan" | grep -nE '[A-Za-z0-9._-]+/[A-Za-z0-9._-]+' | head -1 || true)"
