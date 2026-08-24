@@ -49,7 +49,20 @@ This project structure supports Java, Go, JavaScript/TypeScript, and React Nativ
 
 ## Model Configuration
 
-This repo's spec pipeline agents are configured to use models via `opencode.json` `{env:SPEC_*_MODEL}` references. Concrete default model ids are defined only in `config/model.local.env.example`; per-machine overrides live in the gitignored `config/model.local.env`. Docs intentionally carry no model or provider ids — switch models by editing your local override, never tracked files.
+This repo's spec pipeline agents are configured to use models via `opencode.json` `{env:SPEC_*_MODEL}` references. Per-machine overrides in `config/model.local.env` route all 8 agents:
+
+| Agent | Model |
+|---|---|
+| spec-specifier | `ANY_SUBSCRIPTION`
+| spec-ux | `ANY_SUBSCRIPTION`
+| spec-verifier | `ANY_SUBSCRIPTION`
+| spec-mutation-runner | `ANY_SUBSCRIPTION`
+| spec-pr-opener | `ANY_SUBSCRIPTION`
+| spec-coder | `ANY_SUBSCRIPTION`
+| spec-refactorer | `ANY_SUBSCRIPTION`
+| spec-pipeline | `ANY_SUBSCRIPTION`
+
+Concrete default model ids are defined only in `config/model.local.env.example`; per-machine overrides live in the gitignored `config/model.local.env`. Docs intentionally carry no model or provider ids — switch models by editing your local override, never tracked files.
 
 Per-machine values arrive via the gitignored repo-root `.envrc` (direnv). It
 loads the committed `config/model.local.env.example` defaults, then the
@@ -68,6 +81,8 @@ to verify the resolution behavior. See `docs/SPEC_PIPELINE.md §Model
 configuration` for the full mechanism and precedence.
 
 **Plugin triggers**: `rate_limit`, `quota_exceeded`, `5xx`, `timeout`, `overloaded`. Cooldown: 5 min; retry original after 15 min; max depth: 3.
+
+**Provider fallback**: To be defined
 
 ## Per-machine agent environment (credentials)
 
