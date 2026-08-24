@@ -39,6 +39,9 @@ jobs:
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
       PR_NUMBER: ${{ inputs.pr-number }}
       HEAD_SHA: ${{ inputs.head-sha }}
+      # Default model for the review run; a repo-level Actions variable
+      # PR_REVIEW_MODEL overrides it without touching this file.
+      PR_REVIEW_MODEL: ${{ vars.PR_REVIEW_MODEL || 'ox-alpha-free' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -140,13 +143,12 @@ jobs:
           # The subshell + set +e wrapper is required because set -euo
           # pipefail (line 110) would exit the script before review_rc=$?
           # is reached when opencode returns non-zero.
+          # Build the prompt with printf, not a multi-line double-quoted
+          # assignment: an unindented line inside the run:| block scalar
+          # terminates the scalar and breaks YAML parsing (that bug shipped
+          # in e812761 and failed the Validate gate post-merge).
           agent_instructions="$(cat agents/pr-review.md | sed '/^---$/,/^---$/d')"
-          prompt="You are the PR review agent. Review PR ${PR_NUMBER} at head ${HEAD_SHA}.
-
-${agent_instructions}
-
-Post your findings as one PR review comment via gh. End the comment with:
-Reviewed-SHA: ${HEAD_SHA}"
+          prompt="$(printf 'You are the PR review agent. Review PR %s at head %s.\n\n%s\n\nPost your findings as one PR review comment via gh. End the comment with:\nReviewed-SHA: %s' "${PR_NUMBER}" "${HEAD_SHA}" "${agent_instructions}" "${HEAD_SHA}")"
 
           review_output=$(set +e; /tmp/opencode-bin/opencode run --print-logs \
             ${model_flag} \
