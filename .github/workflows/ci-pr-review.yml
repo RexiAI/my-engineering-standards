@@ -41,7 +41,8 @@ jobs:
       HEAD_SHA: ${{ inputs.head-sha }}
       # Default model for the review run; a repo-level Actions variable
       # PR_REVIEW_MODEL overrides it without touching this file.
-      PR_REVIEW_MODEL: ${{ vars.PR_REVIEW_MODEL || 'ox-alpha-free' }}
+      # Must be provider-qualified: bare ids fail with Model not found.
+      PR_REVIEW_MODEL: ${{ vars.PR_REVIEW_MODEL || 'opencode/x-preview-f-free' }}
     steps:
       - uses: actions/checkout@v4
         with:

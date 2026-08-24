@@ -29,7 +29,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: bash scripts/ci-smoke-test.sh --phase 1
+        # Child repos consume these scripts via the .standards submodule.
+        with:
+          submodules: true
+      - name: Structural checks (phase 1)
+        run: |
+          script=".standards/scripts/ci-smoke-test.sh"
+          [ -f "$script" ] || script="scripts/ci-smoke-test.sh"
+          bash "$script" --phase 1
 
   unit-test:
     name: Unit Tests

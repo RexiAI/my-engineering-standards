@@ -1,3 +1,10 @@
+## [1.27.2](https://github.com/RexiAI/my-engineering-standards/compare/v1.27.1...v1.27.2) (2026-08-24)
+
+
+### Bug Fixes
+
+* **ci:** structural checks scan consuming repo ([#51](https://github.com/RexiAI/my-engineering-standards/issues/51)) ([531776d](https://github.com/RexiAI/my-engineering-standards/commit/531776de002bd2a4c05363574dd6b3addda34420))
+
 ## [1.27.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.27.0...v1.27.1) (2026-08-24)
 
 
