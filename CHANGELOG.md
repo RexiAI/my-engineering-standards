@@ -1,3 +1,10 @@
+# [1.29.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.28.0...v1.29.0) (2026-08-25)
+
+
+### Features
+
+* **pr-review:** make model configurable via env vars, register x-preview-f-free ([#55](https://github.com/RexiAI/my-engineering-standards/issues/55)) ([6b4c8cb](https://github.com/RexiAI/my-engineering-standards/commit/6b4c8cb079492ae7f60739171b488d2a28e73892))
+
 # [1.28.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.27.4...v1.28.0) (2026-08-24)
 
 
