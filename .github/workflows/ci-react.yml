@@ -48,7 +48,15 @@ jobs:
           node-version-file: ${{ inputs.node-version-file }}
           cache: npm
       - run: npm ci
-      - run: npm test -- --passWithNoTests 2>/dev/null || npm run test:unit --if-present || npm test
+      - name: Unit tests (fail hard on real failure; scaffold-grace when no test script yet)
+        run: |
+          if node -e 'process.exit(require("./package.json").scripts?.test ? 0 : 1)'; then
+            npm test -- --passWithNoTests
+          elif node -e 'process.exit(require("./package.json").scripts?.["test:unit"] ? 0 : 1)'; then
+            npm run test:unit
+          else
+            echo "::warning::package.json defines neither a 'test' nor a 'test:unit' script — nothing to run"
+          fi
 
   lint:
     name: Lint & Format
@@ -85,6 +93,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Preflight — Dockerfile must exist at repo root
+        run: test -f Dockerfile || { echo "::error::deploy-on-main=true but no Dockerfile at repo root — see templates/Dockerfile.node"; exit 1; }
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
