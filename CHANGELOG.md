@@ -1,3 +1,10 @@
+## [1.29.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.29.0...v1.29.1) (2026-08-25)
+
+
+### Bug Fixes
+
+* **ci-react:** stop masking test failures; wire hooks + strict TS into children ([#58](https://github.com/RexiAI/my-engineering-standards/issues/58)) ([b3410b1](https://github.com/RexiAI/my-engineering-standards/commit/b3410b1ed205dba541e90da1632e210b057d137d))
+
 # [1.29.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.28.0...v1.29.0) (2026-08-25)
 
 
