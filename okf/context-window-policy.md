@@ -101,9 +101,9 @@ Mark deliberate shortcuts with `// ponytail:` comments naming the ceiling and up
 |----------|--------|-------------|
 | Single response | ≤4 lines (unless detail requested) | Caveman + self-discipline |
 | Tool output | Compressed if >2 KB | Headroom hooks |
-| Session ceiling | 50k tokens | `/caveman-stats` check |
+| Session ceiling | 50k tokens | Manual token audit (no stats command ships) |
 
-When approaching ceiling: compress last 5 outputs with headroom, run `/caveman-stats`, continue or rotate session.
+When approaching ceiling: compress last 5 outputs with headroom, check the session token readout, continue or rotate session.
 
 ## What We Don't Do
 
