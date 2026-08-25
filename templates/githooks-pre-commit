@@ -1,0 +1,23 @@
+#!/bin/bash
+# pre-commit — fast staged-files checks only (~5s budget).
+# Wired by scripts/bootstrap.sh / `make hooks-install` (git config core.hooksPath .githooks).
+# The full gate (lint + tests) belongs to CI and pre-push, not here — see
+# docs/GIT_WORKFLOW.md §Git Hooks. Skip entirely with SKIP_HOOKS=1 (an env var,
+# never --no-verify).
+set -uo pipefail
+
+[ -n "${SKIP_HOOKS:-}" ] && exit 0
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+STANDARDS_DIR="$REPO_ROOT/.standards"
+
+# 1. Secret guard on the staged set only (config/agent.local.env must never be staged)
+# Invoked via `bash` deliberately: the submodule may ship the script without the
+# exec bit set, and a silent skip here would defeat the whole guard.
+if [ -f "$STANDARDS_DIR/scripts/guard-env.sh" ]; then
+    bash "$STANDARDS_DIR/scripts/guard-env.sh" --staged "$REPO_ROOT" || exit 1
+else
+    echo "[WARN] .standards/scripts/guard-env.sh not found — secret guard skipped"
+fi
+
+exit 0

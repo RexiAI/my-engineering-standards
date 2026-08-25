@@ -249,6 +249,47 @@ for script in session-start-check.sh session-end-check.sh; do
     fi
 done
 
+# 7. Git hooks — wire the guard-env pre-commit (docs/GIT_WORKFLOW.md §Git Hooks)
+echo ""
+echo "--- Git Hooks ---"
+mkdir -p "$REPO_ROOT/.githooks"
+if [ ! -f "$REPO_ROOT/.githooks/pre-commit" ]; then
+    cp "$STANDARDS_DIR/templates/githooks-pre-commit" "$REPO_ROOT/.githooks/pre-commit"
+    chmod +x "$REPO_ROOT/.githooks/pre-commit"
+    echo "  [COPY] templates/githooks-pre-commit -> .githooks/pre-commit"
+else
+    echo "  [SKIP] .githooks/pre-commit already exists"
+fi
+if git -C "$REPO_ROOT" config core.hooksPath .githooks; then
+    echo "  [CONFIG] core.hooksPath = .githooks"
+else
+    echo "  [WARN] could not set core.hooksPath — run manually: git config core.hooksPath .githooks"
+fi
+
+# 8. TS strict flags — merge into child tsconfig*.json for Node projects. The
+# shared baseline (language-specific/javascript/tsconfig.base.json) is a
+# reference doc, not a copy; Vite/create-react-app scaffolds ship loose and
+# null-safety bugs stay invisible to `tsc -b` until strict is on.
+if [ "${LANG_DETECTED:-}" = "node" ]; then
+    for tsconf in "$REPO_ROOT"/tsconfig*.json; do
+        [ -e "$tsconf" ] || continue
+        node -e '
+            const fs = require("fs");
+            const p = process.argv[1];
+            let j;
+            try { j = JSON.parse(fs.readFileSync(p, "utf8")); }
+            catch { console.log("  [SKIP] " + p + " — not plain JSON (comments present); enable strict:true manually"); process.exit(0); }
+            const c = j.compilerOptions || {};
+            if (c.strict === true && c.noImplicitReturns === true) { process.exit(0); }
+            j.compilerOptions = Object.assign({}, c);
+            if (j.compilerOptions.strict !== true) j.compilerOptions.strict = true;
+            if (j.compilerOptions.noImplicitReturns !== true) j.compilerOptions.noImplicitReturns = true;
+            fs.writeFileSync(p, JSON.stringify(j, null, 2) + "\n");
+            console.log("  [MERGE] strict + noImplicitReturns -> " + p);
+        ' "$tsconf" || echo "  [WARN] merge failed for $tsconf — check manually"
+    done
+fi
+
 echo ""
 echo "=== Bootstrap complete ==="
 echo "Next steps:"
