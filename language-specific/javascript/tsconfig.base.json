@@ -1,5 +1,5 @@
 {
-  "_note": "not copied by scripts/bootstrap.sh or referenced by language-specific/javascript/SKILL.md; verify before removing",
+  "_note": "reference compiler-options baseline. scripts/bootstrap.sh merges the strict flags (strict, noImplicitReturns) into child tsconfig*.json when it detects a Node project; this file itself is not copied verbatim.",
   "compilerOptions": {
     "target": "ES2020",
     "module": "ESNext",

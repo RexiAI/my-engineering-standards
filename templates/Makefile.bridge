@@ -2,7 +2,7 @@
 # Copy this to your child repo root as `Makefile`
 # Then run: make init-ai
 
-.PHONY: init-ai init-standards session-check session-end help
+.PHONY: init-ai init-standards session-check session-end hooks-install help
 
 help:
 	@echo "Available targets:"
@@ -11,6 +11,7 @@ help:
 	@echo "                  real files instead of symlinking (e.g. to set a per-agent"
 	@echo "                  model override without editing files inside .standards/)."
 	@echo "  init-standards  Initialize .standards/ submodule"
+	@echo "  hooks-install   Wire .githooks/pre-commit (guard-env) via core.hooksPath"
 	@echo "  session-check   Run session start health check"
 	@echo "  session-end     Run session end check (pre-commit verification)"
 
@@ -119,6 +120,18 @@ endif
 	@echo ""
 	@echo "Done! AGENTS.md is now linked to .standards/."
 	@echo "OpenCode will auto-discover AGENTS.md and load instructions from .standards/"
+	@$(MAKE) --no-print-directory hooks-install
+
+hooks-install:
+	@mkdir -p .githooks
+	@if [ ! -f ".githooks/pre-commit" ]; then \
+		cp .standards/templates/githooks-pre-commit .githooks/pre-commit; \
+		chmod +x .githooks/pre-commit; \
+		echo "  [COPY] templates/githooks-pre-commit -> .githooks/pre-commit"; \
+	else \
+		echo "  [SKIP] .githooks/pre-commit already exists"; \
+	fi
+	@git config core.hooksPath .githooks && echo "  [CONFIG] core.hooksPath = .githooks"
 
 session-check:
 	@if [ -f "session-start-check.sh" ]; then \
