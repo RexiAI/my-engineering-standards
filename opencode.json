@@ -12,10 +12,10 @@
     "pr-review": { "model": "{env:SPEC_PR_REVIEW_MODEL}" }
   },
   "provider": {
-    "opencode-zen": {
+    "opencode": {
       "env": ["OPENCODE_API_KEY"],
-      "options": { "baseURL": "https://opencode.ai/zen/go/v1" },
-      "models": { "kimi-k3": {}, "x-preview-f-free": {} }
+      "options": { "baseURL": "https://opencode.ai/zen/v1" },
+      "models": { "mimo-v2.5-free": {} }
     }
   }
 }

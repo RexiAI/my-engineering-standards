@@ -59,11 +59,10 @@ RUN_RC=0
 ok() { PASS_COUNT=$((PASS_COUNT + 1)); echo -e "${GREEN}PASS${NC} $1"; }
 bad() { FAIL_COUNT=$((FAIL_COUNT + 1)); echo -e "${RED}FAIL${NC} $1"; }
 
-# Fixture model ids — arbitrary provider/model-shaped tokens; fixtures prove
-# resolution and tier-differentiation mechanics, never real vendors.
-provider="fixture"
-DEFAULT_FAST="$provider/""fast-model"
-DEFAULT_PLUS="$provider/""plus-model"
+# Runtime-built model ids (no inline literal model-id values anywhere below).
+provider="opencode-""go"
+DEFAULT_FAST="$provider/""deepseek-v4-flash"
+DEFAULT_PLUS="$provider/""qwen3.7-plus"
 
 # Banned-name patterns assembled at runtime — this file never contains the
 # contiguous strings the purge greps for.
@@ -187,15 +186,15 @@ else
   bad "AC-025-01-01 .envrc on disk: git ls-files non-zero, git check-ignore exit 0"
 fi
 
-# ── AC-020-01 shipped agents ship without model: (all env-driven, ADR 0003) ──
-# Every shipped agent — the standalone pr-review agent included — ships
-# without a model: key. A pinned agent-file model would silently beat its
-# {env:...} reference in opencode.json and break the per-machine override;
-# model selection lives in opencode.json via {env:SPEC_*_MODEL} vars only.
+# ── AC-020-01 shipped agents ship without model: (all env-driven) ────────────
+# Every shipped agent must ship without a model: key. A pinned agent-file model
+# would silently beat its {env:...} reference in opencode.json and break the
+# per-machine override. Model selection lives in opencode.json via env vars
+# only — no agent frontmatter pins.
 if grep -rqE '^model:[[:space:]]' "$ROOT/agents" 2>/dev/null; then
   bad "AC-020-01-01 every shipped agent ships without a model: key (agent-file model would beat the {env:...} reference)"
 else
-  ok "AC-020-01-01 every shipped agent including agents/pr-review.md ships without a model: key"
+  ok "AC-020-01-01 every shipped agent ships without a model: key"
 fi
 
 # 01-02 / 01-03: template shapes — exactly three dotenv_if_exists lines, in
