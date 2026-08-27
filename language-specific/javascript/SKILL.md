@@ -108,10 +108,28 @@ src/
 Run linting: `npm run lint`
 Run formatter: `npm run format`
 
+## Frontend Clean Code — TypeScript, HTML/TSX, CSS
+
+Authoritative rules live in `docs/CODING_CONVENTIONS.md §Formatting / TypeScript / HTML-TSX / CSS`. This section summarizes them for the JS/TS stack.
+
+**TypeScript**
+- No `any` — use `unknown` + narrowing. ESLint `@typescript-eslint/no-explicit-any: error` (was `warn` pre-spec/001; tighten to `error` when 136 legacy warnings are cleared).
+- `prefer-const: error`, `complexity: [error, 6]`, `import/order: warn` (builtin → external → internal → parent → sibling → index), `use-unknown-in-catch-callback-variable: error` (preserve error cause via `{ cause }`).
+
+**HTML / TSX**
+- No inline `style={{...}}` — use CSS classes / CSS Modules / tokens. Spec/001 had 68 inline objects extracted to classes — do not reintroduce.
+- Semantic markup (`header`, `nav`, `main`, `section`, `button`) — no div soup. Headings form one ordered hierarchy. A11y lint via `eslint-plugin-jsx-a11y`.
+
+**CSS**
+- Property order: Layout → Box model → Typography → Visual → Animation (enforce via `stylelint-order`).
+- Tokens via CSS variables (`:root { --color-*, --space-* }`, `var(--token)`). No duplicated hex/px literals across files.
+- BEM or CSS Modules, one convention per repo. No duplicated 4-line blocks (DRY gate).
+
 ## Read in Order
 
 1. [`PATTERNS.md`](./PATTERNS.md) — React patterns, Redux, API client, Next.js (App Router), NestJS backend patterns.
 2. [`TESTING.md`](./TESTING.md) — framework table and per-stack examples (inherits the layered strategy from `docs/TESTING.md`).
+3. [`docs/CODING_CONVENTIONS.md`](../../docs/CODING_CONVENTIONS.md) — TypeScript / HTML-TSX / CSS clean-code gates and CI job-orchestration rule (parallel jobs, no `needs: [lint]` gating `build`).
 
 ## Saga & Outbox CI Gates
 
