@@ -204,8 +204,8 @@ if [ "$BASE_REF_SET" = true ] && [ -z "$BASE_REF" ]; then
 fi
 
 # ── Blocking set (which gates may emit FAIL) ─────────────────────────────────
-# Gate names: complexity, dry, yagni, solid, property-tests. Default:
-# complexity,property-tests (the objective gates). --blocking wins over the
+# Gate names: complexity, dry, yagni, solid, component-per-file, property-tests. Default:
+# complexity,property-tests,component-per-file (the objective gates). --blocking wins over the
 # PRINCIPLES_BLOCKING_GATES env var, which wins over the default.
 blocking_raw() { # blocking_raw — resolve --blocking / env var / default into a raw comma list
   if [ "$BLOCKING_ARG_SET" = true ]; then

@@ -423,7 +423,7 @@ echo "== AC-011-03-07 no naming / test-delta gates =="
 
 run_check "$r1" --blocking naming,complexity
 if [ "$RUN_RC" -eq 2 ] && grep -q "unknown gate name in blocking set: 'naming'" "$ERR" \
-   && grep -q "complexity, dry, yagni, solid, property-tests" "$ERR"; then
+   && grep -q "complexity, dry, yagni, solid, component-per-file, property-tests" "$ERR"; then
   ok "AC-011-03-07 'naming' is not a gate (unknown, exit 2); valid list names only real gates"
 else
   bad "AC-011-03-07 --blocking naming -> exit 2 naming the gate (rc=$RUN_RC, err=$(tr '\n' ' ' < "$ERR"))"
