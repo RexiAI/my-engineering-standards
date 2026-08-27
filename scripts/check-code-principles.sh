@@ -19,11 +19,18 @@
 #                  before consolidating — docs/CODING_CONVENTIONS.md.
 #   YAGNI        — interfaces with exactly one implementation (premature
 #                  abstraction) and empty method bodies in non-test code.
-#   SOLID        — SRP: god classes (>15 methods, >400 lines). OCP: switch
-#                  statements with ≥4 cases / if-else chains ≥4 (type dispatch
-#                  that should be polymorphic). LSP: heavy instanceof/type-test
-#                  dispatch in Java/TS. ISP: interfaces with >5 methods.
-#                  DIP: domain/engine code importing store/repository/infra.
+#   SOLID        — SRP: god classes (>15 methods, >400 lines; TSX: >300 lines
+#                  or >8 components). OCP: switch statements with ≥4 cases /
+#                  if-else chains ≥4 (type dispatch that should be
+#                  polymorphic). LSP: heavy instanceof/type-test dispatch in
+#                  Java/TS. ISP: interfaces with >5 methods. DIP: domain/engine
+#                  code importing store/repository/infra.
+#   Component-per-file — TSX/JSX: >2 exported PascalCase components per file
+#                  (FAIL), >1 is WARN; or >4 total exported functions in .tsx
+#                  (FAIL). Also enforces tightened SRP for TSX (>300 lines).
+#                  Mirrors docs/CODING_CONVENTIONS.md §File Organization
+#                  "One React component per file" — BookingWidget 14-in-1 is
+#                  the anti-pattern.
 #   Property tests — at `production` tier and above, each present language must
 #                  use its property-testing framework (jqwik / testing.quick /
 #                  fast-check). See docs/TESTING.md §Property Testing.
@@ -41,8 +48,8 @@
 # SOURCE_DIR defaults to the current directory. --tier overrides auto-detection
 # from the project's AGENTS_*.md "Conformance tier:" declaration (see
 # docs/CONFORMANCE_TIERS.md). --warn-as-error promotes every WARN to a failure.
-# --gates restricts the run to a comma-separated subset of the five gate
-# categories (complexity, dry, yagni, solid, property-tests) — the Verifier's
+# --gates restricts the run to a comma-separated subset of the six gate
+# categories (complexity, dry, yagni, solid, component-per-file, property-tests) — the Verifier's
 # scoped re-verification of a single failing category (AC-007-02, AC-007-03);
 # --json prints a single JSON object { "tier", "gates", "fails", "warns" }
 # carrying the same findings as the human output, for transcription into
@@ -66,12 +73,14 @@
 #
 # Blocking set (which gates may emit FAIL):
 #   Gate names: complexity (cyclomatic CC + KISS size findings), dry, yagni,
-#   solid (SRP/OCP/LSP/ISP/DIP as one unit), property-tests.
-#   Default blocking set: complexity,property-tests — the objective gates in
-#   this repo's terms. A gate outside the blocking set is warn-only and never
-#   emits FAIL, with or without -BaseRef (DIP and YAGNI single-implementation
-#   findings therefore report as WARN). Override with --blocking <comma-list>
-#   or the PRINCIPLES_BLOCKING_GATES environment variable (flag wins over env
+#   solid (SRP/OCP/LSP/ISP/DIP as one unit), component-per-file, property-tests.
+#   Default blocking set: complexity,property-tests,component-per-file — the
+#   objective gates in this repo's terms (component-per-file is mvp-tier, cheap
+#   heuristic — BookingWidget 14-in-1 must not pass). A gate outside the
+#   blocking set is warn-only and never emits FAIL, with or without -BaseRef
+#   (DIP and YAGNI single-implementation findings therefore report as WARN).
+#   Override with --blocking <comma-list> or the
+#   PRINCIPLES_BLOCKING_GATES environment variable (flag wins over env
 #   over default); an unknown gate name or an empty value exits 2.
 #
 # Exit codes:
@@ -122,7 +131,7 @@ BASE_REF=""
 BASE_REF_SET=false
 BLOCKING_ARG=""
 BLOCKING_ARG_SET=false
-BLOCKING_SET="complexity property-tests"
+BLOCKING_SET="complexity property-tests component-per-file"
 fail() { # fail <message> [file] [line]
   local msg="$1" loc=""
   [ -n "${2:-}" ] && loc=" ($2${3:+:$3})"
@@ -200,7 +209,7 @@ fi
 # PRINCIPLES_BLOCKING_GATES env var, which wins over the default.
 blocking_raw() { # blocking_raw — resolve --blocking / env var / default into a raw comma list
   if [ "$BLOCKING_ARG_SET" = true ]; then
-    [ -n "$BLOCKING_ARG" ] || { echo "Error: --blocking requires a comma-separated list of gates (complexity, dry, yagni, solid, property-tests)" >&2; exit 2; }
+    [ -n "$BLOCKING_ARG" ] || { echo "Error: --blocking requires a comma-separated list of gates (complexity, dry, yagni, solid, component-per-file, property-tests)" >&2; exit 2; }
     printf '%s' "$BLOCKING_ARG"
     return
   fi
@@ -208,12 +217,12 @@ blocking_raw() { # blocking_raw — resolve --blocking / env var / default into 
     printf '%s' "$PRINCIPLES_BLOCKING_GATES"
     return
   fi
-  printf '%s' "complexity,property-tests"
+  printf '%s' "complexity,property-tests,component-per-file"
 }
 
 valid_gate() { # valid_gate <name> — 0 if a known gate name
   case "$1" in
-    complexity|dry|yagni|solid|property-tests) return 0 ;;
+    complexity|dry|yagni|solid|component-per-file|property-tests) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -224,12 +233,12 @@ resolve_blocking_set() {
   BLOCKING_SET=""
   for g in $(printf '%s' "$raw" | tr ',' '\n' | sed '/^$/d'); do
     if ! valid_gate "$g"; then
-      echo "Error: unknown gate name in blocking set: '$g' (valid gates: complexity, dry, yagni, solid, property-tests)" >&2
+      echo "Error: unknown gate name in blocking set: '$g' (valid gates: complexity, dry, yagni, solid, component-per-file, property-tests)" >&2
       exit 2
     fi
     BLOCKING_SET="${BLOCKING_SET}${BLOCKING_SET:+ }$g"
   done
-  [ -n "$BLOCKING_SET" ] || { echo "Error: blocking set is empty — must name at least one of: complexity, dry, yagni, solid, property-tests" >&2; exit 2; }
+  [ -n "$BLOCKING_SET" ] || { echo "Error: blocking set is empty — must name at least one of: complexity, dry, yagni, solid, component-per-file, property-tests" >&2; exit 2; }
 }
 resolve_blocking_set
 
@@ -254,18 +263,18 @@ fi
 SELECTED_GATES=()
 if [ "$GATES_SET" = true ]; then
   if [ -z "$GATES" ]; then
-    echo "ERROR: --gates requires a comma-separated list of gate names (complexity, dry, yagni, solid, property-tests)" >&2
+    echo "ERROR: --gates requires a comma-separated list of gate names (complexity, dry, yagni, solid, component-per-file, property-tests)" >&2
     exit 2
   fi
   IFS=',' read -r -a gate_list <<< "$GATES"
   for g in "${gate_list[@]}"; do
     case "$g" in
-      complexity|dry|yagni|solid|property-tests) SELECTED_GATES+=("$g") ;;
-      *) echo "ERROR: unknown gate '$g' (valid: complexity, dry, yagni, solid, property-tests)" >&2; exit 2 ;;
+      complexity|dry|yagni|solid|component-per-file|property-tests) SELECTED_GATES+=("$g") ;;
+      *) echo "ERROR: unknown gate '$g' (valid: complexity, dry, yagni, solid, component-per-file, property-tests)" >&2; exit 2 ;;
     esac
   done
 else
-  SELECTED_GATES=(complexity dry yagni solid property-tests)
+  SELECTED_GATES=(complexity dry yagni solid component-per-file property-tests)
 fi
 
 contains_gate() { # contains_gate <name>
@@ -581,7 +590,7 @@ check_solid_srp() {
   local files="$1"; local lang="$2"
   [ -z "$files" ] && return 0
   local found=false
-  local f lines methods
+  local f lines methods comp_count
   for f in $files; do
     [ -f "$f" ] || continue
     lines=$(wc -l < "$f" | tr -d ' ')
@@ -591,6 +600,20 @@ check_solid_srp() {
       node) methods=$(grep -cE '^\s*(public|private|protected|async\s+)?[A-Za-z0-9_$]+\s*\([^)]*\)\s*\{' "$f" 2>/dev/null | tr -d ' ') || methods=0 ;;
       *) methods=0 ;;
     esac
+    # Tightened SRP for TSX/JSX: >300 lines OR >8 components (god-file via component count).
+    # BookingWidget 14-in-1 was 390 lines / 14 components and passed the old 400/15 gate.
+    if [ "$lang" = "node" ]; then
+      case "$f" in
+        *.tsx|*.jsx)
+          comp_count=$( (grep -E '^\s*(export\s+)?(default\s+)?(function\s+[A-Z]|const\s+[A-Z][A-Za-z0-9_]*\s*[:=][^;]*=>|const\s+[A-Z][A-Za-z0-9_]*\s*=\s*React\.(memo|forwardRef)|class\s+[A-Z])' "$f" 2>/dev/null || true) | wc -l | tr -d ' ') || comp_count=0
+          if [ "$lines" -gt 300 ] || [ "$comp_count" -gt 8 ] || [ "$lines" -gt 400 ] || [ "$methods" -gt 15 ]; then
+            emit "$(classify "solid" "warn" "$f" "" "")" "SRP: possible god file ($lang) — $f: ${lines} lines, ${methods} methods, ${comp_count} components (TSX threshold: 300 lines / 8 components; general: 400 lines / 15 methods) — split by responsibility" "$f"
+            found=true
+          fi
+          continue
+          ;;
+      esac
+    fi
     if [ "$lines" -gt 400 ] || [ "$methods" -gt 15 ]; then
       emit "$(classify "solid" "warn" "$f" "" "")" "SRP: possible god file ($lang) — $f: ${lines} lines, ${methods} methods (split by responsibility)" "$f"
       found=true
@@ -721,6 +744,73 @@ check_solid_dip() {
       ;;
   esac
   $found || pass "SOLID-DIP ($lang): no domain→infrastructure imports"
+}
+
+# ── Component-per-file (TSX/JSX, mvp tier) ──────────────────────────────────
+# One React component per file: TSX/JSX files must export ≤2 PascalCase components
+# (FAIL if >2, WARN if >1) and ≤4 total exported functions (FAIL). For .ts with
+# React (imports React) and api/*.ts, total exported functions are also checked.
+# Tightened god-file for TSX via this gate (blocking): >300 lines FAIL.
+# Keep existing behavior for Java/Go untouched — only NODE_FILES inspected.
+check_component_per_file() {
+  local files="$1"
+  [ -z "$files" ] && return 0
+  local found=false
+  local f comp exported_total lines all_comp
+  for f in $files; do
+    [ -f "$f" ] || continue
+    case "$f" in
+      *.tsx|*.jsx) ;;
+      *.ts|*.js)
+        # For plain .ts/.js: only check api/*.ts or files that import React
+        if [[ "$f" == *"/api/"* ]]; then
+          : # always check api files
+        elif grep -qiE 'from\s+["'\'']react["'\'']|import\s+.*react|from\s+["'\''].*react' "$f" 2>/dev/null; then
+          : # React TS file — check
+        else
+          continue
+        fi
+        ;;
+      *) continue ;;
+    esac
+    # Exported PascalCase components: export function Foo / export const Foo = ...=> / export default function Foo
+    comp=$( (grep -E '^\s*export\s+(default\s+)?function\s+[A-Z]|^\s*export\s+const\s+[A-Z][A-Za-z0-9_]*\s*[:=][^;]*=>|^\s*export\s+default\s+function(\s+[A-Z]|\s*\()' "$f" 2>/dev/null || true) | wc -l | tr -d ' ')
+    comp=${comp:-0}
+    # Total exported functions/callables (any case): export function / export const X = / export async function
+    exported_total=$( (grep -E '^\s*export\s+(default\s+)?(async\s+)?function\s+[A-Za-z]|^\s*export\s+(const|let|var)\s+[A-Za-z0-9_]+\s*=' "$f" 2>/dev/null || true) | wc -l | tr -d ' ')
+    exported_total=${exported_total:-0}
+    lines=$(wc -l < "$f" 2>/dev/null | tr -d ' ') || lines=0
+    # All components in file (for god-file threshold 8, not just exported)
+    all_comp=$( (grep -E '^\s*(export\s+)?(default\s+)?(function\s+[A-Z]|const\s+[A-Z][A-Za-z0-9_]*\s*[:=][^;]*=>|const\s+[A-Z][A-Za-z0-9_]*\s*=\s*React\.(memo|forwardRef)|class\s+[A-Z])' "$f" 2>/dev/null || true) | wc -l | tr -d ' ')
+    all_comp=${all_comp:-0}
+    # Gate: >2 exported components => FAIL, >1 => WARN
+    if [ "$comp" -gt 2 ]; then
+      emit "$(classify "component-per-file" "fail" "$f" "" "")" "Component-per-file: $f has $comp exported components (threshold: ≤2, ideal ≤1) — split into one component per file with barrel index.ts (BookingWidget 14-in-1 anti-pattern)" "$f"
+      found=true
+    elif [ "$comp" -gt 1 ]; then
+      emit "$(classify "component-per-file" "warn" "$f" "" "")" "Component-per-file: $f has $comp exported components (ideal ≤1) — consider one component per file" "$f"
+      found=true
+    fi
+    # Gate: >4 total exported functions in .tsx/.jsx (covers App.tsx 7 functions) and api/*.ts
+    if [[ "$f" == *.tsx || "$f" == *.jsx ]] && [ "$exported_total" -gt 4 ]; then
+      emit "$(classify "component-per-file" "fail" "$f" "" "")" "Component-per-file: $f exports $exported_total functions/components (threshold: ≤4) — split file" "$f"
+      found=true
+    elif [[ "$f" == *"/api/"* ]] && [ "$exported_total" -gt 4 ]; then
+      emit "$(classify "component-per-file" "fail" "$f" "" "")" "Component-per-file: $f (api) exports $exported_total functions (threshold: ≤4) — split file" "$f"
+      found=true
+    fi
+    # Tightened god-file via blocking gate: >300 lines or >8 components for TSX/JSX
+    if [[ "$f" == *.tsx || "$f" == *.jsx ]]; then
+      if [ "$lines" -gt 300 ]; then
+        emit "$(classify "component-per-file" "fail" "$f" "" "")" "Component-per-file: god file — $f: ${lines} lines (TSX threshold: 300) — split by responsibility" "$f"
+        found=true
+      elif [ "$all_comp" -gt 8 ]; then
+        emit "$(classify "component-per-file" "fail" "$f" "" "")" "Component-per-file: god file — $f: ${all_comp} components (TSX threshold: 8) — split by responsibility" "$f"
+        found=true
+      fi
+    fi
+  done
+  $found || pass "Component-per-file: no violations"
 }
 
 # ── Property tests (production tier and above) ───────────────────────────────
@@ -931,7 +1021,7 @@ if [ -n "$BASE_REF" ]; then
   compute_diff "$ALL_NONTEST"
 fi
 # --gates restricts execution to the listed categories (AC-007-03-01,
-# AC-007-03-02); the default runs all five, byte-identical to prior behavior.
+# AC-007-03-02); the default runs all six, byte-identical to prior behavior.
 if contains_gate complexity; then
   run_complexity_kiss java $NONTEST_JAVA
   run_complexity_kiss go $NONTEST_GO
@@ -971,6 +1061,12 @@ if contains_gate solid; then
   say ""
 fi
 
+if contains_gate component-per-file; then
+  say "--- Component-per-file ---"
+  check_component_per_file "$NONTEST_NODE"
+  say ""
+fi
+
 if contains_gate property-tests; then
   say "--- Property tests ---"
   check_property_tests java
@@ -989,7 +1085,7 @@ fi
 # Report the subset when --gates narrowed the run (AC-007-03-01); the default
 # full run keeps its prior summary text byte-for-byte.
 GATE_SUMMARY=""
-[ "${#SELECTED_GATES[@]}" -lt 5 ] && GATE_SUMMARY="(gates: $(IFS=,; echo "${SELECTED_GATES[*]}"))"
+[ "${#SELECTED_GATES[@]}" -lt 6 ] && GATE_SUMMARY="(gates: $(IFS=,; echo "${SELECTED_GATES[*]}"))"
 
 say "---------------------------------------------"
 emit_report

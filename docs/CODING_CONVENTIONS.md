@@ -18,7 +18,8 @@
 ## File Organization
 
 - **One class per file** (Java).
-- **One component per directory** with barrel export `index.js` (JS/TS).
+- **One React component per file** (TSX/JSX: ≤1 exported component; hooks/helpers co-located only if <20 lines and used by that single component) — barrel `index.ts` re-exports. **BookingWidget 14-in-1 (390 lines, 14 components in one file) is the anti-pattern.** `scripts/check-code-principles.sh` gate `component-per-file` enforces this (FAIL if >2 exported components, WARN if >1; FAIL if >4 exported functions in `.tsx`).
+- **One component per directory** with barrel export `index.js` / `index.ts` (JS/TS) — the directory holds the single component file plus its co-located CSS module / test / stories.
 - **Shared code** goes in `common_*` packages (Go) or `shared/` (JS).
 - **Test files** mirror the source package structure.
 
@@ -74,7 +75,7 @@ defect; a WARN is a review hint to verify before merging.
 ### Base rules
 
 - **Prefer composition over inheritance.** Use interfaces and delegation instead of abstract base classes. For tests, use plain `@BeforeEach` + helper methods instead of `AbstractBaseTestSuite` base classes.
-- **Keep things small.** Classes under 200 lines, methods under 20 lines, files under 500 lines. Split by responsibility, not by arbitrary size limits.
+- **Keep things small.** Classes under 200 lines, methods under 20 lines, files under 500 lines. Split by responsibility, not by arbitrary size limits. For TSX/JSX, `scripts/check-code-principles.sh` `component-per-file` gate enforces tighter bounds: **FAIL if >2 exported components per file (WARN if >1), FAIL if >4 total exported functions in `.tsx`, and FAIL if >300 lines or >8 components (god-file)** — BookingWidget 14-in-1 is the canonical violation.
 - **Cyclomatic complexity ≤6 per method/function.** Enforced via PMD `CyclomaticComplexity`/`CognitiveComplexity` (Java), golangci `cyclop`/`gocognit` (Go), ESLint `complexity` (JS/TS) — see `language-specific/<lang>/`. Extract methods, invert conditionals, or replace nested branching with early returns rather than raise the threshold. `scripts/check-code-principles.sh` applies the same threshold as a language-agnostic heuristic.
 - **Dependency rule.** Source code dependencies must point inward. Domain code never depends on infrastructure code. Controllers depend on services, services on repositories, never the reverse.
 - **Generalize, don't special-case.** One mechanism should handle all similar cases. Avoid if/else chains that check exception types — use polymorphic dispatch or Result pattern matching.
