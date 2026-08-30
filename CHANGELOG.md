@@ -1,3 +1,10 @@
+## [1.29.2](https://github.com/RexiAI/my-engineering-standards/compare/v1.29.1...v1.29.2) (2026-08-30)
+
+
+### Bug Fixes
+
+* **ci,docs:** clean code — TS/HTML/CSS standards + CI parallel jobs (no skip on fail) ([#59](https://github.com/RexiAI/my-engineering-standards/issues/59)) ([be0a4a3](https://github.com/RexiAI/my-engineering-standards/commit/be0a4a391a54a9ff68d886df852dbd17ce673cc6))
+
 ## [1.29.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.29.0...v1.29.1) (2026-08-25)
 
 
