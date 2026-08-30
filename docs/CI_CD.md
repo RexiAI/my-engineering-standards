@@ -312,6 +312,24 @@ Steps:
 | `GH_TOKEN` | Semantic Release (release, opt-in only) |
 | `OPENCODE_API_KEY` | API key for the PR review agent's provider (opt-in via `init-ci.sh --with-pr-review` only) |
 
+## CI Job Orchestration — Parallel Feedback
+
+All reusable frontend workflows (`ci-react.yml`, `ci-nextjs.yml`, etc.) run `unit-test`, `lint`, and `build` **in parallel with no `needs` between them**. Only `docker` has `needs: [build]`. This preserves full signal: a lint failure never causes Build to show SKIPPED and hide a real build breakage (the spec/001 anti-pattern: `build: needs: [lint, unit-test]`). If branch protection needs a single required check, add an aggregator job:
+
+```yaml
+ci-success:
+  needs: [unit-test, lint, build]
+  if: always()
+  runs-on: ubuntu-latest
+  steps:
+    - run: |
+        [[ "${{ needs.unit-test.result }}" == "success" ]] || exit 1
+        [[ "${{ needs.lint.result }}" == "success" ]]      || exit 1
+        [[ "${{ needs.build.result }}" == "success" ]]     || exit 1
+```
+
+Canonical reference: `.standards/.github/workflows/ci-react.yml` — comment above `build:` job states the parallel rule explicitly. See also `docs/CODING_CONVENTIONS.md §CI Job Orchestration — Clean Feedback`.
+
 ## Weekly E2E Pipeline
 
 *Conformance tier: `production`. See docs/CONFORMANCE_TIERS.md — projects with no staging environment don't need this job; it has nothing to run against.*

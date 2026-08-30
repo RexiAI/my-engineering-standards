@@ -74,7 +74,9 @@ jobs:
 
   build:
     name: Build
-    needs: [unit-test, lint]
+    # Runs in parallel with unit-test and lint — no needs between them.
+    # Each job validates independently so a lint failure does not hide
+    # build/test results (all jobs report even if one fails).
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
