@@ -1,4 +1,4 @@
-.PHONY: help validate validate-docs validate-refs validate-all lint format stats
+.PHONY: help validate validate-docs validate-refs validate-all lint format stats test test-scripts test-shell test-java test-go test-js mutation property-tests ci-fast ci ci-full
 
 DOCS := AGENTS.md README.md \
   docs/AGENTS_AND_SKILLS.md \
@@ -104,5 +104,52 @@ stats:
 	@echo "  Templates:   $$(wc -l templates/* 2>/dev/null | tail -1 | awk '{print $$1}') lines across $$(ls templates/* 2>/dev/null | wc -l) files"
 	@echo "  CI configs:  $$(find .github ci -name '*.yml' 2>/dev/null | xargs wc -l 2>/dev/null | tail -1 | awk '{print $$1}') lines across $$(find .github ci -name '*.yml' 2>/dev/null | wc -l) files"
 	@echo "  Total:       $$(find . -name '*.md' -not -path './.git/*' -exec cat {} + | wc -l) lines markdown"
+
+# --- TDD harness (spec 001) — shell track ---
+test-scripts:   # Run bats shell gate tests (Track B, spec 001)
+	@command -v bats >/dev/null 2>&1 || { echo "ERROR: bats not found on PATH — install bats-core >=1.10 (https://github.com/bats-core/bats-core)" >&2; echo "  e.g. git clone https://github.com/bats-core/bats-core.git && ./bats-core/install.sh \$$HOME/.local" >&2; exit 1; }
+	@echo "Running bats tests (TAP)..."
+	@bats --tap scripts/tests/*.bats
+
+test-shell: test-scripts
+
+test: test-scripts   # Unified entry (Track B; lang template validation is doc-linked smoke, not local)
+	@echo "test: shell track passed (lang scaffolds are template smoke, see docs/TESTING_TDD_GUIDE.md)"
+
+test-java:   # Validate java-feature template smoke (no Maven build, just structural check)
+	@test -f ci/templates/java-feature/pom-fragment.xml && echo "[OK] java-feature template present" || { echo "[FAIL] ci/templates/java-feature missing" >&2; exit 1; }
+	@grep -q "junit-jupiter" ci/templates/java-feature/pom-fragment.xml && echo "[OK] junit-jupiter present" || { echo "[FAIL] junit-jupiter missing" >&2; exit 1; }
+
+test-go:   # Validate go-feature template smoke
+	@test -f ci/templates/go-feature/Makefile && echo "[OK] go-feature template present" || { echo "[FAIL] ci/templates/go-feature missing" >&2; exit 1; }
+	@grep -q "go test -race -shuffle=on -count=1" ci/templates/go-feature/Makefile && echo "[OK] go test command correct" || { echo "[FAIL] go test command wrong" >&2; exit 1; }
+
+test-js:   # Validate js-feature template smoke
+	@test -f ci/templates/js-feature/package.json && echo "[OK] js-feature template present" || { echo "[FAIL] ci/templates/js-feature missing" >&2; exit 1; }
+	@grep -q "vitest\|jest" ci/templates/js-feature/package.json && echo "[OK] test runner present" || { echo "[FAIL] test runner missing" >&2; exit 1; }
+
+mutation:   # Mutation testing (production tier, 80% threshold — skipped at mvp)
+	@if grep -q "Conformance tier: production" AGENTS.md 2>/dev/null || grep -q "Conformance tier: production" AGENTS_*.md 2>/dev/null; then \
+		echo "mutation: production tier — run tier-specific mutation (see ci/templates)"; \
+		echo "  Java: mvn verify -Pmutation | Go: gremlins unleash --threshold-efficacy 80 | JS: npx stryker run"; \
+	else \
+		echo "skipped — production tier required (current tier is mvp, see docs/CONFORMANCE_TIERS.md)"; \
+	fi
+
+property-tests:   # Property tests (production tier — skipped at mvp)
+	@if grep -q "Conformance tier: production" AGENTS.md 2>/dev/null || grep -q "Conformance tier: production" AGENTS_*.md 2>/dev/null; then \
+		echo "property-tests: production tier — run with tier's framework (jqwik / testing/quick / fast-check)"; \
+	else \
+		echo "skipped — production tier required (current tier is mvp, see docs/CONFORMANCE_TIERS.md)"; \
+	fi
+
+ci-fast: test-scripts validate-all   # Fast CI ladder: shell tests + validations, no Docker
+	@echo "ci-fast: green"
+
+ci: ci-fast   # Alias for ci-fast in this repo (no build artifact)
+	@echo "ci: green"
+
+ci-full: ci   # Full ladder (no E2E in this repo)
+	@echo "ci-full: green"
 
 

@@ -197,6 +197,19 @@ jobs:
       # (e.g. the complexity threshold raised so a fixture no longer fires)
       # fails the job. The principles selftest fail-fasts with a clear message
       # if 007's --gates flag is not yet merged — 012 lands in the same batch.
+      - name: Install bats-core
+        run: |
+          set -euo pipefail
+          if ! command -v bats >/dev/null 2>&1; then
+            git -c core.autocrlf=false clone --depth 1 --branch v1.11.0 https://github.com/bats-core/bats-core.git /tmp/bats-core
+            /tmp/bats-core/install.sh /tmp/bats-install
+            echo "/tmp/bats-install/bin" >> "$GITHUB_PATH"
+          fi
+          /tmp/bats-install/bin/bats --version 2>/dev/null || bats --version
+
+      - name: Run shell gate bats tests (spec 001 Track B)
+        run: make test-scripts
+
       - name: Run gate selftests
         run: |
           set -euo pipefail
