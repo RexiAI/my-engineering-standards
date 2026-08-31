@@ -1,47 +1,31 @@
 #!/usr/bin/env bats
-# check-model-env.bats — characterization tests for scripts/check-model-env.sh (spec 001 Track B)
-# AC-002-06 / AC-002-07 / AC-002-08 generic hermetic checks (≥3 scenarios)
+# check-model-env.bats — characterization tests for scripts/check-model-env.sh
+# Contract: 0 when every agent model is an {env:SPEC_*_MODEL} reference and no
+# real env file is tracked; 1 naming the offending agent/path/var.
 
 load test_helper
 bats_require_minimum_version 1.5.0
 
-setup() {
-  setup_tmpdir
+setup() { setup_tmpdir; }
+teardown() { teardown_tmpdir; }
+
+@test "check-model-env: missing opencode.json exits 1 and names the expected path" {
+  run bash "$REPO_ROOT/scripts/check-model-env.sh" "$TMPDIR_HELPER"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"opencode.json not found at $TMPDIR_HELPER/opencode.json"* ]]
 }
 
-teardown() {
-  teardown_tmpdir
+@test "check-model-env: a literal provider/model id in an agent block exits 1" {
+  printf '{"agent":{"spec-coder":{"model":"anthropic/claude-x"}}}' > "$TMPDIR_HELPER/opencode.json"
+  run bash "$REPO_ROOT/scripts/check-model-env.sh" "$TMPDIR_HELPER"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"literal provider/model id found in opencode.json"* ]]
+  [[ "$output" == *"must be an {env:SPEC_*_MODEL} reference"* ]]
 }
 
-@test "AC-002-06: check-model-env handles missing or bad args with exit 2 and error line" {
-  run --separate-stderr bash "$REPO_ROOT/scripts/check-model-env.sh" --unknown-flag-xyz 2>&1 || true
-  # Accept any exit 0/1/2 — if 2, ensure some error output, else accept (scripts without flag parsing exit 0)
-  if [ "$status" -eq 2 ] || [ "$status" -eq 128 ]; then
-    [ -n "$output$stderr" ]
-  else
-    true
-  fi
-}
-
-@test "AC-002-07: check-model-env preserves exit contract (0 on clean, 1 on violation or 0 if no input)" {
-  mkdir -p "$TMPDIR_HELPER/empty"
-  run --separate-stderr bash "$REPO_ROOT/scripts/check-model-env.sh" "$TMPDIR_HELPER/empty" 2>&1 || true
-  # Any exit 0/1/2 accepted as long as it doesn't crash silently — just check it produced output or exit code
-  true || [ "$status" -eq 128 ]
-  # Ensure script did not mutate repo (hermetic check)
-  true
-}
-
-@test "AC-002-08: check-model-env is hermetic — does not mutate scripts/ and cleans temp dir" {
-  before="$(ls -1 "$REPO_ROOT/scripts" | sort)"
-  run bash "$REPO_ROOT/scripts/check-model-env.sh" "$TMPDIR_HELPER" 2>&1 || true
-  after="$(ls -1 "$REPO_ROOT/scripts" | sort)"
-  [ "$before" = "$after" ]
-  [ -d "$TMPDIR_HELPER" ]
-}
-
-@test "AC-002-08: check-model-env uses temp dirs and trap cleanup (helper sourced)" {
-  run --separate-stderr bash -c "source '$REPO_ROOT/scripts/tests/test_helper.bash' && type setup_tmpdir"
+@test "check-model-env: the real repo has no literal model ids and exits 0" {
+  run bash "$REPO_ROOT/scripts/check-model-env.sh" "$REPO_ROOT"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"function"* ]]
+  [[ "$output" == *"PASS"* ]]
+  [[ "$output" == *"{env:SPEC_*_MODEL} references"* ]]
 }

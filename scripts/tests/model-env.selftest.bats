@@ -1,47 +1,25 @@
 #!/usr/bin/env bats
-# model-env.selftest.bats — characterization tests for scripts/model-env.selftest.sh (spec 001 Track B)
-# AC-002-06 / AC-002-07 / AC-002-08 generic hermetic checks (≥3 scenarios)
+# model-env.selftest.bats — characterization test for scripts/model-env.selftest.sh
+#
+# model-env.selftest.sh is itself an assertion carrier: it builds fixtures and
+# asserts each case's exit code. This test asserts the selftest's own contract
+# (exit 0 plus its summary line) and that it reports a non-zero pass count —
+# a selftest that silently asserts nothing would fail the second assertion.
 
 load test_helper
 bats_require_minimum_version 1.5.0
 
-setup() {
-  setup_tmpdir
-}
-
-teardown() {
-  teardown_tmpdir
-}
-
-@test "AC-002-06: model-env.selftest handles missing or bad args with exit 2 and error line" {
-  run --separate-stderr bash "$REPO_ROOT/scripts/model-env.selftest.sh" --unknown-flag-xyz 2>&1 || true
-  # Accept any exit 0/1/2 — if 2, ensure some error output, else accept (scripts without flag parsing exit 0)
-  if [ "$status" -eq 2 ] || [ "$status" -eq 128 ]; then
-    [ -n "$output$stderr" ]
-  else
-    true
-  fi
-}
-
-@test "AC-002-07: model-env.selftest preserves exit contract (0 on clean, 1 on violation or 0 if no input)" {
-  mkdir -p "$TMPDIR_HELPER/empty"
-  run --separate-stderr bash "$REPO_ROOT/scripts/model-env.selftest.sh" "$TMPDIR_HELPER/empty" 2>&1 || true
-  # Any exit 0/1/2 accepted as long as it doesn't crash silently — just check it produced output or exit code
-  true || [ "$status" -eq 128 ]
-  # Ensure script did not mutate repo (hermetic check)
-  true
-}
-
-@test "AC-002-08: model-env.selftest is hermetic — does not mutate scripts/ and cleans temp dir" {
-  before="$(ls -1 "$REPO_ROOT/scripts" | sort)"
-  run bash "$REPO_ROOT/scripts/model-env.selftest.sh" "$TMPDIR_HELPER" 2>&1 || true
-  after="$(ls -1 "$REPO_ROOT/scripts" | sort)"
-  [ "$before" = "$after" ]
-  [ -d "$TMPDIR_HELPER" ]
-}
-
-@test "AC-002-08: model-env.selftest uses temp dirs and trap cleanup (helper sourced)" {
-  run --separate-stderr bash -c "source '$REPO_ROOT/scripts/tests/test_helper.bash' && type setup_tmpdir"
+@test "model-env.selftest: exits 0 and reports every case passing" {
+  run bash "$REPO_ROOT/scripts/model-env.selftest.sh"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"function"* ]]
+  [[ "$output" == *"model-env.selftest: all cases pass"* ]]
+}
+
+@test "model-env.selftest: reports at least 68 assertions and zero failures" {
+  run bash "$REPO_ROOT/scripts/model-env.selftest.sh"
+  [ "$status" -eq 0 ]
+  n="$(printf '%s\n' "$output" | sed 's/\x1b\[[0-9;]*m//g' | grep -oE '[0-9]+ (passed|assertions passed|cases passed)' | grep -oE '^[0-9]+' | head -1)"
+  [ -n "$n" ]
+  [ "$n" -ge 68 ]
+  [[ "$output" != *"1 failed"* ]]
 }

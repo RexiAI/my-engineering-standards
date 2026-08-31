@@ -1,47 +1,34 @@
 #!/usr/bin/env bats
-# check-saga-timeouts.bats — characterization tests for scripts/check-saga-timeouts.sh (spec 001 Track B)
-# AC-002-06 / AC-002-07 / AC-002-08 generic hermetic checks (≥3 scenarios)
+# check-saga-timeouts.bats — characterization tests for scripts/check-saga-timeouts.sh
+# Contract: 0 when no saga code or every handler has a timeout; 1 when saga code
+# is present without timeout enforcement.
 
 load test_helper
 bats_require_minimum_version 1.5.0
 
-setup() {
-  setup_tmpdir
-}
+setup() { setup_tmpdir; }
+teardown() { teardown_tmpdir; }
 
-teardown() {
-  teardown_tmpdir
-}
-
-@test "AC-002-06: check-saga-timeouts handles missing or bad args with exit 2 and error line" {
-  run --separate-stderr bash "$REPO_ROOT/scripts/check-saga-timeouts.sh" --unknown-flag-xyz 2>&1 || true
-  # Accept any exit 0/1/2 — if 2, ensure some error output, else accept (scripts without flag parsing exit 0)
-  if [ "$status" -eq 2 ] || [ "$status" -eq 128 ]; then
-    [ -n "$output$stderr" ]
-  else
-    true
-  fi
-}
-
-@test "AC-002-07: check-saga-timeouts preserves exit contract (0 on clean, 1 on violation or 0 if no input)" {
-  mkdir -p "$TMPDIR_HELPER/empty"
-  run --separate-stderr bash "$REPO_ROOT/scripts/check-saga-timeouts.sh" "$TMPDIR_HELPER/empty" 2>&1 || true
-  # Any exit 0/1/2 accepted as long as it doesn't crash silently — just check it produced output or exit code
-  true || [ "$status" -eq 128 ]
-  # Ensure script did not mutate repo (hermetic check)
-  true
-}
-
-@test "AC-002-08: check-saga-timeouts is hermetic — does not mutate scripts/ and cleans temp dir" {
-  before="$(ls -1 "$REPO_ROOT/scripts" | sort)"
-  run bash "$REPO_ROOT/scripts/check-saga-timeouts.sh" "$TMPDIR_HELPER" 2>&1 || true
-  after="$(ls -1 "$REPO_ROOT/scripts" | sort)"
-  [ "$before" = "$after" ]
-  [ -d "$TMPDIR_HELPER" ]
-}
-
-@test "AC-002-08: check-saga-timeouts uses temp dirs and trap cleanup (helper sourced)" {
-  run --separate-stderr bash -c "source '$REPO_ROOT/scripts/tests/test_helper.bash' && type setup_tmpdir"
+@test "check-saga-timeouts: tree with no saga code exits 0" {
+  mkdir -p "$TMPDIR_HELPER/src"
+  printf 'package src\nfunc Add(a, b int) int { return a + b }\n' > "$TMPDIR_HELPER/src/math.go"
+  run bash "$REPO_ROOT/scripts/check-saga-timeouts.sh" "$TMPDIR_HELPER"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"function"* ]]
+}
+
+@test "check-saga-timeouts: saga handler without a timeout exits 1 and counts violations" {
+  mkdir -p "$TMPDIR_HELPER/sg"
+  printf 'package sg\nfunc OrderSagaHandler() error { return nil }\n' > "$TMPDIR_HELPER/sg/order_saga.go"
+  run bash "$REPO_ROOT/scripts/check-saga-timeouts.sh" "$TMPDIR_HELPER/sg"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Saga timeout check"* ]]
+  [[ "$output" == *"violation(s)"* ]]
+  [[ "$output" == *"docs/SAGA_PATTERN.md"* ]]
+}
+
+@test "check-saga-timeouts: saga handler with WithTimeout exits 0" {
+  mkdir -p "$TMPDIR_HELPER/sg2"
+  printf 'package sg\nfunc OrderSagaHandler() error {\n\tctx, cancel := context.WithTimeout(ctx, d)\n\tdefer cancel()\n\treturn nil\n}\n' > "$TMPDIR_HELPER/sg2/order_saga.go"
+  run bash "$REPO_ROOT/scripts/check-saga-timeouts.sh" "$TMPDIR_HELPER/sg2"
+  [ "$status" -eq 0 ]
 }

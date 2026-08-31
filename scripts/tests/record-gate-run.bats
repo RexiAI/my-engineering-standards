@@ -1,47 +1,45 @@
 #!/usr/bin/env bats
-# record-gate-run.bats — characterization tests for scripts/record-gate-run.sh (spec 001 Track B)
-# AC-002-06 / AC-002-07 / AC-002-08 generic hermetic checks (≥3 scenarios)
+# record-gate-run.bats — characterization tests for scripts/record-gate-run.sh
+# Contract: 0 when the record validates and is appended; 1 with a stderr message
+# naming the offending field and nothing appended.
 
 load test_helper
 bats_require_minimum_version 1.5.0
 
 setup() {
   setup_tmpdir
+  RUNS="$TMPDIR_HELPER/runs.jsonl"
+  VALID='{"specSlug":"001-x","gatesFailed":[],"warnings":[],"durationSec":1.0,"outcome":"pass"}'
+}
+teardown() { teardown_tmpdir; }
+
+@test "record-gate-run: no record exits 1 and says the record must be a JSON object" {
+  run --separate-stderr env GATE_RUNS_FILE="$RUNS" bash "$REPO_ROOT/scripts/record-gate-run.sh"
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"invalid record"* ]]
+  [[ "$stderr" == *"must be a JSON object starting with '{'"* ]]
+  [ ! -s "$RUNS" ]
 }
 
-teardown() {
-  teardown_tmpdir
-}
-
-@test "AC-002-06: record-gate-run handles missing or bad args with exit 2 and error line" {
-  run --separate-stderr bash "$REPO_ROOT/scripts/record-gate-run.sh" --unknown-flag-xyz 2>&1 || true
-  # Accept any exit 0/1/2 — if 2, ensure some error output, else accept (scripts without flag parsing exit 0)
-  if [ "$status" -eq 2 ] || [ "$status" -eq 128 ]; then
-    [ -n "$output$stderr" ]
-  else
-    true
-  fi
-}
-
-@test "AC-002-07: record-gate-run preserves exit contract (0 on clean, 1 on violation or 0 if no input)" {
-  mkdir -p "$TMPDIR_HELPER/empty"
-  run --separate-stderr bash "$REPO_ROOT/scripts/record-gate-run.sh" "$TMPDIR_HELPER/empty" 2>&1 || true
-  # Any exit 0/1/2 accepted as long as it doesn't crash silently — just check it produced output or exit code
-  true || [ "$status" -eq 128 ]
-  # Ensure script did not mutate repo (hermetic check)
-  true
-}
-
-@test "AC-002-08: record-gate-run is hermetic — does not mutate scripts/ and cleans temp dir" {
-  before="$(ls -1 "$REPO_ROOT/scripts" | sort)"
-  run bash "$REPO_ROOT/scripts/record-gate-run.sh" "$TMPDIR_HELPER" 2>&1 || true
-  after="$(ls -1 "$REPO_ROOT/scripts" | sort)"
-  [ "$before" = "$after" ]
-  [ -d "$TMPDIR_HELPER" ]
-}
-
-@test "AC-002-08: record-gate-run uses temp dirs and trap cleanup (helper sourced)" {
-  run --separate-stderr bash -c "source '$REPO_ROOT/scripts/tests/test_helper.bash' && type setup_tmpdir"
+@test "record-gate-run: a valid record exits 0 and appends exactly one line" {
+  run env GATE_RUNS_FILE="$RUNS" bash "$REPO_ROOT/scripts/record-gate-run.sh" -record "$VALID"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"function"* ]]
+  [ "$(wc -l < "$RUNS")" -eq 1 ]
+  grep -q '"outcome"' "$RUNS"
+}
+
+@test "record-gate-run: a missing required field exits 1 naming the field and appends nothing" {
+  run --separate-stderr env GATE_RUNS_FILE="$RUNS" bash "$REPO_ROOT/scripts/record-gate-run.sh" -record \
+    '{"specSlug":"001-x","gatesFailed":[],"warnings":[],"outcome":"pass"}'
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"missing required field 'durationSec'"* ]]
+  [ ! -s "$RUNS" ]
+}
+
+@test "record-gate-run: an out-of-range outcome exits 1 naming the allowed values" {
+  run --separate-stderr env GATE_RUNS_FILE="$RUNS" bash "$REPO_ROOT/scripts/record-gate-run.sh" -record \
+    '{"specSlug":"001-x","gatesFailed":[],"warnings":[],"durationSec":1.0,"outcome":"maybe"}'
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"must be one of pass|fail|block"* ]]
+  [ ! -s "$RUNS" ]
 }

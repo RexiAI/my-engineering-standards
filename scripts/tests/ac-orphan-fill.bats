@@ -8,9 +8,9 @@ bats_require_minimum_version 1.5.0
 @test "AC-004-04: mvn wiring documented and CI template references it" {
   run grep -R "mvn test" "$REPO_ROOT/ci/templates/java-feature" 2>&1
   [[ "$output" == *"mvn"* ]]
-  run grep -R "child-ci-java" "$REPO_ROOT/ci/templates" 2>&1 || true
-  # CI template child-ci-java.yml already invokes mvn test (no new file needed)
   [ -f "$REPO_ROOT/ci/templates/child-ci-java.yml" ]
+  run grep -R "child-ci-java" "$REPO_ROOT/ci/templates"
+  [ "$status" -eq 0 ]
 }
 
 @test "AC-005-04: internal layout follows Go standards" {

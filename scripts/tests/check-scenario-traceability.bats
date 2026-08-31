@@ -68,7 +68,7 @@ trace_id() { printf 'AC-%03d-%02d' "$1" "$2"; }
   chmod 755 "$TMPDIR_HELPER/bad-src"
 }
 
-@test "AC-002-06: unreadable specs dir yields exit 2 or handled" {
+@test "check-scenario-traceability: an unreadable specs dir is a tooling failure" {
   mkdir -p "$TMPDIR_HELPER/unreadable/specs" "$TMPDIR_HELPER/unreadable/src"
   chmod 000 "$TMPDIR_HELPER/unreadable/specs"
   run --separate-stderr bash "$REPO_ROOT/scripts/check-scenario-traceability.sh" "$TMPDIR_HELPER/unreadable/specs" "$TMPDIR_HELPER/unreadable/src"
@@ -86,8 +86,10 @@ trace_id() { printf 'AC-%03d-%02d' "$1" "$2"; }
   before="$(ls -1 "$REPO_ROOT/scripts" | sort)"
   mkdir -p "$TMPDIR_HELPER/specs/001-foo/20-acceptance" "$TMPDIR_HELPER/src"
   printf '## %s — hermetic\n' "$hid" > "$TMPDIR_HELPER/specs/001-foo/20-acceptance/a.md"
-  printf 'Test%s\n' "$(printf '%s' "$hid" | tr '-' '_')" > "$TMPDIR_HELPER/src/t.go"
-  run bash "$REPO_ROOT/scripts/check-scenario-traceability.sh" "$TMPDIR_HELPER/specs" "$TMPDIR_HELPER/src" 2>&1 || true
+  printf 'func Test%s(t *testing.T) {}\n' "$(printf '%s' "$hid" | tr '-' '_')" > "$TMPDIR_HELPER/src/t_test.go"
+  run bash "$REPO_ROOT/scripts/check-scenario-traceability.sh" "$TMPDIR_HELPER/specs" "$TMPDIR_HELPER/src"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"$hid"* ]]
   after="$(ls -1 "$REPO_ROOT/scripts" | sort)"
   [ "$before" = "$after" ]
   [ -d "$TMPDIR_HELPER" ]

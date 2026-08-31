@@ -1,47 +1,50 @@
 #!/usr/bin/env bats
-# check-no-hardcoded-secrets.bats — characterization tests for scripts/check-no-hardcoded-secrets.sh (spec 001 Track B)
-# AC-002-06 / AC-002-07 / AC-002-08 generic hermetic checks (≥3 scenarios)
+# check-no-hardcoded-secrets.bats — characterization tests for
+# scripts/check-no-hardcoded-secrets.sh
+#
+# Token literals are assembled at runtime by concatenation so this file itself
+# stays clean under the very check it exercises (same trick the script uses).
 
 load test_helper
 bats_require_minimum_version 1.5.0
 
-setup() {
-  setup_tmpdir
-}
+setup() { setup_tmpdir; }
+teardown() { teardown_tmpdir; }
 
-teardown() {
-  teardown_tmpdir
-}
-
-@test "AC-002-06: check-no-hardcoded-secrets handles missing or bad args with exit 2 and error line" {
-  run --separate-stderr bash "$REPO_ROOT/scripts/check-no-hardcoded-secrets.sh" --unknown-flag-xyz 2>&1 || true
-  # Accept any exit 0/1/2 — if 2, ensure some error output, else accept (scripts without flag parsing exit 0)
-  if [ "$status" -eq 2 ] || [ "$status" -eq 128 ]; then
-    [ -n "$output$stderr" ]
-  else
-    true
-  fi
-}
-
-@test "AC-002-07: check-no-hardcoded-secrets preserves exit contract (0 on clean, 1 on violation or 0 if no input)" {
-  mkdir -p "$TMPDIR_HELPER/empty"
-  run --separate-stderr bash "$REPO_ROOT/scripts/check-no-hardcoded-secrets.sh" "$TMPDIR_HELPER/empty" 2>&1 || true
-  # Any exit 0/1/2 accepted as long as it doesn't crash silently — just check it produced output or exit code
-  true || [ "$status" -eq 128 ]
-  # Ensure script did not mutate repo (hermetic check)
-  true
-}
-
-@test "AC-002-08: check-no-hardcoded-secrets is hermetic — does not mutate scripts/ and cleans temp dir" {
-  before="$(ls -1 "$REPO_ROOT/scripts" | sort)"
-  run bash "$REPO_ROOT/scripts/check-no-hardcoded-secrets.sh" "$TMPDIR_HELPER" 2>&1 || true
-  after="$(ls -1 "$REPO_ROOT/scripts" | sort)"
-  [ "$before" = "$after" ]
-  [ -d "$TMPDIR_HELPER" ]
-}
-
-@test "AC-002-08: check-no-hardcoded-secrets uses temp dirs and trap cleanup (helper sourced)" {
-  run --separate-stderr bash -c "source '$REPO_ROOT/scripts/tests/test_helper.bash' && type setup_tmpdir"
+@test "check-no-hardcoded-secrets: clean scratch root exits 0 with PASS line" {
+  mkdir -p "$TMPDIR_HELPER/scripts"
+  printf 'echo hello\n' > "$TMPDIR_HELPER/scripts/ok.sh"
+  run bash "$REPO_ROOT/scripts/check-no-hardcoded-secrets.sh" "$TMPDIR_HELPER"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"function"* ]]
+  [[ "$output" == *"PASS"* ]]
+  [[ "$output" == *"no hardcoded credential values"* ]]
+}
+
+@test "check-no-hardcoded-secrets: literal GitHub token prefix exits 1 and prints file:line" {
+  mkdir -p "$TMPDIR_HELPER/scripts"
+  printf 'X="%s%s"\n' 'ghp' '_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' > "$TMPDIR_HELPER/scripts/leak.sh"
+  run bash "$REPO_ROOT/scripts/check-no-hardcoded-secrets.sh" "$TMPDIR_HELPER"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"scripts/leak.sh:1"* ]]
+  [[ "$output" == *"literal token prefix"* ]]
+}
+
+@test "check-no-hardcoded-secrets: secret-style assignment with a literal value exits 1" {
+  mkdir -p "$TMPDIR_HELPER/docs"
+  printf 'API_TOKEN=abc123literal\n' > "$TMPDIR_HELPER/docs/notes.md"
+  run bash "$REPO_ROOT/scripts/check-no-hardcoded-secrets.sh" "$TMPDIR_HELPER"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"secret-style assignment"* ]]
+}
+
+@test "check-no-hardcoded-secrets: placeholder and \${VAR} values are not violations" {
+  mkdir -p "$TMPDIR_HELPER/scripts"
+  {
+    printf 'API_TOKEN=<your-token-here>\n'
+    printf 'OTHER_SECRET=${FROM_ENV}\n'
+    printf 'THIRD_KEY=PLACEHOLDER\n'
+  } > "$TMPDIR_HELPER/scripts/tpl.sh"
+  run bash "$REPO_ROOT/scripts/check-no-hardcoded-secrets.sh" "$TMPDIR_HELPER"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"PASS"* ]]
 }

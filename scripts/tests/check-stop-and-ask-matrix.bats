@@ -1,47 +1,43 @@
 #!/usr/bin/env bats
-# check-stop-and-ask-matrix.bats — characterization tests for scripts/check-stop-and-ask-matrix.sh (spec 001 Track B)
-# AC-002-06 / AC-002-07 / AC-002-08 generic hermetic checks (≥3 scenarios)
+# check-stop-and-ask-matrix.bats — characterization tests for
+# scripts/check-stop-and-ask-matrix.sh
+#
+# Deliberately fixture-driven, not run against the repo root: the script's
+# AC-009-03-03 assertion fails on any *uncommitted* working-tree change to
+# scripts/check-code-principles.sh, so a repo-root run is not deterministic
+# mid-branch. Both fixtures below are hermetic.
 
 load test_helper
 bats_require_minimum_version 1.5.0
 
-setup() {
-  setup_tmpdir
+setup() { setup_tmpdir; }
+teardown() { teardown_tmpdir; }
+
+@test "check-stop-and-ask-matrix: an empty tree cannot be checked and exits 2" {
+  run --separate-stderr bash "$REPO_ROOT/scripts/check-stop-and-ask-matrix.sh" "$TMPDIR_HELPER"
+  [ "$status" -eq 2 ]
+  [[ "$output$stderr" == *"docs/SPEC_PIPELINE.md"* ]]
 }
 
-teardown() {
-  teardown_tmpdir
+@test "check-stop-and-ask-matrix: a matrix missing the design-gate row exits 1 with FAIL AC-009" {
+  mkdir -p "$TMPDIR_HELPER/docs" "$TMPDIR_HELPER/agents" "$TMPDIR_HELPER/scripts"
+  cat > "$TMPDIR_HELPER/docs/SPEC_PIPELINE.md" <<'MD'
+## Stop-and-Ask decision matrix
+
+| Condition | Deterministic action |
+|---|---|
+| Working tree dirty | STOP and report |
+MD
+  run bash "$REPO_ROOT/scripts/check-stop-and-ask-matrix.sh" "$TMPDIR_HELPER"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"AC-009-01-01 — '## Stop-and-Ask decision matrix' heading present"* ]]
+  [[ "$output" == *"AC-009-01-02 — section must state the matrix is authoritative"* ]]
+  [[ "$output" == *"matrix row missing or altered"* ]]
+  [[ "$output" == *"Fix the code, never the threshold"* ]]
 }
 
-@test "AC-002-06: check-stop-and-ask-matrix handles missing or bad args with exit 2 and error line" {
-  run --separate-stderr bash "$REPO_ROOT/scripts/check-stop-and-ask-matrix.sh" --unknown-flag-xyz 2>&1 || true
-  # Accept any exit 0/1/2 — if 2, ensure some error output, else accept (scripts without flag parsing exit 0)
-  if [ "$status" -eq 2 ] || [ "$status" -eq 128 ]; then
-    [ -n "$output$stderr" ]
-  else
-    true
-  fi
-}
-
-@test "AC-002-07: check-stop-and-ask-matrix preserves exit contract (0 on clean, 1 on violation or 0 if no input)" {
-  mkdir -p "$TMPDIR_HELPER/empty"
-  run --separate-stderr bash "$REPO_ROOT/scripts/check-stop-and-ask-matrix.sh" "$TMPDIR_HELPER/empty" 2>&1 || true
-  # Any exit 0/1/2 accepted as long as it doesn't crash silently — just check it produced output or exit code
-  true || [ "$status" -eq 128 ]
-  # Ensure script did not mutate repo (hermetic check)
-  true
-}
-
-@test "AC-002-08: check-stop-and-ask-matrix is hermetic — does not mutate scripts/ and cleans temp dir" {
-  before="$(ls -1 "$REPO_ROOT/scripts" | sort)"
-  run bash "$REPO_ROOT/scripts/check-stop-and-ask-matrix.sh" "$TMPDIR_HELPER" 2>&1 || true
-  after="$(ls -1 "$REPO_ROOT/scripts" | sort)"
-  [ "$before" = "$after" ]
-  [ -d "$TMPDIR_HELPER" ]
-}
-
-@test "AC-002-08: check-stop-and-ask-matrix uses temp dirs and trap cleanup (helper sourced)" {
-  run --separate-stderr bash -c "source '$REPO_ROOT/scripts/tests/test_helper.bash' && type setup_tmpdir"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"function"* ]]
+@test "check-stop-and-ask-matrix: the design-gate row wording is asserted verbatim" {
+  run bash "$REPO_ROOT/scripts/check-stop-and-ask-matrix.sh" "$REPO_ROOT"
+  [[ "$output" == *"Fix the code, never the threshold"* ]]
+  [[ "$output" == *"AC-009-03-04"* ]]
 }

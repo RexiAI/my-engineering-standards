@@ -1,47 +1,44 @@
 #!/usr/bin/env bats
-# check-specs-archived.bats — characterization tests for scripts/check-specs-archived.sh (spec 001 Track B)
-# AC-002-06 / AC-002-07 / AC-002-08 generic hermetic checks (≥3 scenarios)
+# check-specs-archived.bats — characterization tests for scripts/check-specs-archived.sh
+# Contract: 0 when every finished spec (one with 30-report.md) has its
+# docs/changes/NNN-slug.md archive; 1 naming the unarchived slug.
+# Index-aware (git ls-files), so fixtures must be committed.
 
 load test_helper
 bats_require_minimum_version 1.5.0
 
 setup() {
   setup_tmpdir
+  REPO="$TMPDIR_HELPER/r"
+  mkdir -p "$REPO/specs/001-x" "$REPO/docs/changes"
+  git -C "$REPO" init -q
+  git -C "$REPO" config user.email t@e.st
+  git -C "$REPO" config user.name Test
 }
+teardown() { teardown_tmpdir; }
 
-teardown() {
-  teardown_tmpdir
-}
-
-@test "AC-002-06: check-specs-archived handles missing or bad args with exit 2 and error line" {
-  run --separate-stderr bash "$REPO_ROOT/scripts/check-specs-archived.sh" --unknown-flag-xyz 2>&1 || true
-  # Accept any exit 0/1/2 — if 2, ensure some error output, else accept (scripts without flag parsing exit 0)
-  if [ "$status" -eq 2 ] || [ "$status" -eq 128 ]; then
-    [ -n "$output$stderr" ]
-  else
-    true
-  fi
-}
-
-@test "AC-002-07: check-specs-archived preserves exit contract (0 on clean, 1 on violation or 0 if no input)" {
-  mkdir -p "$TMPDIR_HELPER/empty"
-  run --separate-stderr bash "$REPO_ROOT/scripts/check-specs-archived.sh" "$TMPDIR_HELPER/empty" 2>&1 || true
-  # Any exit 0/1/2 accepted as long as it doesn't crash silently — just check it produced output or exit code
-  true || [ "$status" -eq 128 ]
-  # Ensure script did not mutate repo (hermetic check)
-  true
-}
-
-@test "AC-002-08: check-specs-archived is hermetic — does not mutate scripts/ and cleans temp dir" {
-  before="$(ls -1 "$REPO_ROOT/scripts" | sort)"
-  run bash "$REPO_ROOT/scripts/check-specs-archived.sh" "$TMPDIR_HELPER" 2>&1 || true
-  after="$(ls -1 "$REPO_ROOT/scripts" | sort)"
-  [ "$before" = "$after" ]
-  [ -d "$TMPDIR_HELPER" ]
-}
-
-@test "AC-002-08: check-specs-archived uses temp dirs and trap cleanup (helper sourced)" {
-  run --separate-stderr bash -c "source '$REPO_ROOT/scripts/tests/test_helper.bash' && type setup_tmpdir"
+@test "check-specs-archived: no finished specs exits 0 with the all-archived line" {
+  echo x > "$REPO/README.md"; git -C "$REPO" add -A; git -C "$REPO" commit -qm i
+  run bash -c "cd '$REPO' && bash '$REPO_ROOT/scripts/check-specs-archived.sh'"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"function"* ]]
+  [[ "$output" == *"All finished specs archived."* ]]
+}
+
+@test "check-specs-archived: a finished spec with no archive exits 1 and names the missing file" {
+  echo r > "$REPO/specs/001-x/30-report.md"
+  git -C "$REPO" add -A; git -C "$REPO" commit -qm i
+  run bash -c "cd '$REPO' && bash '$REPO_ROOT/scripts/check-specs-archived.sh'"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"001-x is finished (has 30-report.md) but not archived"* ]]
+  [[ "$output" == *"docs/changes/001-x.md"* ]]
+  [[ "$output" == *"scripts/archive-spec.sh 001-x"* ]]
+}
+
+@test "check-specs-archived: a finished spec with its archive exits 0 and prints [OK]" {
+  echo r > "$REPO/specs/001-x/30-report.md"
+  echo a > "$REPO/docs/changes/001-x.md"
+  git -C "$REPO" add -A; git -C "$REPO" commit -qm i
+  run bash -c "cd '$REPO' && bash '$REPO_ROOT/scripts/check-specs-archived.sh'"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"[OK] 001-x archived -> docs/changes/001-x.md"* ]]
 }

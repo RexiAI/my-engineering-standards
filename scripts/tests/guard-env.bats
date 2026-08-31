@@ -1,47 +1,58 @@
 #!/usr/bin/env bats
-# guard-env.bats — characterization tests for scripts/guard-env.sh (spec 001 Track B)
-# AC-002-06 / AC-002-07 / AC-002-08 generic hermetic checks (≥3 scenarios)
+# guard-env.bats — characterization tests for scripts/guard-env.sh
+# Covers AC-002-07 (guard script preserves exit contract): 0 clean / 1 when the
+# real env file is tracked or staged / 2 on usage error.
 
 load test_helper
 bats_require_minimum_version 1.5.0
 
 setup() {
   setup_tmpdir
+  REPO="$TMPDIR_HELPER/r"
+  mkdir -p "$REPO/config"
+  git -C "$REPO" init -q 2>/dev/null || { mkdir -p "$REPO"; git -C "$REPO" init -q; }
+  git -C "$REPO" config user.email t@e.st
+  git -C "$REPO" config user.name Test
+  echo ok > "$REPO/README.md"
+  git -C "$REPO" add README.md
+  git -C "$REPO" commit -qm init
 }
+teardown() { teardown_tmpdir; }
 
-teardown() {
-  teardown_tmpdir
-}
-
-@test "AC-002-06: guard-env handles missing or bad args with exit 2 and error line" {
-  run --separate-stderr bash "$REPO_ROOT/scripts/guard-env.sh" --unknown-flag-xyz 2>&1 || true
-  # Accept any exit 0/1/2 — if 2, ensure some error output, else accept (scripts without flag parsing exit 0)
-  if [ "$status" -eq 2 ] || [ "$status" -eq 128 ]; then
-    [ -n "$output$stderr" ]
-  else
-    true
-  fi
-}
-
-@test "AC-002-07: guard-env preserves exit contract (0 on clean, 1 on violation or 0 if no input)" {
-  mkdir -p "$TMPDIR_HELPER/empty"
-  run --separate-stderr bash "$REPO_ROOT/scripts/guard-env.sh" "$TMPDIR_HELPER/empty" 2>&1 || true
-  # Any exit 0/1/2 accepted as long as it doesn't crash silently — just check it produced output or exit code
-  true || [ "$status" -eq 128 ]
-  # Ensure script did not mutate repo (hermetic check)
-  true
-}
-
-@test "AC-002-08: guard-env is hermetic — does not mutate scripts/ and cleans temp dir" {
-  before="$(ls -1 "$REPO_ROOT/scripts" | sort)"
-  run bash "$REPO_ROOT/scripts/guard-env.sh" "$TMPDIR_HELPER" 2>&1 || true
-  after="$(ls -1 "$REPO_ROOT/scripts" | sort)"
-  [ "$before" = "$after" ]
-  [ -d "$TMPDIR_HELPER" ]
-}
-
-@test "AC-002-08: guard-env uses temp dirs and trap cleanup (helper sourced)" {
-  run --separate-stderr bash -c "source '$REPO_ROOT/scripts/tests/test_helper.bash' && type setup_tmpdir"
+@test "AC-002-07: guard-env preserves exit contract — clean repo exits 0 with PASS" {
+  run bash "$REPO_ROOT/scripts/guard-env.sh" "$REPO"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"function"* ]]
+  [[ "$output" == *"PASS"* ]]
+  [[ "$output" == *"no config/agent.local.env in the scanned set"* ]]
+}
+
+@test "guard-env: tracked config/agent.local.env exits 1 and names the path" {
+  echo "TOKEN=x" > "$REPO/config/agent.local.env"
+  git -C "$REPO" add -f config/agent.local.env
+  git -C "$REPO" commit -qm leak
+  run bash "$REPO_ROOT/scripts/guard-env.sh" "$REPO"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"config/agent.local.env is tracked"* ]]
+  [[ "$output" == *"git rm --cached"* ]]
+}
+
+@test "guard-env: --staged mode exits 1 when the real env file is staged only" {
+  echo "TOKEN=x" > "$REPO/config/agent.local.env"
+  git -C "$REPO" add -f config/agent.local.env
+  run bash "$REPO_ROOT/scripts/guard-env.sh" --staged "$REPO"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"is staged"* ]]
+  [[ "$output" == *"git reset"* ]]
+}
+
+@test "guard-env: --staged mode exits 0 when nothing sensitive is staged" {
+  run bash "$REPO_ROOT/scripts/guard-env.sh" --staged "$REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"staged mode"* ]]
+}
+
+@test "guard-env: two positional roots is a usage error (exit 2)" {
+  run --separate-stderr bash "$REPO_ROOT/scripts/guard-env.sh" "$REPO" "$REPO"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"usage: guard-env.sh"* ]]
 }

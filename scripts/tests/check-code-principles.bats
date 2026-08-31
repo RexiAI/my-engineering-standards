@@ -163,3 +163,31 @@ JAVA
   [ "$status" -eq 0 ] || [ "$status" -eq 1 ]
   wc -l "$TMPDIR_HELPER/quick/src/X.java" | awk '{if ($1 > 30) exit 1}'
 }
+
+@test "check-code-principles: a Go 'type X interface' declaration does not abort the YAGNI scan" {
+  # Regression: the Go YAGNI branch extracted the interface name with Java's
+  # `interface X` pattern. Go writes `type X interface {`, so grep -o matched
+  # nothing, returned 1, and aborted the whole gate under `set -euo pipefail` —
+  # truncating the run with no summary line. The gate must complete.
+  mkdir -p "$TMPDIR_HELPER/goif/store"
+  printf 'package store\n\ntype FeatureStore interface {\n\tGet(id string) (string, error)\n}\n' \
+    > "$TMPDIR_HELPER/goif/store/feature_store.go"
+  printf 'package store\n\nfunc Use(s FeatureStore) error { _, err := s.Get("x"); return err }\n' \
+    > "$TMPDIR_HELPER/goif/store/use.go"
+  run bash "$REPO_ROOT/scripts/check-code-principles.sh" "$TMPDIR_HELPER/goif"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Design-principles check:"* ]]
+  [[ "$output" == *"FAIL(s)"* ]]
+}
+
+@test "check-code-principles: ci/ is analyzed, not pruned from discovery" {
+  # Regression: `-o -name ci` was added to FIND_PRUNE, silently excluding every
+  # child-repo CI template from the design gate. Discovery must reach ci/.
+  run grep -n 'FIND_PRUNE=' "$REPO_ROOT/scripts/check-code-principles.sh"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"-name ci "* ]]
+  [[ "$output" != *"-name ci)"* ]]
+  run bash "$REPO_ROOT/scripts/check-code-principles.sh" "$REPO_ROOT/ci"
+  [[ "$output" != *"No Java, Go, or JS/TS source files found"* ]]
+  [[ "$output" == *"Checking design principles in:"* ]]
+}

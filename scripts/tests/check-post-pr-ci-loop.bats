@@ -1,47 +1,30 @@
 #!/usr/bin/env bats
-# check-post-pr-ci-loop.bats — characterization tests for scripts/check-post-pr-ci-loop.sh (spec 001 Track B)
-# AC-002-06 / AC-002-07 / AC-002-08 generic hermetic checks (≥3 scenarios)
+# check-post-pr-ci-loop.bats — characterization tests for scripts/check-post-pr-ci-loop.sh
+# Contract: 0 when every assertion holds; 1 with a `FAIL <scenario-id>` line per
+# failed assertion; 2 when the source tree cannot be read at all.
 
 load test_helper
 bats_require_minimum_version 1.5.0
 
-setup() {
-  setup_tmpdir
-}
+setup() { setup_tmpdir; }
+teardown() { teardown_tmpdir; }
 
-teardown() {
-  teardown_tmpdir
-}
-
-@test "AC-002-06: check-post-pr-ci-loop handles missing or bad args with exit 2 and error line" {
-  run --separate-stderr bash "$REPO_ROOT/scripts/check-post-pr-ci-loop.sh" --unknown-flag-xyz 2>&1 || true
-  # Accept any exit 0/1/2 — if 2, ensure some error output, else accept (scripts without flag parsing exit 0)
-  if [ "$status" -eq 2 ] || [ "$status" -eq 128 ]; then
-    [ -n "$output$stderr" ]
-  else
-    true
-  fi
-}
-
-@test "AC-002-07: check-post-pr-ci-loop preserves exit contract (0 on clean, 1 on violation or 0 if no input)" {
-  mkdir -p "$TMPDIR_HELPER/empty"
-  run --separate-stderr bash "$REPO_ROOT/scripts/check-post-pr-ci-loop.sh" "$TMPDIR_HELPER/empty" 2>&1 || true
-  # Any exit 0/1/2 accepted as long as it doesn't crash silently — just check it produced output or exit code
-  true || [ "$status" -eq 128 ]
-  # Ensure script did not mutate repo (hermetic check)
-  true
-}
-
-@test "AC-002-08: check-post-pr-ci-loop is hermetic — does not mutate scripts/ and cleans temp dir" {
-  before="$(ls -1 "$REPO_ROOT/scripts" | sort)"
-  run bash "$REPO_ROOT/scripts/check-post-pr-ci-loop.sh" "$TMPDIR_HELPER" 2>&1 || true
-  after="$(ls -1 "$REPO_ROOT/scripts" | sort)"
-  [ "$before" = "$after" ]
-  [ -d "$TMPDIR_HELPER" ]
-}
-
-@test "AC-002-08: check-post-pr-ci-loop uses temp dirs and trap cleanup (helper sourced)" {
-  run --separate-stderr bash -c "source '$REPO_ROOT/scripts/tests/test_helper.bash' && type setup_tmpdir"
+@test "check-post-pr-ci-loop: real repo satisfies every assertion and exits 0" {
+  run bash "$REPO_ROOT/scripts/check-post-pr-ci-loop.sh" "$REPO_ROOT"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"function"* ]]
+  [[ "$output" == *"Post-PR CI loop check: all assertions hold."* ]]
+}
+
+@test "check-post-pr-ci-loop: an empty tree cannot be checked and exits 2" {
+  run --separate-stderr bash "$REPO_ROOT/scripts/check-post-pr-ci-loop.sh" "$TMPDIR_HELPER"
+  [ "$status" -eq 2 ]
+  [[ "$output$stderr" == *"docs/SPEC_PIPELINE.md"* ]]
+}
+
+@test "check-post-pr-ci-loop: a tree with a gutted SPEC_PIPELINE.md exits non-zero with FAIL lines" {
+  mkdir -p "$TMPDIR_HELPER/docs"
+  printf '# Spec pipeline\n\nnothing here\n' > "$TMPDIR_HELPER/docs/SPEC_PIPELINE.md"
+  run bash "$REPO_ROOT/scripts/check-post-pr-ci-loop.sh" "$TMPDIR_HELPER"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"FAIL"* ]]
 }

@@ -29,7 +29,7 @@ teardown() {
   [[ "$output" == *"SAGA_DETECTED=true"* ]]
 }
 
-@test "AC-002-01: detect-saga-outbox detects sagaStep pattern" {
+@test "detect-saga-outbox: sagaStep() in a JS/TS file sets SAGA_DETECTED=true" {
   local repo="$TMPDIR_HELPER/repo2"
   mkdir -p "$repo"
   git -C "$repo" init -q
@@ -59,7 +59,7 @@ teardown() {
   [[ "$output" == *"OUTBOX_DETECTED=false"* ]]
 }
 
-@test "AC-002-08: detect-saga-outbox is hermetic and cleans temp dir" {
+@test "detect-saga-outbox: run is hermetic — leaves scripts/ untouched" {
   before="$(ls -1 "$REPO_ROOT/scripts" | sort)"
   local repo="$TMPDIR_HELPER/hermetic"
   mkdir -p "$repo"
@@ -69,7 +69,9 @@ teardown() {
   touch "$repo/empty.txt"
   git -C "$repo" add .
   git -C "$repo" commit -qm "init" --allow-empty 2>&1 || true
-  run bash -c "cd '$repo' && bash '$REPO_ROOT/scripts/detect-saga-outbox.sh'" 2>&1 || true
+  run bash -c "cd '$repo' && bash '$REPO_ROOT/scripts/detect-saga-outbox.sh'"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"SAGA_DETECTED="* ]]
   after="$(ls -1 "$REPO_ROOT/scripts" | sort)"
   [ "$before" = "$after" ]
   [ -d "$TMPDIR_HELPER" ]

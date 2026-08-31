@@ -1,47 +1,37 @@
 #!/usr/bin/env bats
-# check-audit-trail.bats — characterization tests for scripts/check-audit-trail.sh (spec 001 Track B)
-# AC-002-06 / AC-002-07 / AC-002-08 generic hermetic checks (≥3 scenarios)
+# check-audit-trail.bats — characterization tests for scripts/check-audit-trail.sh
+# Contract: 0 when the spec folder + verifier evidence are complete (or absent);
+# 1 on a missing/empty artifact or incomplete evidence; 2 on a usage error.
 
 load test_helper
 bats_require_minimum_version 1.5.0
 
-setup() {
-  setup_tmpdir
+setup() { setup_tmpdir; }
+teardown() { teardown_tmpdir; }
+
+@test "check-audit-trail: no slug exits 2 and prints the usage block" {
+  run --separate-stderr bash "$REPO_ROOT/scripts/check-audit-trail.sh"
+  [ "$status" -eq 2 ]
+  [[ "$output$stderr" == *"Usage:"* ]]
+  [[ "$output$stderr" == *"check-audit-trail.sh <slug>"* ]]
 }
 
-teardown() {
-  teardown_tmpdir
-}
-
-@test "AC-002-06: check-audit-trail handles missing or bad args with exit 2 and error line" {
-  run --separate-stderr bash "$REPO_ROOT/scripts/check-audit-trail.sh" --unknown-flag-xyz 2>&1 || true
-  # Accept any exit 0/1/2 — if 2, ensure some error output, else accept (scripts without flag parsing exit 0)
-  if [ "$status" -eq 2 ] || [ "$status" -eq 128 ]; then
-    [ -n "$output$stderr" ]
-  else
-    true
-  fi
-}
-
-@test "AC-002-07: check-audit-trail preserves exit contract (0 on clean, 1 on violation or 0 if no input)" {
-  mkdir -p "$TMPDIR_HELPER/empty"
-  run --separate-stderr bash "$REPO_ROOT/scripts/check-audit-trail.sh" "$TMPDIR_HELPER/empty" 2>&1 || true
-  # Any exit 0/1/2 accepted as long as it doesn't crash silently — just check it produced output or exit code
-  true || [ "$status" -eq 128 ]
-  # Ensure script did not mutate repo (hermetic check)
-  true
-}
-
-@test "AC-002-08: check-audit-trail is hermetic — does not mutate scripts/ and cleans temp dir" {
-  before="$(ls -1 "$REPO_ROOT/scripts" | sort)"
-  run bash "$REPO_ROOT/scripts/check-audit-trail.sh" "$TMPDIR_HELPER" 2>&1 || true
-  after="$(ls -1 "$REPO_ROOT/scripts" | sort)"
-  [ "$before" = "$after" ]
-  [ -d "$TMPDIR_HELPER" ]
-}
-
-@test "AC-002-08: check-audit-trail uses temp dirs and trap cleanup (helper sourced)" {
-  run --separate-stderr bash -c "source '$REPO_ROOT/scripts/tests/test_helper.bash' && type setup_tmpdir"
+@test "check-audit-trail: an absent spec folder is 'nothing to check' and exits 0" {
+  run bash "$REPO_ROOT/scripts/check-audit-trail.sh" 999-absent "$TMPDIR_HELPER"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"function"* ]]
+  [[ "$output" == *"Nothing to check"* ]]
+}
+
+@test "check-audit-trail: a spec folder missing 25-verification.md exits 1" {
+  mkdir -p "$TMPDIR_HELPER/001-x"
+  printf '# tasks\n' > "$TMPDIR_HELPER/001-x/10-tasks.md"
+  run bash "$REPO_ROOT/scripts/check-audit-trail.sh" 001-x "$TMPDIR_HELPER"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"25-verification.md"* ]]
+}
+
+@test "check-audit-trail: --selftest exercises every negative case and exits 0" {
+  run bash "$REPO_ROOT/scripts/check-audit-trail.sh" --selftest
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Selftest: every audit-trail scenario exercised and passing"* ]]
 }

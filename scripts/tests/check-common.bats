@@ -1,47 +1,41 @@
 #!/usr/bin/env bats
-# check-common.bats — characterization tests for scripts/check-common.sh (spec 001 Track B)
-# AC-002-06 / AC-002-07 / AC-002-08 generic hermetic checks (≥3 scenarios)
+# check-common.bats — characterization tests for scripts/check-common.sh
+# Sourced-only library: json_escape, require_tools (exit 2 on a missing tool),
+# finish_clean (exit 0 "nothing to check").
 
 load test_helper
 bats_require_minimum_version 1.5.0
 
-setup() {
-  setup_tmpdir
-}
+setup() { setup_tmpdir; }
+teardown() { teardown_tmpdir; }
 
-teardown() {
-  teardown_tmpdir
-}
-
-@test "AC-002-06: check-common handles missing or bad args with exit 2 and error line" {
-  run --separate-stderr bash "$REPO_ROOT/scripts/check-common.sh" --unknown-flag-xyz 2>&1 || true
-  # Accept any exit 0/1/2 — if 2, ensure some error output, else accept (scripts without flag parsing exit 0)
-  if [ "$status" -eq 2 ] || [ "$status" -eq 128 ]; then
-    [ -n "$output$stderr" ]
-  else
-    true
-  fi
-}
-
-@test "AC-002-07: check-common preserves exit contract (0 on clean, 1 on violation or 0 if no input)" {
-  mkdir -p "$TMPDIR_HELPER/empty"
-  run --separate-stderr bash "$REPO_ROOT/scripts/check-common.sh" "$TMPDIR_HELPER/empty" 2>&1 || true
-  # Any exit 0/1/2 accepted as long as it doesn't crash silently — just check it produced output or exit code
-  true || [ "$status" -eq 128 ]
-  # Ensure script did not mutate repo (hermetic check)
-  true
-}
-
-@test "AC-002-08: check-common is hermetic — does not mutate scripts/ and cleans temp dir" {
-  before="$(ls -1 "$REPO_ROOT/scripts" | sort)"
-  run bash "$REPO_ROOT/scripts/check-common.sh" "$TMPDIR_HELPER" 2>&1 || true
-  after="$(ls -1 "$REPO_ROOT/scripts" | sort)"
-  [ "$before" = "$after" ]
-  [ -d "$TMPDIR_HELPER" ]
-}
-
-@test "AC-002-08: check-common uses temp dirs and trap cleanup (helper sourced)" {
-  run --separate-stderr bash -c "source '$REPO_ROOT/scripts/tests/test_helper.bash' && type setup_tmpdir"
+@test "check-common: json_escape escapes backslash, quote, tab and newline" {
+  run bash -c "source '$REPO_ROOT/scripts/gate-report-lib.sh'; source '$REPO_ROOT/scripts/check-common.sh'; json_escape 'a\"b\\c'"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"function"* ]]
+  [ "$output" = 'a\"b\\c' ]
+}
+
+@test "check-common: require_tools exits 2 with an ERROR line when a tool is absent" {
+  run --separate-stderr bash -c "set -euo pipefail; source '$REPO_ROOT/scripts/check-common.sh'; require_tools 'demo' definitely-not-a-real-tool-xyz"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"required tool 'definitely-not-a-real-tool-xyz' not found"* ]]
+  [[ "$stderr" == *"cannot perform the demo check"* ]]
+}
+
+@test "check-common: require_tools returns without exiting when every tool is present" {
+  run bash -c "set -euo pipefail; source '$REPO_ROOT/scripts/check-common.sh'; require_tools 'demo' bash grep; echo REACHED"
+  [ "$status" -eq 0 ]
+  [ "$output" = "REACHED" ]
+}
+
+@test "check-common: finish_clean prints the human line and exits 0 when JSON is false" {
+  run bash -c "set -euo pipefail; source '$REPO_ROOT/scripts/check-common.sh'; JSON=false; finish_clean 'nothing to check here'; echo UNREACHED"
+  [ "$status" -eq 0 ]
+  [ "$output" = "nothing to check here" ]
+}
+
+@test "check-common: json_escape is not redefined when gate-report-lib already defined it" {
+  run bash -c "source '$REPO_ROOT/scripts/gate-report-lib.sh'; before=\$(declare -f json_escape); source '$REPO_ROOT/scripts/check-common.sh'; after=\$(declare -f json_escape); [ \"\$before\" = \"\$after\" ] && echo SAME"
+  [ "$status" -eq 0 ]
+  [ "$output" = "SAME" ]
 }

@@ -1,47 +1,39 @@
 #!/usr/bin/env bats
-# model-env.vars.bats — characterization tests for scripts/model-env.vars.sh (spec 001 Track B)
-# AC-002-06 / AC-002-07 / AC-002-08 generic hermetic checks (≥3 scenarios)
+# model-env.vars.bats — characterization tests for scripts/model-env.vars.sh
+# Sourced-only roster: MODEL_ENV_VARS / MODEL_ENV_AGENTS must stay the same
+# length and order; model_env_var_for_agent maps agent -> var, "" otherwise.
 
 load test_helper
 bats_require_minimum_version 1.5.0
 
-setup() {
-  setup_tmpdir
-}
+SRC() { printf "source '%s/scripts/model-env.vars.sh'" "$REPO_ROOT"; }
 
-teardown() {
-  teardown_tmpdir
-}
-
-@test "AC-002-06: model-env.vars handles missing or bad args with exit 2 and error line" {
-  run --separate-stderr bash "$REPO_ROOT/scripts/model-env.vars.sh" --unknown-flag-xyz 2>&1 || true
-  # Accept any exit 0/1/2 — if 2, ensure some error output, else accept (scripts without flag parsing exit 0)
-  if [ "$status" -eq 2 ] || [ "$status" -eq 128 ]; then
-    [ -n "$output$stderr" ]
-  else
-    true
-  fi
-}
-
-@test "AC-002-07: model-env.vars preserves exit contract (0 on clean, 1 on violation or 0 if no input)" {
-  mkdir -p "$TMPDIR_HELPER/empty"
-  run --separate-stderr bash "$REPO_ROOT/scripts/model-env.vars.sh" "$TMPDIR_HELPER/empty" 2>&1 || true
-  # Any exit 0/1/2 accepted as long as it doesn't crash silently — just check it produced output or exit code
-  true || [ "$status" -eq 128 ]
-  # Ensure script did not mutate repo (hermetic check)
-  true
-}
-
-@test "AC-002-08: model-env.vars is hermetic — does not mutate scripts/ and cleans temp dir" {
-  before="$(ls -1 "$REPO_ROOT/scripts" | sort)"
-  run bash "$REPO_ROOT/scripts/model-env.vars.sh" "$TMPDIR_HELPER" 2>&1 || true
-  after="$(ls -1 "$REPO_ROOT/scripts" | sort)"
-  [ "$before" = "$after" ]
-  [ -d "$TMPDIR_HELPER" ]
-}
-
-@test "AC-002-08: model-env.vars uses temp dirs and trap cleanup (helper sourced)" {
-  run --separate-stderr bash -c "source '$REPO_ROOT/scripts/tests/test_helper.bash' && type setup_tmpdir"
+@test "model-env.vars: the var roster and the agent roster are the same length" {
+  run bash -c "$(SRC); [ \${#MODEL_ENV_VARS[@]} -eq \${#MODEL_ENV_AGENTS[@]} ] && echo \${#MODEL_ENV_VARS[@]}"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"function"* ]]
+  [ "$output" -ge 9 ]
+}
+
+@test "model-env.vars: every agent in the roster maps to its own SPEC_*_MODEL var, in order" {
+  run bash -c "$(SRC); for i in \"\${!MODEL_ENV_AGENTS[@]}\"; do [ \"\$(model_env_var_for_agent \"\${MODEL_ENV_AGENTS[\$i]}\")\" = \"\${MODEL_ENV_VARS[\$i]}\" ] || { echo \"MISMATCH \${MODEL_ENV_AGENTS[\$i]}\"; exit 1; }; done; echo ALIGNED"
+  [ "$status" -eq 0 ]
+  [ "$output" = "ALIGNED" ]
+}
+
+@test "model-env.vars: an unknown agent maps to the empty string" {
+  run bash -c "$(SRC); printf '[%s]' \"\$(model_env_var_for_agent not-a-spec-agent)\""
+  [ "$status" -eq 0 ]
+  [ "$output" = "[]" ]
+}
+
+@test "model-env.vars: spec-coder maps to SPEC_CODER_MODEL" {
+  run bash -c "$(SRC); model_env_var_for_agent spec-coder"
+  [ "$status" -eq 0 ]
+  [ "$output" = "SPEC_CODER_MODEL" ]
+}
+
+@test "model-env.vars: every plus-tier agent is also a member of the agent roster" {
+  run bash -c "$(SRC); for a in \"\${MODEL_ENV_PLUS_AGENTS[@]}\"; do printf '%s\n' \"\${MODEL_ENV_AGENTS[@]}\" | grep -qx \"\$a\" || { echo \"ORPHAN \$a\"; exit 1; }; done; echo ALL_KNOWN"
+  [ "$status" -eq 0 ]
+  [ "$output" = "ALL_KNOWN" ]
 }
