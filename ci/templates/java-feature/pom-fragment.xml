@@ -1,0 +1,57 @@
+<!-- pom-fragment.xml — copy into your pom.xml <dependencies> and <build> blocks.
+     Target: Java 17+, JUnit 5 + Mockito + AssertJ + jqwik, PMD ≤6, PiTest 80.
+     Usage: mvn test -Pservice (unit+acceptance), mvn verify -Pmutation (mutation, production tier)
+-->
+<dependencies>
+  <!-- Testing: JUnit 5 (Jupiter) — required -->
+  <dependency>
+    <groupId>org.junit.jupiter</groupId>
+    <artifactId>junit-jupiter</artifactId>
+    <version>5.11.0</version>
+    <scope>test</scope>
+  </dependency>
+  <dependency>
+    <groupId>org.mockito</groupId>
+    <artifactId>mockito-core</artifactId>
+    <version>5.11.0</version>
+    <scope>test</scope>
+  </dependency>
+  <dependency>
+    <groupId>org.mockito</groupId>
+    <artifactId>mockito-junit-jupiter</artifactId>
+    <version>5.11.0</version>
+    <scope>test</scope>
+  </dependency>
+  <dependency>
+    <groupId>org.assertj</groupId>
+    <artifactId>assertj-core</artifactId>
+    <version>3.26.3</version>
+    <scope>test</scope>
+  </dependency>
+  <!-- Property testing: jqwik (production tier, see docs/CONFORMANCE_TIERS.md) -->
+  <dependency>
+    <groupId>net.jqwik</groupId>
+    <artifactId>jqwik</artifactId>
+    <version>1.8.4</version>
+    <scope>test</scope>
+  </dependency>
+</dependencies>
+
+<build>
+  <plugins>
+    <!-- PMD complexity gate: CyclomaticComplexity ≤6, CognitiveComplexity ≤6 (docs/CODING_CONVENTIONS.md) -->
+    <plugin>
+      <groupId>org.apache.maven.plugins</groupId>
+      <artifactId>maven-pmd-plugin</artifactId>
+      <version>3.22.0</version>
+      <configuration>
+        <rulesets>
+          <ruleset>ci/templates/java-feature/pmd-rules.xml</ruleset>
+        </rulesets>
+      </configuration>
+    </plugin>
+  </plugins>
+</build>
+
+<!-- Mutation: include pitest profile (threshold 80, see ci/templates/pitest-profile.xml) -->
+<!-- Add to <profiles>: <profile> from ci/templates/pitest-profile.xml (mutationThreshold 80) -->
