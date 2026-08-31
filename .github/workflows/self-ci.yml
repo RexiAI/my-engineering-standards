@@ -79,6 +79,15 @@ jobs:
       - name: Check design-gate blame scoping (scratch repos)
         run: bash scripts/tests/check-code-principles-blame.sh
 
+      # Gate consistency (verifiable single source of truth): the valid gate
+      # list is defined once in scripts/check-code-principles.sh; the blame
+      # test's expected error message and docs must match it. This check
+      # would have caught the component-per-file addition that left the
+      # hardcoded "complexity, dry, yagni, solid, property-tests" expectation
+      # stale (PR #59 first push, 1/24 blame tests red).
+      - name: Check gate list consistency
+        run: bash scripts/check-gate-consistency.sh
+
       - name: Check orchestration references
         run: ./scripts/check-orchestration.sh
 

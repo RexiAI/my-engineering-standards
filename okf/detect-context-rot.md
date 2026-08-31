@@ -2,7 +2,7 @@
 type: runbook
 title: Detect Context Rot
 description: How to detect when LLM context has degraded and recover it
-tags: [context, maintenance, rot, caveman-stats, headroom]
+tags: [context, maintenance, rot, token-audit, headroom]
 timestamp: 2026-07-11T00:00:00Z
 related:
   - context-window-policy.md
@@ -17,7 +17,8 @@ Context rot is the gradual degradation of AI output quality as the conversation 
 
 ### Automatic Triggers
 
-Run `/caveman-stats` every 20-30 messages. Signs of rot:
+Check session token usage every 20-30 messages (via your harness's usage
+display — no stats command ships with these docs). Signs of rot:
 
 | Metric | Healthy | Rotting | Critical |
 |--------|---------|---------|----------|
@@ -47,10 +48,8 @@ headroom_compress "$(cat /tmp/last-output-2.log)"
 
 ### Step 2: Verify compression ratio
 
-```bash
-/caveman-stats
-# Target: >50% compression ratio
-```
+Read the session token/compression readout from your harness (no dedicated
+command ships here). Target: >50% compression ratio.
 
 ### Step 3: Strip stale artifacts
 
@@ -80,7 +79,7 @@ Record the rot event in `log.md` so patterns emerge:
 
 ## Prevention Checklist (Pre-Session)
 
-- [ ] Started with `/caveman-stats` baseline?
+- [ ] Session token baseline checked and visible?
 - [ ] Configured `rtk` prefix loaded in AGENTS.md?
 - [ ] Headroom hook active for auto-compression?
 - [ ] Token ceiling (50k) known and visible?

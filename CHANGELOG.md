@@ -1,3 +1,24 @@
+## [1.29.2](https://github.com/RexiAI/my-engineering-standards/compare/v1.29.1...v1.29.2) (2026-08-30)
+
+
+### Bug Fixes
+
+* **ci,docs:** clean code — TS/HTML/CSS standards + CI parallel jobs (no skip on fail) ([#59](https://github.com/RexiAI/my-engineering-standards/issues/59)) ([be0a4a3](https://github.com/RexiAI/my-engineering-standards/commit/be0a4a391a54a9ff68d886df852dbd17ce673cc6))
+
+## [1.29.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.29.0...v1.29.1) (2026-08-25)
+
+
+### Bug Fixes
+
+* **ci-react:** stop masking test failures; wire hooks + strict TS into children ([#58](https://github.com/RexiAI/my-engineering-standards/issues/58)) ([b3410b1](https://github.com/RexiAI/my-engineering-standards/commit/b3410b1ed205dba541e90da1632e210b057d137d))
+
+# [1.29.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.28.0...v1.29.0) (2026-08-25)
+
+
+### Features
+
+* **pr-review:** make model configurable via env vars, register x-preview-f-free ([#55](https://github.com/RexiAI/my-engineering-standards/issues/55)) ([6b4c8cb](https://github.com/RexiAI/my-engineering-standards/commit/6b4c8cb079492ae7f60739171b488d2a28e73892))
+
 # [1.28.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.27.4...v1.28.0) (2026-08-24)
 
 

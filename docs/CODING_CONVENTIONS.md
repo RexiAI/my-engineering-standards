@@ -18,7 +18,8 @@
 ## File Organization
 
 - **One class per file** (Java).
-- **One component per directory** with barrel export `index.js` (JS/TS).
+- **One React component per file** (TSX/JSX: ≤1 exported component; hooks/helpers co-located only if <20 lines and used by that single component) — barrel `index.ts` re-exports. **BookingWidget 14-in-1 (390 lines, 14 components in one file) is the anti-pattern.** `scripts/check-code-principles.sh` gate `component-per-file` enforces this (FAIL if >2 exported components, WARN if >1; FAIL if >4 exported functions in `.tsx`).
+- **One component per directory** with barrel export `index.js` / `index.ts` (JS/TS) — the directory holds the single component file plus its co-located style module / test / stories. **Web:** `Component.module.css`; **React Native (Expo):** follow the official Expo folder-structure guidance — one component per file still applies, and styles live in `StyleSheet.create` either colocated at the bottom of the component file (the modern Expo/React Native default — see `expo.dev/blog/expo-app-folder-structure-best-practices` §Colocate your styles and `reactnative.dev/docs/stylesheet` Code quality tips) or extracted to a sibling `styles.ts` / `Component.styles.ts` when the style block grows. Both are valid; flat `components/chat/` with 7 components in one directory and bottom-of-file `StyleSheet.create` in every file without per-component directories is not.
 - **Shared code** goes in `common_*` packages (Go) or `shared/` (JS).
 - **Test files** mirror the source package structure.
 
@@ -74,7 +75,7 @@ defect; a WARN is a review hint to verify before merging.
 ### Base rules
 
 - **Prefer composition over inheritance.** Use interfaces and delegation instead of abstract base classes. For tests, use plain `@BeforeEach` + helper methods instead of `AbstractBaseTestSuite` base classes.
-- **Keep things small.** Classes under 200 lines, methods under 20 lines, files under 500 lines. Split by responsibility, not by arbitrary size limits.
+- **Keep things small.** Classes under 200 lines, methods under 20 lines, files under 500 lines. Split by responsibility, not by arbitrary size limits. For TSX/JSX, `scripts/check-code-principles.sh` `component-per-file` gate enforces tighter bounds: **FAIL if >2 exported components per file (WARN if >1), FAIL if >4 total exported functions in `.tsx`, and FAIL if >300 lines or >8 components (god-file)** — BookingWidget 14-in-1 is the canonical violation.
 - **Cyclomatic complexity ≤6 per method/function.** Enforced via PMD `CyclomaticComplexity`/`CognitiveComplexity` (Java), golangci `cyclop`/`gocognit` (Go), ESLint `complexity` (JS/TS) — see `language-specific/<lang>/`. Extract methods, invert conditionals, or replace nested branching with early returns rather than raise the threshold. `scripts/check-code-principles.sh` applies the same threshold as a language-agnostic heuristic.
 - **Dependency rule.** Source code dependencies must point inward. Domain code never depends on infrastructure code. Controllers depend on services, services on repositories, never the reverse.
 - **Generalize, don't special-case.** One mechanism should handle all similar cases. Avoid if/else chains that check exception types — use polymorphic dispatch or Result pattern matching.
@@ -151,6 +152,46 @@ type CreateUserResult =
   - Trailing commas (es5).
   - 100-character line width.
   - 2-space indentation.
+- ESLint enforces: `prefer-const` (error), `complexity ≤6` (error), `import/order` (warn, groups: builtin → external → internal → parent → sibling → index, alphabetized), `no-explicit-any` (error — use `unknown` + narrowing), `use-unknown-in-catch-callback-variable` (error, preserve caught error cause).
+
+### TypeScript — Clean Code
+
+- **No `any`.** Use `unknown` and narrow with type guards / `zod` / `instanceof`. `any` disables the type checker — it is not a shortcut. If an external API is untyped, wrap it in a typed adapter that returns `unknown` at the boundary.
+- **`prefer-const` (error).** Never use `let` when the binding is not reassigned. ESLint `prefer-const` is enforced.
+- **Complexity ≤6 per function.** Same gate as `Base rules` — ESLint `complexity: [error, 6]`. Extract helpers, early-return, replace nested branching with lookup/polymorphism. Verifier (`spec-verifier`) re-checks this; `scripts/check-code-principles.sh` applies the same heuristic language-agnostically.
+- **Preserve caught error cause.** When re-throwing, use `throw new AppError(msg, { cause })` (ES2022 cause) or include the original error in the Result. ESLint `@typescript-eslint/use-unknown-in-catch-callback-variable` enforces `unknown` in `catch (e)` — narrow before use. Never `catch (e) { throw new Error('failed') }` that discards the stack/cause.
+- **Explicit boundaries over implicit.** Public/exported function return types should be explicit when the inferred type is non-trivial (generic, union, Promise). Internal helpers may rely on inference.
+- **Import order.** Enforced by `eslint-plugin-import` (`import/order`). Keep imports sorted and grouped; no duplicate imports (`import/no-duplicates: error`).
+- **No magic numbers / duplicated literals.** Extract shared numeric/string literals to named constants or design tokens. Duplicated 4-line blocks trigger `check-code-principles.sh` DRY gate.
+
+### HTML / TSX — Clean Code
+
+- **No inline `style` prop (`style={{...}}`).** All visual styling lives in CSS classes / CSS Modules / design-token variables. Inline objects are unordered, un-lintable, duplicated, and bypass the token system. The spec/001 fix (68 inline objects → CSS classes) is the canonical example. ESLint `react/no-inline-style` or equivalent custom rule should warn/error on `style=` in TSX. **React Native:** the equivalent rule is `StyleSheet.create` + design tokens. `reactnative.dev/docs/stylesheet` Code quality tips explicitly recommends moving styles away from the render function into `StyleSheet.create` at the bottom of the file, naming styles for reuse, and relying on static type checking — not inline `style={{...}}` objects. Allow `style={[styles.foo, { color: theme.text }]}` array merges only for dynamic theme values; literal `style={{ padding: 16 }}` remains banned. Enforce with `eslint-plugin-react-native` or `react-native/no-inline-styles` / `react-native/no-color-literals` where available.
+- **Semantic markup.** Use `<header>`, `<nav>`, `<main>`, `<section>`, `<article>`, `<aside>`, `<footer>`, `<button>`, `<a>` for their meaning — not `<div>` soup. Headings form a single ordered hierarchy (`h1` → `h2` → `h3`). **React Native:** use semantic `accessibilityRole` (`button`, `header`, `image`), `accessibilityLabel`, and `Text` hierarchy instead of HTML tags — same intent, native primitives.
+- **Accessibility (a11y).** Every interactive element is keyboard-reachable, has an accessible name (`aria-label` or visible text), images have `alt`, forms have associated `<label>`. Lint with `eslint-plugin-jsx-a11y` (`jsx-a11y/*`) at warn minimum.
+- **Tokens, not literals.** Colors, spacing, radii, shadows, font sizes/weights come from CSS variables / design tokens (`--color-*`, `--space-*`, `--radius-*`), never hard-coded hex/px scattered through TSX or CSS. **React Native:** tokens are JS objects in `theme/tokens.ts` (`spacing`, `palettes`, `typography`, `radius` — see `reactnative.dev/docs/stylesheet` Code quality tips and `expo.dev/blog/expo-app-folder-structure-best-practices` §Colocate your styles) imported as `spacing.lg`, `theme.text`, `StyleSheet.create({ padding: spacing.lg })`, not `var(--token)`. Same no-literals rule applies.
+- **Class naming.** BEM (`block__element--modifier`) or CSS Modules (`Component.module.css`) — one convention per repo, enforced at review. No global single-word classes that collide. **React Native:** StyleSheet keys are `camelCase` (`emptyWrap`, `headerRight`) local to `StyleSheet.create` / `styles.ts`, not global classes — same one-convention rule.
+
+### CSS — Clean Code
+
+> **Scope:** this section is **Web (React/Vite, Next.js)**. For React Native, see **React Native Styling** below — same principles, different primitives (`StyleSheet.create` instead of CSS files).
+
+- **Property order.** Within each rule, order groups as: **Layout** (display, position, top/right/bottom/left, z-index, flex/grid) → **Box model** (width/height, margin, padding, border, box-sizing) → **Typography** (font-*, line-height, text-*, color) → **Visual** (background, opacity, box-shadow, filter) → **Animation** (transform, transition, animation). Enforce with `stylelint-order` (`order/properties-order`) or Prettier + review. Ordered properties reduce merge conflicts and make diffs scannable.
+- **Design tokens via CSS variables.** Define tokens once in `styles/tokens.css` or `globals.css` (`:root { --color-primary: ...; --space-md: ... }`) and reference with `var(--token)`. No duplicated hex/rgba/px values across files — duplication is a DRY violation flagged by `check-code-principles.sh`.
+- **No magic numbers.** Bare `16px`, `#2563eb`, `0.5rem` outside a token definition is a review finding. Promote repeated values to a token; one-off values get a comment explaining why they are not tokenized.
+- **BEM or CSS Modules, not ad-hoc globals.** Choose one: BEM for plain CSS, CSS Modules / Tailwind utility composition for component-scoped styles. Mixing conventions in one repo requires an ADR.
+- **No dead / duplicated rules.** Identical 4-line CSS blocks across files trigger the DRY gate. Extract to a shared class or token. Remove unused selectors before merge (stylelint `no-duplicate-selectors`, `block-no-empty`).
+
+### React Native Styling — Clean Code
+
+`reactnative.dev/docs/stylesheet` and `expo.dev/blog/expo-app-folder-structure-best-practices` §Colocate your styles are the authoritative sources. Same clean-code intent as CSS above, mapped to native primitives:
+
+- **Property order.** Same Layout → Box model → Typography → Visual → Animation grouping applies **inside** `StyleSheet.create({})` objects. Enforce via review (no `stylelint-order` for `StyleSheet`; ESLint `react-native/sort-styles` or `sort-keys` can help).
+- **Design tokens via JS objects.** Define tokens once in `theme/tokens.ts` (`spacing`, `palettes`, `typography`, `radius` JS objects — dark-first palette per `reactnative.dev/docs/stylesheet` Code quality tips) and reference as `spacing.lg`, `typography.sizes.sm`, `theme.background` inside `StyleSheet.create`. No duplicated hex/rgba/px literals across files — same DRY violation as web. `check-code-principles.sh` DRY gate already flags duplicated `fontSize: typography.sizes.sm` blocks; wire token imports instead of raw literals.
+- **No magic numbers.** Bare `16`, `'#2563eb'` outside `theme/tokens.ts` is a review finding, same as web.
+- **StyleSheet keys, not BEM globals.** Choose one `camelCase` StyleSheet naming convention per repo (e.g. `emptyWrap`, `headerRight`). No global single-word keys that collide across files.
+- **No dead / duplicated StyleSheet rules.** Identical 4-line `StyleSheet.create` blocks across files trigger the same DRY gate as web — extract to a shared `theme/tokens.ts` entry or a shared `styles.ts` (e.g. `styles/common.ts`). Remove unused keys before merge.
+- **Platform-specific styles.** Small differences via `Platform.select` inside `StyleSheet.create` (see `reactnative.dev/docs/platform-specific-code` §Platform module); larger divergences via `.ios.tsx` / `.android.tsx` / `.native.tsx` file extensions (same doc §Platform-specific extensions). No `if (Platform.OS === 'ios')` branching inside render logic — encapsulate in `StyleSheet.create` or file split. Expo blog §Platform-specific code endorses the same: `bar-chart.tsx` + `bar-chart.web.tsx` pattern, props identical.
 
 ## Logging
 
@@ -237,3 +278,12 @@ Standard Go imports: stdlib first, third-party, local, blank line between groups
 
 ### JavaScript
 Organized imports: `react`/framework → libraries → local modules → styles.
+
+## CI Job Orchestration — Clean Feedback
+
+CI jobs must run in parallel and report independently. A lint failure must never hide build or test results.
+
+- **No `needs: [lint]` gating `build` or `test`.** `lint`, `unit-test`, and `build` run with no inter-dependencies (or only `needs` that are truly required, e.g. `docker` needs `build`). Each job validates independently.
+- **If gating is unavoidable, use an aggregator.** Add a final `ci-success` job with `needs: [lint, unit-test, build]` and `if: always()` that checks all results — this is the branch-protection required check, not the individual jobs.
+- **Anti-pattern (from spec/001):** `build: needs: [lint, unit-test]` causes Build to show SKIPPED on lint failure — reviewer sees no build signal. Fixed by removing the `needs` line so all three jobs post their own pass/fail.
+- **Canonical example:** `.standards/.github/workflows/ci-react.yml` — `unit-test`, `lint`, `build` have no `needs` between them; `docker` alone has `needs: [build]`.
