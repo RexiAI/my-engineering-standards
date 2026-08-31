@@ -91,6 +91,13 @@ jobs:
       - name: Check orchestration references
         run: ./scripts/check-orchestration.sh
 
+      # Vacuous-assertion gate: a bats test that would still pass with its
+      # script under test replaced by `exit 0` is theatre, not coverage.
+      # Also runs inside `make test-scripts`; named here so a failure is
+      # legible without reading the test job's log. No continue-on-error.
+      - name: Check bats assertions are not vacuous
+        run: ./scripts/check-bats-assertions.sh
+
       # Phase-2 loop mechanics gate (docs/SPEC_PIPELINE.md §Post-PR CI
       # check-and-remediate loop (phase 2), spec 014): grep-assert the post-PR
       # CI check is wired into the pipeline prompts/docs. No continue-on-error.

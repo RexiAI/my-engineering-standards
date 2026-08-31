@@ -108,6 +108,8 @@ stats:
 # --- TDD harness (spec 001) — shell track ---
 test-scripts:   # Run bats shell gate tests (Track B, spec 001)
 	@command -v bats >/dev/null 2>&1 || { echo "ERROR: bats not found on PATH — install bats-core >=1.10 (https://github.com/bats-core/bats-core)" >&2; echo "  e.g. git clone https://github.com/bats-core/bats-core.git && ./bats-core/install.sh \$$HOME/.local" >&2; exit 1; }
+	@echo "Checking bats assertions are not vacuous..."
+	@./scripts/check-bats-assertions.sh
 	@echo "Running bats tests (TAP)..."
 	@bats --tap scripts/tests/*.bats
 
