@@ -678,3 +678,5 @@ Mutation score: skipped — `mvp` tier (threshold 80 verified in `ci/templates/p
 Test results: GREEN (195/195).
 Equivalent mutants: none (no run).
 Report: `specs/001-tdd-scaffolding-both-tracks/30-report.md`
+PR:https://github.com/RexiAI/my-engineering-standards/pull/62
+commits: 9
