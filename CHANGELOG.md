@@ -1,3 +1,10 @@
+## [1.30.2](https://github.com/RexiAI/my-engineering-standards/compare/v1.30.1...v1.30.2) (2026-09-01)
+
+
+### Bug Fixes
+
+* **traceability:** resolve test IDs against archived specs ([#64](https://github.com/RexiAI/my-engineering-standards/issues/64)) ([a01506c](https://github.com/RexiAI/my-engineering-standards/commit/a01506c2470b1906f9d45870188ba8080a34f12e))
+
 ## [1.30.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.30.0...v1.30.1) (2026-09-01)
 
 
