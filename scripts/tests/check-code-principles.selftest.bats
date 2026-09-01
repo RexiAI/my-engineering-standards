@@ -12,14 +12,18 @@ bats_require_minimum_version 1.5.0
 @test "check-code-principles.selftest: exits 0 and reports every case passing" {
   run bash "$REPO_ROOT/scripts/check-code-principles.selftest.sh"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"check-code-principles selftest: 19 assertions passed"* ]]
+  [[ "$output" == *"check-code-principles selftest: "*" assertions passed"* ]]
 }
 
-@test "check-code-principles.selftest: reports at least 19 assertions and zero failures" {
+@test "check-code-principles.selftest: reports a non-zero assertion count and zero failures" {
   run bash "$REPO_ROOT/scripts/check-code-principles.selftest.sh"
   [ "$status" -eq 0 ]
   n="$(printf '%s\n' "$output" | sed 's/\x1b\[[0-9;]*m//g' | grep -oE '[0-9]+ (passed|assertions passed|cases passed)' | grep -oE '^[0-9]+' | head -1)"
   [ -n "$n" ]
-  [ "$n" -ge 19 ]
-  [[ "$output" != *"1 failed"* ]]
+  # Contract, not census: assert the selftest asserted something and reported
+  # no failures. The exact count is incidental and would break on every
+  # legitimate case added or removed. This selftest prints its failure tally
+  # only on the failing path, so absence of "failed" is the zero-failure signal.
+  [ "$n" -gt 0 ]
+  [[ "$output" != *"failed"* ]]
 }

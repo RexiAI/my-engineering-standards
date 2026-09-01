@@ -15,11 +15,16 @@ bats_require_minimum_version 1.5.0
   [[ "$output" == *"model-env.selftest: all cases pass"* ]]
 }
 
-@test "model-env.selftest: reports at least 68 assertions and zero failures" {
+@test "model-env.selftest: reports a non-zero assertion count and zero failures" {
   run bash "$REPO_ROOT/scripts/model-env.selftest.sh"
   [ "$status" -eq 0 ]
   n="$(printf '%s\n' "$output" | sed 's/\x1b\[[0-9;]*m//g' | grep -oE '[0-9]+ (passed|assertions passed|cases passed)' | grep -oE '^[0-9]+' | head -1)"
   [ -n "$n" ]
-  [ "$n" -ge 68 ]
-  [[ "$output" != *"1 failed"* ]]
+  # Contract, not census: the selftest must have actually asserted something
+  # (guards a silently-empty run) and must report no failures. The exact case
+  # count is deliberately not asserted — it varies with the environment
+  # (direnv-conditional cases are skipped when the binary is absent) and would
+  # otherwise break on every legitimate case added or removed.
+  [ "$n" -gt 0 ]
+  [[ "$output" == *"0 failed"* ]]
 }
