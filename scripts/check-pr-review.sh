@@ -178,11 +178,16 @@ echo ""
 
 # ── Task 1: agent config (AC-024-01) ─────────────────────────────────────────
 # AC-024-01-01 — Agent file exists with review-only scope
+# mode: primary, not subagent (spec 026, AC-026-02): opencode rejects
+# `--agent <name>` for a subagent-mode agent, which used to force
+# ci-pr-review.yml to strip this file's frontmatter before invoking it —
+# silently discarding the `permission` block at runtime. `primary` lets the
+# workflow invoke `--agent pr-review` directly, so the block actually loads.
 if [ -f "$AGENT" ]; then
   AGENT_FM="$(frontmatter "$AGENT")"
   AGENT_BODY="$(body "$AGENT")"
   AGENT_FIRST="$(printf '%s\n' "$AGENT_BODY" | head -6)"
-  str_contains AC-024-01-01 'agents/pr-review.md' "$AGENT_FM" 'mode: subagent'
+  str_contains AC-024-01-01 'agents/pr-review.md' "$AGENT_FM" 'mode: primary'
   str_contains AC-024-01-01 'agents/pr-review.md first directive' "$AGENT_FIRST" 'review the PR diff'
   str_contains AC-024-01-01 'agents/pr-review.md first directive' "$AGENT_FIRST" 'suggested fixes'
 else
@@ -473,8 +478,8 @@ echo ""
 
 # AC-024-03-03 — Calls the shared workflow with PR context
 if [ -f "$TRIGGER_WF" ]; then
-  verify_grep AC-024-03-03 "$TRIGGER_WF" "job calls the shared pr-review workflow@main" \
-    "RexiAI/my-engineering-standards/.github/workflows/ci-pr-review.yml@main"
+  verify_grep AC-024-03-03 "$TRIGGER_WF" "job calls the shared pr-review workflow, pinned to a commit SHA (not @main)" \
+    "RexiAI/my-engineering-standards/.github/workflows/ci-pr-review.yml@21046d96796467f8238d6d613ce3a552bf3fced0 # pinned; bump deliberately, never track a branch"
   verify_grep AC-024-03-03 "$TRIGGER_WF" "pr-number and head-sha passed from the PR event" \
     "pr-number: \${{ github.event.pull_request.number }}" \
     "head-sha: \${{ github.event.pull_request.head.sha }}"
@@ -511,11 +516,11 @@ echo ""
 
 # AC-024-03-07 — Self-hosting wiring is identical to child wiring
 if [ -f "$TRIGGER_WF" ] && [ -f "$INIT_CI" ]; then
-  SHARED_URL='RexiAI/my-engineering-standards/.github/workflows/ci-pr-review.yml@main'
+  SHARED_URL='RexiAI/my-engineering-standards/.github/workflows/ci-pr-review.yml@21046d96796467f8238d6d613ce3a552bf3fced0 # pinned; bump deliberately, never track a branch'
   if grep -qF -- "$SHARED_URL" "$TRIGGER_WF" && grep -qF -- "$SHARED_URL" "$INIT_CI"; then
-    pass "AC-024-03-07: trigger workflow and init-ci.sh emit the same shared pr-review workflow@main"
+    pass "AC-024-03-07: trigger workflow and init-ci.sh emit the same SHA-pinned shared pr-review workflow reference"
   else
-    fail "AC-024-03-07: trigger workflow and init-ci.sh must reference the same ci-pr-review.yml@main"
+    fail "AC-024-03-07: trigger workflow and init-ci.sh must reference the same pinned ci-pr-review.yml@<sha>"
   fi
 fi
 
@@ -546,7 +551,7 @@ if [ -f "$INIT_CI" ]; then
        --with-pr-review --platform github --backend go < /dev/null > /dev/null 2>&1 ); then
     if [ -f "$FIX/.github/workflows/ci.yml" ]; then
       verify_grep AC-024-04-02 "$FIX/.github/workflows/ci.yml" "generated ci.yml carries the pr-review job" \
-        "pr-review:" "RexiAI/my-engineering-standards/.github/workflows/ci-pr-review.yml@main" \
+        "pr-review:" "RexiAI/my-engineering-standards/.github/workflows/ci-pr-review.yml@21046d96796467f8238d6d613ce3a552bf3fced0 # pinned; bump deliberately, never track a branch" \
         "OPENCODE_API_KEY: \${{ secrets.OPENCODE_API_KEY }}"
     else
       fail "AC-024-04-02: init-ci.sh did not generate .github/workflows/ci.yml"

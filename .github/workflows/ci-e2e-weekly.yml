@@ -28,7 +28,7 @@ jobs:
     name: Smoke Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
       - name: Health check
         run: |
           IFS=',' read -ra ENDPOINTS <<< "${{ inputs.smoke-endpoints }}"
@@ -48,7 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ inputs.suite == 'full' || inputs.suite == 'contract' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
       - name: Verify provider pacts
         run: make test-contract 2>/dev/null || echo "No contract tests configured"
         env:
@@ -60,7 +60,7 @@ jobs:
     if: ${{ inputs.suite == '' || inputs.suite == 'full' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
       - name: Run E2E suite
         run: |
           if [ -f "Makefile" ] && grep -q "^e2e:" Makefile; then

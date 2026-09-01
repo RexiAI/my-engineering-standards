@@ -4,6 +4,22 @@ Per-loop cost limits for the `daily-triage` loop (spec 019). Loaded before
 every run; a run must not start if any limit is already exhausted. Consumed
 from the 016 template (`templates/loop-budget.md`).
 
+## ci-sweeper (spec 026, AC-026-08)
+
+The sweeper reacts to every failing Self CI run on this repo (not forks —
+`.github/workflows/ci-sweeper.yml`'s job guard excludes fork-originated runs,
+`docs/SECURITY.md §Pwn requests`). Without a ceiling, a burst of failing runs
+(e.g. a broken `main` commit, or repeated pushes to a red branch) could still
+spend unbounded model tokens in a short window.
+
+- max sweeper invocations per rolling 24h: `20`
+- on-exceed: the workflow's budget-guard step appends a warning to the job
+  summary and exits 0 before installing/invoking opencode — same "skip
+  cleanly, never fail the job" contract as the missing-API-key guard.
+  No `STATE.md` kill switch is required for this loop (it is L1, stateless,
+  and self-limiting); repeated cap hits are visible in the Actions run list
+  for a human to act on.
+
 ## Daily token caps
 
 - per-run token cap: `150_000`

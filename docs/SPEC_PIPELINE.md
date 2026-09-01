@@ -187,15 +187,29 @@ score survive in the one-pager; the original prose does not, because what the
 code actually does is the source of truth.
 
 `archive-spec.sh` copies the `## AC-NNN-NN` headings verbatim into the
-one-pager, and `check-scenario-traceability.sh` check 2 resolves test
-references against **both** `specs/*/20-acceptance/*.md` and
-`docs/changes/*.md`. That pairing is what makes the paragraph above true:
-archiving deletes `specs/NNN-slug/` while the tests keep citing its IDs, so
-without the archive as a second ID source every merged spec would permanently
-dangle its own IDs and check 2 could never pass again in a repo that has
-archived even one spec. Both directories are ID *sources* only — each is
-excluded from the reference scan, because scenario markdown and archive
-one-pagers quote IDs (including illustrative ones) in prose.
+one-pager, and `check-scenario-traceability.sh` check 2 resolves each test
+reference against whichever source is authoritative **for that spec number**:
+
+| Spec number NNN | Authority for check 2 |
+|---|---|
+| `specs/NNN-*/` exists (in flight) | `specs/*/20-acceptance/*.md` |
+| `docs/changes/NNN-*.md` exists (archived) | that one-pager |
+| neither exists | out of scope — skipped, not a finding |
+
+That pairing is what makes the paragraph above true: archiving deletes
+`specs/NNN-slug/` while the tests keep citing its IDs, so without the archive
+as a second ID source every merged spec would permanently dangle its own IDs
+and check 2 could never pass again in a repo that has archived even one spec.
+Scoping to in-flight specs alone has the mirror problem — a spec's IDs stop
+being validated the moment it merges, so a later typo in one of its citations
+is never caught. The skip in the third row is what keeps the check quiet about
+references it has no authority to judge: negative-case fixture IDs such as
+`AC-999-99`, and self-citations for specs archived before this convention
+existed.
+
+Both directories are ID *sources* only — each is excluded from the reference
+scan, because scenario markdown and archive one-pagers quote IDs (including
+illustrative ones) in prose.
 
 ## Definition of done
 
@@ -587,6 +601,7 @@ one is a project of its own, three times over.
 `scripts/check-scenario-traceability.sh` catches the same failure mode at a fraction
 of the cost: every scenario ID must be cited by at least one test, and every test
 citing an ID must reference one that exists — in `specs/*/20-acceptance/` for a
-live spec, or `docs/changes/*.md` for one already archived (`§Archive in the PR`).
+live spec, or `docs/changes/*.md` for one already archived (`§Archive in the PR`),
+with references to spec numbers in neither place left out of scope.
 It does not catch a test that cites the right ID but asserts nothing useful — but
 code mutation testing already catches that.

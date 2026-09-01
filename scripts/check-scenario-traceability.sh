@@ -5,16 +5,21 @@
 # Checks:
 #   1. Every AC-NNN-NN heading in specs/*/20-acceptance/*.md has a matching test
 #      (test name/description containing the same ID, underscores or hyphens).
-#   2. Every AC-NNN-NN reference found in test files resolves to a real scenario
-#      heading — catches copy-paste typos and stale IDs after a scenario is
-#      renumbered or removed. Resolution spans BOTH live specs
-#      (specs/*/20-acceptance/*.md) and archived ones (docs/changes/*.md),
-#      because docs/SPEC_PIPELINE.md §Archive in the PR deletes specs/NNN-slug/
-#      on merge while the tests keep citing its AC-NNN-NN IDs. archive-spec.sh
-#      copies the '## AC-NNN-NN' headings verbatim into the one-pager, so the
-#      archive is an authoritative ID source. Without this, every merged spec
-#      permanently dangles its own IDs and check 2 can never pass again in a
-#      repo that has archived even one spec.
+#   2. Every AC-NNN-NN reference found in test files resolves against whichever
+#      source is authoritative for that spec number — catches copy-paste typos
+#      and stale IDs after a scenario is renumbered or removed:
+#        - spec number has an in-flight specs/NNN-*/ folder  -> must match a
+#          heading in specs/*/20-acceptance/*.md (spec 027, AC-027-01)
+#        - spec number has an archived docs/changes/NNN-*.md -> must match a
+#          heading in that one-pager. archive-spec.sh copies the
+#          '## AC-NNN-NN' headings verbatim, so the archive is authoritative
+#          after §Archive in the PR deletes specs/NNN-slug/ on merge
+#        - neither exists -> out of scope, silently skipped: there is no
+#          authority to judge the reference against
+#      Strict wherever an authority exists, quiet where none does. Scoping to
+#      in-flight specs alone would stop validating a merged spec's IDs forever;
+#      resolving against every source unscoped would flag a reference to a spec
+#      that was never archived (e.g. a negative-case fixture ID like AC-999-99).
 #
 # The Verifier re-runs a single failing check on a BLOCK/FAIL fix
 # (AC-007-02, AC-007-04): --checks narrows the run to check 1 and/or check 2,
@@ -218,15 +223,66 @@ if contains 1; then
 fi
 
 # ── Check 2: every test reference resolves to a real scenario (AC-007-04-02) ─
-# Resolves against live specs AND archived one-pagers: a merged spec's tests keep
-# citing IDs whose specs/NNN-slug/ folder archive-spec.sh has already deleted.
+#
+# Per-spec-number authority (hybrid of spec 027 and the archive-resolution fix):
+# a reference is judged only against the source that can actually answer for its
+# spec number.
+#
+#   in-flight  specs/NNN-*/ exists          -> resolve against SCENARIO_IDS
+#   archived   docs/changes/NNN-*.md exists -> resolve against ARCHIVED_IDS
+#   neither                                 -> skip, no authority to judge
+#
+# Why not in-flight only: §Archive in the PR deletes specs/NNN-slug/ on merge,
+# so scoping to in-flight numbers stops validating a spec's IDs the moment it
+# merges — a typo in a merged spec's citation would never be caught again.
+# archive-spec.sh copies the '## AC-NNN-NN' headings verbatim into the
+# one-pager, so the archive can still answer for those numbers.
+#
+# Why not unscoped: a reference to a number that was never archived and is not
+# in flight has no authority behind it — negative-case fixture IDs
+# (e.g. AC-999-99) and self-citations in gate scripts for specs archived before
+# this convention existed would read as dangling. Those are noise, not signal.
+IN_FLIGHT_NUMS=""
+for d in "$SPECS_DIR"/*/; do
+  [ -d "$d" ] || continue
+  base="$(basename "$d")"
+  case "$base" in
+    [0-9][0-9][0-9]-*) IN_FLIGHT_NUMS="$IN_FLIGHT_NUMS ${base%%-*}" ;;
+  esac
+done
+
+ARCHIVED_NUMS=""
+if [ -d "$ARCHIVE_DIR" ]; then
+  for f in "$ARCHIVE_DIR"/*.md; do
+    [ -f "$f" ] || continue
+    base="$(basename "$f")"
+    case "$base" in
+      [0-9][0-9][0-9]-*) ARCHIVED_NUMS="$ARCHIVED_NUMS ${base%%-*}" ;;
+    esac
+  done
+fi
+
 if contains 2; then
-  KNOWN_IDS=$(printf '%s\n%s\n' "$SCENARIO_IDS" "$ARCHIVED_IDS" | grep -v '^$' | sort -u)
   for id in $REFERENCED_IDS; do
-    if ! echo "$KNOWN_IDS" | grep -qx "$id"; then
-      fail "$id — referenced in a test but no matching scenario heading exists in " \
-           "$SPECS_DIR/*/20-acceptance/ or $ARCHIVE_DIR/*.md. Stale ID after a rename, or a typo."
-    fi
+    num="${id#AC-}"; num="${num%%-*}"
+    case " $IN_FLIGHT_NUMS " in
+      *" $num "*)
+        if ! echo "$SCENARIO_IDS" | grep -qx "$id"; then
+          fail "$id — referenced in a test but no matching scenario heading exists in " \
+               "$SPECS_DIR/*/20-acceptance/ for in-flight spec $num. Stale ID after a rename, or a typo."
+        fi
+        continue ;;
+    esac
+    case " $ARCHIVED_NUMS " in
+      *" $num "*)
+        if ! echo "$ARCHIVED_IDS" | grep -qx "$id"; then
+          fail "$id — referenced in a test but no matching scenario heading exists in " \
+               "$ARCHIVE_DIR/$num-*.md for archived spec $num. Stale ID after a rename, or a typo."
+        fi
+        continue ;;
+    esac
+    # No specs/NNN-*/ and no docs/changes/NNN-*.md — nothing authoritative to
+    # resolve against, so this reference is out of scope rather than a finding.
   done
   say ""
 fi

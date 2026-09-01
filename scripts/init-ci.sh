@@ -37,6 +37,16 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
+# Commit SHA this repo's own reusable workflows are pinned to when generated
+# into a child repo (spec 026, AC-026-13; docs/SECURITY.md §CI/CD Supply
+# Chain §Pin third-party Actions and reusable workflows to a commit SHA).
+# Never `@main` — a floating ref means every child repo picks up whatever
+# lands on this repo's main branch next, with no review on the child's side.
+# Bump deliberately when this repo's reusable workflows change in a way
+# child repos should pick up; update every `@${STANDARDS_PIN}` below (and in
+# .github/workflows/pr-review.yml, which pins the same way) together.
+STANDARDS_PIN="21046d96796467f8238d6d613ce3a552bf3fced0"
+
 info()  { echo -e "${CYAN}ℹ${NC} $1"; }
 ok()    { echo -e "${GREEN}✔${NC} $1"; }
 warn()  { echo -e "${YELLOW}⚠${NC} $1"; }
@@ -350,7 +360,7 @@ EOF
   for lang in "${BACKEND[@]}"; do
     cat >> "$target" << EOF
   backend-ci-${lang}:
-    uses: RexiAI/my-engineering-standards/.github/workflows/ci-${lang}.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-${lang}.yml@${STANDARDS_PIN} # pinned; bump deliberately, never track a branch
     with:
       docker-registry: $registry
     secrets:
@@ -389,7 +399,7 @@ _gh_deploy_job() {
   deploy:
     needs: [$(_gh_deploy_needs)]
     if: \${{ github.event_name == 'push' && github.ref_name == github.event.repository.default_branch }}
-    uses: RexiAI/my-engineering-standards/.github/workflows/ci-deploy-${DEPLOY_TOOL}.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-deploy-${DEPLOY_TOOL}.yml@${STANDARDS_PIN} # pinned; bump deliberately, never track a branch
     with:
       service-name: ""
       docker-registry: \$registry
@@ -418,7 +428,7 @@ _gh_release_job() {
 
   release:
     if: \${{ github.event_name == 'push' && github.ref_name == github.event.repository.default_branch }}
-    uses: RexiAI/my-engineering-standards/.github/workflows/ci-release.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-release.yml@${STANDARDS_PIN} # pinned; bump deliberately, never track a branch
     secrets:
       GH_TOKEN: \${{ secrets.GH_TOKEN }}
 EOF
@@ -444,7 +454,7 @@ _gh_pr_review_job() {
 
   pr-review:
     if: \${{ github.event_name == 'pull_request' && secrets.OPENCODE_API_KEY != '' }}
-    uses: RexiAI/my-engineering-standards/.github/workflows/ci-pr-review.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-pr-review.yml@21046d96796467f8238d6d613ce3a552bf3fced0 # pinned; bump deliberately, never track a branch
     with:
       pr-number: \${{ github.event.pull_request.number }}
       head-sha: \${{ github.event.pull_request.head.sha }}
@@ -473,7 +483,7 @@ _gh_frontend_job() {
 
   cat >> "$target" << EOF
   frontend-ci:
-    uses: RexiAI/my-engineering-standards/.github/workflows/${workflow}@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/${workflow}@${STANDARDS_PIN} # pinned; bump deliberately, never track a branch
     with:
 ${with_block}
     secrets:

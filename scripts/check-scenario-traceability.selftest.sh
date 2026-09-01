@@ -83,7 +83,12 @@ trace_id() { printf 'AC-%03d-%02d' "$1" "$2"; }
 PASS_ID="$(trace_id 999 01)"
 ORPHAN_ID="$(trace_id 999 02)"
 DANGLE_ID="$(trace_id 999 03)"
-BOGUS_ID="$(trace_id 888 88)"
+# BOGUS_ID must share DANGLE_ID's spec number (999) — spec 027's scoping fix
+# (check-scenario-traceability.sh §Check 2) only flags a dangling reference
+# for a spec number that currently has an in-flight specs/NNN-*/ folder.
+# Using an out-of-flight number here (e.g. 888) would make this case no
+# longer exercise check 2 at all after that fix; it must stay in scope.
+BOGUS_ID="$(trace_id 999 04)"
 
 mkdir -p "$TMP/pass/specs/999-slug/20-acceptance" "$TMP/pass/src"
 printf '## %s — widget renders\nGiven a widget\nWhen it renders\nThen it shows\n' "$PASS_ID" \
@@ -121,6 +126,34 @@ printf '# 997-merged-slug\n\n## Acceptance scenarios\n\n## %s — archived scena
   > "$TMP/archived/changes/997-merged-slug.md"
 printf 'func TestArchived_%s(t *testing.T) {}\n' "$(printf '%s' "$ARCHIVED_ID" | tr '-' '_')" \
   > "$TMP/archived/src/archived_test.go"
+# ── out_of_flight: a reference to a spec number with NO specs/NNN-*/ folder
+# at all must NOT be flagged (spec 027, AC-027-01) — this is exactly the
+# permanent, by-design state of every archived spec's own deliverables-gate
+# script (e.g. check-pr-review.sh's AC-024-* self-citations, once
+# specs/024-pr-review-agent/ is archived and deleted). Only in-flight specs/
+# folders are in scope for the dangling-reference check.
+OUT_OF_FLIGHT_TRACED_ID="$(trace_id 999 05)"
+OUT_OF_FLIGHT_ARCHIVED_ID="$(trace_id 700 01)"
+mkdir -p "$TMP/out_of_flight/specs/999-slug/20-acceptance" "$TMP/out_of_flight/src"
+printf '## %s — traced scenario\nGiven a widget\nWhen it renders\nThen it shows\n' "$OUT_OF_FLIGHT_TRACED_ID" \
+  > "$TMP/out_of_flight/specs/999-slug/20-acceptance/${OUT_OF_FLIGHT_TRACED_ID}-traced.md"
+printf 'func TestWidget_%s(t *testing.T) {}\nfunc TestArchived_%s(t *testing.T) {}\n' \
+  "$(printf '%s' "$OUT_OF_FLIGHT_TRACED_ID" | tr '-' '_')" "$(printf '%s' "$OUT_OF_FLIGHT_ARCHIVED_ID" | tr '-' '_')" \
+  > "$TMP/out_of_flight/src/widget_test.go"
+# Note: no specs/700-*/ folder exists anywhere under $TMP/out_of_flight —
+# spec 700 is "archived" (or simply doesn't exist) from this fixture's point
+# of view, exactly like every real archived spec on this repo's own main.
+
+# ── stale_archived: an archived spec IS an authority, so a typo'd ID for that
+# spec number must still be caught. This is what the hybrid buys over scoping
+# to in-flight specs alone, where this reference would be silently skipped.
+STALE_ARCHIVED_REAL="$(trace_id 996 01)"
+STALE_ARCHIVED_TYPO="$(trace_id 996 47)"
+mkdir -p "$TMP/stale_archived/specs" "$TMP/stale_archived/src" "$TMP/stale_archived/changes"
+printf '# 996-merged-slug\n\n## Acceptance scenarios\n\n## %s — archived scenario\n' "$STALE_ARCHIVED_REAL" \
+  > "$TMP/stale_archived/changes/996-merged-slug.md"
+printf 'func TestStale_%s(t *testing.T) {}\n' "$(printf '%s' "$STALE_ARCHIVED_TYPO" | tr '-' '_')" \
+  > "$TMP/stale_archived/src/stale_test.go"
 
 # ── Run ──────────────────────────────────────────────────────────────────────
 echo "== AC-012-02 traceability selftest =="
@@ -128,6 +161,8 @@ run_case pass 0 "$PASS_ID — traced to a test"
 run_case orphan 1 "no test references it"
 run_case dangle 1 "no matching scenario heading exists" "$DANGLE_ID — traced to a test"
 run_case archived 0 "every scenario traced, every reference resolves"
+run_case out_of_flight 0 "$OUT_OF_FLIGHT_TRACED_ID — traced to a test"
+run_case stale_archived 1 "no matching scenario heading exists"
 
 echo ""
 if [ "$FAIL_COUNT" -gt 0 ]; then
