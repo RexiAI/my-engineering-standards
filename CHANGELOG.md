@@ -1,3 +1,10 @@
+## [1.30.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.30.0...v1.30.1) (2026-09-01)
+
+
+### Bug Fixes
+
+* **security:** harden CI/CD workflows and agent invocation (spec 026) ([#63](https://github.com/RexiAI/my-engineering-standards/issues/63)) ([875ef91](https://github.com/RexiAI/my-engineering-standards/commit/875ef9123c3a96d46107a703af4d0ad0ebd8df0c))
+
 # [1.30.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.29.2...v1.30.0) (2026-09-01)
 
 
