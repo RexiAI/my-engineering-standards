@@ -127,3 +127,114 @@ Checkmarx, Bamboo, and Nancy are not used anywhere in this repo's CI — removed
 - Review OWASP Dependency Check reports before upgrading.
 - Use Dependabot or Renovate for automated dependency update PRs where available.
 - Exclude unnecessary transitive dependencies to minimize attack surface.
+
+## CI/CD Supply Chain (spec 026)
+
+A security review of this repo's own `.github/workflows/` and headless agent
+invocations found and fixed several classes of issue. This section is the
+standing rule set that keeps them fixed — every point below has a concrete
+enforced example in this repo; treat a new workflow or agent invocation that
+violates one of these as a regression, not a style preference.
+
+### Pwn requests
+
+A `workflow_run`-, `pull_request_target`-, or `issue_comment`-triggered
+workflow always runs with the **base repository's** privileges (secrets, a
+writable `GITHUB_TOKEN`) — including when the event it reacts to originated
+from a fork. Checking out that event's head commit and then executing
+anything from the checked-out tree (a script, a symlinked skill, a sourced
+env file, `npm install`, a build step) hands an attacker-controlled commit
+those privileges. This is the "pwn request" pattern GitHub's own security
+docs and the tj-actions/changed-files and eigent-ai incidents are examples
+of.
+
+Rules:
+
+- A `workflow_run`-triggered job must gate on the triggering run's origin
+  (`github.event.workflow_run.head_repository.full_name == github.repository`)
+  before doing anything privileged. A fork-originated run gets no automated
+  reaction — a human triages it via the PR's own (unprivileged) checks.
+  See `.github/workflows/ci-sweeper.yml`.
+- Never pass `ref: <event-supplied SHA>` to `actions/checkout` in a
+  privileged trigger context. Check out the workflow's own trusted ref (no
+  `ref:` override, or an explicit `github.sha`/default-branch ref) and read
+  anything about the untrusted commit through a read-only API (`gh run view
+  --log-failed`, `gh pr diff`) instead of executing its tree.
+- If a privileged workflow genuinely needs the untrusted tree (rare — e.g.
+  building a preview), check it out in an unprivileged job with no secrets,
+  never in the same job that holds them.
+
+### Pin third-party Actions and reusable workflows to a commit SHA
+
+`uses: owner/action@v4` and `uses: owner/action@master` both resolve a
+mutable ref at the moment the job runs — the exact mechanism behind the
+tj-actions/changed-files supply-chain compromise (a maintainer's compromised
+account moved a tag to a malicious commit; every workflow pinned to that tag
+picked it up immediately). Pin every third-party action to its full-length
+commit SHA, with the version as a trailing comment for humans:
+
+```yaml
+uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+```
+
+Cross-repository reusable workflows follow the same rule — pin
+`RexiAI/my-engineering-standards/.github/workflows/<name>.yml` to a commit
+SHA, bump deliberately, never track `@main`. This repo's own
+consumer-facing workflows do this (`.github/workflows/pr-review.yml`,
+`scripts/init-ci.sh`'s `STANDARDS_PIN`).
+
+### Binaries fetched by a script must be checksum-verified
+
+A workflow that `curl`s a release tarball and executes it (this repo's
+pinned `opencode` binary, installed by `scripts/install-opencode.sh`) is
+downloading and running a binary based on a version string alone. Pin a
+SHA-256 alongside the version and verify with `sha256sum -c` before
+extracting — a compromised release, a stale CDN cache, or a MITM window all
+fail closed instead of silently executing.
+
+### An agent's `permission` block must actually load at invocation time
+
+An agent config's frontmatter (`agents/*.md`) — `mode`, `permission.edit`,
+`permission.bash` — is only an enforced boundary if the invocation actually
+passes through it. Concatenating an agent file's prose into a plain prompt
+string (because its declared `mode` rejected `--agent <name>` from a
+headless `opencode run`) strips the frontmatter before opencode ever parses
+it: the `permission` block was true of the committed file and false of every
+CI run. If an agent needs direct headless invocation, its `mode` must allow
+that (`primary`, not `subagent`) so `--agent` — and the real permission
+enforcement — is available. See `agents/pr-review.md` and
+`.github/workflows/ci-pr-review.yml`.
+
+### Treat model input as untrusted data (prompt injection)
+
+Anything an agent reads that a third party wrote — a PR diff, a commit
+message, a CI log line, an issue comment — is data, not an instruction from
+the operator, however it is phrased. An agent's system prompt must say this
+explicitly, but the prompt is a courtesy, not the boundary: the `permission`
+block (previous section) is what actually stops an injected instruction from
+having effect. Never let an agent's own prompt text be the only thing
+standing between untrusted input and a write/push/merge/secret-disclosure
+action. See `agents/pr-review.md §Untrusted content warning`.
+
+### Bound automated-loop cost
+
+An automation that reacts to an external trigger (a failing CI run, a
+schedule) without an invocation ceiling can be driven into unbounded model
+spend by anyone who can cause that trigger to fire — see
+`.github/workflows/ci-sweeper.yml`'s budget-guard step and
+`loop-budget.md`. Every `on: workflow_run` or `on: schedule` loop that
+invokes a model gets an explicit per-window cap, checked before the model
+is invoked, that skips cleanly (not a failure) when exceeded.
+
+### Reusable-workflow inputs are not repo-owner-controlled
+
+A `workflow_call` `inputs:` value comes from whoever calls the workflow — a
+child repo's own workflow file, potentially years out of sync with this
+one's expectations — and must be validated the same way any external input
+would be before it is interpolated into a remote shell command (see
+`.github/workflows/ci-deploy-ssh.yml`'s input-validation step). Prefer
+mapping `${{ secrets.* }}` and `${{ inputs.* }}` into a step's `env:` block
+and referencing them as shell variables over interpolating them directly
+into a `run:` script body — this avoids both accidental shell injection via
+special characters and secret values landing in a process's argv (visible
+via `/proc` to co-resident processes on the runner).

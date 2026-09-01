@@ -15,9 +15,9 @@ jobs:
     name: Validate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.x'
 
@@ -91,6 +91,13 @@ jobs:
       - name: Check orchestration references
         run: ./scripts/check-orchestration.sh
 
+      # Vacuous-assertion gate: a bats test that would still pass with its
+      # script under test replaced by `exit 0` is theatre, not coverage.
+      # Also runs inside `make test-scripts`; named here so a failure is
+      # legible without reading the test job's log. No continue-on-error.
+      - name: Check bats assertions are not vacuous
+        run: ./scripts/check-bats-assertions.sh
+
       # Phase-2 loop mechanics gate (docs/SPEC_PIPELINE.md §Post-PR CI
       # check-and-remediate loop (phase 2), spec 014): grep-assert the post-PR
       # CI check is wired into the pipeline prompts/docs. No continue-on-error.
@@ -159,14 +166,16 @@ jobs:
           bash scripts/model-env.runtime-check.sh /tmp/opencode-bin/opencode
 
       # Agent local-env gates (spec 013): the guard refuses to track
-      # config/agent.local.env, the hardcoded-secrets check scans the four
-      # dirs, and the selftest proves loader/guard/check fire. No
-      # continue-on-error: a committed secret or a gate regression fails the job.
+      # config/agent.local.env, the hardcoded-secrets check scans the scoped
+      # dirs (widened in spec 026, AC-026-09), and the selftests prove
+      # loader/guard/check fire. No continue-on-error: a committed secret or
+      # a gate regression fails the job.
       - name: Check agent env guard and hardcoded secrets
         run: |
           set -euo pipefail
           bash scripts/guard-env.sh
           bash scripts/check-no-hardcoded-secrets.sh
+          bash scripts/check-no-hardcoded-secrets.sh --self-test
           bash scripts/agent-env.selftest.sh
 
       - name: Run loop files check
@@ -189,6 +198,16 @@ jobs:
           ./scripts/check-pr-review.sh
           ./scripts/check-pr-review.selftest.sh
 
+      # Security-hardening gate (spec 026): the check script doubles as the
+      # spec's test carrier for its thirteen findings — a regression in any
+      # one of them (e.g. StrictHostKeyChecking=no creeping back in, a
+      # secret-scan scope shrinking, an @main reference reappearing) fails
+      # the Validate job. --self-test proves the gate itself fails closed.
+      - name: Check security-hardening deliverables
+        run: |
+          ./scripts/check-security-hardening.sh
+          ./scripts/check-security-hardening.sh --self-test
+
       - name: Check remediation budget
         run: ./scripts/check-remediation-budget.sh
 
@@ -206,12 +225,38 @@ jobs:
       # (e.g. the complexity threshold raised so a fixture no longer fires)
       # fails the job. The principles selftest fail-fasts with a clear message
       # if 007's --gates flag is not yet merged — 012 lands in the same batch.
+      - name: Install bats-core
+        run: |
+          set -euo pipefail
+          if ! command -v bats >/dev/null 2>&1; then
+            git -c core.autocrlf=false clone --depth 1 --branch v1.11.0 https://github.com/bats-core/bats-core.git /tmp/bats-core
+            /tmp/bats-core/install.sh /tmp/bats-install
+            echo "/tmp/bats-install/bin" >> "$GITHUB_PATH"
+          fi
+          /tmp/bats-install/bin/bats --version 2>/dev/null || bats --version
+
+      - name: Run shell gate bats tests (spec 001 Track B)
+        run: make test-scripts
+
       - name: Run gate selftests
         run: |
           set -euo pipefail
           bash scripts/check-code-principles.selftest.sh
           bash scripts/check-scenario-traceability.selftest.sh
           bash scripts/tests/gate-telemetry.selftest.sh
+
+      # Live scenario-traceability check (spec 027, AC-027-02): the selftest
+      # above only proves the checker's logic against hermetic fixtures — it
+      # never ran against this repo's own specs/ + source tree, so a real
+      # in-flight spec's dangling/untraced reference could ship unnoticed.
+      # Safe to run unconditionally now that check-scenario-traceability.sh's
+      # check 2 is scoped to in-flight specs/NNN-*/ folders only (spec 027) —
+      # an archived spec's permanent, by-design AC-NNN-NN self-citations in
+      # its surviving gate script no longer produce false-positive noise.
+      # A no-op, exit 0, when no specs/ folder is present (the normal state
+      # of main between spec PRs).
+      - name: Check scenario traceability (live tree)
+        run: bash scripts/check-scenario-traceability.sh
 
       # Note: this intentionally mirrors `make lint`'s YAML scope (.github + ci),
       # not full-repo. Expanding scope belongs in the Makefile, not here.

@@ -1,0 +1,18 @@
+{
+  "name": "feature",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "mutation": "npx stryker run",
+    "lint": "eslint . --ext .ts,.js"
+  },
+  "devDependencies": {
+    "vitest": "^1.4.0",
+    "fast-check": "^3.20.0",
+    "@stryker-mutator/core": "^8.0.0",
+    "@stryker-mutator/vitest-runner": "^8.0.0",
+    "eslint": "^9.0.0"
+  }
+}

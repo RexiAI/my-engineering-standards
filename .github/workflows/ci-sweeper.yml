@@ -8,6 +8,22 @@ name: CI Sweeper
 # file ships. Readiness: the loop runs report-only (L1) — until spec 016's loop
 # foundation lands it must not auto-fix unattended; the ci-triage skill holds
 # the flake rule (never auto-fix) and the infra/config-not-defects rules.
+#
+# Pwn-request hardening (spec 026, AC-026-01): workflow_run always runs with
+# base-repo privileges (secrets, issues: write) — including for Self CI runs
+# triggered by a fork's pull_request. Two independent controls keep an
+# attacker-controlled commit from ever executing here:
+#   1. Job-level guard: the sweep only runs when the failing run's head
+#      repository is THIS repo (never a fork) — see docs/SECURITY.md §Pwn
+#      requests. A fork-originated Self CI failure gets no automated sweep;
+#      a human triages it via the normal PR checks instead.
+#   2. No `ref:` override on checkout below: the runner checks out this
+#      workflow's own trusted ref (the repo's default branch), never
+#      `github.event.workflow_run.head_sha`. The failing commit's tree is
+#      never fetched, so it is never executed, sourced, or symlinked into
+#      opencode's discovery path. The skill inspects the failure exclusively
+#      via the read-only `gh run view --log-failed` API
+#      (skills/ci-triage/SKILL.md) — it never needs the failing tree.
 on:
   workflow_run:
     workflows: ["Self CI"]
@@ -26,19 +42,53 @@ jobs:
   sweep:
     name: Sweep failing run
     runs-on: ubuntu-latest
-    # Early exit when CI is green: the loop reacts only to failures. A green run
-    # is skipped as a no-op — no tokens are spent on a healthy workflow.
-    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    # Early exit when CI is green: the loop reacts only to failures — a green
+    # run is a no-op, no tokens spent on a healthy workflow. AND early exit
+    # when the failing run did not originate from this repo's own default
+    # branch/PRs (AC-026-01): a fork's Self CI run still executes here with
+    # base-repo privileges under workflow_run, so it must never reach the
+    # steps below. Gate closed by default — an absent head_repository (should
+    # never happen) also fails this comparison, never opening it accidentally.
+    if: ${{ github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.head_repository.full_name == github.repository }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
         with:
-          # Sweep the exact commit that failed, not the branch head.
-          ref: ${{ github.event.workflow_run.head_sha }}
+          # No `ref:` here — deliberately. This checks out the workflow's own
+          # trusted ref, never the failing run's (possibly attacker-authored)
+          # head_sha. See the pwn-request note above; do not "fix" this by
+          # re-adding a ref: override.
           # No credentials in the working tree: the sweeper never pushes, and gh
           # uses the workflow's GITHUB_TOKEN rather than git credentials.
           persist-credentials: false
 
+      # Budget guard (spec 026, AC-026-08, loop-budget.md §ci-sweeper): count
+      # this workflow's own runs in the last 24h via the read-only Actions API
+      # (no repo tree involved — safe regardless of the pwn-request guard
+      # above) and skip installing/invoking opencode past the cap. Skips
+      # cleanly (exit 0), never fails the job.
+      - name: Check sweeper invocation budget
+        id: budget
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cap=20
+          since="$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)"
+          count=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci-sweeper.yml/runs?created=>${since}&per_page=100" \
+            --jq '.total_count' 2>/dev/null || echo "")
+          if [ -z "$count" ]; then
+            echo "::warning::Could not read sweeper run history from the Actions API; proceeding without a budget check for this run."
+            echo "over-budget=false" >> "$GITHUB_OUTPUT"
+          elif [ "$count" -gt "$cap" ]; then
+            echo "::warning::CI Sweeper budget exceeded: ${count} runs in the last 24h (cap ${cap}, loop-budget.md §ci-sweeper). Skipping this sweep."
+            echo "over-budget=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Sweeper runs in the last 24h: ${count} (cap ${cap})."
+            echo "over-budget=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Install pinned opencode binary
+        if: steps.budget.outputs.over-budget != 'true'
         run: |
           set -euo pipefail
           # Pin lives in scripts/install-opencode.sh — shared with self-ci's
@@ -46,6 +96,7 @@ jobs:
           bash scripts/install-opencode.sh
 
       - name: Sweep the failing run with the ci-triage skill
+        if: steps.budget.outputs.over-budget != 'true'
         env:
           SWEEPER_RUN_ID: ${{ github.event.workflow_run.id }}
           SWEEPER_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}

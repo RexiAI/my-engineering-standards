@@ -223,7 +223,7 @@ kamal setup
 ```yaml
 jobs:
   backend-ci:
-    uses: RexiAI/my-engineering-standards/.github/workflows/ci-go.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-go.yml@<commit-sha>  # pinned — see docs/SECURITY.md §CI/CD Supply Chain
     with:
       docker-registry: ghcr.io
     secrets:
@@ -232,7 +232,7 @@ jobs:
   deploy:
     needs: [backend-ci]
     if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
-    uses: RexiAI/my-engineering-standards/.github/workflows/ci-deploy-kamal.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-deploy-kamal.yml@<commit-sha>  # pinned — see docs/SECURITY.md §CI/CD Supply Chain
     with:
       service-name: my-api
       docker-registry: ghcr.io
@@ -342,7 +342,7 @@ ssh root@<VPS_IP> "dokku letsencrypt:enable my-api"
 ```yaml
 jobs:
   backend-ci:
-    uses: RexiAI/my-engineering-standards/.github/workflows/ci-go.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-go.yml@<commit-sha>  # pinned — see docs/SECURITY.md §CI/CD Supply Chain
     with:
       docker-registry: ghcr.io
     secrets:
@@ -351,7 +351,7 @@ jobs:
   deploy:
     needs: [backend-ci]
     if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
-    uses: RexiAI/my-engineering-standards/.github/workflows/ci-deploy-dokku.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-deploy-dokku.yml@<commit-sha>  # pinned — see docs/SECURITY.md §CI/CD Supply Chain
     with:
       service-name: my-api
       dokku-app-name: my-api
@@ -445,7 +445,7 @@ ssh root@<VM_IP> \
 ```yaml
 jobs:
   backend-ci:
-    uses: RexiAI/my-engineering-standards/.github/workflows/ci-go.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-go.yml@<commit-sha>  # pinned — see docs/SECURITY.md §CI/CD Supply Chain
     with:
       docker-registry: ghcr.io
     secrets:
@@ -454,7 +454,7 @@ jobs:
   deploy:
     needs: [backend-ci]
     if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
-    uses: RexiAI/my-engineering-standards/.github/workflows/ci-deploy-ssh.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-deploy-ssh.yml@<commit-sha>  # pinned — see docs/SECURITY.md §CI/CD Supply Chain
     with:
       service-name: my-api
       docker-registry: ghcr.io

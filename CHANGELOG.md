@@ -1,3 +1,24 @@
+## [1.30.2](https://github.com/RexiAI/my-engineering-standards/compare/v1.30.1...v1.30.2) (2026-09-01)
+
+
+### Bug Fixes
+
+* **traceability:** resolve test IDs against archived specs ([#64](https://github.com/RexiAI/my-engineering-standards/issues/64)) ([a01506c](https://github.com/RexiAI/my-engineering-standards/commit/a01506c2470b1906f9d45870188ba8080a34f12e))
+
+## [1.30.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.30.0...v1.30.1) (2026-09-01)
+
+
+### Bug Fixes
+
+* **security:** harden CI/CD workflows and agent invocation (spec 026) ([#63](https://github.com/RexiAI/my-engineering-standards/issues/63)) ([875ef91](https://github.com/RexiAI/my-engineering-standards/commit/875ef9123c3a96d46107a703af4d0ad0ebd8df0c))
+
+# [1.30.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.29.2...v1.30.0) (2026-09-01)
+
+
+### Features
+
+* TDD scaffolding both tracks (spec 001) ([#62](https://github.com/RexiAI/my-engineering-standards/issues/62)) ([6158336](https://github.com/RexiAI/my-engineering-standards/commit/6158336e715af1297311912c24bdd135835cb56e))
+
 ## [1.29.2](https://github.com/RexiAI/my-engineering-standards/compare/v1.29.1...v1.29.2) (2026-08-30)
 
 
