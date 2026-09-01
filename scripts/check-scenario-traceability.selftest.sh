@@ -43,12 +43,14 @@ trap 'rm -rf "$TMP"' EXIT
 # run_case NAME — runs the checker against $TMP/$NAME (with specs/ and src/ as
 # sibling directories so the source scan never includes the specs dir), checks
 # the expected exit code and that the output contains every required message.
+# The archive dir ($TMP/$NAME/changes) is passed as the third positional so each
+# fixture controls its own archived-ID source in isolation.
 run_case() {
   local name="$1" expected_rc="$2"
   shift 2
   local out="$TMP/$name.out" missing=0 msg
   set +e
-  bash "$CHECKER" "$TMP/$name/specs" "$TMP/$name/src" >"$out" 2>&1
+  bash "$CHECKER" "$TMP/$name/specs" "$TMP/$name/src" "$TMP/$name/changes" >"$out" 2>&1
   local rc=$?
   set -e
   if [ "$rc" -ne "$expected_rc" ]; then
@@ -106,11 +108,26 @@ printf 'func TestWidget_%s(t *testing.T) {}\nfunc TestBogus_%s(t *testing.T) {}\
   "$(printf '%s' "$DANGLE_ID" | tr '-' '_')" "$(printf '%s' "$BOGUS_ID" | tr '-' '_')" \
   > "$TMP/dangle/src/widget_test.go"
 
+# ── archived: spec merged + archived, its test ID must still resolve ─────────
+# Regression guard for the §Archive in the PR defect: archive-spec.sh deletes
+# specs/NNN-slug/ on merge while the tests keep citing its IDs. Before the fix,
+# check 2 resolved only against specs/*/20-acceptance/, so every merged spec
+# permanently dangled its own IDs (81 in llm-app) and the gate could never pass
+# again. The archive one-pager carries the '## AC-NNN-NN' headings verbatim, so
+# it is an authoritative ID source.
+ARCHIVED_ID="$(trace_id 997 01)"
+mkdir -p "$TMP/archived/specs" "$TMP/archived/src" "$TMP/archived/changes"
+printf '# 997-merged-slug\n\n## Acceptance scenarios\n\n## %s — archived scenario\n' "$ARCHIVED_ID" \
+  > "$TMP/archived/changes/997-merged-slug.md"
+printf 'func TestArchived_%s(t *testing.T) {}\n' "$(printf '%s' "$ARCHIVED_ID" | tr '-' '_')" \
+  > "$TMP/archived/src/archived_test.go"
+
 # ── Run ──────────────────────────────────────────────────────────────────────
 echo "== AC-012-02 traceability selftest =="
 run_case pass 0 "$PASS_ID — traced to a test"
 run_case orphan 1 "no test references it"
 run_case dangle 1 "no matching scenario heading exists" "$DANGLE_ID — traced to a test"
+run_case archived 0 "every scenario traced, every reference resolves"
 
 echo ""
 if [ "$FAIL_COUNT" -gt 0 ]; then

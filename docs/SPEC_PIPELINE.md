@@ -186,6 +186,17 @@ anyway, `§Why no scenario mutation`); the verification verdict and mutation
 score survive in the one-pager; the original prose does not, because what the
 code actually does is the source of truth.
 
+`archive-spec.sh` copies the `## AC-NNN-NN` headings verbatim into the
+one-pager, and `check-scenario-traceability.sh` check 2 resolves test
+references against **both** `specs/*/20-acceptance/*.md` and
+`docs/changes/*.md`. That pairing is what makes the paragraph above true:
+archiving deletes `specs/NNN-slug/` while the tests keep citing its IDs, so
+without the archive as a second ID source every merged spec would permanently
+dangle its own IDs and check 2 could never pass again in a repo that has
+archived even one spec. Both directories are ID *sources* only — each is
+excluded from the reference scan, because scenario markdown and archive
+one-pagers quote IDs (including illustrative ones) in prose.
+
 ## Definition of done
 
 A spec pipeline run is done when all of the following hold — mechanically, not
@@ -575,6 +586,7 @@ one is a project of its own, three times over.
 
 `scripts/check-scenario-traceability.sh` catches the same failure mode at a fraction
 of the cost: every scenario ID must be cited by at least one test, and every test
-citing an ID must reference one that exists. It does not catch a test that cites the
-right ID but asserts nothing useful — but code mutation testing already catches
-that.
+citing an ID must reference one that exists — in `specs/*/20-acceptance/` for a
+live spec, or `docs/changes/*.md` for one already archived (`§Archive in the PR`).
+It does not catch a test that cites the right ID but asserts nothing useful — but
+code mutation testing already catches that.
