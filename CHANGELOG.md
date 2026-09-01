@@ -1,3 +1,10 @@
+# [1.30.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.29.2...v1.30.0) (2026-09-01)
+
+
+### Features
+
+* TDD scaffolding both tracks (spec 001) ([#62](https://github.com/RexiAI/my-engineering-standards/issues/62)) ([6158336](https://github.com/RexiAI/my-engineering-standards/commit/6158336e715af1297311912c24bdd135835cb56e))
+
 ## [1.29.2](https://github.com/RexiAI/my-engineering-standards/compare/v1.29.1...v1.29.2) (2026-08-30)
 
 

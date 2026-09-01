@@ -553,7 +553,10 @@ check_yagni() {
           [ -z "$lniface" ] && continue
           ln=${lniface%%:*}
           iface=${lniface#*:}
-          name=$(echo "$iface" | grep -oE 'interface[ \t]+[A-Za-z0-9_]+' | awk '{print $2}')
+          # Go declares the name BEFORE the keyword (`type X interface {`), unlike
+          # Java's `interface X`. Match the Go form and tolerate a non-match:
+          # bare `grep -o` returns 1 on no match, which aborts under pipefail.
+          name=$(echo "$iface" | grep -oE 'type[ \t]+[A-Za-z0-9_]+[ \t]+interface' | awk '{print $2}' || true)
           [ -z "$name" ] && continue
           refs=$(grep -rE "\b$name\b" $GREP_EXCLUDES "$SOURCE_DIR" --include="*.go" 2>/dev/null | grep -v "interface[ \t]*$name" | wc -l | tr -d ' ' || true)
           if [ "$refs" -le 1 ]; then
