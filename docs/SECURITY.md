@@ -59,6 +59,53 @@ A third-party API's raw error response is not automatically safe to forward. Pro
 - Return a generic, static error message to the caller — never `return c.JSON(502, gin.H{"error": upstreamErr.Error()})` or equivalent passthrough.
 - This applies to any upstream call made with a credential the client doesn't already have: payment gateways, LLM providers, third-party auth, internal services called with a shared secret.
 
+## Escape User Data in Outbound HTML
+
+Any user-controlled value rendered into an outbound HTML surface — transactional email bodies,
+PDF/report generation, admin notification panels, chat or webhook cards — must be HTML-escaped
+at render time. These surfaces are usually read by operators, so injection here targets your
+own inbox rather than a customer browser, and is easy to miss because it never touches the
+public web app.
+
+- Building a plaintext string and then converting it to HTML by replacing newlines with `<br>`
+  is **not** escaping. The value is interpolated raw; only the line breaks changed.
+- Build the text and HTML representations separately from the same per-field values, escaping
+  each value for the HTML variant: replace `&` first, then `<`, `>`, `"`, `'`.
+- Escape at every sink, not once at the boundary. A value stored safely can still be injected
+  into a different sink later.
+
+Permissive validators are the enabling condition. A common address pattern such as
+`/^[^\s@]+@[^\s@]+\.[^\s@]+$/` accepts `<`, `>`, `"`, and `'`, so an address field can carry
+markup and still pass validation. Use a conservative address pattern plus an explicit length
+cap.
+
+**Validation is not sanitisation.** A value that passed validation still needs escaping at
+every sink it reaches.
+
+## Internal and Machine-Facing Endpoints Fail Closed
+
+An endpoint invoked only by an operator, a scheduled job, or another service is not protected
+by obscurity. It requires an explicit credential check.
+
+- When the credential is unconfigured, the endpoint **refuses** (503 or 500). It never falls
+  through to open access — the misconfiguration must break the feature, not silently disable
+  the guard.
+- Compare shared secrets in constant time (`crypto.timingSafeEqual`, `hmac.Equal`,
+  `MessageDigest.isEqual`), never with `==`.
+- The auth check runs **before** body parsing and before any side-effecting or billable
+  downstream call, so an unauthenticated caller cannot make you spend money or allocate memory.
+
+| Condition | Behaviour |
+|---|---|
+| Credential configured and matches | Proceed |
+| Credential configured and mismatches | 401/403 |
+| Credential unconfigured | 503/500 — never proceed |
+
+A machine-facing endpoint that accepts a quantity affecting money (minutes, units, amount)
+must bound that quantity against an **independently recorded source of truth** — the recorded
+duration, the stored order total — not merely a plausible range check. Trusting the caller
+anywhere within an unbounded range is an authorization control, not a correctness control.
+
 ## Vulnerability Scanning
 
 *ZAP is `production`-tier — see docs/CONFORMANCE_TIERS.md. The rest of this table applies at `mvp`.*

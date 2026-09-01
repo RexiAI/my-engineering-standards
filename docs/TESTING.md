@@ -244,6 +244,33 @@ properties disconnected from the spec's acceptance criteria.
   types need custom generators `testing/quick` can't express.
 - **JS/TS**: fast-check.
 
+## Tests That Encode a Defect
+
+A test can assert the currently-wrong behavior. When it does — especially for money,
+authorization, or data-retention behavior — fixing the defect necessarily fails that test.
+The failure is the correct signal, not an obstacle.
+
+An agent or engineer must **not** silently rewrite such an assertion to make the suite green.
+Rewriting it destroys the only record that the behavior changed.
+
+Required procedure when a test fails because it encodes the defect:
+
+1. Stop. Do not edit the assertion yet.
+2. Name the specific test and the specific assertion.
+3. State why that assertion encodes the defect rather than the intended behavior.
+4. Get explicit human authorization before changing it.
+5. When authorized, preserve the scenario ID verbatim (traceability — see `docs/SPEC_PIPELINE.md`).
+6. Record in the commit or PR body which assertion changed and why.
+
+| Situation | Correct action |
+|---|---|
+| Test fails after a behavior fix, assertion is still correct | Fix the code |
+| Test fails because the assertion encodes the old, wrong behavior | Stop and ask, per the procedure above |
+| Test fails and it is unclear which is wrong | Stop and ask — never guess in favor of green |
+
+The general principle: a green suite after a behavior change proves only that the tests agree
+with the code. It does not prove that either one is correct.
+
 ## Mutation Testing
 
 *Conformance tier: `production`. See docs/CONFORMANCE_TIERS.md.*

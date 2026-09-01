@@ -180,6 +180,19 @@ type CreateUserResult =
 - **BEM or CSS Modules, not ad-hoc globals.** Choose one: BEM for plain CSS, CSS Modules / Tailwind utility composition for component-scoped styles. Mixing conventions in one repo requires an ADR.
 - **No dead / duplicated rules.** Identical 4-line CSS blocks across files trigger the DRY gate. Extract to a shared class or token. Remove unused selectors before merge (stylelint `no-duplicate-selectors`, `block-no-empty`).
 
+### Currency and Quantity Formatting
+
+- **Store and compute money in the smallest currency unit** (integer minor units — cents, pence, sen). Never a float, never a decimal string parsed back into a float.
+- **Render the full precision of the currency when formatting for display or notification.** The number of decimals is a property of the currency, not a formatting preference: 2 for EUR/USD/GBP, 0 for JPY/KRW, 3 for BHD/KWD. `toFixed(0)` on a euro amount silently misreports a real charge.
+- **Never round a monetary value for display.** A rounded figure in an email, invoice, or dashboard contradicts the amount actually captured, and the discrepancy surfaces as a support ticket rather than a test failure.
+- **Derive unit labels from the same configuration source as the value.** Where a label accompanies a configurable value — timezone, currency code, locale — the label must come from that same config. A hardcoded label beside a config-driven value produces output that contradicts itself the moment the knob changes.
+
+| Currency | Minor units | Displayed as |
+|---|---|---|
+| EUR / USD / GBP | 100 | `12.34` |
+| JPY / KRW | 1 | `1234` |
+| BHD / KWD | 1000 | `12.345` |
+
 ## Logging
 
 ### Java
