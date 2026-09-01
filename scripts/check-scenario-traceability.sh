@@ -5,13 +5,21 @@
 # Checks:
 #   1. Every AC-NNN-NN heading in specs/*/20-acceptance/*.md has a matching test
 #      (test name/description containing the same ID, underscores or hyphens).
-#   2. Every AC-NNN-NN reference found in test files, for a spec number that
-#      currently has an in-flight specs/NNN-*/ folder, resolves to a real
-#      scenario heading — catches copy-paste typos and stale IDs after a
-#      scenario is renumbered or removed, within the spec currently being
-#      worked. References to already-archived specs' own gate-script
-#      self-citations, and to numbers with no specs/ folder at all, are out
-#      of scope by design (spec 027 — see the check-2 block below).
+#   2. Every AC-NNN-NN reference found in test files resolves against whichever
+#      source is authoritative for that spec number — catches copy-paste typos
+#      and stale IDs after a scenario is renumbered or removed:
+#        - spec number has an in-flight specs/NNN-*/ folder  -> must match a
+#          heading in specs/*/20-acceptance/*.md (spec 027, AC-027-01)
+#        - spec number has an archived docs/changes/NNN-*.md -> must match a
+#          heading in that one-pager. archive-spec.sh copies the
+#          '## AC-NNN-NN' headings verbatim, so the archive is authoritative
+#          after §Archive in the PR deletes specs/NNN-slug/ on merge
+#        - neither exists -> out of scope, silently skipped: there is no
+#          authority to judge the reference against
+#      Strict wherever an authority exists, quiet where none does. Scoping to
+#      in-flight specs alone would stop validating a merged spec's IDs forever;
+#      resolving against every source unscoped would flag a reference to a spec
+#      that was never archived (e.g. a negative-case fixture ID like AC-999-99).
 #
 # The Verifier re-runs a single failing check on a BLOCK/FAIL fix
 # (AC-007-02, AC-007-04): --checks narrows the run to check 1 and/or check 2,
@@ -22,8 +30,8 @@
 # (AC-007-04-06): BLOCK, not PASS.
 #
 # Usage:
-#   .standards/scripts/check-scenario-traceability.sh [--checks 1|2|1,2] [--json] [-ReportPath <file>] [SPECS_DIR] [SOURCE_DIR]
-#   defaults: SPECS_DIR=specs  SOURCE_DIR=.
+#   .standards/scripts/check-scenario-traceability.sh [--checks 1|2|1,2] [--json] [-ReportPath <file>] [SPECS_DIR] [SOURCE_DIR] [ARCHIVE_DIR]
+#   defaults: SPECS_DIR=specs  SOURCE_DIR=.  ARCHIVE_DIR=docs/changes
 #   --checks selects which checks run (default: both); --json prints a single
 #   JSON object { "checks": [...], "passes": [...], "fails": [...] } instead of
 #   the human output, with the same exit code.
@@ -86,6 +94,7 @@ done
 
 SPECS_DIR="${POSITIONAL[0]:-specs}"
 SOURCE_DIR="${POSITIONAL[1]:-.}"
+ARCHIVE_DIR="${POSITIONAL[2]:-docs/changes}"
 
 # ── Tooling preflight (AC-007-04-06): a missing tool is exit 2, never a clean ──
 require_tools traceability grep sed sort wc tr
@@ -137,27 +146,50 @@ emit_json() {
 PASSES_JSON=()
 FAILS_JSON=()
 
-if [ ! -d "$SPECS_DIR" ]; then
-  finish_clean "No $SPECS_DIR/ directory — nothing to check."
-fi
-
 if [ ! -d "$SOURCE_DIR" ] || [ ! -r "$SOURCE_DIR" ]; then
   echo "ERROR: source directory '$SOURCE_DIR' is missing or unreadable — cannot perform the traceability check" >&2
   exit 2
 fi
 
-GREP_EXCLUDES='--exclude-dir=node_modules --exclude-dir=target --exclude-dir=vendor --exclude-dir=.git --exclude-dir=.standards --exclude-dir=dist --exclude-dir=specs --exclude-dir=docs'
+# specs/ is excluded because scenario markdown cites its own IDs in prose; the
+# archive dir is excluded for exactly the same reason — docs/changes/*.md is the
+# merged form of specs/ and quotes IDs (including illustrative ones) in prose.
+# Both are ID *sources* for resolution, never *reference* sites for check 2.
+#
+# `docs` is excluded as well (from spec 001): the reference scan is already
+# restricted to the test-file --include patterns below, so this is
+# belt-and-braces for the default layout, while $(basename "$ARCHIVE_DIR") is
+# the general form that also covers a non-default archive dir passed as the
+# third positional argument — which the selftest fixtures rely on.
+GREP_EXCLUDES="--exclude-dir=node_modules --exclude-dir=target --exclude-dir=vendor --exclude-dir=.git --exclude-dir=.standards --exclude-dir=dist --exclude-dir=specs --exclude-dir=docs --exclude-dir=$(basename "$ARCHIVE_DIR")"
 
 # ── Collect scenario IDs from specs/*/20-acceptance/*.md ─────────────────────
 # Match "## AC-NNN-NN" headings, e.g. "## AC-002-01 — Apply a percentage discount"
-SCENARIO_IDS=$(grep -rhoE '^## (AC-[0-9]{3}-[0-9]{2})' "$SPECS_DIR"/*/20-acceptance/*.md 2>/dev/null \
-  | sed -E 's/^## //' | sort -u || true)
-
-if [ -z "$SCENARIO_IDS" ]; then
-  finish_clean "No AC-NNN-NN scenario headings found under $SPECS_DIR/*/20-acceptance/ — nothing to check."
+SCENARIO_IDS=""
+if [ -d "$SPECS_DIR" ]; then
+  SCENARIO_IDS=$(grep -rhoE '^## (AC-[0-9]{3}-[0-9]{2})' "$SPECS_DIR"/*/20-acceptance/*.md 2>/dev/null \
+    | sed -E 's/^## //' | sort -u || true)
 fi
 
-say "Scenario IDs found: $(echo "$SCENARIO_IDS" | wc -l | tr -d ' ')"
+# ── Collect scenario IDs from archived one-pagers (docs/changes/*.md) ────────
+# archive-spec.sh copies the '## AC-NNN-NN' headings verbatim into the archive,
+# so a merged spec's IDs stay resolvable after specs/NNN-slug/ is deleted
+# (docs/SPEC_PIPELINE.md §Archive in the PR). Check 2 only — an archived spec
+# must not re-demand a test via check 1.
+ARCHIVED_IDS=""
+if [ -d "$ARCHIVE_DIR" ]; then
+  ARCHIVED_IDS=$(grep -rhoE '^## (AC-[0-9]{3}-[0-9]{2})' "$ARCHIVE_DIR"/*.md 2>/dev/null \
+    | sed -E 's/^## //' | sort -u || true)
+fi
+
+# Nothing to resolve against at all — no live specs and no archive. On a repo
+# whose specs are all merged and archived, ARCHIVED_IDS still lets check 2 catch
+# a typo'd ID, so this only fires when neither source exists.
+if [ -z "$SCENARIO_IDS" ] && [ -z "$ARCHIVED_IDS" ]; then
+  finish_clean "No AC-NNN-NN scenario headings found under $SPECS_DIR/*/20-acceptance/ or $ARCHIVE_DIR/*.md — nothing to check."
+fi
+
+say "Scenario IDs found: $(echo "$SCENARIO_IDS" | grep -c . || true) live, $(echo "$ARCHIVED_IDS" | grep -c . || true) archived"
 say ""
 
 # ── Collect every AC-NNN-NN reference anywhere in source/test files ──────────
@@ -173,6 +205,7 @@ REFERENCED_IDS=$(grep -rhoE 'AC[_-][0-9]{3}[_-][0-9]{2}' "$SOURCE_DIR" \
   --include="*.bats" --include="*_test.go" --include="*Test.java" --include="*PropertyTest.java" \
   --include="*.test.ts" --include="*.test.js" --include="*.spec.ts" --include="*.spec.js" \
   $GREP_EXCLUDES 2>/dev/null | tr '_' '-' | sort -u || true)
+
 
 # ── Check 1: every scenario has a matching test reference (AC-007-04-01) ─────
 if contains 1; then
@@ -191,21 +224,24 @@ fi
 
 # ── Check 2: every test reference resolves to a real scenario (AC-007-04-02) ─
 #
-# Scoped to in-flight spec numbers only (spec 027, AC-027-01): a finished,
-# archived spec's scenario headings are DELETED from specs/*/20-acceptance/
-# by design (docs/SPEC_PIPELINE.md §Archive in the PR — "the acceptance
-# scenarios survive in the test files as AC-NNN-NN IDs... the original prose
-# does not"). That means every merged spec's deliverables-gate script
-# (check-ci-sweeper.sh's AC-017-* self-citations, check-pr-review.sh's
-# AC-024-*, etc.) permanently and correctly cites AC-NNN-NN IDs whose
-# scenario heading no longer exists anywhere — by the pipeline's own design,
-# not a defect. Running check 2 unscoped against a repo with even one
-# archived spec always reports every archived spec's legitimate citations
-# (and every other spec's own negative-case fixture IDs, e.g. AC-999-99) as
-# "dangling" — noise, not signal, and it would make check 2 permanently red
-# the moment any spec merges. The only reference a stale/typo'd-ID check can
-# meaningfully make right now is against a spec that is CURRENTLY in
-# specs/ (not yet archived) — so only those spec numbers are in scope.
+# Per-spec-number authority (hybrid of spec 027 and the archive-resolution fix):
+# a reference is judged only against the source that can actually answer for its
+# spec number.
+#
+#   in-flight  specs/NNN-*/ exists          -> resolve against SCENARIO_IDS
+#   archived   docs/changes/NNN-*.md exists -> resolve against ARCHIVED_IDS
+#   neither                                 -> skip, no authority to judge
+#
+# Why not in-flight only: §Archive in the PR deletes specs/NNN-slug/ on merge,
+# so scoping to in-flight numbers stops validating a spec's IDs the moment it
+# merges — a typo in a merged spec's citation would never be caught again.
+# archive-spec.sh copies the '## AC-NNN-NN' headings verbatim into the
+# one-pager, so the archive can still answer for those numbers.
+#
+# Why not unscoped: a reference to a number that was never archived and is not
+# in flight has no authority behind it — negative-case fixture IDs
+# (e.g. AC-999-99) and self-citations in gate scripts for specs archived before
+# this convention existed would read as dangling. Those are noise, not signal.
 IN_FLIGHT_NUMS=""
 for d in "$SPECS_DIR"/*/; do
   [ -d "$d" ] || continue
@@ -215,17 +251,38 @@ for d in "$SPECS_DIR"/*/; do
   esac
 done
 
+ARCHIVED_NUMS=""
+if [ -d "$ARCHIVE_DIR" ]; then
+  for f in "$ARCHIVE_DIR"/*.md; do
+    [ -f "$f" ] || continue
+    base="$(basename "$f")"
+    case "$base" in
+      [0-9][0-9][0-9]-*) ARCHIVED_NUMS="$ARCHIVED_NUMS ${base%%-*}" ;;
+    esac
+  done
+fi
+
 if contains 2; then
   for id in $REFERENCED_IDS; do
     num="${id#AC-}"; num="${num%%-*}"
     case " $IN_FLIGHT_NUMS " in
-      *" $num "*) ;;   # in-flight spec number — check it below
-      *) continue ;;   # archived or nonexistent spec number — out of scope, not a finding
+      *" $num "*)
+        if ! echo "$SCENARIO_IDS" | grep -qx "$id"; then
+          fail "$id — referenced in a test but no matching scenario heading exists in " \
+               "$SPECS_DIR/*/20-acceptance/ for in-flight spec $num. Stale ID after a rename, or a typo."
+        fi
+        continue ;;
     esac
-    if ! echo "$SCENARIO_IDS" | grep -qx "$id"; then
-      fail "$id — referenced in a test but no matching scenario heading exists in " \
-           "$SPECS_DIR/*/20-acceptance/. Stale ID after a rename, or a typo."
-    fi
+    case " $ARCHIVED_NUMS " in
+      *" $num "*)
+        if ! echo "$ARCHIVED_IDS" | grep -qx "$id"; then
+          fail "$id — referenced in a test but no matching scenario heading exists in " \
+               "$ARCHIVE_DIR/$num-*.md for archived spec $num. Stale ID after a rename, or a typo."
+        fi
+        continue ;;
+    esac
+    # No specs/NNN-*/ and no docs/changes/NNN-*.md — nothing authoritative to
+    # resolve against, so this reference is out of scope rather than a finding.
   done
   say ""
 fi

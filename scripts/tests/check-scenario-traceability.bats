@@ -40,14 +40,21 @@ trace_id() { printf 'AC-%03d-%02d' "$1" "$2"; }
 }
 
 @test "AC-002-05: check-scenario-traceability fails on dangling test reference" {
+  # The dangling ID must belong to a spec number that has an authority to be
+  # judged against — here the in-flight specs/001-foo/. A reference to a number
+  # with neither a specs/NNN-*/ folder nor a docs/changes/NNN-*.md one-pager is
+  # deliberately out of scope (see check 2 in the script), so a bogus AC-999-01
+  # would be skipped rather than flagged.
   local bogus real
-  bogus=$(trace_id 999 01)
-  real=$(trace_id 3 01)
+  bogus=$(trace_id 1 99)
+  real=$(trace_id 1 01)
   mkdir -p "$TMPDIR_HELPER/specs/001-foo/20-acceptance"
   printf '## %s — real\nGiven real\n' "$real" > "$TMPDIR_HELPER/specs/001-foo/20-acceptance/${real}.md"
   mkdir -p "$TMPDIR_HELPER/src"
-  printf 'func Test%s(t *testing.T) {}\n' "$(printf '%s' "$bogus" | tr '-' '_')" > "$TMPDIR_HELPER/src/foo_test.go"
-  run --separate-stderr bash "$REPO_ROOT/scripts/check-scenario-traceability.sh" "$TMPDIR_HELPER/specs" "$TMPDIR_HELPER/src"
+  printf 'func Test%s(t *testing.T) {}\nfunc Test%s(t *testing.T) {}\n' \
+    "$(printf '%s' "$real" | tr '-' '_')" "$(printf '%s' "$bogus" | tr '-' '_')" \
+    > "$TMPDIR_HELPER/src/foo_test.go"
+  run --separate-stderr bash "$REPO_ROOT/scripts/check-scenario-traceability.sh" "$TMPDIR_HELPER/specs" "$TMPDIR_HELPER/src" "$TMPDIR_HELPER/changes"
   [ "$status" -eq 1 ]
   [[ "$output" == *"$bogus"* ]]
 }
