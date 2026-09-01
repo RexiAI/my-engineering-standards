@@ -12,7 +12,7 @@ on:
 
 jobs:
   ci:
-    uses: RexiAI/my-engineering-standards/.github/workflows/ci-node.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-node.yml@21046d96796467f8238d6d613ce3a552bf3fced0 # pinned; bump deliberately, never track a branch
     with:
       node-version: "22"
       deploy-on-main: true

@@ -1,10 +1,14 @@
 name: PR Review Agent
 
-# Shared PR review workflow (spec 024): run the pr-review agent headless
-# against a PR and post findings as a review comment. Review + suggest fixes
-# only — the agent's permission block denies edits and this workflow grants no
-# write capability beyond posting a comment. Comment-only by construction: no
-# repo-content write, no merge, no push step anywhere in this file.
+# Shared PR review workflow (spec 024, hardened spec 026): run the pr-review
+# agent headless against a PR and post findings as a review comment. Review +
+# suggest fixes only — the agent's permission block (agents/pr-review.md)
+# denies edits and this workflow grants no write capability beyond posting a
+# comment. Comment-only by construction: no repo-content write, no merge, no
+# push step anywhere in this file. The permission block is loaded for real:
+# the review step invokes `opencode run --agent pr-review`, not a
+# string-concatenated prompt with the frontmatter stripped out (spec 026,
+# AC-026-02 — see the review step's comments for what that used to do wrong).
 #
 # Consumers (child repos via init-ci.sh --with-pr-review, and this repo's own
 # .github/workflows/pr-review.yml) call this with pr-number + head-sha. The
@@ -46,7 +50,7 @@ jobs:
       # config/model.local.env.example — same chain as every other agent.
       PR_REVIEW_MODEL: ${{ vars.PR_REVIEW_MODEL }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
         with:
           # The calling repository, including its .standards submodule (child
           # repos resolve the agent from .standards/agents/). No credentials in
@@ -138,21 +142,28 @@ jobs:
           # A billing issue is not a code defect — fail the step only if the
           # error is something else.
           #
-          # pr-review is declared as mode: subagent, so --agent is rejected
-          # by opencode. Embed the agent's instructions directly in the
-          # prompt instead (same pattern as ci-sweeper.yml).
+          # AC-026-02: invoke the agent by name (`--agent pr-review`), not by
+          # catting agents/pr-review.md into a plain prompt string. The old
+          # approach required stripping the frontmatter with
+          # `sed '/^---$/,/^---$/d'` to avoid feeding YAML into the prompt —
+          # which silently deleted the entire `permission` block before
+          # opencode ever saw it, so `edit: deny` and the bash allowlist were
+          # enforced in the committed file but NOT in the actual CI run. The
+          # agent's mode is `primary` (agents/pr-review.md) specifically so
+          # `--agent` is accepted here and the real permission block loads.
           #
           # The subshell + set +e wrapper is required because set -euo
-          # pipefail (line 110) would exit the script before review_rc=$?
+          # pipefail (above) would exit the script before review_rc=$?
           # is reached when opencode returns non-zero.
-          # Build the prompt with printf, not a multi-line double-quoted
-          # assignment: an unindented line inside the run:| block scalar
-          # terminates the scalar and breaks YAML parsing (that bug shipped
-          # in e812761 and failed the Validate gate post-merge).
-          agent_instructions="$(cat agents/pr-review.md | sed '/^---$/,/^---$/d')"
-          prompt="$(printf 'You are the PR review agent. Review PR %s at head %s.\n\n%s\n\nPost your findings as one PR review comment via gh. End the comment with:\nReviewed-SHA: %s' "${PR_NUMBER}" "${HEAD_SHA}" "${agent_instructions}" "${HEAD_SHA}")"
+          # The task prompt carries only trusted, workflow-supplied values
+          # (PR number, head SHA) — never PR-author-controlled content. The
+          # agent fetches the diff itself via its own allow-listed `gh`/`git`
+          # commands and is instructed (agents/pr-review.md §Untrusted content
+          # warning) to treat that content as data, never as instructions.
+          prompt="Review PR ${PR_NUMBER} at head ${HEAD_SHA}. Post your findings as one PR review comment via gh. End the comment with: Reviewed-SHA: ${HEAD_SHA}"
 
           review_output=$(set +e; /tmp/opencode-bin/opencode run --print-logs \
+            --agent pr-review \
             "${prompt}" 2>&1) && review_rc=0 || review_rc=$?
 
           if [ "$review_rc" -ne 0 ]; then

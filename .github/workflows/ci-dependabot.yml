@@ -1,22 +1,38 @@
 name: Dependabot
 
+# Hardened (spec 026, AC-026-10): auto-merge is now patch-only. Minor bumps
+# are a routine malware-delivery vector (a compromised registry account can
+# ship a malicious minor release just as easily as a patch) and still get
+# `gh pr merge --auto`'d — this workflow's automation only removes *human*
+# review latency for the lowest-risk bump class; it deliberately does not
+# extend to every bump semver allows. Minor and major bumps still open a
+# normal Dependabot PR requiring human approval.
+#
+# Prerequisite (undocumented before this spec, now explicit): this workflow's
+# safety depends entirely on the repo's branch protection actually requiring
+# passing status checks before merge — `gh pr merge --auto` respects branch
+# protection, it does not bypass it. If required checks are not configured
+# on the target branch (see templates/branch-protection.md), `--auto` merges
+# immediately with no CI gate at all. Verify branch protection is configured
+# before enabling this workflow.
+
 on:
   workflow_call:
 
 jobs:
   auto-merge:
-    name: Auto-merge patch/minor
+    name: Auto-merge patch only
     if: github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
     steps:
-      - uses: dependabot/fetch-metadata@v2
+      - uses: dependabot/fetch-metadata@21025c705c08248db411dc16f3619e6b5f9ea21a # v2.4.0
         id: metadata
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
       - name: Approve & merge
-        if: contains(fromJSON('["version-update:semver-patch", "version-update:semver-minor"]'), steps.metadata.outputs.update-type)
+        if: steps.metadata.outputs.update-type == 'version-update:semver-patch'
         run: |
           gh pr review --approve "$PR_URL"
           gh pr merge --auto --squash "$PR_URL"

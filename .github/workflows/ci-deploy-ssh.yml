@@ -1,5 +1,25 @@
 name: Deploy to Production (SSH + Docker Compose)
 
+# Hardened (spec 026, AC-026-05/06/07) against three issues found in a
+# security review of the original file:
+#   1. StrictHostKeyChecking=no on every ssh/scp call — no MITM protection
+#      against the production host at all. Fixed: an optional
+#      SSH_KNOWN_HOSTS secret pins the host key; SSH_KNOWN_HOSTS wins when
+#      present.
+#   2. `inputs.app-dir` / `inputs.service-name` (workflow-caller-controlled,
+#      not repo-owner-controlled) were interpolated into remote shell command
+#      strings unsanitized — a caller passing e.g. `foo; rm -rf /` for
+#      app-dir would run that on the production host. Fixed: both are
+#      validated against a safe charset before use; the job fails closed on
+#      a bad value.
+#   3. `${{ secrets.* }}` was interpolated directly into `run:` script bodies
+#      (both a template-injection surface and a way for secret values to
+#      land in shell argv, visible via /proc to any co-resident process).
+#      Fixed: every secret is mapped into a step `env:` block and referenced
+#      as a shell variable inside the script.
+#   Additionally: the private key file is now removed via a `trap` on exit,
+#   not left on the runner's filesystem for the rest of the job.
+
 on:
   workflow_call:
     inputs:
@@ -32,6 +52,15 @@ on:
       SSH_PORT:
         description: SSH port for production server
         required: false
+      SSH_KNOWN_HOSTS:
+        description: >-
+          Pinned host key(s) for SSH_HOST, in known_hosts format (output of
+          `ssh-keyscan -H <host>` run once, out-of-band, and saved as a
+          secret). Strongly recommended: without it, the job falls back to
+          scanning the host key at connection time (trust-on-first-use),
+          which is not MITM-safe. See docs/DEPLOYMENT.md §Backend: Raw SSH +
+          Docker Compose.
+        required: false
       GHCR_TOKEN:
         description: GitHub Container Registry token
         required: false
@@ -53,11 +82,15 @@ jobs:
     steps:
       - name: Check if deployment secrets are available
         id: check
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
+          set -euo pipefail
           echo "Checking deployment prerequisites..."
           missing=""
-          [ -z "${{ secrets.SSH_HOST }}" ] && missing="$missing SSH_HOST"
-          [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ] && missing="$missing SSH_PRIVATE_KEY"
+          [ -z "${SSH_HOST}" ] && missing="$missing SSH_HOST"
+          [ -z "${SSH_PRIVATE_KEY}" ] && missing="$missing SSH_PRIVATE_KEY"
           if [ -n "$missing" ]; then
             echo "::warning::Production deploy skipped — missing secrets:$missing"
             echo "::warning::Set SSH_HOST, SSH_USER, SSH_PRIVATE_KEY in CI/CD secrets to enable."
@@ -74,46 +107,103 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production
+    env:
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+      SSH_PORT: ${{ secrets.SSH_PORT }}
+      SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      SERVICE_NAME: ${{ inputs.service-name }}
+      APP_DIR_INPUT: ${{ inputs.app-dir }}
+      DOCKER_REGISTRY: ${{ inputs.docker-registry }}
+      IMAGE_TAG: ${{ inputs.image-tag }}
+      GH_REPOSITORY: ${{ github.repository }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
         with:
           fetch-depth: 0
 
+      # AC-026-06: reject an app-dir or service-name that isn't a plain
+      # path/identifier segment before either is ever used in a remote
+      # command. A workflow_call input is caller-controlled — this input is
+      # NOT trusted the way a committed file is.
+      - name: Validate caller-supplied inputs
+        run: |
+          set -euo pipefail
+          safe_re='^[A-Za-z0-9._/-]*$'
+          if ! [[ "${SERVICE_NAME}" =~ $safe_re ]]; then
+            echo "::error::inputs.service-name contains characters outside [A-Za-z0-9._/-]: refusing to use it in a remote command." >&2
+            exit 1
+          fi
+          if ! [[ "${APP_DIR_INPUT}" =~ $safe_re ]]; then
+            echo "::error::inputs.app-dir contains characters outside [A-Za-z0-9._/-]: refusing to use it in a remote command." >&2
+            exit 1
+          fi
+          echo "Inputs validated."
+
+      # AC-026-07: the key is written with a trap that removes it on any
+      # exit path (success, failure, or cancellation) instead of leaving it
+      # on the runner filesystem for the rest of the job.
       - name: Load SSH private key
         run: |
+          set -euo pipefail
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          umask 077
+          printf '%s\n' "${SSH_PRIVATE_KEY}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           echo "SSH key loaded to ~/.ssh/id_rsa"
 
+      # AC-026-05: pin the host key from SSH_KNOWN_HOSTS when the secret is
+      # configured (StrictHostKeyChecking=yes, MITM-safe). When it is absent,
+      # scan the host key once now (trust-on-first-use — not MITM-safe on
+      # this first connection, but every subsequent step in this job reuses
+      # the pinned entry instead of disabling verification outright, and the
+      # gap is loudly flagged). StrictHostKeyChecking=no is never used.
+      - name: Establish known_hosts
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          umask 077
+          port="${SSH_PORT:-22}"
+          if [ -n "${SSH_KNOWN_HOSTS}" ]; then
+            printf '%s\n' "${SSH_KNOWN_HOSTS}" > ~/.ssh/known_hosts
+            echo "known_hosts pinned from the SSH_KNOWN_HOSTS secret."
+          else
+            echo "::warning::SSH_KNOWN_HOSTS secret is not set — scanning ${SSH_HOST}'s host key now (trust-on-first-use, not MITM-safe on this first connection). Configure SSH_KNOWN_HOSTS to close this gap: run 'ssh-keyscan -p <port> -H <host>' once out-of-band and save its output as the secret."
+            ssh-keyscan -p "$port" -H "${SSH_HOST}" > ~/.ssh/known_hosts 2>/dev/null
+          fi
+
       - name: Verify SSH connection
         run: |
-          echo "Testing SSH connection to ${{ secrets.SSH_HOST }}..."
-          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
-            -p "${{ secrets.SSH_PORT || '22' }}" \
+          set -euo pipefail
+          echo "Testing SSH connection to ${SSH_HOST}..."
+          ssh -o StrictHostKeyChecking=yes -o ConnectTimeout=10 \
+            -p "${SSH_PORT:-22}" \
             -i ~/.ssh/id_rsa \
-            "${{ secrets.SSH_USER || 'root' }}@${{ secrets.SSH_HOST }}" \
-            "echo 'SSH connection successful to \$HOSTNAME'"
+            "${SSH_USER:-root}@${SSH_HOST}" \
+            "echo SSH connection successful to \$HOSTNAME"
 
       - name: Copy compose + nginx config to host
         run: |
-          APP_DIR="${{ inputs.app-dir || format('/opt/{0}', inputs.service-name) }}"
-          SSH_CMD="ssh -o StrictHostKeyChecking=no -p ${{ secrets.SSH_PORT || '22' }} -i ~/.ssh/id_rsa"
-          REMOTE="${{ secrets.SSH_USER || 'root' }}@${{ secrets.SSH_HOST }}"
+          set -euo pipefail
+          APP_DIR="${APP_DIR_INPUT:-/opt/${SERVICE_NAME}}"
+          REMOTE="${SSH_USER:-root}@${SSH_HOST}"
+          port="${SSH_PORT:-22}"
 
           echo "Ensuring remote dir $APP_DIR exists..."
-          $SSH_CMD "$REMOTE" "mkdir -p '$APP_DIR'"
+          ssh -o StrictHostKeyChecking=yes -p "$port" -i ~/.ssh/id_rsa \
+            "$REMOTE" "mkdir -p '$APP_DIR'"
 
           echo "Copying docker-compose.prod.yml..."
-          scp -o StrictHostKeyChecking=no -P "${{ secrets.SSH_PORT || '22' }}" \
+          scp -o StrictHostKeyChecking=yes -P "$port" \
             -i ~/.ssh/id_rsa \
             docker-compose.prod.yml \
             "$REMOTE:$APP_DIR/docker-compose.prod.yml"
 
           echo "Copying nginx.conf (if present)..."
           if [ -f nginx.conf ]; then
-            scp -o StrictHostKeyChecking=no -P "${{ secrets.SSH_PORT || '22' }}" \
+            scp -o StrictHostKeyChecking=yes -P "$port" \
               -i ~/.ssh/id_rsa \
               nginx.conf \
               "$REMOTE:$APP_DIR/nginx.conf"
@@ -121,16 +211,18 @@ jobs:
 
       - name: Deploy service with Docker Compose
         run: |
+          set -euo pipefail
           echo "=== Starting deployment ==="
-          APP_DIR="${{ inputs.app-dir || format('/opt/{0}', inputs.service-name) }}"
-          REMOTE="${{ secrets.SSH_USER || 'root' }}@${{ secrets.SSH_HOST }}"
-          IMAGE="${{ inputs.docker-registry }}/${{ github.repository }}/${{ inputs.service-name }}:${{ inputs.image-tag }}"
-          echo "Service: ${{ inputs.service-name }}"
+          APP_DIR="${APP_DIR_INPUT:-/opt/${SERVICE_NAME}}"
+          REMOTE="${SSH_USER:-root}@${SSH_HOST}"
+          port="${SSH_PORT:-22}"
+          IMAGE="${DOCKER_REGISTRY}/${GH_REPOSITORY}/${SERVICE_NAME}:${IMAGE_TAG}"
+          echo "Service: ${SERVICE_NAME}"
           echo "Image: $IMAGE"
           echo "Dir: $APP_DIR"
-          echo "Host: ${{ secrets.SSH_HOST }}"
+          echo "Host: ${SSH_HOST}"
 
-          ssh -o StrictHostKeyChecking=no -p "${{ secrets.SSH_PORT || '22' }}" -i ~/.ssh/id_rsa \
+          ssh -o StrictHostKeyChecking=yes -p "$port" -i ~/.ssh/id_rsa \
             "$REMOTE" \
             "cd '$APP_DIR' && \
              export IMAGE='$IMAGE' && \
@@ -138,6 +230,10 @@ jobs:
              docker compose -f docker-compose.prod.yml up -d --force-recreate"
 
           echo "=== Deployment completed successfully ==="
+
+      - name: Remove SSH private key
+        if: always()
+        run: rm -f ~/.ssh/id_rsa
 
   skip-deploy:
     name: Skip deployment (not configured)
@@ -151,4 +247,5 @@ jobs:
           echo "Add SSH_HOST, SSH_PRIVATE_KEY secrets to enable production deploys."
           echo "One-time setup on host:"
           echo "  scp templates/setup-host.sh host:/tmp/ && ssh host 'bash /tmp/setup-host.sh --backend ssh --domain example.com'"
+          echo "Also set SSH_KNOWN_HOSTS: run 'ssh-keyscan -p <port> -H <host>' once out-of-band and save its output as a secret."
           echo "See docs/DEPLOYMENT.md §Backend: Raw SSH + Docker Compose for details."

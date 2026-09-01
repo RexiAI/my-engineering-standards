@@ -134,7 +134,7 @@ The child's `ci.yml` calls orthogonal reusable workflows — one per layer:
 jobs:
   # ── Backend CI ──
   backend-ci:
-    uses: RexiAI/my-engineering-standards/.github/workflows/ci-go.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-go.yml@<commit-sha>  # pinned — see docs/SECURITY.md §CI/CD Supply Chain
     with:
       go-version-file: go.mod
       docker-registry: ghcr.io
@@ -143,7 +143,7 @@ jobs:
 
   # ── Frontend CI ──
   frontend-ci:
-    uses: RexiAI/my-engineering-standards/.github/workflows/ci-nextjs.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-nextjs.yml@<commit-sha>  # pinned — see docs/SECURITY.md §CI/CD Supply Chain
     with:
       node-version-file: .nvmrc
     secrets:
@@ -153,14 +153,14 @@ jobs:
   release:
     needs: [backend-ci, frontend-ci]
     if: github.ref_name == github.event.repository.default_branch
-    uses: RexiAI/my-engineering-standards/.github/workflows/ci-release.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-release.yml@<commit-sha>  # pinned — see docs/SECURITY.md §CI/CD Supply Chain
     secrets:
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
   # ── Shared: E2E (weekly schedule) ──
   e2e:
     if: github.event_name == 'schedule'
-    uses: RexiAI/my-engineering-standards/.github/workflows/ci-e2e-weekly.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-e2e-weekly.yml@<commit-sha>  # pinned — see docs/SECURITY.md §CI/CD Supply Chain
     with:
       target-url: https://staging.example.com
 ```
@@ -192,7 +192,7 @@ on:
   workflow_dispatch: {}
 jobs:
   bump:
-    uses: RexiAI/my-engineering-standards/.github/workflows/ci-toolchain-bump.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-toolchain-bump.yml@<commit-sha>  # pinned — see docs/SECURITY.md §CI/CD Supply Chain
 ```
 
 It skips any manifest that doesn't exist in the consumer repo — safe to add even if you only use one of Go/Node/Python.
@@ -278,8 +278,8 @@ All reusable workflows live flat in `.github/workflows/` — no `backend/`, `fro
 A consumer's `uses:` therefore always points at a flat path:
 
 ```yaml
-uses: RexiAI/my-engineering-standards/.github/workflows/ci-go.yml@main
-uses: RexiAI/my-engineering-standards/.github/workflows/ci-release.yml@main
+uses: RexiAI/my-engineering-standards/.github/workflows/ci-go.yml@<commit-sha>  # pinned — see docs/SECURITY.md §CI/CD Supply Chain
+uses: RexiAI/my-engineering-standards/.github/workflows/ci-release.yml@<commit-sha>  # pinned — see docs/SECURITY.md §CI/CD Supply Chain
 ```
 
 If your `ci.yml` still references the old subdirectory paths (`backend/`, `frontend/`, `shared/`), update them to the flat equivalents:
@@ -347,7 +347,7 @@ on:
 
 jobs:
   e2e:
-    uses: RexiAI/my-engineering-standards/.github/workflows/ci-e2e-weekly.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-e2e-weekly.yml@<commit-sha>  # pinned — see docs/SECURITY.md §CI/CD Supply Chain
     with:
       target-url: https://staging.example.com
       smoke-endpoints: /health,/api/v1/users/me,/api/v1/products
@@ -456,7 +456,7 @@ files they reference, with no other information needed.
    ```yaml
    release:
      if: ${{ github.event_name == 'push' && github.ref_name == github.event.repository.default_branch }}
-     uses: RexiAI/my-engineering-standards/.github/workflows/ci-release.yml@main
+     uses: RexiAI/my-engineering-standards/.github/workflows/ci-release.yml@<commit-sha>  # pinned — see docs/SECURITY.md §CI/CD Supply Chain
      secrets:
        GH_TOKEN: ${{ secrets.GH_TOKEN }}
    ```
@@ -541,7 +541,7 @@ PR review is opt-in per child, mirroring `§Release Process`:
 ```
 
 The flag appends a `pr-review` job to the generated `.github/workflows/ci.yml`
-that calls `RexiAI/my-engineering-standards/.github/workflows/ci-pr-review.yml@main`
+that calls `RexiAI/my-engineering-standards/.github/workflows/ci-pr-review.yml@<commit-sha>  # pinned — see docs/SECURITY.md §CI/CD Supply Chain`
 with `OPENCODE_API_KEY` mapped from the repo's secrets, and prompts for the
 secret during generation. On `--platform gitlab` the flag prints a warning and
 emits nothing — the shared workflow is GitHub Actions-only.

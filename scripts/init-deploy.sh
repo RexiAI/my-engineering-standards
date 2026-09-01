@@ -21,6 +21,13 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
+# Commit SHA this repo's own reusable workflows are pinned to when generated
+# into a child repo (spec 026, AC-026-13; docs/SECURITY.md §CI/CD Supply
+# Chain). Never `@main` — see scripts/init-ci.sh's STANDARDS_PIN, the same
+# constant duplicated here because this script generates its own ci.yml
+# independently. Bump both together.
+STANDARDS_PIN="21046d96796467f8238d6d613ce3a552bf3fced0"
+
 info() { echo -e "${CYAN}ℹ${NC} $1"; }
 ok() { echo -e "${GREEN}✔${NC} $1"; }
 warn() { echo -e "${YELLOW}⚠${NC} $1"; }
@@ -331,7 +338,7 @@ on:
 
 jobs:
   backend-ci:
-    uses: RexiAI/my-engineering-standards/.github/workflows/ci-${BACKEND:-go}.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-${BACKEND:-go}.yml@${STANDARDS_PIN} # pinned; bump deliberately, never track a branch
     with:
       docker-registry: $REGISTRY
     secrets:
@@ -340,7 +347,7 @@ jobs:
   deploy:
     needs: [backend-ci]
     if: \${ github.event_name == 'push' && github.ref_name == github.ref }
-    uses: RexiAI/my-engineering-standards/.github/workflows/ci-deploy-${DEPLOY_TOOL}.yml@main
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-deploy-${DEPLOY_TOOL}.yml@${STANDARDS_PIN} # pinned; bump deliberately, never track a branch
     with:
       service-name: $SERVICE_NAME
       docker-registry: $REGISTRY
@@ -354,7 +361,7 @@ EOF
     ok "Generated: .github/workflows/ci.yml (customize jobs as needed)"
   else
     warn "ci.yml already exists — add the deploy job manually:"
-    echo "  uses: RexiAI/my-engineering-standards/.github/workflows/ci-deploy-${DEPLOY_TOOL}.yml@main"
+    echo "  uses: RexiAI/my-engineering-standards/.github/workflows/ci-deploy-${DEPLOY_TOOL}.yml@${STANDARDS_PIN} # pinned; bump deliberately, never track a branch"
   fi
 fi
 
