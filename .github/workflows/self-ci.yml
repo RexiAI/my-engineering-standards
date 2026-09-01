@@ -15,9 +15,9 @@ jobs:
     name: Validate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.x'
 
@@ -159,14 +159,16 @@ jobs:
           bash scripts/model-env.runtime-check.sh /tmp/opencode-bin/opencode
 
       # Agent local-env gates (spec 013): the guard refuses to track
-      # config/agent.local.env, the hardcoded-secrets check scans the four
-      # dirs, and the selftest proves loader/guard/check fire. No
-      # continue-on-error: a committed secret or a gate regression fails the job.
+      # config/agent.local.env, the hardcoded-secrets check scans the scoped
+      # dirs (widened in spec 026, AC-026-09), and the selftests prove
+      # loader/guard/check fire. No continue-on-error: a committed secret or
+      # a gate regression fails the job.
       - name: Check agent env guard and hardcoded secrets
         run: |
           set -euo pipefail
           bash scripts/guard-env.sh
           bash scripts/check-no-hardcoded-secrets.sh
+          bash scripts/check-no-hardcoded-secrets.sh --self-test
           bash scripts/agent-env.selftest.sh
 
       - name: Run loop files check
@@ -188,6 +190,16 @@ jobs:
         run: |
           ./scripts/check-pr-review.sh
           ./scripts/check-pr-review.selftest.sh
+
+      # Security-hardening gate (spec 026): the check script doubles as the
+      # spec's test carrier for its thirteen findings — a regression in any
+      # one of them (e.g. StrictHostKeyChecking=no creeping back in, a
+      # secret-scan scope shrinking, an @main reference reappearing) fails
+      # the Validate job. --self-test proves the gate itself fails closed.
+      - name: Check security-hardening deliverables
+        run: |
+          ./scripts/check-security-hardening.sh
+          ./scripts/check-security-hardening.sh --self-test
 
       - name: Check remediation budget
         run: ./scripts/check-remediation-budget.sh

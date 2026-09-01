@@ -40,7 +40,7 @@ jobs:
     name: Daily Triage
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
         with:
           fetch-depth: 0
 
@@ -63,15 +63,14 @@ jobs:
           fi
 
       # Install the pinned opencode binary and sanity-check it. Same pinned
-      # release the repo's own self-ci uses for the model-env runtime check.
+      # release + checksum the repo's other headless workflows use — via the
+      # shared script (spec 026, AC-026-04): this step used to duplicate the
+      # download inline with no checksum verification and no version-drift
+      # protection (the exact bug class scripts/install-opencode.sh's own
+      # header warns other workflows about — this one just hadn't been wired
+      # to it yet).
       - name: Install opencode
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/opencode-bin
-          curl -sSL -o /tmp/opencode-bin/opencode-linux-x64.tar.gz \
-            https://github.com/anomalyco/opencode/releases/download/v1.18.18/opencode-linux-x64.tar.gz
-          tar -xzf /tmp/opencode-bin/opencode-linux-x64.tar.gz -C /tmp/opencode-bin
-          /tmp/opencode-bin/opencode --version
+        run: bash scripts/install-opencode.sh
 
       # The workflow never creates or edits the notification issue — that is
       # the run's job (the skill instructs creating or updating the issue via
