@@ -235,6 +235,15 @@ select CI_CHOICE in "GitHub Actions" "GitLab CI" "Skip"; do
 done
 fi
 
+# 5b. TDD feature templates (spec 001 Track A) — reference ci/templates/*-feature
+# Scaffolds for polyglot TDD: ci/templates/java-feature, ci/templates/go-feature, ci/templates/js-feature
+# Child repos copy one via: cp -r .standards/ci/templates/go-feature ./my-feature
+# No hard-coded child path (/home/ etc.) — uses REPO_ROOT and STANDARDS_DIR only.
+if [ -d "$STANDARDS_DIR/ci/templates/java-feature" ]; then
+  echo "[INFO] TDD scaffolds available: ci/templates/java-feature, ci/templates/go-feature, ci/templates/js-feature"
+  echo "  See docs/TESTING_TDD_GUIDE.md §(a) for bootstrap snippet."
+fi
+
 # 6. Session hygiene scripts
 echo ""
 echo "--- Session Hygiene ---"

@@ -91,6 +91,13 @@ jobs:
       - name: Check orchestration references
         run: ./scripts/check-orchestration.sh
 
+      # Vacuous-assertion gate: a bats test that would still pass with its
+      # script under test replaced by `exit 0` is theatre, not coverage.
+      # Also runs inside `make test-scripts`; named here so a failure is
+      # legible without reading the test job's log. No continue-on-error.
+      - name: Check bats assertions are not vacuous
+        run: ./scripts/check-bats-assertions.sh
+
       # Phase-2 loop mechanics gate (docs/SPEC_PIPELINE.md §Post-PR CI
       # check-and-remediate loop (phase 2), spec 014): grep-assert the post-PR
       # CI check is wired into the pipeline prompts/docs. No continue-on-error.
@@ -206,6 +213,19 @@ jobs:
       # (e.g. the complexity threshold raised so a fixture no longer fires)
       # fails the job. The principles selftest fail-fasts with a clear message
       # if 007's --gates flag is not yet merged — 012 lands in the same batch.
+      - name: Install bats-core
+        run: |
+          set -euo pipefail
+          if ! command -v bats >/dev/null 2>&1; then
+            git -c core.autocrlf=false clone --depth 1 --branch v1.11.0 https://github.com/bats-core/bats-core.git /tmp/bats-core
+            /tmp/bats-core/install.sh /tmp/bats-install
+            echo "/tmp/bats-install/bin" >> "$GITHUB_PATH"
+          fi
+          /tmp/bats-install/bin/bats --version 2>/dev/null || bats --version
+
+      - name: Run shell gate bats tests (spec 001 Track B)
+        run: make test-scripts
+
       - name: Run gate selftests
         run: |
           set -euo pipefail

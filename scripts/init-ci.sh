@@ -837,6 +837,15 @@ _copy_go_makefile() {
   done
 }
 
+# TDD feature templates (spec 001 Track A) — ci/templates/java-feature, ci/templates/go-feature, ci/templates/js-feature
+# Child repos bootstrap via: cp -r .standards/ci/templates/go-feature ./my-feature
+# No hard-coded child path (/home/ etc.) — uses PROJECT_ROOT and STANDARDS_DIR only.
+_note_feature_templates() {
+  if [ -d "$STANDARDS_DIR/ci/templates/java-feature" ]; then
+    info "TDD scaffolds available: ci/templates/java-feature, ci/templates/go-feature, ci/templates/js-feature (see docs/TESTING_TDD_GUIDE.md)"
+  fi
+}
+
 # ── Step 5: Print summary ─────────────────────────────────────────────────────
 print_summary() {
   echo ""
@@ -855,6 +864,7 @@ print_summary() {
   _print_deploy_note
   _print_release_note
   _print_pr_review_note
+  _note_feature_templates
   echo ""
 }
 

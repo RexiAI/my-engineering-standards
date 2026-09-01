@@ -142,7 +142,7 @@ if [ ! -d "$SOURCE_DIR" ] || [ ! -r "$SOURCE_DIR" ]; then
   exit 2
 fi
 
-GREP_EXCLUDES='--exclude-dir=node_modules --exclude-dir=target --exclude-dir=vendor --exclude-dir=.git --exclude-dir=.standards --exclude-dir=dist --exclude-dir=specs'
+GREP_EXCLUDES='--exclude-dir=node_modules --exclude-dir=target --exclude-dir=vendor --exclude-dir=.git --exclude-dir=.standards --exclude-dir=dist --exclude-dir=specs --exclude-dir=docs'
 
 # ── Collect scenario IDs from specs/*/20-acceptance/*.md ─────────────────────
 # Match "## AC-NNN-NN" headings, e.g. "## AC-002-01 — Apply a percentage discount"
@@ -158,8 +158,16 @@ say ""
 
 # ── Collect every AC-NNN-NN reference anywhere in source/test files ──────────
 # Test naming turns hyphens into underscores (AC_002_01) per docs/SPEC_PIPELINE.md,
-# so match both forms.
+# so match both forms. Only scan test file patterns — gate scripts contain
+# archived AC IDs as check strings (e.g. scripts/check-remediation-budget.sh
+# references AC-008-01) which are not test references and would otherwise
+# appear as dangling after the spec is archived. See spec 001 AC-002-06
+# hermetic note. Scan test files only: bats, Go _test.go, Java *Test.java,
+# JS/TS *.test.* / *.spec.*. Scaffold templates in ci/templates are also
+# considered test sources via their test files.
 REFERENCED_IDS=$(grep -rhoE 'AC[_-][0-9]{3}[_-][0-9]{2}' "$SOURCE_DIR" \
+  --include="*.bats" --include="*_test.go" --include="*Test.java" --include="*PropertyTest.java" \
+  --include="*.test.ts" --include="*.test.js" --include="*.spec.ts" --include="*.spec.js" \
   $GREP_EXCLUDES 2>/dev/null | tr '_' '-' | sort -u || true)
 
 # ── Check 1: every scenario has a matching test reference (AC-007-04-01) ─────
