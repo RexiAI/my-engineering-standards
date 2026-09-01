@@ -225,6 +225,19 @@ jobs:
           bash scripts/check-scenario-traceability.selftest.sh
           bash scripts/tests/gate-telemetry.selftest.sh
 
+      # Live scenario-traceability check (spec 027, AC-027-02): the selftest
+      # above only proves the checker's logic against hermetic fixtures — it
+      # never ran against this repo's own specs/ + source tree, so a real
+      # in-flight spec's dangling/untraced reference could ship unnoticed.
+      # Safe to run unconditionally now that check-scenario-traceability.sh's
+      # check 2 is scoped to in-flight specs/NNN-*/ folders only (spec 027) —
+      # an archived spec's permanent, by-design AC-NNN-NN self-citations in
+      # its surviving gate script no longer produce false-positive noise.
+      # A no-op, exit 0, when no specs/ folder is present (the normal state
+      # of main between spec PRs).
+      - name: Check scenario traceability (live tree)
+        run: bash scripts/check-scenario-traceability.sh
+
       # Note: this intentionally mirrors `make lint`'s YAML scope (.github + ci),
       # not full-repo. Expanding scope belongs in the Makefile, not here.
       - name: Validate YAML syntax (.github, ci)

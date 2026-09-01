@@ -5,9 +5,13 @@
 # Checks:
 #   1. Every AC-NNN-NN heading in specs/*/20-acceptance/*.md has a matching test
 #      (test name/description containing the same ID, underscores or hyphens).
-#   2. Every AC-NNN-NN reference found in test files resolves to a real scenario
-#      heading — catches copy-paste typos and stale IDs after a scenario is
-#      renumbered or removed.
+#   2. Every AC-NNN-NN reference found in test files, for a spec number that
+#      currently has an in-flight specs/NNN-*/ folder, resolves to a real
+#      scenario heading — catches copy-paste typos and stale IDs after a
+#      scenario is renumbered or removed, within the spec currently being
+#      worked. References to already-archived specs' own gate-script
+#      self-citations, and to numbers with no specs/ folder at all, are out
+#      of scope by design (spec 027 — see the check-2 block below).
 #
 # The Verifier re-runs a single failing check on a BLOCK/FAIL fix
 # (AC-007-02, AC-007-04): --checks narrows the run to check 1 and/or check 2,
@@ -178,8 +182,38 @@ if contains 1; then
 fi
 
 # ── Check 2: every test reference resolves to a real scenario (AC-007-04-02) ─
+#
+# Scoped to in-flight spec numbers only (spec 027, AC-027-01): a finished,
+# archived spec's scenario headings are DELETED from specs/*/20-acceptance/
+# by design (docs/SPEC_PIPELINE.md §Archive in the PR — "the acceptance
+# scenarios survive in the test files as AC-NNN-NN IDs... the original prose
+# does not"). That means every merged spec's deliverables-gate script
+# (check-ci-sweeper.sh's AC-017-* self-citations, check-pr-review.sh's
+# AC-024-*, etc.) permanently and correctly cites AC-NNN-NN IDs whose
+# scenario heading no longer exists anywhere — by the pipeline's own design,
+# not a defect. Running check 2 unscoped against a repo with even one
+# archived spec always reports every archived spec's legitimate citations
+# (and every other spec's own negative-case fixture IDs, e.g. AC-999-99) as
+# "dangling" — noise, not signal, and it would make check 2 permanently red
+# the moment any spec merges. The only reference a stale/typo'd-ID check can
+# meaningfully make right now is against a spec that is CURRENTLY in
+# specs/ (not yet archived) — so only those spec numbers are in scope.
+IN_FLIGHT_NUMS=""
+for d in "$SPECS_DIR"/*/; do
+  [ -d "$d" ] || continue
+  base="$(basename "$d")"
+  case "$base" in
+    [0-9][0-9][0-9]-*) IN_FLIGHT_NUMS="$IN_FLIGHT_NUMS ${base%%-*}" ;;
+  esac
+done
+
 if contains 2; then
   for id in $REFERENCED_IDS; do
+    num="${id#AC-}"; num="${num%%-*}"
+    case " $IN_FLIGHT_NUMS " in
+      *" $num "*) ;;   # in-flight spec number — check it below
+      *) continue ;;   # archived or nonexistent spec number — out of scope, not a finding
+    esac
     if ! echo "$SCENARIO_IDS" | grep -qx "$id"; then
       fail "$id — referenced in a test but no matching scenario heading exists in " \
            "$SPECS_DIR/*/20-acceptance/. Stale ID after a rename, or a typo."
