@@ -1,3 +1,10 @@
+## [1.30.4](https://github.com/RexiAI/my-engineering-standards/compare/v1.30.3...v1.30.4) (2026-09-02)
+
+
+### Bug Fixes
+
+* **scripts:** distinguish git tooling failure from gitignore finding in env selftests ([#67](https://github.com/RexiAI/my-engineering-standards/issues/67)) ([0816d3a](https://github.com/RexiAI/my-engineering-standards/commit/0816d3aa60da3134560a4f71610df153cdd56ade))
+
 ## [1.30.3](https://github.com/RexiAI/my-engineering-standards/compare/v1.30.2...v1.30.3) (2026-09-02)
 
 
