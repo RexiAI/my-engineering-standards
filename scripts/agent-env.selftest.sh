@@ -19,6 +19,8 @@
 # Exit codes:
 #   0 — every case passes
 #   1 — at least one case failed
+#   2 — tooling failure: git cannot read the repo, so no assertion below could
+#       report honestly (see git_repo_usable in scripts/check-common.sh)
 set -euo pipefail
 
 RED='\033[0;31m'
@@ -30,6 +32,15 @@ GUARD="$ROOT/scripts/guard-env.sh"
 SECRETS_CHECK="$ROOT/scripts/check-no-hardcoded-secrets.sh"
 REAL_ENV="config/agent.local.env"
 EXAMPLE_ENV="config/agent.local.env.example"
+
+# Shared helpers (git_ignore_status, git_repo_usable).
+# shellcheck disable=SC1091
+source "$ROOT/scripts/check-common.sh"
+
+# Every git-backed assertion below is meaningless if git cannot read the repo,
+# so fail as a tooling failure (exit 2) rather than run assertions that would
+# all misreport an unusable config as a content finding.
+git_repo_usable "$ROOT" || exit 2
 
 PASS_COUNT=0
 FAIL_COUNT=0
@@ -68,8 +79,11 @@ else
 fi
 # Tracked after the PR Opener commits it; before that, "trackable" is the
 # pre-commit invariant: not gitignored and stageable with git add --dry-run.
-if git -C "$ROOT" ls-files --error-unmatch -- "$EXAMPLE_ENV" >/dev/null 2>&1 \
-   || { ! git -C "$ROOT" check-ignore -q -- "$EXAMPLE_ENV" \
+st_example="$(git_ignore_status "$ROOT" "$EXAMPLE_ENV")"
+if [ "$st_example" = git-error ]; then
+  bad "could not run the gitignore check on the example: git failed on this repo — see the git_repo_usable diagnostic; this is NOT a finding about the file"
+elif git -C "$ROOT" ls-files --error-unmatch -- "$EXAMPLE_ENV" >/dev/null 2>&1 \
+   || { [ "$st_example" = not-ignored ] \
         && git -C "$ROOT" add -n -- "$EXAMPLE_ENV" >/dev/null 2>&1; }; then
   ok "example is tracked (or committable pre-commit: not ignored, git add stages it)"
 else
@@ -122,16 +136,20 @@ else
   bad "header documents the direnv dotenv_if_exists flow and never-commit"
 fi
 
-if git -C "$ROOT" check-ignore -q -- "$REAL_ENV"; then
-  ok "git check-ignore config/agent.local.env exits 0 (file absent on disk)"
-else
-  bad "git check-ignore config/agent.local.env exits 0"
-fi
-if git -C "$ROOT" check-ignore -q -- "$EXAMPLE_ENV"; then
-  bad "example is NOT ignored (template stays trackable)"
-else
-  ok "example is NOT ignored (template stays trackable)"
-fi
+# Three-way: a git failure is reported as a failure to run the check, never as
+# "the credential file is committable" (and never the reverse).
+st_real="$(git_ignore_status "$ROOT" "$REAL_ENV")"
+case "$st_real" in
+  ignored)     ok "git check-ignore config/agent.local.env exits 0 (file absent on disk)" ;;
+  not-ignored) bad "SECURITY: config/agent.local.env is not gitignored and is therefore committable — it holds GitHub tokens" ;;
+  *)           bad "could not run the gitignore check on config/agent.local.env: git failed on this repo — see the git_repo_usable diagnostic; this is NOT a finding about the file" ;;
+esac
+st_example_ign="$(git_ignore_status "$ROOT" "$EXAMPLE_ENV")"
+case "$st_example_ign" in
+  not-ignored) ok "example is NOT ignored (template stays trackable)" ;;
+  ignored)     bad "example is NOT ignored (template stays trackable)" ;;
+  *)           bad "could not run the gitignore check on the example: git failed on this repo — see the git_repo_usable diagnostic; this is NOT a finding about the file" ;;
+esac
 
 echo "== guard-env =="
 

@@ -26,3 +26,16 @@ bats_require_minimum_version 1.5.0
   [ "$n" -gt 0 ]
   [[ "$output" == *"0 failed"* ]]
 }
+
+@test "agent-env.selftest: gitignore checks take the ignored path, not the could-not-run path" {
+  # Wiring assertion for the three-way distinction (git_ignore_status): on a
+  # healthy repo the credential-file case must report the ok line and must not
+  # emit the tooling-failure line. The three outcomes themselves are proven
+  # against purpose-built repo fixtures in check-common.bats.
+  run bash "$REPO_ROOT/scripts/agent-env.selftest.sh"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"git check-ignore config/agent.local.env exits 0"* ]]
+  [[ "$output" == *"example is NOT ignored (template stays trackable)"* ]]
+  [[ "$output" != *"could not run the gitignore check"* ]]
+  [[ "$output" != *"SECURITY: config/agent.local.env is not gitignored"* ]]
+}

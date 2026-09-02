@@ -40,6 +40,58 @@ require_tools() {
   done
 }
 
+# git_ignore_status <root> <path> — echo exactly one of `ignored`,
+# `not-ignored`, or `git-error`.
+#
+# `git check-ignore` has three outcomes, and collapsing them lies to the
+# reader: exit 0 means the path IS ignored, exit 1 means it is NOT (a real
+# content finding — for a credential file that means it is committable), and
+# anything else means git could not run at all (invalid repo config, not a
+# repository, permissions). A caller that treats 1 and 128 alike reports a
+# tooling failure in the wording of a security finding, and vice versa — the
+# reader then cannot tell which happened. This is the same discipline
+# require_tools above applies with its exit 2: a gate that could not run must
+# never be reported as a content finding.
+#
+# A `fatal:` on stderr is treated as git-error even on an unexpected exit code,
+# because that is the shape the real incident took: a submodule checkout whose
+# config carried core.bare=true alongside core.worktree made git fatal out, and
+# a two-way caller reported it as "the env files are not gitignored".
+git_ignore_status() {
+  local root="$1" path="$2" rc=0 err
+  err="$(git -C "$root" check-ignore -q -- "$path" 2>&1)" || rc=$?
+  case "$rc" in
+    0) printf 'ignored' ;;
+    1) if [[ "$err" == *"fatal:"* ]]; then printf 'git-error'; else printf 'not-ignored'; fi ;;
+    *) printf 'git-error' ;;
+  esac
+}
+
+# git_repo_usable <root> — 0 when git can read <root> as a work tree. On
+# failure prints an actionable diagnostic to stderr: what is wrong, the most
+# common cause, and the fix. Callers run this once before any git-backed
+# assertion, so a broken repo produces one honest tooling failure instead of a
+# run of assertions that all misreport.
+#
+# The answer matters, not just the exit code: on the core.bare/core.worktree
+# corruption `rev-parse --is-inside-work-tree` exits 0 while printing `false`,
+# and every subsequent work-tree command then fatals out.
+git_repo_usable() {
+  local root="$1" err rc=0
+  err="$(git -C "$root" rev-parse --is-inside-work-tree 2>&1)" || rc=$?
+  if [ "$rc" -eq 0 ] && [ "${err##*$'\n'}" = "true" ]; then
+    return 0
+  fi
+  {
+    echo "ERROR: git cannot use '$root' as a repository — the repo config is unusable."
+    echo "  git said: $err"
+    echo "  Most common cause: core.bare=true set alongside core.worktree, which"
+    echo "  'git worktree add' can produce inside a submodule checkout."
+    echo "  Fix: git config -f <gitdir>/config core.bare false && git -C '$root' worktree prune"
+  } >&2
+  return 1
+}
+
 # finish_clean <human-message> — exit 0 for the "nothing to check" outcome:
 # emit the JSON transcript when running --json, else the human line.
 finish_clean() {
