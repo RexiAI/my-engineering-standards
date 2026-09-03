@@ -225,11 +225,12 @@ fi
 # ── Check 2: every test reference resolves to a real scenario (AC-007-04-02) ─
 #
 # Per-spec-number authority (hybrid of spec 027 and the archive-resolution fix):
-# a reference is judged only against the source that can actually answer for its
-# spec number.
+# a reference is judged only against the sources that can actually answer for
+# its spec number, and it resolves if EITHER answers.
 #
-#   in-flight  specs/NNN-*/ exists          -> resolve against SCENARIO_IDS
-#   archived   docs/changes/NNN-*.md exists -> resolve against ARCHIVED_IDS
+#   in-flight  specs/NNN-*/ exists          -> may resolve against SCENARIO_IDS
+#   archived   docs/changes/NNN-*.md exists -> may resolve against ARCHIVED_IDS
+#   both exist                              -> resolves if either has the ID
 #   neither                                 -> skip, no authority to judge
 #
 # Why not in-flight only: §Archive in the PR deletes specs/NNN-slug/ on merge,
@@ -242,6 +243,19 @@ fi
 # in flight has no authority behind it — negative-case fixture IDs
 # (e.g. AC-999-99) and self-citations in gate scripts for specs archived before
 # this convention existed would read as dangling. Those are noise, not signal.
+#
+# Why both sources are consulted rather than in-flight winning outright, and
+# why resolution is by ID rather than by filename: the AC-NNN-NN convention
+# means NNN is the SPEC number, but a spec predating that convention can number
+# scenarios per TASK instead — this repo's spec 001 does, so
+# docs/changes/001-*.md owns headings numbered AC-001 through AC-017. Deriving
+# authority from the filename alone would say "nothing archived answers for
+# 003", orphaning real, still-cited IDs the moment a later spec takes number
+# 003. So a reference resolves whenever the exact ID exists in either source,
+# and the filename-derived numbers are used only to decide whether ANY
+# authority exists for that number — i.e. whether a miss is a finding or simply
+# out of scope. This loses no detection power: a genuine typo is absent from
+# both sources and still fails.
 IN_FLIGHT_NUMS=""
 for d in "$SPECS_DIR"/*/; do
   [ -d "$d" ] || continue
@@ -264,25 +278,31 @@ fi
 
 if contains 2; then
   for id in $REFERENCED_IDS; do
+    # Resolution is by exact ID against both sources — an archived one-pager can
+    # own IDs numbered differently from its filename (per-task numbering).
+    if echo "$SCENARIO_IDS" | grep -qx "$id"; then continue; fi
+    if echo "$ARCHIVED_IDS" | grep -qx "$id"; then continue; fi
+
+    # Unresolved. Only a finding if some source claims authority for the number;
+    # otherwise it is a fixture/self-citation with nothing to judge it against.
     num="${id#AC-}"; num="${num%%-*}"
-    case " $IN_FLIGHT_NUMS " in
-      *" $num "*)
-        if ! echo "$SCENARIO_IDS" | grep -qx "$id"; then
-          fail "$id — referenced in a test but no matching scenario heading exists in " \
-               "$SPECS_DIR/*/20-acceptance/ for in-flight spec $num. Stale ID after a rename, or a typo."
-        fi
-        continue ;;
-    esac
-    case " $ARCHIVED_NUMS " in
-      *" $num "*)
-        if ! echo "$ARCHIVED_IDS" | grep -qx "$id"; then
-          fail "$id — referenced in a test but no matching scenario heading exists in " \
-               "$ARCHIVE_DIR/$num-*.md for archived spec $num. Stale ID after a rename, or a typo."
-        fi
-        continue ;;
-    esac
-    # No specs/NNN-*/ and no docs/changes/NNN-*.md — nothing authoritative to
-    # resolve against, so this reference is out of scope rather than a finding.
+    in_flight=false
+    archived=false
+    case " $IN_FLIGHT_NUMS " in *" $num "*) in_flight=true ;; esac
+    case " $ARCHIVED_NUMS " in *" $num "*) archived=true ;; esac
+
+    if [ "$in_flight" = true ] && [ "$archived" = true ]; then
+      where="$SPECS_DIR/*/20-acceptance/ for in-flight spec $num or $ARCHIVE_DIR/$num-*.md"
+    elif [ "$in_flight" = true ]; then
+      where="$SPECS_DIR/*/20-acceptance/ for in-flight spec $num"
+    elif [ "$archived" = true ]; then
+      where="$ARCHIVE_DIR/$num-*.md for archived spec $num"
+    else
+      continue
+    fi
+
+    fail "$id — referenced in a test but no matching scenario heading exists in " \
+         "$where. Stale ID after a rename, or a typo."
   done
   say ""
 fi

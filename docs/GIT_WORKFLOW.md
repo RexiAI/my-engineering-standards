@@ -151,6 +151,27 @@ See `docs/CI_CD.md §Release Process` and `ci/templates/releaserc.json`.
 6. Author **squash-merges** (squash merge required for all feature branches — disable merge-commit and rebase-merge options in repo settings).
 7. Source branch is deleted after merge.
 
+### Dependency Major Bumps
+
+A major version bump of a linter, test runner, build tool, or framework must be evaluated for
+**peer-plugin** compatibility, not just its own changelog. The ecosystem around a tool normally
+lags its major release, so the tool upgrades cleanly while the plugins, presets, and shared
+configs that load into it do not.
+
+A bot-raised major bump whose gate fails at plugin or rule **load time** is blocked upstream.
+Merging it to quiet the bot turns every subsequent PR red.
+
+| Action | Outcome |
+|---|---|
+| Merge it | Every later PR fails on the same load error |
+| Close it | The bot reopens on the next scan |
+| Leave it open with a comment | Correct — the PR records the blocker |
+
+The comment names the upstream incompatibility (which peer plugin, which error) and the
+unblock condition (a release of that plugin declaring peer support for the new major).
+
+**Never merge a PR whose required gates are red.**
+
 ## Submodule Management
 
 ### Adding the Standards Submodule

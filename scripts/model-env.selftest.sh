@@ -34,6 +34,8 @@
 # Exit codes:
 #   0 — every case passes
 #   1 — at least one case failed
+#   2 — tooling failure: git cannot read the repo, so no assertion below could
+#       report honestly (see git_repo_usable in scripts/check-common.sh)
 set -euo pipefail
 
 RED='\033[0;31m'
@@ -49,6 +51,15 @@ CHILD_TPL="$ROOT/templates/.envrc.child"
 # Shared roster (MODEL_ENV_VARS, MODEL_ENV_PLUS_AGENTS, model_env_var_for_agent).
 # shellcheck disable=SC1091
 source "$ROOT/scripts/model-env.vars.sh"
+
+# Shared helpers (git_ignore_status, git_repo_usable).
+# shellcheck disable=SC1091
+source "$ROOT/scripts/check-common.sh"
+
+# Every git-backed assertion below is meaningless if git cannot read the repo,
+# so fail as a tooling failure (exit 2) rather than run assertions that would
+# all misreport an unusable config as a content finding.
+git_repo_usable "$ROOT" || exit 2
 
 ALL_VARS=("${MODEL_ENV_VARS[@]}")
 
@@ -263,12 +274,16 @@ else
   bad "AC-025-01-04 no .envrc path outside templates/ (found: $(printf '%s ' $envrc_outside))"
 fi
 
-# 01-05: real env files ignored, examples committable
-if git -C "$ROOT" check-ignore -q -- config/model.local.env \
-   && git -C "$ROOT" check-ignore -q -- config/agent.local.env; then
+# 01-05: real env files ignored, examples committable. Three-way: a git failure
+# is reported as a failure to run the check, never as "the file is committable".
+st_model="$(git_ignore_status "$ROOT" config/model.local.env)"
+st_agent="$(git_ignore_status "$ROOT" config/agent.local.env)"
+if [ "$st_model" = git-error ] || [ "$st_agent" = git-error ]; then
+  bad "AC-025-01-05 could not run the gitignore check: git failed on this repo (model=$st_model agent=$st_agent) — see the git_repo_usable diagnostic; this is NOT a finding about the files"
+elif [ "$st_model" = ignored ] && [ "$st_agent" = ignored ]; then
   ok "AC-025-01-05 git check-ignore exits 0 for both real env files"
 else
-  bad "AC-025-01-05 git check-ignore exits 0 for both real env files"
+  bad "AC-025-01-05 SECURITY: a real env file is not gitignored and is therefore committable (model=$st_model agent=$st_agent) — these files hold GitHub tokens and API keys"
 fi
 if git -C "$ROOT" check-ignore -q -- config/model.local.env.example \
    || git -C "$ROOT" check-ignore -q -- config/agent.local.env.example; then

@@ -193,6 +193,19 @@ type CreateUserResult =
 - **No dead / duplicated StyleSheet rules.** Identical 4-line `StyleSheet.create` blocks across files trigger the same DRY gate as web — extract to a shared `theme/tokens.ts` entry or a shared `styles.ts` (e.g. `styles/common.ts`). Remove unused keys before merge.
 - **Platform-specific styles.** Small differences via `Platform.select` inside `StyleSheet.create` (see `reactnative.dev/docs/platform-specific-code` §Platform module); larger divergences via `.ios.tsx` / `.android.tsx` / `.native.tsx` file extensions (same doc §Platform-specific extensions). No `if (Platform.OS === 'ios')` branching inside render logic — encapsulate in `StyleSheet.create` or file split. Expo blog §Platform-specific code endorses the same: `bar-chart.tsx` + `bar-chart.web.tsx` pattern, props identical.
 
+### Currency and Quantity Formatting
+
+- **Store and compute money in the smallest currency unit** (integer minor units — cents, pence, sen). Never a float, never a decimal string parsed back into a float.
+- **Render the full precision of the currency when formatting for display or notification.** The number of decimals is a property of the currency, not a formatting preference: 2 for EUR/USD/GBP, 0 for JPY/KRW, 3 for BHD/KWD. `toFixed(0)` on a euro amount silently misreports a real charge.
+- **Never round a monetary value for display.** A rounded figure in an email, invoice, or dashboard contradicts the amount actually captured, and the discrepancy surfaces as a support ticket rather than a test failure.
+- **Derive unit labels from the same configuration source as the value.** Where a label accompanies a configurable value — timezone, currency code, locale — the label must come from that same config. A hardcoded label beside a config-driven value produces output that contradicts itself the moment the knob changes.
+
+| Currency | Minor units | Displayed as |
+|---|---|---|
+| EUR / USD / GBP | 100 | `12.34` |
+| JPY / KRW | 1 | `1234` |
+| BHD / KWD | 1000 | `12.345` |
+
 ## Logging
 
 ### Java

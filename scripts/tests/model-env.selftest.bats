@@ -28,3 +28,15 @@ bats_require_minimum_version 1.5.0
   [ "$n" -gt 0 ]
   [[ "$output" == *"0 failed"* ]]
 }
+
+@test "model-env.selftest: gitignore check takes the ignored path, not the could-not-run path" {
+  # Wiring assertion for the three-way distinction (git_ignore_status): on a
+  # healthy repo the env-file case must report the ok line and must not emit
+  # the tooling-failure line. The three outcomes themselves are proven against
+  # purpose-built repo fixtures in check-common.bats.
+  run bash "$REPO_ROOT/scripts/model-env.selftest.sh"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"AC-025-01-05 git check-ignore exits 0 for both real env files"* ]]
+  [[ "$output" != *"could not run the gitignore check"* ]]
+  [[ "$output" != *"SECURITY: a real env file is not gitignored"* ]]
+}

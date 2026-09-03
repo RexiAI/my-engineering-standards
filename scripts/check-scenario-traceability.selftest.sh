@@ -155,6 +155,40 @@ printf '# 996-merged-slug\n\n## Acceptance scenarios\n\n## %s — archived scena
 printf 'func TestStale_%s(t *testing.T) {}\n' "$(printf '%s' "$STALE_ARCHIVED_TYPO" | tr '-' '_')" \
   > "$TMP/stale_archived/src/stale_test.go"
 
+# ── dual_authority: an archived spec that numbered scenarios per TASK owns IDs
+# under a number a LATER in-flight spec legitimately takes. Both sources must be
+# consulted: the in-flight folder answers for its own IDs, the archive answers
+# for the ones it still owns. Letting in-flight win outright orphans the
+# archived spec's real, still-cited IDs — the exact failure this repo's spec 001
+# produces (it occupies AC-001..AC-017 inside one archived one-pager).
+DUAL_INFLIGHT_ID="$(trace_id 995 21)"
+DUAL_ARCHIVED_ID="$(trace_id 995 01)"
+mkdir -p "$TMP/dual_authority/specs/995-current/20-acceptance" \
+         "$TMP/dual_authority/src" "$TMP/dual_authority/changes"
+printf '## %s — in-flight scenario\nGiven a thing\nWhen it runs\nThen it works\n' "$DUAL_INFLIGHT_ID" \
+  > "$TMP/dual_authority/specs/995-current/20-acceptance/${DUAL_INFLIGHT_ID}-live.md"
+# Archived predecessor owns AC-995-01 under its own (per-task) numbering.
+printf '# 990-legacy-slug\n\n## Acceptance scenarios\n\n## %s — archived scenario\n' "$DUAL_ARCHIVED_ID" \
+  > "$TMP/dual_authority/changes/990-legacy-slug.md"
+printf 'func TestLive_%s(t *testing.T) {}\nfunc TestLegacy_%s(t *testing.T) {}\n' \
+  "$(printf '%s' "$DUAL_INFLIGHT_ID" | tr '-' '_')" \
+  "$(printf '%s' "$DUAL_ARCHIVED_ID" | tr '-' '_')" \
+  > "$TMP/dual_authority/src/dual_test.go"
+
+# ── dual_typo: dual authority must not become a blanket amnesty — an ID absent
+# from BOTH sources still fails, even when both authorities exist for a number.
+DUAL_TYPO_ID="$(trace_id 995 77)"
+mkdir -p "$TMP/dual_typo/specs/995-current/20-acceptance" \
+         "$TMP/dual_typo/src" "$TMP/dual_typo/changes"
+printf '## %s — in-flight scenario\nGiven a thing\nWhen it runs\nThen it works\n' "$DUAL_INFLIGHT_ID" \
+  > "$TMP/dual_typo/specs/995-current/20-acceptance/${DUAL_INFLIGHT_ID}-live.md"
+printf '# 990-legacy-slug\n\n## Acceptance scenarios\n\n## %s — archived scenario\n' "$DUAL_ARCHIVED_ID" \
+  > "$TMP/dual_typo/changes/990-legacy-slug.md"
+printf 'func TestLive_%s(t *testing.T) {}\nfunc TestTypo_%s(t *testing.T) {}\n' \
+  "$(printf '%s' "$DUAL_INFLIGHT_ID" | tr '-' '_')" \
+  "$(printf '%s' "$DUAL_TYPO_ID" | tr '-' '_')" \
+  > "$TMP/dual_typo/src/dual_typo_test.go"
+
 # ── Run ──────────────────────────────────────────────────────────────────────
 echo "== AC-012-02 traceability selftest =="
 run_case pass 0 "$PASS_ID — traced to a test"
@@ -163,6 +197,8 @@ run_case dangle 1 "no matching scenario heading exists" "$DANGLE_ID — traced t
 run_case archived 0 "every scenario traced, every reference resolves"
 run_case out_of_flight 0 "$OUT_OF_FLIGHT_TRACED_ID — traced to a test"
 run_case stale_archived 1 "no matching scenario heading exists"
+run_case dual_authority 0 "every scenario traced, every reference resolves"
+run_case dual_typo 1 "no matching scenario heading exists"
 
 echo ""
 if [ "$FAIL_COUNT" -gt 0 ]; then
