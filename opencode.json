@@ -16,6 +16,51 @@
       "env": ["OPENCODE_API_KEY"],
       "options": { "baseURL": "https://opencode.ai/zen/v1" },
       "models": { "mimo-v2.5-free": {} }
+    },
+    "bailian-token-plan-personal": {
+      "npm": "@ai-sdk/anthropic",
+      "name": "Alibaba Cloud Model Studio",
+      "env": ["BAILIAN_TOKEN_PLAN_API_KEY"],
+      "options": {
+        "baseURL": "https://token-plan.ap-southeast-1.maas.aliyuncs.com/apps/anthropic/v1"
+      },
+      "models": {
+        "qwen3.8-max": {
+          "name": "Qwen3.8 Max",
+          "reasoning": true,
+          "limit": { "context": 983616, "output": 131072 },
+          "modalities": { "input": ["text", "image"], "output": ["text"] },
+          "options": { "effort": "xhigh" }
+        },
+        "qwen3.8-flash": {
+          "name": "Qwen3.8 Flash",
+          "reasoning": true,
+          "limit": { "context": 983616, "output": 131072 },
+          "modalities": { "input": ["text", "image"], "output": ["text"] },
+          "options": { "effort": "xhigh" }
+        },
+        "qwen3.7-max": {
+          "name": "Qwen3.7 Max",
+          "options": { "thinking": { "type": "enabled", "budgetTokens": 8192 } }
+        },
+        "qwen3.7-plus": {
+          "name": "Qwen3.7 Plus",
+          "modalities": { "input": ["text", "image"], "output": ["text"] },
+          "options": { "thinking": { "type": "enabled", "budgetTokens": 8192 } }
+        },
+        "qwen3.6-flash": {
+          "name": "Qwen3.6 Flash",
+          "modalities": { "input": ["text", "image"], "output": ["text"] },
+          "options": { "thinking": { "type": "enabled", "budgetTokens": 8192 } }
+        },
+        "glm-5.2": {
+          "name": "GLM-5.2",
+          "options": { "thinking": { "type": "enabled", "budgetTokens": 8192 } }
+        },
+        "deepseek-v4-pro": { "name": "DeepSeek V4 Pro" },
+        "deepseek-v4-pro-0813": { "name": "DeepSeek V4 Pro 0813" },
+        "deepseek-v4-flash-0731": { "name": "DeepSeek V4 Flash 0731" }
+      }
     }
   }
 }
