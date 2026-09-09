@@ -1,4 +1,4 @@
-.PHONY: help validate validate-docs validate-refs validate-all lint format stats test test-scripts test-shell test-java test-go test-js mutation property-tests ci-fast ci ci-full
+.PHONY: help validate validate-docs validate-refs validate-all lint format stats test test-scripts test-shell test-java test-go test-js mutation property-tests ci-fast ci ci-full sync-qwen
 
 DOCS := AGENTS.md README.md \
   docs/AGENTS_AND_SKILLS.md \
@@ -32,6 +32,7 @@ help:
 	@echo "  lint           Lint YAML/JSON/TOML files"
 	@echo "  format         Format with prettier"
 	@echo "  stats          Show file sizes"
+	@echo "  sync-qwen      Sync Token Plan models to Qwen CLI settings"
 	@echo ""
 	@echo "Releases: handled by Semantic Release CI after merge to main."
 	@echo "  See docs/CI_CD.md §Release Process and ci/templates/releaserc.json."
@@ -153,5 +154,8 @@ ci: ci-fast   # Alias for ci-fast in this repo (no build artifact)
 
 ci-full: ci   # Full ladder (no E2E in this repo)
 	@echo "ci-full: green"
+
+sync-qwen:   # Sync Token Plan models from opencode.json → ~/.qwen/settings.json
+	@./scripts/sync-qwen-settings.sh
 
 

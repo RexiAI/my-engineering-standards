@@ -23,6 +23,18 @@ direnv allow                        # load it at the repo root
 
 Switching a model means editing the gitignored `config/model.local.env` and restarting OpenCode — no commit, no PR. See `docs/SPEC_PIPELINE.md` for details.
 
+## Qwen CLI Sync
+
+The spec pipeline's Token Plan models can also be used in the [Qwen Code CLI](https://github.com/anthropics/qwen-code). After cloning or pulling this repo, sync the models:
+
+```bash
+make sync-qwen   # one-way sync: opencode.json → ~/.qwen/settings.json
+```
+
+This adds all `bailian-token-plan-personal` provider models from `opencode.json` to your local Qwen CLI settings. The script is idempotent — re-running it replaces previous Token Plan entries with the current repo versions.
+
+**Note:** The Token Plan's OpenAI-compatible endpoint (`/compatible-mode/v1`) currently only serves `qwen3.8-max` and `qwen3.8-flash`. Other models (qwen3.7-max, glm-5.2, deepseek-v4-pro, etc.) require the Anthropic-compatible endpoint, which opencode uses but Qwen CLI does not support.
+
 ## OKF — Operational Knowledge Framework
 
 [`okf/`](okf/index.md) documents how we work with AI: practices, decisions, and runbooks for managing context windows, choosing between RAG and context stuffing, detecting context rot, and setting up MCP servers.
