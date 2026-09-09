@@ -1,3 +1,10 @@
+# [1.31.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.30.4...v1.31.0) (2026-09-09)
+
+
+### Features
+
+* add bailian-token-plan-personal provider ([#68](https://github.com/RexiAI/my-engineering-standards/issues/68)) ([968cd1e](https://github.com/RexiAI/my-engineering-standards/commit/968cd1e62ccf7d7856cf758136658dd50fae34a8))
+
 ## [1.30.4](https://github.com/RexiAI/my-engineering-standards/compare/v1.30.3...v1.30.4) (2026-09-02)
 
 
