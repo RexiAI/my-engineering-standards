@@ -22,6 +22,16 @@ if [[ -n "${TEST_HELPER_LOADED:-}" ]]; then
 fi
 TEST_HELPER_LOADED=1
 
+# Hermeticity: git exports GIT_DIR (and friends) when running hooks — e.g.
+# `make test-scripts` under pre-push inside a submodule checkout. A leaked
+# GIT_DIR makes every fixture call like `git -C "$TMPDIR/..." config ...`
+# ignore -C and write into the HOST repo's config instead of the temp fixture
+# (the exact core.bare/core.worktree corruption check-common.bats
+# characterizes — observed live: a pre-push run bricked the host submodule
+# config). Unset the hook-exported discovery vars for all tests.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_COMMON_DIR \
+      GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_QUARANTINE_PATH
+
 # Resolve repo root from helper location (scripts/tests/test_helper.bash → repo root)
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 export REPO_ROOT
