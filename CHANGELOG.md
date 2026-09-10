@@ -1,3 +1,10 @@
+## [1.31.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.31.0...v1.31.1) (2026-09-10)
+
+
+### Bug Fixes
+
+* **ci-templates,tests:** saga gate templates under CC 6; hermetic bats fixtures ([#70](https://github.com/RexiAI/my-engineering-standards/issues/70)) ([6e077f1](https://github.com/RexiAI/my-engineering-standards/commit/6e077f1529975dd6c360810337a8a570d60e1909))
+
 # [1.31.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.30.4...v1.31.0) (2026-09-09)
 
 
