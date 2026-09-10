@@ -50,22 +50,25 @@ function isSagaStepCall(node) {
 }
 
 /**
+ * Returns the argument node when it is an ObjectExpression, null otherwise.
+ */
+function objectArg(arg) {
+  return arg && arg.type === "ObjectExpression" ? arg : null;
+}
+
+/**
  * Returns the options object argument of a sagaStep(handler, options) call, or null.
  * sagaStep accepts (handler, options) or a single config object.
  */
 function getSagaStepOptions(callNode) {
-  const args = callNode.arguments;
-  if (!args || args.length === 0) return null;
+  const args = callNode.arguments || [];
+  if (args.length === 0) return null;
 
   // sagaStep({ handler, compensate, timeout }) — single object form
-  if (args.length === 1 && args[0].type === "ObjectExpression") {
-    return args[0];
-  }
+  if (args.length === 1) return objectArg(args[0]);
+
   // sagaStep(handler, { compensate, timeout }) — two-arg form
-  if (args.length >= 2 && args[1].type === "ObjectExpression") {
-    return args[1];
-  }
-  return null;
+  return objectArg(args[1]);
 }
 
 /**
