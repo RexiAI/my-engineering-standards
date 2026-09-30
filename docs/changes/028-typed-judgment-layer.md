@@ -1468,3 +1468,183 @@ loopCount 3 / phase1Retries 1 / phase2Retries 0 taken from the exported env.)
 | Round | Head | Result | Failing checks | Disposition |
 |---|---|---|---|---|
 | 1 | 7bf10af | **FAIL** | Validate 109893554694 (pull_request, run 36717384099), Validate 109893527396 (push, run 36717375700) — AC-028-48 | Route to Coder (option A above); fix round 1 of max 3 opens |
+
+---
+
+# Post-PR CI check (phase 2) — round 2 of max 3
+
+Date: 2026-09-30. Verifier run: **attempt 4, phase 2, round 2** — SCOPED
+re-verification per docs/SPEC_PIPELINE.md §Scoped re-verification: round 1
+failed solely on Self CI `Validate` (both events), so only the two Self CI runs
+at the new head are re-checked; unchanged gates' round-1 results stand without
+re-execution. PR #73 (draft),
+https://github.com/RexiAI/my-engineering-standards/pull/73, branch
+`spec/028-typed-judgment-layer`, head `ddc32e2127a87f1b6ed2a41abfdb0757f2f2c182`
+(fix round 1: `cb06c54` helper regex fix + `ddc32e2` round-1 report addendum &
+telemetry). Local HEAD parity confirmed (E7): same SHA, working tree clean.
+
+Fix verification: `cb06c54` is exactly round 1's recommended option A —
+`md_tracked_excluding` regex extended `^(okf|config|specs)/` →
+`^(okf|config|specs|docs/changes)/` with the lifecycle-equivalence rationale in
+the helper comment. The shared-helper blind spot noted for AC-028-24 in round 1
+is covered by the same fix: `ok 163 AC-028-24` green in both CI events (E4/E5).
+
+PR Review Agent passed round 1 and stands; the workflow nonetheless re-triggered
+at the new head, so its re-run was polled to terminal state (never ruled on
+while pending) and is success (E8). The check suite at this head is the same
+three checks as round 1 — **no new checks appeared, none failing**.
+
+## Round-2 verdict: **PASS** — phase-2 CI loop closes
+
+| Check | Workflow | Event | Bucket | Run / check id |
+|---|---|---|---|---|
+| Review PR / Review PR | PR Review Agent | pull_request | **pass** | run 36720016949, check id 109902436028 |
+| Validate | Self CI | pull_request | **pass** (round 1: fail) | run 36720016273, check id **109902429655** |
+| Validate | Self CI | push | **pass** (round 1: fail) | run 36720011039, check id **109902412561** |
+
+Previously-failing test, both events (verbatim from CI logs): `ok 190
+AC-028-48: product name TypeSafe appears only in okf/ and config/ among
+tracked md outside specs/`. pull_request run suite tally: **225 ok / 0 not ok
+of 225** (round 1: 224/1), single TAP plan `1..225`, `make test-scripts` step
+green.
+
+## Evidence: post-PR CI check (phase 2, round 2) — previously-failing checks
+
+command: gh pr checks 73 --repo RexiAI/my-engineering-standards --json name,state,bucket,workflow,link
+exit: 0
+at: 2026-09-30T13:18:11Z
+
+```
+[{"bucket":"pass","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/36720016949/job/109902436028","name":"Review PR / Review PR","state":"SUCCESS","workflow":"PR Review Agent"},{"bucket":"pass","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/36720016273/job/109902429655","name":"Validate","state":"SUCCESS","workflow":"Self CI"},{"bucket":"pass","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/36720011039/job/109902412561","name":"Validate","state":"SUCCESS","workflow":"Self CI"}]
+```
+
+(An opening poll at ~13:13Z showed all three IN_PROGRESS — pending was not
+ruled on; this terminal query is the ruling. Round-1 failing check ids for
+contrast: 109893554694 / 109893527396.)
+
+command: gh api repos/RexiAI/my-engineering-standards/commits/ddc32e2127a87f1b6ed2a41abfdb0757f2f2c182/check-runs --jq '.check_runs[] | {id, name, status, conclusion, html_url}'
+exit: 0
+at: 2026-09-30T13:18:12Z
+
+```
+{"conclusion":"success","html_url":"https://github.com/RexiAI/my-engineering-standards/actions/runs/36720016949/job/109902436028","id":109902436028,"name":"Review PR / Review PR","status":"completed"}
+{"conclusion":"success","html_url":"https://github.com/RexiAI/my-engineering-standards/actions/runs/36720016273/job/109902429655","id":109902429655,"name":"Validate","status":"completed"}
+{"conclusion":"success","html_url":"https://github.com/RexiAI/my-engineering-standards/actions/runs/36720011039/job/109902412561","id":109902412561,"name":"Validate","status":"completed"}
+```
+
+command: gh run list --repo RexiAI/my-engineering-standards --branch spec/028-typed-judgment-layer --json databaseId,workflowName,event,status,conclusion,headSha,url --jq '.[] | select(.headSha=="ddc32e2127a87f1b6ed2a41abfdb0757f2f2c182")'
+exit: 0
+at: 2026-09-30T13:19:30Z
+
+```
+{"conclusion":"success","databaseId":36720016273,"event":"pull_request","headSha":"ddc32e2127a87f1b6ed2a41abfdb0757f2f2c182","status":"completed","url":"https://github.com/RexiAI/my-engineering-standards/actions/runs/36720016273","workflowName":"Self CI"}
+{"conclusion":"success","databaseId":36720016949,"event":"pull_request","headSha":"ddc32e2127a87f1b6ed2a41abfdb0757f2f2c182","status":"completed","url":"https://github.com/RexiAI/my-engineering-standards/actions/runs/36720016949","workflowName":"PR Review Agent"}
+{"conclusion":"success","databaseId":36720011039,"event":"push","headSha":"ddc32e2127a87f1b6ed2a41abfdb0757f2f2c182","status":"completed","url":"https://github.com/RexiAI/my-engineering-standards/actions/runs/36720011039","workflowName":"Self CI"}
+```
+
+Exactly three runs at this head — same workflow set as round 1; no new checks.
+
+## Evidence: CI log confirmation — previously-failing test (both events)
+
+command: gh run view 36720016273 --repo RexiAI/my-engineering-standards --log 2>&1 | grep -E "AC-028-48|AC-028-24|^[0-9]+:Validate.*1\.\.[0-9]+|not ok|make.*test-scripts" | head -20
+exit: 0
+at: 2026-09-30T13:15:52Z
+
+```
+2485:Validate	Run shell gate bats tests (spec 001 Track B)	﻿2026-09-30T13:14:10.4166437Z ##[group]Run make test-scripts
+2486:Validate	Run shell gate bats tests (spec 001 Track B)	2026-09-30T13:14:10.4166816Z ^[[36;1mmake test-scripts^[[0m
+2502:Validate	Run shell gate bats tests (spec 001 Track B)	2026-09-30T13:14:12.2369523Z ok 2 AC-001-02: Failing bats test fails the target (not ok)
+2504:Validate	Run shell gate bats tests (spec 001 Track B)	2026-09-30T13:14:12.3039162Z ok 4 AC-001-04: Missing bats binary yields actionable error via make test-scripts
+2506:Validate	Run shell gate bats tests (spec 001 Track B)	2026-09-30T13:14:13.2248703Z ok 6 AC-001-06: CI invokes the harness (self-ci.yml contains make test-scripts or bats scripts/tests)
+2663:Validate	Run shell gate bats tests (spec 001 Track B)	2026-09-30T13:14:42.6374859Z ok 163 AC-028-24: no literal typed-judgment endpoint or model id in tracked docs outside config/ okf/ specs/
+2690:Validate	Run shell gate bats tests (spec 001 Track B)	2026-09-30T13:14:43.3811504Z ok 190 AC-028-48: product name TypeSafe appears only in okf/ and config/ among tracked md outside specs/
+```
+
+(The only "not ok" substring in the grep is inside AC-001-02's passing test
+*name*; there are zero failing TAP lines — see the tally below.)
+
+command: gh run view 36720016273 --log > /tmp/opencode/r2-pr-full.txt; grep -cE "Z ok [0-9]+" /tmp/opencode/r2-pr-full.txt; grep -cE "Z not ok [0-9]+" /tmp/opencode/r2-pr-full.txt; grep -E "Z 1\.\.[0-9]+" /tmp/opencode/r2-pr-full.txt
+exit: 0
+at: 2026-09-30T13:17:30Z
+
+```
+225
+0
+2500:Validate	Run shell gate bats tests (spec 001 Track B)	2026-09-30T13:14:12.0015302Z 1..225
+```
+
+command: gh run view 36720011039 --repo RexiAI/my-engineering-standards --log 2>/dev/null | grep -E "AC-028-48|AC-028-24" | head -5
+exit: 0
+at: 2026-09-30T13:16:25Z
+
+```
+2650:Validate	UNKNOWN STEP	2026-09-30T13:14:26.4272338Z ok 163 AC-028-24: no literal typed-judgment endpoint or model id in tracked docs outside config/ okf/ specs/
+2677:Validate	UNKNOWN STEP	2026-09-30T13:14:27.0855649Z ok 190 AC-028-48: product name TypeSafe appears only in okf/ and config/ among tracked md outside specs/
+```
+
+(Push-event run; `gh` labels some steps `UNKNOWN STEP` — step-attribution
+artifact only, same job, same green result, run conclusion success.)
+
+## Evidence: local reproduction on the pushed tree (scoped)
+
+command: bats --tap --filter "AC-028-48" scripts/tests/typed-judgment-integration.bats
+exit: 0
+at: 2026-09-30T13:15:54Z
+
+```
+1..1
+ok 1 AC-028-48: product name TypeSafe appears only in okf/ and config/ among tracked md outside specs/
+```
+
+(Round 1's identical local command returned `not ok 1` / exit 1 at head
+7bf10af — the defect and its fix both reproduce locally.)
+
+command: git rev-parse HEAD; git status --porcelain | wc -l
+exit: 0
+at: 2026-09-30T13:19:30Z
+
+```
+ddc32e2127a87f1b6ed2a41abfdb0757f2f2c182
+0
+```
+
+## Evidence: PR Review Agent re-run at new head (polled to terminal)
+
+command: timeout 540 gh run watch 36720016949 --repo RexiAI/my-engineering-standards --exit-status --interval 20; echo "watch_exit=$?"
+exit: 0
+at: 2026-09-30T13:16:56Z
+
+```
+watch_exit=0
+Run PR Review Agent (36720016949) has already completed with 'success'
+```
+
+## Round-2 telemetry
+
+Appended via `bash scripts/record-gate-run.sh` (W5 mode-644 note stands) with
+`SPEC_LOOP_COUNT=4 SPEC_PHASE1_RETRIES=1 SPEC_PHASE2_RETRIES=1` exported:
+`specSlug` 028-typed-judgment-layer, `gatesFailed` [] (scoped re-check of the
+round-1 `test-suite` gate: pass), `outcome` pass. Recorded on branch
+`spec/028-typed-judgment-layer`, not committed.
+
+Telemetry line (appended to `runs.jsonl`, verbatim):
+
+command: SPEC_LOOP_COUNT=4 SPEC_PHASE1_RETRIES=1 SPEC_PHASE2_RETRIES=1 bash scripts/record-gate-run.sh -record '<json>'
+exit: 0
+at: 2026-09-30T13:22:18Z
+
+```json
+{"specSlug":"028-typed-judgment-layer","gatesFailed":[],"warnings":["phase2-round2 scoped re-check: previously-failing Self CI Validate green on both events at head ddc32e2 (pull_request run 36720016273 check 109902429655; push run 36720011039 check 109902412561) - CI log ok 190 AC-028-48, suite 225 ok / 0 not ok of 225 (round 1: 224/1)","fix cb06c54 verified = round-1 option A (md_tracked_excluding regex extended to ^(okf|config|specs|docs/changes)/); AC-028-24 shared-helper blind spot covered by the same fix - ok 163 both events","PR Review Agent re-ran at new head and passed (run 36720016949 check 109902436028); same three-check suite as round 1 - no new checks, none failing; pending never ruled on","W5 stands: record-gate-run.sh mode 644 - invoked via bash","durationSec approximate: opening queries from ~13:13:00Z to telemetry timestamp"],"durationSec":558,"outcome":"pass","runId":"c7b7b474-2ec8-4d7e-9ef8-97a46d6354fc","loopCount":4,"phase1Retries":1,"phase2Retries":1}
+```
+
+Script output: `record-gate-run: appended record to
+/home/dbueno/projects/my-engineering-standards/runs.jsonl` (runId generated by
+the script; loopCount 4 / phase1Retries 1 / phase2Retries 1 taken from the
+exported env.)
+
+## Round summary (phase 2, updated)
+
+| Round | Head | Result | Failing checks | Disposition |
+|---|---|---|---|---|
+| 1 | 7bf10af | **FAIL** | Validate 109893554694 (pull_request, run 36717384099), Validate 109893527396 (push, run 36717375700) — AC-028-48 | Routed to Coder (option A); fix round 1 applied (cb06c54) |
+| 2 | ddc32e2 | **PASS** | none — Validate 109902429655 (pull_request, run 36720016273) and 109902412561 (push, run 36720011039) success; Review PR 109902436028 success; suite 225 ok / 0 not ok | Phase-2 CI loop **closed** after 1 of max 3 fix rounds; this addendum + telemetry remain uncommitted for the PR Opener to push |
