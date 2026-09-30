@@ -41,11 +41,14 @@ bats_names_tests() {
 }
 
 # md_tracked_excluding <regex...> — tracked .md files outside okf/, config/,
-# specs/ (spec artifacts are pre-existing requirement sources, not outputs of
-# this change). Echoes matching paths.
+# specs/, docs/changes/ (spec artifacts are pre-existing requirement sources,
+# not outputs of this change; docs/changes/ holds the archived one-pagers —
+# same content as specs/ in its post-archive lifecycle state, per
+# docs/SPEC_PIPELINE.md's treatment of both as ID sources excluded from
+# reference scans). Echoes matching paths.
 md_tracked_excluding() {
   git -C "$REPO_ROOT" ls-files -z '*.md' \
-    | grep -zv '^(okf|config|specs)/' --perl-regexp \
+    | grep -zv '^(okf|config|specs|docs/changes)/' --perl-regexp \
     | xargs -0 grep -lE "$@" 2>/dev/null || true
 }
 
