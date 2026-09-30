@@ -1244,3 +1244,8 @@ introduced here): N1 (branch must become `spec/028-typed-judgment-layer`), F2
 orchestrator disposition before any commit.
 
 Report path: `specs/028-typed-judgment-layer/30-report.md`.
+
+---
+
+PR: https://github.com/RexiAI/my-engineering-standards/pull/73
+Commits: 11
