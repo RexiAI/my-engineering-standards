@@ -2,7 +2,7 @@
 name: ci-triage
 description: Triage a failing Self CI run on this repo — read the failing logs with gh, classify the failure as flake / regression / infra / config, and at L1 report-only escalate to a human or propose a minimal fix from an isolated worktree. Use when a Self CI run fails on a branch or PR, when the CI Sweeper workflow invokes a sweep, or when asked to diagnose why CI is red.
 license: See repo root
-allowed-tools: Bash(gh:*) Bash(git worktree add:*)
+allowed-tools: Bash(gh:*) Bash(git worktree add:*) Bash(scripts/typed-judgment.sh:*)
 ---
 
 # When to use
@@ -50,6 +50,52 @@ The flake criteria: **seen before** (the same signature is already in the
 quarantine ledger), **intermittent** (fails sometimes, passes other times on the
 same commit), or **passed on retry with no code change** (a rerun of the same
 commit was green).
+
+# Typed-judgment fast-path (opt-in, spec 028)
+
+This fast-path is **opt-in and never authoritative**: a typed judgment is a
+probabilistic classification hint, not a gate. The Decision guide table above
+remains the source of the rubrics and the final word on routing.
+
+**Gate:** both `JUDGMENT_API_URL` and `JUDGMENT_API_KEY` must be set and
+non-empty in the environment. If either is unset or empty, **skip this section
+entirely** — the stock LLM classification procedure below runs unchanged and
+the run-log records no judgment fields at all (behavior identical to
+pre-integration).
+
+When configured, after gathering the `gh` evidence and before classifying by
+hand, build the state JSON from that evidence — exactly these fields:
+
+```json
+{ "failed_log_excerpt": "<the failing log lines>",
+  "changed_files": ["<paths from the failing commit>"],
+  "prior_state_entries": ["<matching STATE.md / quarantine entries>"] }
+```
+
+Write it to a temp file and ask exactly one Choice question whose options are
+the four classes and whose criteria are the rubrics from the Decision guide
+table above:
+
+```bash
+scripts/typed-judgment.sh --state-file "$STATE_JSON" \
+  --questions '{"classification":{"type":"choice","instructions":"Classify this failing CI run as exactly one of flake, regression, infra, config.","criteria":"flake: seen before, intermittent, or passed on retry with no code change; regression: a code change introduced the failure, deterministic on the failing commit; infra: runner OOM, registry down, secrets missing, or another environment failure; config: workflow syntax, wrong tool version, or a configuration error.","options":["flake","regression","infra","config"]}}'
+```
+
+Then branch on the script's exit code:
+
+- **exit 0** — stdout carries the normalized answer. Use the typed answer as
+  the `class` field of the classification output (the three-part output rule
+  still applies: evidence must back it — cite the same log evidence you
+  gathered). Record in `loop-run-log.md`:
+  `{"judgment":"classification","answer":"<answer>","confidence":<0..1>,"latency_ms":<ms>,"tokens":<n>,"fallback":false,"judgment_fallback":false}`.
+- **exit 10** (fallback: not configured after all, cap exceeded, API error,
+  or confidence below `JUDGMENT_MIN_CONFIDENCE`) — run the existing LLM
+  classification procedure unchanged and record
+  `{"judgment":"classification","judgment_fallback":true}` in the run-log.
+
+Never let a typed judgment change the flake rule, the infra/config
+"not a code defect" routing, the maker/checker split, or the escalation
+gates — those stay with the deterministic procedure and the human.
 
 # The flake rule
 

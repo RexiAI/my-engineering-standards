@@ -9,6 +9,7 @@ How we work with AI. Practices, decisions, and runbooks distilled from real sess
 ## Decisions
 
 - [When to Use RAG vs Context Stuffing](when-to-use-rag.md) — Default to stuffing (with compression). RAG only when size, scale, or freshness demands it
+- [When to Use Typed Judgment vs Deterministic Code vs Full LLM](when-to-use-typesafe.md) — Rules stay in code, small classifications go to typed judgment with fallback, open-ended work to the full LLM; jaggedness caveat included
 
 ## Runbooks
 
