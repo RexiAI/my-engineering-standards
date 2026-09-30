@@ -563,6 +563,34 @@ lock, permissions, secret handling, and cost bounds are documented in
 `docs/CI_CD.md §PR Review Agent`, the authoritative reference for wiring it
 into child repos (`init-ci.sh --with-pr-review`).
 
+## Typed-judgment layer
+
+Some pipeline steps make small probabilistic classification calls (CI failure
+class, spec-ux applicability) that a typed-judgment API answers cheaply: send
+state + a typed question, get back an answer with a confidence. The pipeline
+supports this as an **opt-in** fast-path — see ADR 0004.
+
+- **Mechanism.** `scripts/typed-judgment.sh` is a curl+jq wrapper configured
+  entirely through the gitignored per-machine env files (the commented
+  `JUDGMENT_*` entries in `config/model.local.env.example` and
+  `config/agent.local.env.example`). Unset credentials mean no network call:
+  the script immediately falls back. It enforces a bounded retry (max 3
+  attempts with exponential backoff), a per-day call cap
+  (`.cache/judgment-cap-YYYY-MM-DD`, gitignored), a confidence threshold
+  (default `0.6`), and never prints the API key or an untruncated state
+  payload in diagnostics. `--dry-run` prints the request body offline.
+- **Exit-code contract.** `0` = usable answer (parsed, every question
+  answered, every confidence at or above the threshold); `10` = fallback
+  (not configured, cap exceeded, transport/HTTP failure after retries,
+  unparsable response, or low confidence); `2` = usage error. Exit `10` is
+  the load-bearing case: consumers treat it exactly like "no fast-path
+  exists".
+- **Consumers must preserve their stock procedure.** Every consumer of the
+  fast-path keeps its original LLM/manual procedure intact and runs it on
+  any exit `10` — the typed judgment may only pick a path the consumer
+  already knew how to take, and never overrides a deterministic gate or a
+  human. A consumer with no fallback must not adopt the layer.
+
 ## Tooling by language
 
 | Concern | Java | Go | JS/TS |
