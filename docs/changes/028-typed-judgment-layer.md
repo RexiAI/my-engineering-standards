@@ -1249,3 +1249,222 @@ Report path: `specs/028-typed-judgment-layer/30-report.md`.
 
 PR: https://github.com/RexiAI/my-engineering-standards/pull/73
 Commits: 11
+
+---
+
+# Post-PR CI check (phase 2) — round 1 of max 3
+
+Date: 2026-09-30. Verifier run: **attempt 3, phase 2, round 1** (phase-2 counter
+independent of phase 1 per docs/SPEC_PIPELINE.md §Post-PR CI check-and-remediate
+loop; phase 1 closed at attempt 2 PASS). PR #73 (draft),
+https://github.com/RexiAI/my-engineering-standards/pull/73, branch
+`spec/028-typed-judgment-layer`, head `7bf10afd46a93b1907d98866d48e0270dad5c85a`.
+Local HEAD parity confirmed (E7): same SHA, working tree clean — the local
+reproduction below ran on the exact tree CI saw.
+
+Spec folder is archived (stage 5b), so per the orchestrator's archived-spec
+instruction this phase-2 record is appended to this one-pager instead of
+`specs/028-typed-judgment-layer/25-verification.md` (deleted). Written without
+committing; the PR Opener handles pushes.
+
+## Round-1 verdict: **FAIL** — Self CI failed on both events; fix round 1 of max 3 opens
+
+Check suite (all checks terminal at ruling; an early transient poll showed the
+two IN_PROGRESS entries that E1/E3 record as completed — pending was never
+ruled on):
+
+| Check | Workflow | Event | Bucket | Run / check id |
+|---|---|---|---|---|
+| Review PR / Review PR | PR Review Agent | pull_request | **pass** | run 36717384478 |
+| Validate | Self CI | pull_request | **fail** | run 36717384099, check id **109893554694** |
+| Validate | Self CI | push | **fail** | run 36717375700, check id **109893527396** |
+
+Both Validate runs failed in the same job step (`Run shell gate bats tests
+(spec 001 Track B)`, step 29 — `make test-scripts`) with the **same single test
+failure**: CI suite is **224 ok / 1 not ok of 225**. The phase-1 local-env
+failures (AC-001-05, agent-env.selftest ×2 — Adjudication B) did **not** occur
+in CI, exactly as that adjudication predicted (gitignored
+`config/agent.local.env` is absent in CI); they are not implicated here.
+
+Failing test (verbatim from CI log):
+
+```
+not ok 190 AC-028-48: product name TypeSafe appears only in okf/ and config/ among tracked md outside specs/
+# (in test file scripts/tests/typed-judgment-integration.bats, line 237)
+#   `[ -z "$matches" ]' failed
+```
+
+## Evidence: post-PR CI check (phase 2, round 1)
+
+command: gh pr checks 73 --json name,state,bucket,workflow,link
+exit: 0
+at: 2026-09-30T12:57:28Z
+
+```
+[{"bucket":"pass","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/36717384478/job/109894084613","name":"Review PR / Review PR","state":"SUCCESS","workflow":"PR Review Agent"},{"bucket":"fail","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/36717384099/job/109893554694","name":"Validate","state":"FAILURE","workflow":"Self CI"},{"bucket":"fail","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/36717375700/job/109893527396","name":"Validate","state":"FAILURE","workflow":"Self CI"}]
+```
+
+command: gh api repos/RexiAI/my-engineering-standards/commits/7bf10afd46a93b1907d98866d48e0270dad5c85a/check-runs --jq '.check_runs[] | select(.conclusion=="failure") | {id, name, conclusion, html_url}'
+exit: 0
+at: 2026-09-30T12:57:29Z
+
+```
+{"conclusion":"failure","html_url":"https://github.com/RexiAI/my-engineering-standards/actions/runs/36717384099/job/109893554694","id":109893554694,"name":"Validate"}
+{"conclusion":"failure","html_url":"https://github.com/RexiAI/my-engineering-standards/actions/runs/36717375700/job/109893527396","id":109893527396,"name":"Validate"}
+```
+
+command: gh run list --branch spec/028-typed-judgment-layer --json databaseId,workflowName,event,status,conclusion,headSha,url --jq '.[] | select(.headSha=="7bf10afd46a93b1907d98866d48e0270dad5c85a")'
+exit: 0
+at: 2026-09-30T12:58:04Z
+
+```
+{"conclusion":"failure","databaseId":36717384099,"event":"pull_request","headSha":"7bf10afd46a93b1907d98866d48e0270dad5c85a","status":"completed","url":"https://github.com/RexiAI/my-engineering-standards/actions/runs/36717384099","workflowName":"Self CI"}
+{"conclusion":"success","databaseId":36717384478,"event":"pull_request","headSha":"7bf10afd46a93b1907d98866d48e0270dad5c85a","status":"completed","url":"https://github.com/RexiAI/my-engineering-standards/actions/runs/36717384478","workflowName":"PR Review Agent"}
+{"conclusion":"failure","databaseId":36717375700,"event":"push","headSha":"7bf10afd46a93b1907d98866d48e0270dad5c85a","status":"completed","url":"https://github.com/RexiAI/my-engineering-standards/actions/runs/36717375700","workflowName":"Self CI"}
+```
+
+command: gh run view 36717384099 --log-failed 2>&1 | grep -E "not ok 190|line 237|\[ -z|make: \*\*\*|##\[error\]"
+exit: 0
+at: 2026-09-30T12:58:05Z
+
+```
+206:Validate	Run shell gate bats tests (spec 001 Track B)	2026-09-30T12:51:41.8303707Z not ok 190 AC-028-48: product name TypeSafe appears only in okf/ and config/ among tracked md outside specs/
+207:Validate	Run shell gate bats tests (spec 001 Track B)	2026-09-30T12:51:41.8309865Z # (in test file scripts/tests/typed-judgment-integration.bats, line 237)
+208:Validate	Run shell gate bats tests (spec 001 Track B)	2026-09-30T12:51:41.8325763Z #   `[ -z "$matches" ]' failed
+244:Validate	Run shell gate bats tests (spec 001 Track B)	2026-09-30T12:51:46.4222047Z make: *** [Makefile:115: test-scripts] Error 1
+245:Validate	Run shell gate bats tests (spec 001 Track B)	2026-09-30T12:51:46.4227466Z ##[error]Process completed with exit code 2.
+```
+
+The push-event run 36717375700 fails identically (`gh run view 36717375700
+--log-failed` → `not ok 190 AC-028-48` … `make: *** [Makefile:115:
+test-scripts] Error 1` … exit code 2; queried 2026-09-30, output not
+re-captured in the timestamped pass — the pull_request run above is the
+authoritative excerpt, both runs share head 7bf10af and the same single
+failure).
+
+## Evidence: local reproduction on the pushed tree
+
+command: bats --tap --filter "AC-028-48" scripts/tests/typed-judgment-integration.bats
+exit: 1
+at: 2026-09-30T12:58:07Z
+
+```
+1..1
+not ok 1 AC-028-48: product name TypeSafe appears only in okf/ and config/ among tracked md outside specs/
+# (in test file scripts/tests/typed-judgment-integration.bats, line 237)
+#   `[ -z "$matches" ]' failed
+```
+
+command: git ls-files -z '*.md' | grep -zv '^(okf|config|specs)/' --perl-regexp | xargs -0 grep -nE 'TypeSafe'
+exit: 0
+at: 2026-09-30T12:58:08Z
+
+```
+docs/changes/028-typed-judgment-layer.md:21:A typed-judgment API (TypeSafe "System One" style: send state + typed
+```
+
+command: git rev-parse HEAD; git status --porcelain | wc -l
+exit: 0
+at: 2026-09-30T12:58:08Z
+
+```
+7bf10afd46a93b1907d98866d48e0270dad5c85a
+0
+```
+
+This is a genuine tree defect, **not** a local-env artifact: it reproduces on
+the exact pushed HEAD with a clean working tree, and it reproduces in CI on
+both events. It is a fourth failure, independent of Adjudication B's three
+env-caused local failures.
+
+## Diagnosis (root cause, verified)
+
+The test's scan helper (`scripts/tests/typed-judgment-integration.bats:46-50`)
+is:
+
+```
+md_tracked_excluding() {
+  git -C "$REPO_ROOT" ls-files -z '*.md' \
+    | grep -zv '^(okf|config|specs)/' --perl-regexp \
+    | xargs -0 grep -lE "$@" 2>/dev/null || true
+}
+```
+
+It excludes `okf/`, `config/`, `specs/` — but **not `docs/changes/`**. The
+exactly-one offending file is this archive one-pager: stage 5b's archive commit
+`dba52a4` (`scripts/archive-spec.sh`) copied the original informal ask verbatim
+into `docs/changes/028-typed-judgment-layer.md`, and that prose contains the
+product name once (line 21, `TypeSafe "System One" style`). During phase 1 the
+same content lived under `specs/028-typed-judgment-layer/` — inside the
+exclusion — so AC-028-48 passed (it was `ok` in both attempt-1 and attempt-2
+suite runs). Archiving moved the content out of the exclusion's reach; the
+failure was **latent from the moment the test was written**, because every spec
+archives to `docs/changes/` at 5b by design (docs/SPEC_PIPELINE.md §Archive in
+the PR / §Definition of done item 3). First failing CI run: 36717188483 on the
+archive commit `dba52a4` itself — consistent with this timeline.
+
+Corroborating design precedent: docs/SPEC_PIPELINE.md already treats
+`specs/*/` (live) and `docs/changes/*.md` (archived) as the same content in two
+lifecycle states, excluding **both** from the traceability reference scan
+("Both directories are ID *sources* only — each is excluded from the reference
+scan, because scenario markdown and archive one-pagers quote IDs (including
+illustrative ones) in prose"). AC-028-48's helper predates the archive and
+missed the second state.
+
+Note: AC-028-24 (line 73) uses the same helper with endpoint/model-id patterns
+and passed in CI only because no archived prose contains such a literal — it
+carries the identical latent blind spot. One helper fix covers both.
+
+## Routing recommendation: **Coder (behavior)**
+
+Not a Refactorer matter — no complexity/duplication/structure issue; the defect
+is wrong scan-scope behavior in a test helper against the post-archive tree.
+Recommended fix (option A): extend the exclusion in `md_tracked_excluding`
+(`scripts/tests/typed-judgment-integration.bats:48`) to cover `docs/changes/`,
+e.g. `^(okf|config|specs|docs/changes)/` — same rationale SPEC_PIPELINE.md uses
+for the traceability scan (archive one-pagers quote spec prose verbatim). This
+is not "fix the threshold": the scenario's intent (no product name in the
+repo's live docs) is preserved; the archived pipeline artifact is spec-scope
+content in its post-5b location, exactly like `specs/`.
+
+Alternative (option B, human/orchestrator judgment): sanitize the product name
+in `archive-spec.sh` output or in this one-pager. Rejected as primary because
+it conflicts with the archive's verbatim-copy property (check 2 of
+`check-scenario-traceability.sh` resolves IDs against the one-pager as the
+post-archive authority; redacting archived prose weakens that source).
+
+After the fix: PR Opener commits + pushes (re-triggering CI), then scoped
+re-check — **round 2 re-verifies only the previously-failing checks** (the two
+Self CI `Validate` runs at the new head; specifically `make test-scripts` green
+and AC-028-48 `ok`), not the whole suite, per §Scoped re-verification.
+
+## Round-1 telemetry
+
+Appended via `bash scripts/record-gate-run.sh` (W5 mode-644 note stands) with
+`SPEC_LOOP_COUNT=3 SPEC_PHASE1_RETRIES=1 SPEC_PHASE2_RETRIES=0` exported:
+`specSlug` 028-typed-judgment-layer, `gatesFailed` ["test-suite"] (the CI
+failure is the bats suite gate inside Self CI's Validate job), `outcome` fail,
+`durationSec` measured (approximate: exact timestamped-evidence window plus the
+~5 min of untimestamped opening queries/reads preceding it), warnings carrying
+the diagnosis and the AC-028-24 shared-helper note. Recorded on branch
+`spec/028-typed-judgment-layer`, not committed.
+
+Telemetry line (appended to `runs.jsonl`, verbatim):
+
+command: SPEC_LOOP_COUNT=3 SPEC_PHASE1_RETRIES=1 SPEC_PHASE2_RETRIES=0 bash scripts/record-gate-run.sh -record '<json>'
+exit: 0
+at: 2026-09-30T13:01:23Z
+
+```json
+{"specSlug":"028-typed-judgment-layer","gatesFailed":["test-suite"],"warnings":["phase2-round1: Self CI Validate failed on both events (run 36717384099 check 109893554694 pull_request; run 36717375700 check 109893527396 push) - AC-028-48 not ok: archive one-pager docs/changes/028-typed-judgment-layer.md:21 contains the product name; test helper md_tracked_excluding excludes ^(okf|config|specs)/ but not docs/changes/ - latent since authoring, triggered by stage-5b archive commit dba52a4; reproduced locally on clean HEAD 7bf10af; routed to Coder (option A: extend exclusion)","AC-028-24 shares md_tracked_excluding - same latent blind spot; one helper fix covers both","CI suite otherwise green: 224 ok / 1 not ok of 225; Adjudication-B env-caused local failures (AC-001-05, agent-env.selftest x2) did not occur in CI as predicted","W5 stands: record-gate-run.sh mode 644 - invoked via bash","durationSec approximate: timestamped evidence window + ~300s untimestamped opening queries/reads"],"durationSec":535,"outcome":"fail"}
+```
+
+Script output: `record-gate-run: appended record to /home/dbueno/projects/my-engineering-standards/runs.jsonl`
+(runId `2fbab4a0-5259-4bca-8ccf-8917f9f9d3b3` generated by the script;
+loopCount 3 / phase1Retries 1 / phase2Retries 0 taken from the exported env.)
+
+## Round summary (phase 2)
+
+| Round | Head | Result | Failing checks | Disposition |
+|---|---|---|---|---|
+| 1 | 7bf10af | **FAIL** | Validate 109893554694 (pull_request, run 36717384099), Validate 109893527396 (push, run 36717375700) — AC-028-48 | Route to Coder (option A above); fix round 1 of max 3 opens |
