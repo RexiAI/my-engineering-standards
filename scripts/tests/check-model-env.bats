@@ -19,8 +19,39 @@ teardown() { teardown_tmpdir; }
   printf '{"agent":{"spec-coder":{"model":"anthropic/claude-x"}}}' > "$TMPDIR_HELPER/opencode.json"
   run bash "$REPO_ROOT/scripts/check-model-env.sh" "$TMPDIR_HELPER"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"literal provider/model id found in opencode.json"* ]]
+  [[ "$output" == *"opencode.json: literal provider/model id found"* ]]
   [[ "$output" == *"must be an {env:SPEC_*_MODEL} reference"* ]]
+}
+
+scratch_root_with_good_files() {
+  cp "$REPO_ROOT/opencode.json" "$TMPDIR_HELPER/opencode.json"
+  mkdir -p "$TMPDIR_HELPER/config"
+  cp "$REPO_ROOT/config/model.local.env.example" "$TMPDIR_HELPER/config/model.local.env.example"
+  mkdir -p "$TMPDIR_HELPER/templates"
+}
+
+@test "check-model-env: a bridge template missing an agent exits 1 and names it" {
+  scratch_root_with_good_files
+  grep -v '"spec-ux"' "$REPO_ROOT/templates/opencode.json.bridge" > "$TMPDIR_HELPER/templates/opencode.json.bridge"
+  run bash "$REPO_ROOT/scripts/check-model-env.sh" "$TMPDIR_HELPER"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"templates/opencode.json.bridge: agent spec-ux missing"* ]]
+}
+
+@test "check-model-env: a bridge template with a literal model id exits 1" {
+  scratch_root_with_good_files
+  sed 's|{env:SPEC_CODER_MODEL}|opencode-go/deepseek-v4-flash|' \
+    "$REPO_ROOT/templates/opencode.json.bridge" > "$TMPDIR_HELPER/templates/opencode.json.bridge"
+  run bash "$REPO_ROOT/scripts/check-model-env.sh" "$TMPDIR_HELPER"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"templates/opencode.json.bridge: agent spec-coder: model value 'opencode-go/deepseek-v4-flash' is not an {env:SPEC_CODER_MODEL} reference"* ]]
+}
+
+@test "check-model-env: a root without a bridge template skips check 4 and exits 0" {
+  scratch_root_with_good_files
+  rmdir "$TMPDIR_HELPER/templates"
+  run bash "$REPO_ROOT/scripts/check-model-env.sh" "$TMPDIR_HELPER"
+  [ "$status" -eq 0 ]
 }
 
 @test "check-model-env: the real repo has no literal model ids and exits 0" {
