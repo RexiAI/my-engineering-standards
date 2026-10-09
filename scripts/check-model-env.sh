@@ -14,6 +14,10 @@
 #      SPEC_*_MODEL var names, and the set of vars referenced by opencode.json
 #      equals the set defined by the example. A reference with no example
 #      default, or an example var with no reference, fails naming the var.
+#   4. templates/opencode.json.bridge, when present, carries the same
+#      agent.*.model env-reference wiring — so bootstrapped children get
+#      SPEC_*_MODEL routing by default instead of silently inheriting the
+#      caller's model.
 #
 # Usage:
 #   scripts/check-model-env.sh [PROJECT_ROOT]
@@ -46,27 +50,26 @@ ROOT="${1:-$(dirname "$SCRIPT_DIR")}"
 OPENCODE_JSON="$ROOT/opencode.json"
 EXAMPLE="$ROOT/config/model.local.env.example"
 
-# ── Check 1: opencode.json — env references only, all 8 agents present ───────
-if [ ! -f "$OPENCODE_JSON" ]; then
-  fail "opencode.json not found at $OPENCODE_JSON"
-else
-  # Strip $schema lines before the whole-file literal scan so the schema URL's
-  # slashes cannot false-positive; then flag any remaining provider/model-style
-  # token (X/Y) — a literal model id above the provider blocks is a violation.
-  # Provider blocks are carved out before the scan (ADR 0002/0003): they
-  # legitimately carry endpoint URLs and provider-side model names — operator
-  # configuration, none of which is an agent model id. The scan's job is to
-  # keep the *agent block* env-reference-only. The provider block(s) sit at
-  # the end of the file, so deleting from the first "provider": line to EOF
-  # is sufficient.
-  scan="$(sed -E 's/"[[:space:]]*\$schema[[:space:]]*"[[:space:]]*:[[:space:]]*"[^"]*"[[:space:]]*[,]?//' "$OPENCODE_JSON")"
-  scan="$(sed -E '/^[[:space:]]*"provider"[[:space:]]*:/,$d' <<< "$scan")"
-  literal_line="$(printf '%s\n' "$scan" | grep -nE '[A-Za-z0-9._-]+/[A-Za-z0-9._-]+' | head -1 || true)"
-  if [ -n "$literal_line" ]; then
-    fail "literal provider/model id found in opencode.json agent block (line $literal_line) — every agent.*.model must be an {env:SPEC_*_MODEL} reference"
+# Validate one file's model wiring: every "model" line must be exactly the
+# {env:VAR} mapped for its agent, and every roster agent must be present.
+# Optional third arg "literal" enables a whole-file provider/model-token scan;
+# it relies on the provider block sitting at EOF (ADR 0002/0003 carve out
+# provider as operator config) and would false-positive on files whose
+# instructions paths (X/Y) precede it — so callers without that layout skip it.
+validate_model_wiring() {
+  local file="$1" label="$2" literal="${3:-skip}"
+  local line agent value expected
+  if [ "$literal" = "literal" ]; then
+    # $schema stripped first so its URL slash cannot false-positive.
+    local scan
+    scan="$(sed -E 's/"[[:space:]]*\$schema[[:space:]]*"[[:space:]]*:[[:space:]]*"[^"]*"[[:space:]]*[,]?//' "$file")"
+    scan="$(sed -E '/^[[:space:]]*"provider"[[:space:]]*:/,$d' <<< "$scan")"
+    local literal_line
+    literal_line="$(printf '%s\n' "$scan" | grep -nE '[A-Za-z0-9._-]+/[A-Za-z0-9._-]+' | head -1 || true)"
+    if [ -n "$literal_line" ]; then
+      fail "$label: literal provider/model id found (line $literal_line) — every agent.*.model must be an {env:SPEC_*_MODEL} reference"
+    fi
   fi
-
-  # Per-agent exact-match on model values; one agent per line.
   while IFS= read -r line; do
     case "$line" in
       *'"model"'*) ;;
@@ -76,18 +79,23 @@ else
     value="$(printf '%s' "$line" | sed -nE 's/.*"model"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/p')"
     expected="$(model_env_var_for_agent "$agent")"
     if [ -z "$expected" ]; then
-      fail "agent $agent in opencode.json is not one of the 9 configured agents"
+      fail "$label: agent $agent is not one of the 9 configured agents"
     elif [ "$value" != "{env:$expected}" ]; then
-      fail "agent $agent: model value '$value' is not an {env:$expected} reference"
+      fail "$label: agent $agent: model value '$value' is not an {env:$expected} reference"
     fi
-  done < "$OPENCODE_JSON"
-
-  # Every expected agent must be present in the file.
+  done < "$file"
   for agent in "${MODEL_ENV_AGENTS[@]}"; do
-    if ! grep -qE "^[[:space:]]*\"$agent\"[[:space:]]*:" "$OPENCODE_JSON"; then
-      fail "agent $agent missing from opencode.json"
+    if ! grep -qE "^[[:space:]]*\"$agent\"[[:space:]]*:" "$file"; then
+      fail "$label: agent $agent missing"
     fi
   done
+}
+
+# ── Check 1: opencode.json — env references only, all agents present ─────────
+if [ ! -f "$OPENCODE_JSON" ]; then
+  fail "opencode.json not found at $OPENCODE_JSON"
+else
+  validate_model_wiring "$OPENCODE_JSON" "opencode.json" literal
 fi
 
 # ── Check 2: the real env files are never tracked ────────────────────────────
@@ -120,9 +128,19 @@ else
   fi
 fi
 
+# ── Check 4: the child-bridge template carries the wiring by default ─────────
+# bootstrap.sh copies templates/opencode.json.bridge to every fresh child's
+# opencode.json. A template missing the agent block silently deprives every
+# bootstrapped child of SPEC_*_MODEL wiring — the exact drift this gate exists
+# to prevent. Skipped when absent (a child repo's own root has no templates/).
+BRIDGE="$ROOT/templates/opencode.json.bridge"
+if [ -f "$BRIDGE" ]; then
+  validate_model_wiring "$BRIDGE" "templates/opencode.json.bridge"
+fi
+
 echo ""
 if [ "$VIOLATIONS" -gt 0 ]; then
   echo -e "${RED}✘ check-model-env: $VIOLATIONS violation(s).${NC}"
   exit 1
 fi
-echo -e "${GREEN}PASS${NC} check-model-env: all model values are {env:SPEC_*_MODEL} references, no tracked real env files, example wired."
+echo -e "${GREEN}PASS${NC} check-model-env: all model values are {env:SPEC_*_MODEL} references, no tracked real env files, example wired, bridge template checked."
