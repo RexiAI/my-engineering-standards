@@ -15,10 +15,20 @@
 #                        Passed through verbatim in the request body.
 #
 # Environment:
-#   JUDGMENT_API_URL            Judgment API endpoint. Unset/empty -> fallback.
-#   JUDGMENT_API_KEY            Bearer token. Unset/empty -> fallback. Never
-#                               printed in stdout, stderr, or any log output.
-#   JUDGMENT_MODEL              Model id. Required for a live call.
+#   JUDGMENT_BACKEND            'local' | 'hosted' (spec 029). Unset/empty ->
+#                               'hosted' (byte-identical to spec 028). 'local'
+#                               makes JUDGMENT_API_KEY and JUDGMENT_MODEL
+#                               optional: the request is sent without an
+#                               Authorization header when no key is set, and
+#                               the DEFAULT_LOCAL_MODEL alias below when no
+#                               model is set. Any other value -> exit 2.
+#   JUDGMENT_API_URL            Judgment API endpoint. Required in both modes;
+#                               unset/empty -> fallback.
+#   JUDGMENT_API_KEY            Bearer token. Required in hosted mode (unset/
+#                               empty -> fallback); optional in local mode.
+#                               Never printed in stdout, stderr, or logs.
+#   JUDGMENT_MODEL              Model id. Required for a live hosted call;
+#                               optional in local mode (default alias below).
 #   JUDGMENT_MIN_CONFIDENCE     Usability threshold, default 0.6.
 #   JUDGMENT_DAILY_CAP          Max calls per day. Unset -> no cap enforced
 #                               and no counter written.
@@ -50,7 +60,8 @@
 #   0  — usable answer: HTTP 200, parseable, every question answered, and
 #        every confidence >= JUDGMENT_MIN_CONFIDENCE.
 #   2  — usage error (missing --questions, unreadable state, no state, live
-#        call without JUDGMENT_MODEL, unknown flag).
+#        hosted call without JUDGMENT_MODEL, invalid JUDGMENT_BACKEND value,
+#        unknown flag).
 #   10 — fallback, covering exactly: credentials unset/empty (no network
 #        call), network failure, HTTP 401/422/429/529 after at most 2
 #        exponential-backoff retries (3 total attempts), other non-retryable
@@ -66,6 +77,13 @@ REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 MIN_CONFIDENCE_DEFAULT="0.6"
 RETRYABLE_STATUSES="401 422 429 529"
 MAX_ATTEMPTS=3
+
+# Local-backend default model alias, used when JUDGMENT_BACKEND=local and
+# JUDGMENT_MODEL is unset (spec 029, OQ-029-03 resolution). The alias is the
+# winning backend's default model name recorded in the spec 029 spike report
+# (35-spike-report.md §Serving recipe; archived to
+# docs/changes/029-local-judgment-backend.md).
+DEFAULT_LOCAL_MODEL="kev-latest"
 
 usage_error() { echo "typed-judgment: $*" >&2; exit 2; }
 
@@ -112,8 +130,24 @@ load_state() {
   log_debug "state excerpt: ${STATE:0:200}"
 }
 
+resolve_backend() {
+  # spec 029 Task 2: unset or empty -> hosted (byte-identical 028 behavior);
+  # local -> key-less, model-less local serving allowed; anything else -> 2.
+  BACKEND="${JUDGMENT_BACKEND:-hosted}"
+  case "$BACKEND" in
+    local|hosted) ;;
+    *) usage_error "JUDGMENT_BACKEND must be 'local' or 'hosted', got: $BACKEND" ;;
+  esac
+}
+
+resolve_model() {
+  if [ -n "${JUDGMENT_MODEL:-}" ]; then printf '%s' "$JUDGMENT_MODEL"
+  elif [ "$BACKEND" = "local" ]; then printf '%s' "$DEFAULT_LOCAL_MODEL"
+  else printf ''; fi
+}
+
 build_request() {
-  local model="${JUDGMENT_MODEL:-}"
+  local model; model="$(resolve_model)"
   if jq -e . >/dev/null 2>&1 <<< "$STATE"; then
     jq -n --arg model "$model" --argjson questions "$QUESTIONS" --argjson state "$STATE" \
       '{model: $model, state: $state, questions: $questions}'
@@ -124,7 +158,12 @@ build_request() {
 }
 
 configured_credentials() {
-  [ -n "${JUDGMENT_API_KEY:-}" ] && [ -n "${JUDGMENT_API_URL:-}" ]
+  # hosted: URL and key both required (spec 028). local: URL required, key
+  # optional (the winner serves open by default; spec 029 Task 2).
+  case "$BACKEND" in
+    local) [ -n "${JUDGMENT_API_URL:-}" ] ;;
+    *)     [ -n "${JUDGMENT_API_KEY:-}" ] && [ -n "${JUDGMENT_API_URL:-}" ] ;;
+  esac
 }
 
 counter_file() {
@@ -165,14 +204,19 @@ retryable_status() {
   return 1
 }
 
-# api_attempt — one POST; sets HTTP_STATUS (from curl -w) and CURL_RC.
+# api_attempt — one POST; sets HTTP_STATUS (from curl -w) and CURL_RC. The
+# Authorization header is sent whenever a key is set (hosted always has one —
+# configured_credentials gated it; spec 028 order preserved byte-for-byte);
+# local mode with no key sends no auth header at all.
 api_attempt() {
   CURL_RC=0
+  local -a auth=()
+  [ -n "${JUDGMENT_API_KEY:-}" ] && auth=(-H "Authorization: Bearer ${JUDGMENT_API_KEY}")
   HTTP_STATUS="$(curl -sS --max-time "${JUDGMENT_TIMEOUT_SECONDS:-30}" \
     -o "$RESP_FILE" -w '%{http_code}' \
     -X POST \
     -H 'Content-Type: application/json' \
-    -H "Authorization: Bearer ${JUDGMENT_API_KEY}" \
+    "${auth[@]}" \
     --data-binary "@$REQ_FILE" \
     "$JUDGMENT_API_URL")" || CURL_RC=$?
   [ "$CURL_RC" -eq 0 ]
@@ -233,7 +277,11 @@ fallback() { # $1 = reason — debug line then the documented exit 10
 
 check_callable() { # guards before any HTTP: credentials, model, daily cap
   configured_credentials || fallback "not configured (JUDGMENT_API_URL/JUDGMENT_API_KEY)"
-  [ -n "${JUDGMENT_MODEL:-}" ] || usage_error "JUDGMENT_MODEL is required for a live call"
+  # hosted keeps spec 028's strict model requirement; local falls back to the
+  # DEFAULT_LOCAL_MODEL alias (resolved in build_request) instead of erroring.
+  if [ "$BACKEND" != "local" ]; then
+    [ -n "${JUDGMENT_MODEL:-}" ] || usage_error "JUDGMENT_MODEL is required for a live call"
+  fi
   cap_reached && fallback "daily cap reached"
   return 0
 }
@@ -248,6 +296,7 @@ finalize_response() { # $1 = client-measured elapsed ms; prints answer, exits 0/
 }
 
 main() {
+  resolve_backend
   parse_args "$@"
   load_state
   REQ_FILE="$(mktemp)"
