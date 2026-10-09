@@ -1259,5 +1259,611 @@ the pipeline:
 
 **Report status: GREEN.** PR Opener may proceed to stage 5b.
 
+## 35-spike-report.md
+
+# 029 — Local judgment backend: hardware spike report (Task 1)
+
+Machine: RTX 5060 Ti 16 GB (16311 MiB, driver 591.86, CUDA target sm_120), 41 GB RAM,
+Ubuntu, `uv 0.12.12`, `python 3.13` (via uv), Docker 29.7.2 available but not required.
+Run date: 2026-10-09 (UTC). Per OQ-029-01 the Coder ran the spike during `/build` on
+this machine; all downloads went to tool caches (HF `~/.cache/huggingface` + xet,
+uv `~/.cache/uv`), nothing was placed into the repo tree.
+
+Evaluation order (informal §Task 0, restated in 10-tasks.md): Kev-4B → Kev-9B/8B →
+CLM vLLM-FP8 (path A) → CLM llama.cpp-GGUF (path B) → CLM CPU (path C). Stop at the
+first candidate that meets the bar.
+
+## Operational bar applied (declared assumption — flagged for the Verifier)
+
+The numeric bar criteria live in `00-informal.md §Task 0`, which the Coder is
+information-barred from reading and which `10-tasks.md`/`20-acceptance/` did not
+restate. The spike therefore applied this declared operational bar, derived from the
+formalized acceptance criteria:
+
+1. installable and serveable on the target machine (16 GB VRAM) with headroom;
+2. ≤ 2 processes for the serving recipe; startup within the 120 s health budget;
+3. serves ≥ 20 fixture calls with p50 latency in the hundreds-of-ms range or better
+   (fast-path utility: must be cheaper in wall-clock than the full-LLM procedure);
+4. answers the ci-triage-style and spec-ux-style Choice questions with correct labels
+   on a clear majority of the fixture set (must beat the 25%/33% chance floor with
+   margin);
+5. `scripts/typed-judgment.sh` parses the response structurally (exit-code contract
+   holds) with zero changes beyond the Task 2 backend switch; field-level deltas are
+   enumerated rather than silently absorbed.
+
+**Deviation note for the record:** if the informal §Task 0 numbers differ from this
+bar, the Verifier/Architect should re-adjudicate the winner from the measured tables
+below — every bar criterion's measurement is recorded here, so re-deciding is a
+reading task, not a re-run.
+
+## Candidate results
+
+### Kev-4B — EVALUATED — bar: MET (winner)
+
+Model: `jaredpalmer/kev-4b` (Kev 1.0 family, adapter on `Qwen/Qwen3.5-4B-Base`,
+Apache-2.0, temperature 2.41 shipped calibrated). Repo: github.com/jaredpalmer/kev.
+
+Install steps actually executed:
+
+```bash
+git clone --depth 1 https://github.com/jaredpalmer/kev.git   # into /tmp scratch, then ~/.local/share/judgment-local/kev per recipe default
+cd kev && uv sync --extra serve                               # py3.13 via .python-version; torch 2.8.0+cu128; venv 6.9 GB
+uv run --extra serve python -m kev.serve --run jaredpalmer/kev-4b --port 8009
+```
+
+sm_120 note: default torch wheels (2.8.0+cu128) support Blackwell consumer — verified
+`torch.cuda.get_device_capability() == (12, 0)` before serving. `flash-linear-attention`
+(fused Qwen3.5 kernels) was NOT installed; the server runs correct-but-unfused
+(prints "fused Qwen3.5 kernels off" at startup). Optional speedup, not required.
+
+| Measurement | Value |
+|---|---|
+| VRAM usage | 15.6–15.8 GiB used on the 16311 MiB card (peak 15861 MiB sampled at 4 Hz over the 48-call loop; ~450 MiB headroom; weights bf16 + CUDA-graph buffers + 4-state prefix cache). Fits, tight. OOM-retry path (cache drop + re-run) exists in the server. |
+| p50 latency: 117 ms | client-measured over 48 calls (24 cold + 24 warm, ≥ 20 required; one Choice question per call). Cold-state server model time p50 286 ms; warm p50 ~105 ms; first-ever call 761 ms; isolated single-call probes via typed-judgment.sh 397–565 ms client / 66–176 ms server. |
+| ci-triage accuracy | 12 / 12 = 1.00 (labels on first-seen cold calls; warm re-pass 12/12 again) |
+| spec-ux accuracy | 12 / 12 = 1.00 (same protocol) |
+| confidence distribution | correct answers (n=24): min 0.225, p5 0.283, p10 0.335, median 0.694, max 0.940; buckets [0.2,0.4): 3, [0.4,0.6): 5, [0.6,0.8): 12, [0.8,1.0]: 4. wrong answers: n = 0 (distribution empty) |
+| process count | 1 logical process (OS tree: `uv run` launcher + python child — single PID file, tree-kill on stop; see Recipe ops) |
+| startup time | 11.2 s warm (weights cached; measured through `scripts/judgment-local-up.sh up` within its default 120 s health budget). Cold first run ≈ 50–55 min, dominated by the anonymous HF download (~3 MB/s rate limit; a `HF_TOKEN` fixes this). |
+| model download size | 8.8 GiB (`Qwen/Qwen3.5-4B-Base`) + 153 MB (`jaredpalmer/kev-4b` adapter repo, includes checksums/cards) ≈ 8.95 GiB total in the HF cache; uv venv 6.9 GB in the uv cache. Nothing in the repo tree. |
+
+Fixture provenance: the 24 fixtures are Coder-authored synthetic cases mirroring the
+two consumer question shapes (`skills/ci-triage/SKILL.md` Decision-guide rubrics;
+`agents/spec-ux.md` applicability rubrics), stored outside the repo
+(`/tmp/opencode/kev-spike/fixtures.jsonl`). 100 % accuracy on Coder-authored fixtures
+is an optimistic ceiling, not a published claim; Kev-4B's vendor-published new-source
+accuracy is 0.817/0.838 (dev/test), which is the realistic planning figure.
+
+### Kev-9B/8B — NOT EVALUATED
+
+**Skip reason:** stopped at first candidate meeting the bar (Kev-4B, per OQ-029-01
+bounded procedure); also the vendor-published ~17 GB VRAM requirement exceeds this
+16 GB card, so it would likely fail criterion 1 anyway.
+
+### CLM vLLM-FP8 (path A) — NOT EVALUATED
+
+**Skip reason:** stopped at first candidate meeting the bar (Kev-4B, per OQ-029-01 bounded procedure).
+
+### CLM llama.cpp-GGUF (path B) — NOT EVALUATED
+
+**Skip reason:** stopped at first candidate meeting the bar (Kev-4B, per OQ-029-01 bounded procedure).
+
+### CLM CPU (path C) — NOT EVALUATED
+
+**Skip reason:** stopped at first candidate meeting the bar (Kev-4B; path C exists only as a no-GPU fallback, and a CUDA GPU was visible, so per the OQ-029-01 ruling it was never in scope).
+
+## Winner and runner-up
+
+Winner: Kev-4B — first candidate in evaluation order; met every operational bar
+criterion with measured evidence: fits the 16 GB card, one-process recipe, 11.2 s
+startup, p50 latency: 117 ms, 24/24 fixture accuracy (published 0.82–0.84 realistic),
+TypeSafe-compatible wire. Rationale: cheapest ops surface (single process, single
+binary entry point), smallest download among GPU-viable candidates, warm latency well
+below the full-LLM procedure it accelerates, and calibrated confidences that support
+threshold recalibration.
+
+Runner-up: CLM vLLM-FP8 (path A) — named on published evidence without evaluation
+(evaluation stopped at the winner). Rationale: the bi-encoder architecture reports
+server-side p50 ≈ 28 ms on an RTX 4090 for cached action sets and Qwen3-8B FP8 fits
+16 GB; it is the strongest published latency figure of the unevaluated candidates.
+Costs: two-process recipe (vLLM pooling encoder + `clm-serve`), states > 2048 tokens
+truncated by default, and no published ci-triage/spec-ux-style accuracy. If the
+informal §Task 0 bar had required sub-100 ms p50, this is the candidate that would
+have won instead.
+
+## Recommended confidence threshold
+
+Method: 5th percentile (linear interpolation) of correct-answer confidence measured
+on the spike fixture set (24 cold single-Choice calls), floored to two decimals.
+
+Measured p5 of correct answers = 0.2831 →
+Recommended value: 0.28
+
+Rationale: Kev reports Choice confidence as `(p_max − 1/K)/(1 − 1/K)` — a different
+scale than the hosted path's shipped default. At the old 0.6 the local backend would
+have discarded 7 of 24 correct answers (29 % needless fallbacks); at 0.28, 23 of 24
+correct answers stay usable and every usable answer was correct (the one sub-threshold
+case was the genuinely-ambiguous ux-11 at 0.225, which the wrapper then routes to
+fallback — exactly the behavior the contract intends). Wrong-answer distribution was
+empty (0 wrong answers), so no separation evidence — treat 0.28 as a floor calibrated
+on correct answers only; tighten if production error rates appear (spike note, mirrors
+the vendor "check a threshold on your own data" guidance).
+
+## Serving recipe (parameterizes Tasks 3 and 4)
+
+- Exact serving command: `cd <clone-dir> && uv run --extra serve python -m kev.serve --run jaredpalmer/kev-4b --port 8009`
+- Port: `8009`
+- Health endpoint path: `/v1/models` (GET — no `/health` route exists; 200 = loaded)
+- API endpoint path: `/v1/systemone` (POST)
+- Model identifier: `jaredpalmer/kev-4b` (Kev 1.0, weights revision `139fdd94`)
+- Default model alias sent when `JUDGMENT_MODEL` unset: `kev-latest` (OQ-029-03; the
+  server also accepts `jev-latest`)
+- Process count: 1 (one logical server process; OS tree is 2: uv launcher + python
+  child — tracked via a single `kev.pid`, stopped via tree-kill)
+- Auth: server is open by default; `Authorization: Bearer <key>` is required only when
+  `KEV_API_KEY` is set. Local mode therefore sends **no** Authorization header when
+  `JUDGMENT_API_KEY` is unset (Task 2 AC-029-12; no dummy header needed — this
+  document is the authority).
+- PID file per OQ-029-04: single `kev.pid` in `.cache/judgment/` (+ `kev.log`).
+
+## Recipe ops notes
+
+- `uv run` does not exec its python child (launcher + child); the up/down script kills
+  the process tree (parent then children) — verified: after `down`, port free, GPU
+  back to the 1243 MiB display baseline, zero `kev.serve` processes.
+- Health probe budget: the script keeps the Task-3 default of 120 s; measured warm
+  startup is 11.2 s. Set `JUDGMENT_LOCAL_TIMEOUT_SECONDS` if weights must also
+  download on first run.
+- Anonymous HF downloads are rate-limited (~3 MB/s); set `HF_TOKEN` for first-run
+  speed. Downloads land in `~/.cache/huggingface` (hub + xet) only.
+- Useful server env knobs: `KEV_API_KEY` (require bearer), `KEV_DTYPE=fp32` (exact
+  eval path, more VRAM), `KEV_DATE_FACTS=1`, `KEV_TRUNCATE_STATES=1`,
+  `KEV_PREFIX_CACHE` (state cache size).
+- Wire: responses carry top-level `usage` and `latency_ms`; per-answer `type/choice/
+  confidence/probabilities`; every response has `x-typesafe-request-id`.
+
+## Wire compatibility
+
+Measured against the live server (raw response captured at 2026-10-09T17:31:16Z, in
+the E2E addendum below): `scripts/typed-judgment.sh` parses the winner's response with
+zero changes beyond the Task 2 backend switch — the exit-code contract holds
+(HTTP 200 → `response_valid` passes on the numeric per-answer `confidence`, the
+`normalize_output` jq runs unchanged, exit 0 for usable confidences, exit 10 for
+low-confidence with the answer still printed). `normalize_output` needed no
+modification; mock tests for both spec-029 shapes pass (AC-029-16/17).
+
+Enumerated fidelity deltas (documented, not silently absorbed — these are exactly the
+kind AC-029-05 asks the report to list):
+
+1. The winner returns the selected option under per-answer `choice`, not `answer`.
+   The wrapper's normalized `answer` is therefore `null` on a real Kev wire, while
+   `probabilities` carries the full distribution (argmax = the answer). The hosted
+   028 contract's `answer` key is an idealization the real TypeSafe wire also does not
+   emit (published API reference uses `choice`/`noul`/`score` per answer too).
+   Follow-up needed for a `choice→answer` alias in `normalize_output` — out of scope
+   for spec 029 (it would change the byte-frozen hosted path). Consumers today read
+   `probabilities`; the E2E addendum records both views.
+2. `usage` and `latency_ms` are top-level on the wire; the wrapper's per-answer
+   lookups yield `usage: 0` and client-measured `latency_ms` (both are the 028
+   contract's documented fallbacks — behavior, not breakage).
+3. Request side: the Kev server validates `criteria` as an option→description map
+   (identical to the TypeSafe API contract). The literal question JSON embedded in
+   the two consumer prompts today uses a **string** `criteria` plus `options` — the
+   live server rejects it with 422 → the wrapper exhausts its 3 attempts → exit 10 →
+   consumers run their stock procedure (safe fallback, measured in E2E). Consumer
+   prompt shapes should move to map-criteria in a follow-up spec; not changed here
+   (AC-029-74 forbids touching consumer files).
+
+## E2E addendum
+
+E2E-RAN — local server live on this machine (Kev-4B via `scripts/judgment-local-up.sh up`,
+torn down after capture; GPU freed). Both consumer question shapes ran through
+`scripts/typed-judgment.sh` with `JUDGMENT_BACKEND=local` (no key, no model env set —
+default alias sent), spec-028 telemetry format, timestamps UTC.
+
+Normalized-view telemetry (exactly what a consumer sees on stdout):
+
+{"judgment":"classification","question_shape":"ci-triage","backend":"local","answer":null,"confidence":0.7881,"latency_ms":397,"usage":0,"exit":0,"timestamp":"2026-10-09T17:31:16Z"}
+{"judgment":"applicability","question_shape":"spec-ux","backend":"local","answer":null,"confidence":0.797,"latency_ms":565,"usage":0,"exit":0,"timestamp":"2026-10-09T17:31:16Z"}
+
+Raw-server view (same two questions, wire fields — the `answer: null` above is
+delivered as `choice` here): ci-triage → `choice":"flake","confidence":0.7881,"usage":{"input_tokens":176,"output_tokens":75},"latency_ms":66.2`; spec-ux → `choice":"run","confidence":0.797,"usage":{"input_tokens":139,"output_tokens":61},"latency_ms":176.2`. (Raw captures at 2026-10-09T17:27:18Z / 17:33Z.)
+
+Fallback-path probe (literal consumer payload, string criteria): exit 10 after 3
+attempts (HTTP 422 from request validation), timestamp 2026-10-09T17:31:17Z —
+consumer stock procedure would run unchanged; no crash, no key, no leak.
+
+LLM-fallback comparison (advisory): for the ci-triage case (same-signature flake,
+recorded in the quarantine ledger, identical-commit rerun passed), the local backend's
+answer was `flake` (confidence 0.7881); the stock LLM procedure's answer for the same
+state is also `flake` (prior-state + retry-pass rubric branch). **agreement** — the
+typed answer matched the fallback classification. Recorded as advisory, not a gate
+(ADR 0004 unchanged: the deterministic path remains authoritative).
+
+Daily-cap interaction: E2E used a scratch `JUDGMENT_CAP_DIR` (cap unset → no counter
+written), so the machine's real per-day counter is untouched.
+
+## Cross-artifact note (OQ-029-02 requirement)
+
+The key results tables (VRAM, p50 latency, accuracy, calibration/confidence
+distribution) are copied into ADR 0005 (`docs/adr/0005-local-judgment-backend.md`
+§Spike evidence) and must also be re-recorded by the Verifier in
+`25-verification.md`, so the evidence survives `specs/029-*` archiving. The
+`typed-judgment.sh` `DEFAULT_LOCAL_MODEL` constant and `judgment-local-up.sh` recipe
+parameters cite this report.
+
 PR: https://github.com/RexiAI/my-engineering-standards/pull/75
 Commit count: 8 (7 task commits + 1 archive commit)
+
+---
+
+# Post-PR CI check (phase 2) — round 1 of max 3
+
+Date: 2026-10-09. Verifier run: **attempt 2, phase 2, round 1** (phase-2 counter
+independent of phase 1 per docs/SPEC_PIPELINE.md §Post-PR CI check-and-remediate
+loop; phase 1 closed at attempt 1 PASS). PR #75 (draft, **stacked**: base
+`spec/028-typed-judgment-layer` = PR #73, still open),
+https://github.com/RexiAI/my-engineering-standards/pull/75, branch
+`spec/029-local-judgment-backend`, head `5d43e9a780380a6cdac34e4200f8c6149db65f6d`.
+Local HEAD parity confirmed (E7): same SHA, working tree clean — the local
+reproduction below ran on the exact tree CI saw.
+
+Spec folder is archived (stage 5b), so per the orchestrator's archived-spec
+instruction this phase-2 record is appended to this one-pager instead of
+`specs/029-local-judgment-backend/25-verification.md` (deleted). Written without
+committing; the PR Opener handles pushes.
+
+## Round-1 verdict: **FAIL** — Self CI failed on both events; fix round 1 of max 3 opens
+
+Check suite (all checks terminal at ruling; an early query ~19:16Z showed Review PR
+IN_PROGRESS — pending was never ruled on; bounded poll to terminal is E6):
+
+| Check | Workflow | Event | Bucket | Run / check id |
+|---|---|---|---|---|
+| Review PR / Review PR | PR Review Agent | pull_request | **pass** | run 37978439698, check id 113982884254 |
+| Validate | Self CI | pull_request | **fail** | run 37978439585, check id **113982534241** |
+| Validate | Self CI | push | **fail** | run 37978432813, check id **113982511928** |
+
+Both Validate runs failed in the same job step (`Run shell gate bats tests
+(spec 001 Track B)`, step 29 — `make test-scripts`) with the **same 13 test
+failures**: CI suite is **282 ok / 13 not ok / 0 skipped of 295**. The two
+`--log-failed` outputs are byte-identical modulo timestamps (E5). Steps 30–32
+(Run gate selftests, Check scenario traceability (live tree), Validate YAML
+syntax) were **skipped** after the bats failure; round 2's scoped re-check must
+confirm them green within the same Validate checks.
+
+All 13 failures are AC-029 content-contract tests in
+`scripts/tests/typed-judgment-integration.bats`, every one rooted in the same
+error — `specs/029-local-judgment-backend/35-spike-report.md: No such file or
+directory`:
+
+not ok **213 AC-029-01**, **214 AC-029-02**, **215 AC-029-03**, **216 AC-029-04**,
+**217 AC-029-05**, **218 AC-029-06**, **222 AC-029-42**, **229 AC-029-53**,
+**230 AC-029-54**, **241 AC-029-70**, **242 AC-029-71**, **243 AC-029-72**,
+**244 AC-029-73** (verbatim excerpt E4).
+
+## Adjudications (per the orchestrator's phase-2 notes)
+
+1. **The 5 phase-1 local-only failures did not occur in CI — Rulings A and B
+   empirically confirmed.** `ok 5 AC-001-05`, `ok 31/32/33 agent-env.selftest ×3`
+   (Ruling A: env-caused — the gitignored `config/agent.local.env` with real
+   credentials is absent on the runner) and `ok 97 check-pr-review: clean repo`
+   (Ruling B: branch-state) — all green on both events (E4b). Self CI step 23
+   (`Check PR review agent deliverables`) also success.
+2. **Nothing flagged the stacked diff — no stacking-artifact adjudication was
+   needed, and the concern is empirically moot.** The PR Review Agent check is
+   **success** (E6) and `gh pr view 75 --json reviews` shows no formal review
+   object carrying a flag. `git diff --name-only
+   origin/spec/028-typed-judgment-layer..HEAD` — the PR's true diff vs its stacked
+   base — carries 17 files, **zero under `agents/`** (E8): 028's committed
+   `agents/spec-ux.md` amendment appears only in the vs-`main` view, not vs the
+   base. (Counterfactual ruling had an agent-based check flagged it: **stacking
+   artifact**, disposition with PR #73's human review, not a 029 defect — same
+   disposition as phase-1 Ruling B.)
+3. **The 13 CI failures are a genuine 029 defect, not a stacking artifact.** All
+   are 029's own AC tests reading 029's own spike report, deleted by 029's own
+   stage-5b archive commit; the stacked base is not implicated — every AC-028-*
+   test is green (ok 174–212, ok 252–278 in the full E4 log) and the failure
+   reproduces locally on the exact pushed HEAD with a clean working tree (E7).
+
+## Diagnosis (root cause, verified)
+
+Chain, each link verified not assumed:
+
+1. `scripts/tests/typed-judgment-integration.bats:305` hardcodes the LIVE spec
+   path: `SPIKE="$REPO_ROOT/specs/029-local-judgment-backend/35-spike-report.md"`
+   (E8). The 13 tests grep/awk that file (`[ -f "$SPIKE" ]`, `grep_file "$SPIKE"
+   '^## …'`, `spike_threshold_value`).
+2. Commit `81fa9c2` committed the spike report; the stage-5b archive commit
+   `c830f2b` (`scripts/archive-spec.sh`) deleted it — `git show --stat c830f2b`
+   lists `specs/029-local-judgment-backend/35-spike-report.md | 230 ----` among
+   the 13 removed files (E8).
+3. `archive-spec.sh` embeds only `00-informal.md`, `10-tasks.md`, the `## AC-…`
+   heading lines of `20-acceptance/*`, `25-verification.md`, and `30-report.md`
+   into the one-pager (`read_file` calls, lines 68–71), then `git rm -r
+   "$SPEC_DIR"` (line 113). **`35-spike-report.md` is not embedded.** The
+   sections the tests require therefore exist nowhere in the HEAD tree: `grep
+   -cE '^## (Serving recipe|E2E addendum|Winner and runner-up|Wire
+   compatibility)' docs/changes/029-local-judgment-backend.md` → **0** (E8).
+   Only the "Key results tables copied here per OQ-029-02" inside the archived
+   Verification section survived — OQ-029-02's copying instruction mitigated the
+   *numbers*, not the *file* the tests assert against.
+4. The content is recoverable from history: `git cat-file -e
+   HEAD:specs/029-local-judgment-backend/35-spike-report.md` → fatal, does not
+   exist (exit 128); `git cat-file -e 6e3f923:specs/…/35-spike-report.md` → exit
+   0 (E7).
+5. Timeline: the first failing CI runs are `37978279685` (push) / `37978360494`
+   (pull_request) on the archive commit `c830f2b` itself, with the identical 13
+   failing test IDs (E9) — the same pattern 028 round 1 recorded ("first failing
+   CI run … on the archive commit dba52a4 itself").
+6. Phase 1 could not catch this: its suite ran against the pre-archive working
+   tree (the archive is stage 5b's final act, after Verifier + Mutation Runner +
+   PR open). The defect was **latent from the moment the tests were written** —
+   every spec archives to `docs/changes/` by design. Record irony: the test
+   file's own header comment (lines 300–303) says values are cross-checked "so
+   the evidence survives archiving" — value durability was designed for, file-
+   path durability was not.
+
+Same defect *class* as 028 round 1 (a test whose assumption the stage-5b archive
+breaks), but unlike 028's one-regex fix, the referenced content does not exist
+anywhere in the post-archive tree — the fix must restore its survival, not just
+re-point a scan.
+
+## Routing recommendation: **Coder (behavior)**
+
+Not a Refactorer matter — no complexity/duplication/structure issue; the defect
+is wrong test+archive-tooling behavior against the post-archive tree (028
+round-1 precedent: same routing).
+
+**Option A (recommended) — make the archive preserve the evidence, resolve dual-path:**
+
+1. Extend `scripts/archive-spec.sh` to embed remaining top-level evidence
+   artifacts verbatim — general rule: every `specs/NNN-slug/[0-9][0-9]-*.md` not
+   already embedded (here `35-spike-report.md`) into the one-pager, each under
+   its own `## <basename>` section. Verbatim embedding preserves the archive's
+   copy-verbatim property (028 round-1 precedent: move content, never redact or
+   rewrite), and the report's own `^## …`/`^### …` anchors stay grep-matchable
+   inside the one-pager. Extend `scripts/tests/archive-spec.bats` coverage for
+   the new rule (check-bats-assertions gate is active).
+2. Regenerate this one-pager with the missing spike-report section appended
+   (content: `git show 6e3f923:specs/029-local-judgment-backend/35-spike-report.md`,
+   230 lines) — or re-run the updated `archive-spec.sh` against a temporarily
+   reconstructed pre-archive spec dir.
+3. `SPIKE=` (typed-judgment-integration.bats:305) resolves dual-path: the live
+   spec path when present (phase-1 state), else the one-pager
+   `docs/changes/029-local-judgment-backend.md` (post-5b state). All 13 tests
+   then pass in BOTH lifecycle states, since the embedded content is verbatim.
+
+**Option B (narrower, acceptable minimum):** steps 2+3 only, hand-appending the
+section — leaves `archive-spec.sh` untouched but keeps the general trap (any
+future spec's 3x- evidence artifact is silently destroyed by archiving); 028's
+precedent fixed the general mechanism, not only the instance.
+
+**Option C (rejected as primary):** re-point the tests at surviving content only —
+impossible without weakening the AC contracts: AC-029-01 requires per-candidate
+sections and AC-029-70/71/73 require the E2E addendum, none of which exist in
+the one-pager today.
+
+**Option D (rejected):** skip the tests when the spec folder is absent —
+permanently silently no-ops 13 content contracts on `main` after merge; a skip
+is a failure, not a pass (Verifier contract, docs/TESTING.md discipline).
+
+After the fix: PR Opener commits + pushes (re-triggering CI), and round 2 =
+scoped re-check of **only the two Self CI `Validate` checks** at the new head —
+`make test-scripts` green (all 13 IDs ok) plus steps 30–32 (skipped this round)
+confirmed running and green; the PR Review Agent pass from round 1 stands (if it
+re-triggers at the new head, poll to terminal — never rule on pending).
+
+## Evidence: post-PR CI check (phase 2, round 1)
+
+command: gh pr checks 75 --json name,state,bucket,workflow,link
+exit: 0
+at: 2026-10-09T19:21:36Z
+
+```
+[{"bucket":"pass","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/37978439698/job/113982884254","name":"Review PR / Review PR","state":"SUCCESS","workflow":"PR Review Agent"},{"bucket":"fail","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/37978439585/job/113982534241","name":"Validate","state":"FAILURE","workflow":"Self CI"},{"bucket":"fail","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/37978432813/job/113982511928","name":"Validate","state":"FAILURE","workflow":"Self CI"}]
+```
+
+command: gh api repos/RexiAI/my-engineering-standards/commits/5d43e9a780380a6cdac34e4200f8c6149db65f6d/check-runs --jq '.check_runs[] | {id, name, status, conclusion, html_url}'
+exit: 0
+at: 2026-10-09T19:21:37Z
+
+```
+{"conclusion":"success","html_url":"https://github.com/RexiAI/my-engineering-standards/actions/runs/37978439698/job/113982884254","id":113982884254,"name":"Review PR / Review PR","status":"completed"}
+{"conclusion":"failure","html_url":"https://github.com/RexiAI/my-engineering-standards/actions/runs/37978439585/job/113982534241","id":113982534241,"name":"Validate","status":"completed"}
+{"conclusion":"failure","html_url":"https://github.com/RexiAI/my-engineering-standards/actions/runs/37978432813/job/113982511928","id":113982511928,"name":"Validate","status":"completed"}
+```
+
+command: gh run list --branch spec/029-local-judgment-backend --json databaseId,name,event,status,conclusion,headSha --jq '.[] | select(.headSha=="5d43e9a780380a6cdac34e4200f8c6149db65f6d")'
+exit: 0
+at: 2026-10-09T19:23:22Z
+
+```
+{"conclusion":"failure","databaseId":37978439585,"event":"pull_request","headSha":"5d43e9a780380a6cdac34e4200f8c6149db65f6d","name":"Self CI","status":"completed"}
+{"conclusion":"success","databaseId":37978439698,"event":"pull_request","headSha":"5d43e9a780380a6cdac34e4200f8c6149db65f6d","name":"PR Review Agent","status":"completed"}
+{"conclusion":"failure","databaseId":37978432813,"event":"push","headSha":"5d43e9a780380a6cdac34e4200f8c6149db65f6d","name":"Self CI","status":"completed"}
+```
+
+command: gh run view 37978439585 --log-failed (representative excerpt; full log 365 lines, saved verbatim during this run)
+exit: 0
+at: 2026-10-09T19:23:23Z
+
+```
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-09T19:12:02.1167453Z 1..295
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-09T19:12:49.5562464Z not ok 213 AC-029-01: spike report exists with per-candidate sections and measured fields
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-09T19:12:49.5570234Z # (in test file scripts/tests/typed-judgment-integration.bats, line 323)
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-09T19:12:49.5596262Z #   `[ -f "$SPIKE" ]' failed
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-09T19:12:49.5870127Z # grep: /home/runner/work/my-engineering-standards/my-engineering-standards/specs/029-local-judgment-backend/35-spike-report.md: No such file or directory
+… (not ok 214–218, 222, 229, 230, 241–243 — same file, same No such file or directory root error; full log 365 lines) …
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-09T19:12:51.4264679Z not ok 244 AC-029-73: E2E telemetry lines carry the spec-028 run-log fields
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-09T19:12:55.6272043Z make: *** [Makefile:115: test-scripts] Error 1
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-09T19:12:55.6277465Z ##[error]Process completed with exit code 2.
+```
+
+command: gh run view 37978439585 --log-failed 2>&1 | grep -E "not ok 213|line 323|\[ -f .\$SPIKE. \]|make: \*\*\*|##\[error\]|ok 5 AC-001-05|ok 31 |ok 32 |ok 33 |ok 97 " (adjudication lines: phase-1 local-only failures green in CI + first/last failing block + suite error)
+exit: 0
+at: 2026-10-09T19:26:06Z
+
+```
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-09T19:12:03.2855633Z ok 5 AC-001-05: No secrets in harness or fixtures
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-09T19:12:05.5984573Z ok 31 agent-env.selftest: exits 0 and reports every case passing
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-09T19:12:06.5581931Z ok 32 agent-env.selftest: reports a non-zero assertion count and zero failures
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-09T19:12:07.5091796Z ok 33 agent-env.selftest: gitignore checks take the ignored path, not the could-not-run path
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-09T19:12:15.0312750Z ok 97 check-pr-review: clean repo exits 0 and prints its documented clean line
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-09T19:12:49.5562464Z not ok 213 AC-029-01: spike report exists with per-candidate sections and measured fields
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-09T19:12:49.5570234Z # (in test file scripts/tests/typed-judgment-integration.bats, line 323)
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-09T19:12:49.5596262Z #   `[ -f "$SPIKE" ]' failed
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-09T19:12:55.6272043Z make: *** [Makefile:115: test-scripts] Error 1
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-09T19:12:55.6277465Z ##[error]Process completed with exit code 2.
+```
+
+command: diff <(sed 's/[0-9T:.-]*Z //' selfci-pr.log) <(sed 's/[0-9T:.-]*Z //' selfci-push.log) — the two Validate `--log-failed` captures, timestamps stripped
+exit: 0
+at: 2026-10-09T19:23:28Z
+
+```
+(no output — the push-event and pull_request-event failures are byte-identical modulo timestamps)
+```
+
+command: for i in $(seq 1 14); do gh run view 37978439698 --json status,conclusion --jq '.status+" "+.conclusion'; … sleep 45; done (bounded poll, PR Review Agent)
+exit: 0
+at: 2026-10-09T19:19:47Z
+
+```
+poll 1 19:19:47: completed success
+2026-10-09T19:19:47Z
+```
+
+command: bats --tap scripts/tests/typed-judgment-integration.bats (local reproduction on the pushed tree; counts via grep -c)
+exit: 1
+at: 2026-10-09T19:19:28Z
+
+```
+65 ok / 13 not ok of 78 — the same 13 AC IDs as CI:
+not ok 40 AC-029-01: spike report exists with per-candidate sections and measured fields
+not ok 41 AC-029-02: spike declares exactly one winner and one runner-up with rationale
+not ok 42 AC-029-03: spike states recommended JUDGMENT_MIN_CONFIDENCE in (0,1) with method
+not ok 43 AC-029-04: spike records the serving recipe (command, port, model id, process count)
+not ok 44 AC-029-05: spike records the wire-compatibility result
+not ok 45 AC-029-06: every candidate after the winner has a one-line skip reason
+not ok 49 AC-029-42: model.local.env.example carries the recalibrated threshold and method, matching the spike report
+not ok 56 AC-029-53: ADR spike-summary section carries measured numbers matching the report
+not ok 57 AC-029-54: ADR states the recalibrated threshold and method, matching report and config
+not ok 68 AC-029-70: E2E addendum records answers per question shape (or a documented skip)
+not ok 69 AC-029-71: E2E records the local-vs-LLM-fallback comparison (or the skip)
+not ok 70 AC-029-72: skip-with-reason entry exists when the server was unavailable
+not ok 71 AC-029-73: E2E telemetry lines carry the spec-028 run-log fields
+```
+
+command: git rev-parse HEAD; git status --porcelain; git cat-file -e HEAD:specs/029-local-judgment-backend/35-spike-report.md; git cat-file -e 6e3f923:specs/029-local-judgment-backend/35-spike-report.md
+exit: 128 (third command — absent at HEAD), 0 (fourth — present pre-archive)
+at: 2026-10-09T19:31:05Z
+
+```
+5d43e9a780380a6cdac34e4200f8c6149db65f6d
+ M docs/changes/029-local-judgment-backend.md
+ M runs.jsonl
+fatal: path 'specs/029-local-judgment-backend/35-spike-report.md' does not exist in 'HEAD'
+AT-HEAD-EXIT:128
+PRE-ARCHIVE-EXIT:0
+```
+
+(HEAD parity with the CI head was first confirmed pre-write — `git status
+--porcelain | wc -l` → `0` before this addendum existed, and the bats
+reproduction above ran on that clean tree. The timestamped re-capture shown here
+carries only the two intended uncommitted verifier writes: this addendum and the
+telemetry line, which the PR Opener pushes with the fix round per convention.)
+
+command: grep -n 'read_file\|git rm -r' scripts/archive-spec.sh; grep -n 'SPIKE=' scripts/tests/typed-judgment-integration.bats; grep -cE '^## (Serving recipe|E2E addendum|Winner and runner-up|Wire compatibility)' docs/changes/029-local-judgment-backend.md; git show --stat c830f2b (excerpt); git diff --name-only origin/spec/028-typed-judgment-layer..HEAD; git diff --name-only origin/spec/028-typed-judgment-layer..HEAD -- agents/ | wc -l
+exit: 1 (third command — zero matches: spike sections absent from the one-pager)
+at: 2026-10-09T19:23:28Z
+
+```
+66:read_file() { [ -f "$1" ] && cat "$1" || echo "_(not produced)_"; }
+68:INFORMAL=$(read_file "$SPEC_DIR/00-informal.md")
+69:TASKS=$(read_file "$SPEC_DIR/10-tasks.md")
+70:VERIFICATION=$(read_file "$SPEC_DIR/25-verification.md")
+71:REPORT=$(read_file "$SPEC_DIR/30-report.md")
+113:git rm -r "$SPEC_DIR" >/dev/null
+305:SPIKE="$REPO_ROOT/specs/029-local-judgment-backend/35-spike-report.md"
+0
+c830f2b stat excerpt:
+ specs/029-local-judgment-backend/35-spike-report.md  |  230 ----
+ (13 files changed, 1260 insertions(+), 1805 deletions(-))
+base..head (PR diff vs stacked base), 17 files:
+.gitignore
+Makefile
+config/agent.local.env.example
+config/model.local.env.example
+docs/LOOP_ENGINEERING.md
+docs/SPEC_PIPELINE.md
+docs/adr/0005-local-judgment-backend.md
+docs/adr/README.md
+docs/changes/029-local-judgment-backend.md
+okf/log.md
+okf/when-to-use-typesafe.md
+runs.jsonl
+scripts/judgment-local-up.sh
+scripts/tests/judgment-local-up.bats
+scripts/tests/typed-judgment-integration.bats
+scripts/tests/typed-judgment.bats
+scripts/typed-judgment.sh
+agents/ files in base..head: 0
+```
+
+command: gh run view 37978279685 --log-failed 2>&1 | grep -oE "not ok [0-9]+ AC-029-[0-9]+" | sort (push run on the ARCHIVE COMMIT c830f2b — timeline confirmation)
+exit: 0
+at: 2026-10-09T19:23:24Z
+
+```
+not ok 213 AC-029-01
+not ok 214 AC-029-02
+not ok 215 AC-029-03
+not ok 216 AC-029-04
+not ok 217 AC-029-05
+not ok 218 AC-029-06
+not ok 222 AC-029-42
+not ok 229 AC-029-53
+not ok 230 AC-029-54
+not ok 241 AC-029-70
+not ok 242 AC-029-71
+not ok 243 AC-029-72
+not ok 244 AC-029-73
+```
+
+(Identical 13 IDs at c830f2b and at head 5d43e9a — the defect fired on the
+archive commit itself; the earlier pull_request run at c830f2b, 37978360494,
+also failure; its PR Review Agent run 37978360648 was cancelled/superseded by
+the 5d43e9a push.)
+
+## Round-1 telemetry
+
+Appended via `bash scripts/record-gate-run.sh` (mode 644 — invoked via bash;
+028's W5 note stands) with `SPEC_LOOP_COUNT=2 SPEC_PHASE1_RETRIES=0
+SPEC_PHASE2_RETRIES=0` exported: `specSlug` 029-local-judgment-backend,
+`gatesFailed` ["test-suite"] (the CI failure is the bats-suite gate inside Self
+CI's Validate job — 028 precedent), `outcome` fail, `durationSec` 855
+(approximate, disclosed in the record: untimestamped opening reads/queries from
+~19:12:45Z plus the timestamped evidence window). Recorded on branch
+`spec/029-local-judgment-backend`, **not committed** — the PR Opener pushes it
+with the fix round.
+
+Telemetry line (appended to `runs.jsonl`, verbatim):
+
+command: SPEC_LOOP_COUNT=2 SPEC_PHASE1_RETRIES=0 SPEC_PHASE2_RETRIES=0 bash scripts/record-gate-run.sh -record '<json>'
+exit: 0
+at: 2026-10-09T19:25:16Z
+
+```json
+{"specSlug":"029-local-judgment-backend","gatesFailed":["test-suite"],"warnings":["phase2-round1: Self CI Validate failed on both events at head 5d43e9a (pull_request run 37978439585 check 113982534241; push run 37978432813 check 113982511928) - 282 ok / 13 not ok of 295, all 13 are AC-029 content-contract tests (01-06, 42, 53, 54, 70-73) failing on specs/029-local-judgment-backend/35-spike-report.md No such file or directory: stage-5b archive commit c830f2b deleted the spec folder (archive-spec.sh embeds only 00-informal/10-tasks/AC-headings/25-verification/30-report then git rm -r; the 230-line spike report is NOT embedded and its sections are absent from the one-pager) while SPIKE= at typed-judgment-integration.bats:305 still hardcodes the live spec path; latent since authoring (phase-1 suite ran pre-archive); first failing runs 37978279685/37978360494 on the archive commit itself with identical 13 IDs; reproduced locally on clean HEAD (65 ok / 13 not ok, same IDs); routed to Coder - option A: embed remaining NN-*.md evidence artifacts in archive-spec.sh + regenerate one-pager (content recoverable at 6e3f923) + dual-path SPIKE resolution","PR Review Agent pass (run 37978439698 check 113982884254, bounded poll terminal 19:19:47Z, pending never ruled on); stacked-diff adjudication moot: base..head diff carries zero agents/ files (agents/spec-ux.md is main-view-only, belongs to PR #73); Self CI step 23 + bats ok 97 green","phase-1 out-of-scope Rulings A/B empirically confirmed: all 5 local-only failures absent in CI (ok 5 AC-001-05, ok 31/32/33 agent-env.selftest, ok 97 check-pr-review clean repo) on both events","Validate steps 30-32 (gate selftests, scenario-traceability live tree, YAML validation) SKIPPED after the bats failure - round 2 scoped re-check must confirm them green within the same Validate checks","both Validate --log-failed outputs byte-identical modulo timestamps (diff exit 0); push event fails identically to pull_request","record-gate-run.sh mode 644 - invoked via bash (028 W5 stands)","durationSec approximate: untimestamped opening reads/queries from ~19:12:45Z plus timestamped evidence window 19:19:28Z-19:23:28Z plus report write"],"durationSec":855,"outcome":"fail","runId":"7b4845a0-49ba-4d7c-9ff8-bec913b8e9a4","loopCount":2,"phase1Retries":0,"phase2Retries":0}
+```
+
+Script output: `record-gate-run: appended record to /home/dbueno/projects/my-engineering-standards/runs.jsonl`
+(runId `7b4845a0-49ba-4d7c-9ff8-bec913b8e9a4` generated by the script;
+loopCount 2 / phase1Retries 0 / phase2Retries 0 taken from the exported env.)
+
+## Round summary (phase 2)
+
+| Round | Head | Result | Failing checks | Disposition |
+|---|---|---|---|---|
+| 1 | 5d43e9a | **FAIL** | Validate 113982534241 (pull_request, run 37978439585), Validate 113982511928 (push, run 37978432813) — 13× AC-029 content-contract tests vs the archived-away spike report; PR Review Agent pass | Route to Coder (option A above); fix round 1 of max 3 opens |
