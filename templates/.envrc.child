@@ -13,7 +13,7 @@
 # WHAT EACH LINE LOADS (later lines win: a dotenv line clobbers any
 # pre-existing value — the .envrc is the per-directory source of truth):
 #   1. .standards/config/model.local.env.example — the PARENT.s committed defaults for
-#      the 8 SPEC_*_MODEL vars. The submodule never carries
+#      the 9 SPEC_*_MODEL vars. The submodule never carries
 #      gitignored files, so a parent's per-machine override never propagates;
 #      this line always resolves against the committed example only.
 #   2. config/model.local.env — this child's gitignored per-machine override.

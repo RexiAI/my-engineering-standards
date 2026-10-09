@@ -478,7 +478,7 @@ not as literals in `opencode.json`.
 
    | Line | File | Role |
    |---|---|---|
-   | 1 | `config/model.local.env.example` | committed defaults for the 8 `SPEC_*_MODEL` vars |
+   | 1 | `config/model.local.env.example` | committed defaults for the 9 `SPEC_*_MODEL` vars |
    | 2 | `config/model.local.env` | gitignored per-machine override |
    | 3 | `config/agent.local.env` | gitignored per-machine credentials (`GITHUB_TOKEN`, `GH_TOKEN`) |
 
