@@ -71,9 +71,9 @@ ok() { PASS_COUNT=$((PASS_COUNT + 1)); echo -e "${GREEN}PASS${NC} $1"; }
 bad() { FAIL_COUNT=$((FAIL_COUNT + 1)); echo -e "${RED}FAIL${NC} $1"; }
 
 # Runtime-built model ids (no inline literal model-id values anywhere below).
-provider="opencode-""go"
-DEFAULT_FAST="$provider/""deepseek-v4-flash"
-DEFAULT_PLUS="$provider/""qwen3.7-plus"
+provider="fake-provider"
+DEFAULT_FAST="$provider/fast-tier-model"
+DEFAULT_PLUS="$provider/plus-tier-model"
 
 # Banned-name patterns assembled at runtime — this file never contains the
 # contiguous strings the purge greps for.
@@ -109,21 +109,30 @@ write_refs_opencode() {
 EOF
 }
 
-# write_example ROOT FAST PLUS — fixture example defining all 9 vars at
-# differentiated values (plus tier for verifier/mutation-runner/pr-opener)
+# write_example ROOT FAST PLUS — fixture example defining all 9 vars; tier
+# values derive from the shared roster (MODEL_ENV_AGENTS + model_env_is_plus),
+# never a restated agent list — restate here and check-model-env disagrees.
 write_example() {
   mkdir -p "$1/config"
   {
-    printf 'SPEC_SPECIFIER_MODEL=%s\n' "$2"
-    printf 'SPEC_UX_MODEL=%s\n' "$2"
-    printf 'SPEC_VERIFIER_MODEL=%s\n' "$3"
-    printf 'SPEC_MUTATION_RUNNER_MODEL=%s\n' "$3"
-    printf 'SPEC_PR_OPENER_MODEL=%s\n' "$3"
-    printf 'SPEC_CODER_MODEL=%s\n' "$2"
-    printf 'SPEC_REFACTORER_MODEL=%s\n' "$2"
-    printf 'SPEC_PIPELINE_MODEL=%s\n' "$2"
-    printf 'SPEC_PR_REVIEW_MODEL=%s\n' "$2"
+    local a var want
+    for a in "${MODEL_ENV_AGENTS[@]}"; do
+      var="$(model_env_var_for_agent "$a")"
+      if model_env_is_plus "$a"; then want="$3"; else want="$2"; fi
+      printf '%s=%s\n' "$var" "$want"
+    done
   } > "$1/config/model.local.env.example"
+}
+
+# tier_snapshot_ok SNAP — every roster var resolves to its tier's fixture value.
+tier_snapshot_ok() {
+  local snap="$1" a var want
+  for a in "${MODEL_ENV_AGENTS[@]}"; do
+    var="$(model_env_var_for_agent "$a")"
+    if model_env_is_plus "$a"; then want="$DEFAULT_PLUS"; else want="$DEFAULT_FAST"; fi
+    snapshot_has "$snap" "$var" "$want" || return 1
+  done
+  return 0
 }
 
 # snap_envrc TEMPLATE_FILE FIXTURE_ROOT [KEY=VALUE presets...] — emulate the
@@ -311,24 +320,15 @@ done
 
 echo "== AC-025-02 parent .envrc semantics =="
 
-# 02-01: example alone -> all 8 non-empty, differentiated defaults, exit 0
+# 02-01: example alone -> all 9 non-empty, differentiated defaults, exit 0
 f0201="$(mktemp -d "$TMP/parent-0201.XXXXXX")"
 write_example "$f0201" "$DEFAULT_FAST" "$DEFAULT_PLUS"
 run_capture "$TMP/s0201" "$TMP/e0201" snap_envrc "$PARENT_TPL" "$f0201"
 snap="$(cat "$TMP/s0201")"
-if [ "$RUN_RC" -eq 0 ] \
-   && snapshot_has "$snap" SPEC_VERIFIER_MODEL "$DEFAULT_PLUS" \
-   && snapshot_has "$snap" SPEC_MUTATION_RUNNER_MODEL "$DEFAULT_PLUS" \
-   && snapshot_has "$snap" SPEC_PR_OPENER_MODEL "$DEFAULT_PLUS" \
-   && snapshot_has "$snap" SPEC_SPECIFIER_MODEL "$DEFAULT_FAST" \
-   && snapshot_has "$snap" SPEC_UX_MODEL "$DEFAULT_FAST" \
-   && snapshot_has "$snap" SPEC_CODER_MODEL "$DEFAULT_FAST" \
-   && snapshot_has "$snap" SPEC_REFACTORER_MODEL "$DEFAULT_FAST" \
-   && snapshot_has "$snap" SPEC_PIPELINE_MODEL "$DEFAULT_FAST" \
-   && [ "$(snapshot_count "$snap")" -eq 9 ]; then
-  ok "AC-025-02-01 AC-025-06-03 example alone: all 8 vars non-empty, plus-tier -> plus, fast-tier -> fast, exit 0"
+if [ "$RUN_RC" -eq 0 ] && tier_snapshot_ok "$snap" && [ "$(snapshot_count "$snap")" -eq 9 ]; then
+  ok "AC-025-02-01 AC-025-06-03 example alone: all 9 vars non-empty, plus-tier -> plus, fast-tier -> fast, exit 0"
 else
-  bad "AC-025-02-01 AC-025-06-03 example alone: all 8 vars non-empty, differentiated (rc=$RUN_RC, snap=$(tr '\n' ' ' <<< "$snap"))"
+  bad "AC-025-02-01 AC-025-06-03 example alone: all 9 vars non-empty, differentiated (rc=$RUN_RC, snap=$(tr '\n' ' ' <<< "$snap"))"
 fi
 
 # 02-02: per-machine override beats the committed example
@@ -352,7 +352,7 @@ f0203="$(mktemp -d "$TMP/parent-0203.XXXXXX")"
 write_example "$f0203" "$DEFAULT_FAST" "$DEFAULT_PLUS"
 run_capture "$TMP/s0203" "$TMP/e0203" snap_envrc "$PARENT_TPL" "$f0203" "SPEC_SPECIFIER_MODEL=$provider/""pre-exported""$RANDOM"
 snap="$(cat "$TMP/s0203")"
-if snapshot_has "$snap" SPEC_SPECIFIER_MODEL "$DEFAULT_FAST" && [ "$RUN_RC" -eq 0 ]; then
+if snapshot_has "$snap" SPEC_SPECIFIER_MODEL "$DEFAULT_PLUS" && [ "$RUN_RC" -eq 0 ]; then
   ok "AC-025-02-03 AC-025-06-03 clobber: example value wins over the pre-exported var (dotenv line clobbers)"
 else
   bad "AC-025-02-03 AC-025-06-03 clobber: example value wins over the pre-exported var (got: $(printf '%s\n' "$snap" | grep '^SPEC_SPECIFIER_MODEL='))"
@@ -368,7 +368,7 @@ run_capture "$TMP/s0204" "$TMP/e0204" snap_envrc "$PARENT_TPL" "$f0204"
 snap="$(cat "$TMP/s0204")"
 if snapshot_has "$snap" GITHUB_TOKEN "$tok_t" \
    && snapshot_has "$snap" GH_TOKEN "$tok_g" \
-   && snapshot_has "$snap" SPEC_SPECIFIER_MODEL "$DEFAULT_FAST" \
+   && snapshot_has "$snap" SPEC_SPECIFIER_MODEL "$DEFAULT_PLUS" \
    && snapshot_has "$snap" SPEC_VERIFIER_MODEL "$DEFAULT_PLUS" \
     && [ "$(snapshot_count "$snap")" -eq 9 ]; then
   ok "AC-025-02-04 AC-025-06-03 credentials: GITHUB_TOKEN + GH_TOKEN load from the third line, model vars intact"
@@ -429,24 +429,15 @@ fi
 
 echo "== AC-025-03 child template + bootstrap =="
 
-# 03-01: no child files -> all 8 vars resolve to the parent's committed defaults
+# 03-01: no child files -> all 9 vars resolve to the parent's committed defaults
 f0301="$(mktemp -d "$TMP/child-0301.XXXXXX")"
 write_example "$f0301/.standards" "$DEFAULT_FAST" "$DEFAULT_PLUS"
 run_capture "$TMP/s0301" "$TMP/e0301" snap_envrc "$CHILD_TPL" "$f0301"
 snap="$(cat "$TMP/s0301")"
-if [ "$RUN_RC" -eq 0 ] \
-   && snapshot_has "$snap" SPEC_VERIFIER_MODEL "$DEFAULT_PLUS" \
-   && snapshot_has "$snap" SPEC_MUTATION_RUNNER_MODEL "$DEFAULT_PLUS" \
-   && snapshot_has "$snap" SPEC_PR_OPENER_MODEL "$DEFAULT_PLUS" \
-   && snapshot_has "$snap" SPEC_CODER_MODEL "$DEFAULT_FAST" \
-   && snapshot_has "$snap" SPEC_SPECIFIER_MODEL "$DEFAULT_FAST" \
-   && snapshot_has "$snap" SPEC_UX_MODEL "$DEFAULT_FAST" \
-   && snapshot_has "$snap" SPEC_REFACTORER_MODEL "$DEFAULT_FAST" \
-   && snapshot_has "$snap" SPEC_PIPELINE_MODEL "$DEFAULT_FAST" \
-   && [ "$(snapshot_count "$snap")" -eq 9 ]; then
-  ok "AC-025-03-01 AC-025-06-04 no child files: all 8 vars resolve to the parent's committed defaults, exit 0"
+if [ "$RUN_RC" -eq 0 ] && tier_snapshot_ok "$snap" && [ "$(snapshot_count "$snap")" -eq 9 ]; then
+  ok "AC-025-03-01 AC-025-06-04 no child files: all 9 vars resolve to the parent's committed defaults, exit 0"
 else
-  bad "AC-025-03-01 AC-025-06-04 no child files: all 8 vars resolve to the parent's committed defaults (rc=$RUN_RC)"
+  bad "AC-025-03-01 AC-025-06-04 no child files: all 9 vars resolve to the parent's committed defaults (rc=$RUN_RC)"
 fi
 
 # 03-02: child override wins; the parent's other defaults stay
@@ -459,11 +450,11 @@ run_capture "$TMP/s0302" "$TMP/e0302" snap_envrc "$CHILD_TPL" "$f0302"
 snap="$(cat "$TMP/s0302")"
 if snapshot_has "$snap" SPEC_CODER_MODEL "$child_val" \
    && snapshot_has "$snap" SPEC_VERIFIER_MODEL "$DEFAULT_PLUS" \
-   && snapshot_has "$snap" SPEC_SPECIFIER_MODEL "$DEFAULT_FAST" \
+   && snapshot_has "$snap" SPEC_SPECIFIER_MODEL "$DEFAULT_PLUS" \
    && [ "$(snapshot_count "$snap")" -eq 9 ] && [ "$RUN_RC" -eq 0 ]; then
-  ok "AC-025-03-02 AC-025-06-04 child override: SPEC_CODER_MODEL wins, other 7 keep parent defaults, exit 0"
+  ok "AC-025-03-02 AC-025-06-04 child override: SPEC_CODER_MODEL wins, others keep parent defaults, exit 0"
 else
-  bad "AC-025-03-02 AC-025-06-04 child override: SPEC_CODER_MODEL wins, other 7 keep parent defaults (rc=$RUN_RC)"
+  bad "AC-025-03-02 AC-025-06-04 child override: SPEC_CODER_MODEL wins, others keep parent defaults (rc=$RUN_RC)"
 fi
 
 # 03-03: parent per-machine overrides never propagate to children

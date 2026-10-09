@@ -16,7 +16,7 @@ teardown() { teardown_tmpdir; }
 }
 
 @test "check-model-env: a literal provider/model id in an agent block exits 1" {
-  printf '{"agent":{"spec-coder":{"model":"anthropic/claude-x"}}}' > "$TMPDIR_HELPER/opencode.json"
+  printf '{"agent":{"spec-coder":{"model":"fake-provider/fake-model"}}}' > "$TMPDIR_HELPER/opencode.json"
   run bash "$REPO_ROOT/scripts/check-model-env.sh" "$TMPDIR_HELPER"
   [ "$status" -eq 1 ]
   [[ "$output" == *"opencode.json: literal provider/model id found"* ]]
@@ -40,11 +40,11 @@ scratch_root_with_good_files() {
 
 @test "check-model-env: a bridge template with a literal model id exits 1" {
   scratch_root_with_good_files
-  sed 's|{env:SPEC_CODER_MODEL}|opencode-go/deepseek-v4-flash|' \
+  sed 's|{env:SPEC_CODER_MODEL}|fake-provider/fake-model|' \
     "$REPO_ROOT/templates/opencode.json.bridge" > "$TMPDIR_HELPER/templates/opencode.json.bridge"
   run bash "$REPO_ROOT/scripts/check-model-env.sh" "$TMPDIR_HELPER"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"templates/opencode.json.bridge: agent spec-coder: model value 'opencode-go/deepseek-v4-flash' is not an {env:SPEC_CODER_MODEL} reference"* ]]
+  [[ "$output" == *"templates/opencode.json.bridge: agent spec-coder: model value 'fake-provider/fake-model' is not an {env:SPEC_CODER_MODEL} reference"* ]]
 }
 
 @test "check-model-env: a root without a bridge template skips check 4 and exits 0" {
