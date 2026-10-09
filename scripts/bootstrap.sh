@@ -44,6 +44,12 @@ if [ ! -f "$REPO_ROOT/opencode.json" ]; then
     echo "[COPY] opencode.json.bridge -> opencode.json"
 else
     echo "[SKIP] opencode.json already exists"
+    # Children bootstrapped before the bridge template carried the agent block
+    # have an opencode.json with no SPEC_*_MODEL wiring — subagents would
+    # silently inherit the caller's model. Say so instead of skipping quietly.
+    if ! grep -q '{env:SPEC_PIPELINE_MODEL}' "$REPO_ROOT/opencode.json"; then
+        echo "[WARN] existing opencode.json lacks the agent.*.model {env:SPEC_*_MODEL} block — copy it from templates/opencode.json.bridge so pipeline stages resolve per-model"
+    fi
 fi
 
 # 3. Symlink OKF (Operational Knowledge Framework)
