@@ -302,7 +302,17 @@ md_tracked_excluding() {
 # consistency between the spike report, the config templates, and ADR 0005
 # rather than hard-coded, so the evidence survives archiving.
 
+# SPIKE — dual-path across the spec lifecycle (phase-2 fix round 1, option A):
+# the live spike artifact while specs/029-local-judgment-backend/ exists
+# (pre-archive dev state, e.g. the phase-1 working tree), else the archived
+# one-pager, into which archive-spec.sh embeds 35-spike-report.md verbatim
+# under its "## 35-spike-report.md" heading (post-archive state — what CI and
+# main see after stage 5b). The embedded bytes are identical, so every content
+# contract below passes in BOTH states.
 SPIKE="$REPO_ROOT/specs/029-local-judgment-backend/35-spike-report.md"
+if [ ! -f "$SPIKE" ]; then
+  SPIKE="$REPO_ROOT/docs/changes/029-local-judgment-backend.md"
+fi
 ADR5="$REPO_ROOT/docs/adr/0005-local-judgment-backend.md"
 UP_SCRIPT="$REPO_ROOT/scripts/judgment-local-up.sh"
 TJ_BATS="$REPO_ROOT/scripts/tests/typed-judgment.bats"
