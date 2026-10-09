@@ -1,9 +1,9 @@
 #!/bin/bash
 # model-env.vars.sh — Single source of truth for the spec-pipeline model roster.
 #
-# Sourced-only (never executed directly): defines the 8 SPEC_*_MODEL var names,
-# the 8 spec-agent names, the agent→var mapping, and which agents default to the
-# "plus" model tier. Every consumer sources this file — check-model-env.sh,
+# Sourced-only (never executed directly): defines the 9 SPEC_*_MODEL var names,
+# the 9 spec-agent names, the agent→var mapping, tier membership, and which
+# agents default to the "plus" model tier. Every consumer sources this file — check-model-env.sh,
 # model-env.selftest.sh, model-env.runtime-check.sh — so the roster lives in one
 # place. Adding or renaming an agent means editing this file, not four scripts.
 # (The .envrc templates get their values from config/model.local.env.example —
@@ -39,13 +39,27 @@ MODEL_ENV_AGENTS=(
   pr-review
 )
 
-# Agents whose committed default is the "plus" model tier; every other agent
-# defaults to the "fast" tier (see config/model.local.env.example).
+# Agents whose committed default is the "plus" (flagship / high-judgment) model
+# tier; every other agent defaults to the "fast" tier (see
+# config/model.local.env.example). This roster is the single source of truth for
+# tier membership — fixture writers and expectations must derive from
+# model_env_is_plus, never restate the agent list.
 MODEL_ENV_PLUS_AGENTS=(
+  spec-specifier
+  spec-ux
   spec-verifier
   spec-mutation-runner
-  spec-pr-opener
+  pr-review
 )
+
+# Is AGENT a plus-tier agent? Exit 0 yes, 1 no.
+model_env_is_plus() {
+  local a
+  for a in "${MODEL_ENV_PLUS_AGENTS[@]}"; do
+    [ "$a" = "$1" ] && return 0
+  done
+  return 1
+}
 
 # agent -> expected env var, one per modelable spec agent; "" for anything else.
 model_env_var_for_agent() {

@@ -12,7 +12,7 @@
 # WHAT EACH LINE LOADS (later lines win: a dotenv line clobbers any
 # pre-existing value, exported shell vars included — the .envrc is the
 # per-directory source of truth):
-#   1. config/model.local.env.example — committed defaults for the 8
+#   1. config/model.local.env.example — committed defaults for the 9
 #      SPEC_*_MODEL vars opencode.json interpolates. Loaded first so every var
 #      is non-empty when opencode launches ({env:VAR} resolves empty when
 #      unset — this opencode build has no default syntax).
