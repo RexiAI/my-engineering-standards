@@ -579,6 +579,18 @@ supports this as an **opt-in** fast-path — see ADR 0004.
   (`.cache/judgment-cap-YYYY-MM-DD`, gitignored), a confidence threshold
   (default `0.6`), and never prints the API key or an untruncated state
   payload in diagnostics. `--dry-run` prints the request body offline.
+- **Local backend option.** `JUDGMENT_BACKEND=local` activates a local compute
+  backend (spec 029, ADR 0005): a judgment model you serve on your own
+  machine instead of a hosted paid API. In local mode the API key is optional
+  (requests go without an `Authorization` header when no key is configured)
+  and the model id is optional (unset sends the backend's default alias). The
+  default backend is `hosted` — unset or empty behaves exactly as before —
+  and the optionality guarantee is unchanged in both modes: nothing
+  configured means no call and an immediate fallback (exit `10`). The
+  mechanism stays provider-agnostic here; the concrete backends and the
+  serving recipe live in the ADR evidence section and the config templates.
+  `scripts/judgment-local-up.sh` starts and stops the local backend; `make
+  judgment-up` / `make judgment-down` wire the same script.
 - **Exit-code contract.** `0` = usable answer (parsed, every question
   answered, every confidence at or above the threshold); `10` = fallback
   (not configured, cap exceeded, transport/HTTP failure after retries,
