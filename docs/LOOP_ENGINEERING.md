@@ -129,7 +129,10 @@ The opt-in typed-judgment layer (spec 028; `scripts/typed-judgment.sh`,
 `docs/SPEC_PIPELINE.md §Typed-judgment layer`, ADR 0004) is available for
 loop-triage classification — a loop that classifies failing work (flake /
 regression / infra / config style) may use the typed fast-path as advisory
-input. This is a **future phase**: no loop is wired to it yet, and when one
+input. A loop may also run its judgment calls against a local backend
+(`JUDGMENT_BACKEND=local`, ADR 0005) instead of a hosted API — same
+exit-code contract, same fallback rules, no per-call spend. This is a
+**future phase**: no loop is wired to it yet, and when one
 is, it inherits the loop's standing rules unchanged — exit-code fallback to
 the stock triage procedure, no gate authority for a probabilistic answer,
 bounded per-day spend, and L1 report-only behavior until a loop earns a

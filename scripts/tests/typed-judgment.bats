@@ -340,3 +340,232 @@ assert_200_body_fallback() {
   assert_exit_code 0 "$status"
   [ "$(cat "$(counter_file)")" -eq 1 ]
 }
+
+# ── Spec 029: backend switch (AC-029-10 … AC-029-20) ─────────────────────────
+# Tests below extend the spec-028 fake-transport pattern without modifying any
+# of the existing lines above: where an assertion needs curl's argv (auth-header
+# presence/absence), the test overwrites the stub with an argv-recording variant
+# of the same mechanics. All tests stay offline; no real HTTP request is made.
+
+# kev.json / clm.json — the two local response shapes per spec 029 Task 2:
+# Kev shape carries latency_ms per answer; CLM shape carries billing_units per
+# answer (ignored by normalization) and no latency_ms in the body.
+kev_fixture() { printf '0\t200\t%s/kev.json\n' "$FIX" > "$SEQUENCE"; }
+clm_fixture() { printf '0\t200\t%s/clm.json\n' "$FIX" > "$SEQUENCE"; }
+
+stub_curl_args() { # argv-recording variant of the fake transport
+  ARGS_LOG="$TMPDIR_HELPER/args"
+  export MOCK_CURL_ARGS="$ARGS_LOG"
+  cat > "$BIN/curl" <<'STUB2'
+#!/usr/bin/env bash
+# fake curl stub (argv-recording variant): never touches the network
+attempts="${MOCK_CURL_ATTEMPTS:?}"
+mkdir -p "$(dirname "$attempts")"
+printf 'attempt\n' >> "$attempts"
+n=$(grep -c . "$attempts")
+out=""
+body_src=""
+args=("$@")
+i=0
+while [ "$i" -lt "${#args[@]}" ]; do
+  case "${args[$i]}" in
+    -o) out="${args[$((i+1))]}"; i=$((i+2)) ;;
+    --data-binary) body_src="${args[$((i+1))]}"; i=$((i+2)) ;;
+    *) i=$((i+1)) ;;
+  esac
+done
+if [ -n "${MOCK_CURL_ARGS:-}" ]; then
+  { echo "--- argv $n"
+    for a in "${args[@]}"; do case "$a" in -H|--max-time|-o|--data-binary|-w|-X|-sS) printf 'ARG %s\n' "$a" ;; *) printf 'ARG %s\n' "$a" ;; esac; done
+  } >> "$MOCK_CURL_ARGS"
+fi
+if [ -n "$body_src" ]; then
+  bodies="${MOCK_CURL_BODIES:?}"
+  mkdir -p "$(dirname "$bodies")"
+  { echo "--- request $n";
+    case "$body_src" in @*) cat "${body_src#@}" ;; *) printf '%s' "$body_src" ;; esac
+    echo; } >> "$bodies"
+fi
+seq_file="${MOCK_CURL_SEQUENCE:?}"
+line=$(sed -n "${n}p" "$seq_file")
+[ -z "$line" ] && line=$(tail -n 1 "$seq_file")
+IFS=$'\t' read -r cexit code bodyfile <<< "$line"
+[ "$cexit" != "0" ] && exit "$cexit"
+[ -n "$out" ] && cat "$bodyfile" > "$out"
+printf '%s' "$code"
+STUB2
+  chmod +x "$BIN/curl"
+}
+
+# header_lines_from <n> — the -H values passed on fake-curl invocation n
+arg_headers() { awk -v want="--- argv $1" '$0==want{f=1;next} /^--- argv/{f=0} f && /^ARG Authorization:|^ARG Content-Type:/' "$ARGS_LOG"; }
+
+@test "AC-029-10: backend unset preserves hosted behavior (auth header, exit 0)" {
+  stub_curl_args
+  sf=$(make_state 'build failed at step 3')
+  invoke -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 0 "$status"
+  arg_headers 1 | grep -q '^ARG Authorization: Bearer test-key$'
+}
+
+@test "AC-029-11: backend=hosted is byte-identical to unset (headers and body)" {
+  stub_curl_args
+  sf=$(make_state 'build failed at step 3')
+  unset JUDGMENT_BACKEND
+  invoke -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 0 "$status"
+  grep -v '^--- argv' "$ARGS_LOG" > "$TMPDIR_HELPER/args-unset"
+  grep -v '^--- request' "$BODIES" > "$TMPDIR_HELPER/body-unset"
+  rm -f "$ARGS_LOG" "$BODIES" "$ATTEMPTS"
+  invoke JUDGMENT_BACKEND=hosted -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 0 "$status"
+  grep -v '^--- argv' "$ARGS_LOG" > "$TMPDIR_HELPER/args-hosted"
+  grep -v '^--- request' "$BODIES" > "$TMPDIR_HELPER/body-hosted"
+  # argv lines with temp paths differ by design; headers/URL are what must match
+  grep -E 'Authorization:|Content-Type:|judgment\.invalid|^-X$|POST$' "$TMPDIR_HELPER/args-unset" \
+    > "$TMPDIR_HELPER/h-unset"
+  grep -E 'Authorization:|Content-Type:|judgment\.invalid|^-X$|POST$' "$TMPDIR_HELPER/args-hosted" \
+    > "$TMPDIR_HELPER/h-hosted"
+  diff "$TMPDIR_HELPER/h-unset" "$TMPDIR_HELPER/h-hosted"
+  diff "$TMPDIR_HELPER/body-unset" "$TMPDIR_HELPER/body-hosted"
+}
+
+@test "AC-029-12: local backend without API key sends no Authorization header" {
+  stub_curl_args
+  sf=$(make_state 'build failed at step 3')
+  invoke -u JUDGMENT_API_KEY JUDGMENT_BACKEND=local -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 0 "$status"
+  [ "$(attempts_count)" -eq 1 ]
+  ! arg_headers 1 | grep -q '^ARG Authorization:'
+}
+
+@test "AC-029-13: local backend with API key sends Bearer auth header" {
+  stub_curl_args
+  sf=$(make_state 'build failed at step 3')
+  invoke JUDGMENT_BACKEND=local JUDGMENT_API_KEY=local-key -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 0 "$status"
+  arg_headers 1 | grep -q '^ARG Authorization: Bearer local-key$'
+}
+
+@test "AC-029-14: local backend without URL exits 10 with no HTTP request" {
+  sf=$(make_state 'build failed at step 3')
+  invoke -u JUDGMENT_API_URL -u JUDGMENT_API_KEY JUDGMENT_BACKEND=local -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 10 "$status"
+  [ "$(attempts_count)" -eq 0 ]
+}
+
+@test "AC-029-15: invalid backend value is a usage error exiting 2 with diagnostic" {
+  sf=$(make_state 'build failed at step 3')
+  invoke JUDGMENT_BACKEND=invalid -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 2 "$status"
+  [[ "$stderr" == *invalid* ]]
+}
+
+@test "AC-029-16: local backend parses the Kev response shape (latency_ms per answer)" {
+  cat > "$FIX/kev.json" <<'JSON'
+{"answers":{"classification":{"answer":"infra","confidence":0.72,
+"probabilities":{"flake":0.06,"regression":0.06,"infra":0.72,"config":0.16},
+"usage":150,"latency_ms":17}}}
+JSON
+  kev_fixture
+  sf=$(make_state 'build failed at step 3')
+  invoke -u JUDGMENT_API_KEY JUDGMENT_BACKEND=local -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 0 "$status"
+  printf '%s' "$output" | jq -e '.classification.latency_ms == 17'
+  printf '%s' "$output" | jq -e '.classification.answer == "infra"'
+  printf '%s' "$output" | jq -e '.classification.confidence == 0.72'
+  printf '%s' "$output" | jq -e '.classification.probabilities.infra == 0.72'
+  printf '%s' "$output" | jq -e '.classification.usage == 150'
+}
+
+@test "AC-029-17: local backend parses the CLM response shape (billing_units ignored, latency client-measured)" {
+  cat > "$FIX/clm.json" <<'JSON'
+{"answers":{"classification":{"answer":"config","confidence":0.64,
+"probabilities":{"config":0.64,"flake":0.1,"regression":0.13,"infra":0.13},
+"usage":{"total_tokens":210},"billing_units":1}}}
+JSON
+  clm_fixture
+  sf=$(make_state 'build failed at step 3')
+  invoke -u JUDGMENT_API_KEY JUDGMENT_BACKEND=local -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 0 "$status"
+  [[ "$output" != *billing_units* ]]
+  printf '%s' "$output" | jq -e '.classification.answer == "config"'
+  printf '%s' "$output" | jq -e '.classification.confidence == 0.64'
+  printf '%s' "$output" | jq -e '.classification.probabilities.config == 0.64'
+  printf '%s' "$output" | jq -e '.classification.usage == 210'
+  printf '%s' "$output" | jq -e '.classification.latency_ms | type == "number" and . >= 0'
+}
+
+@test "AC-029-18: local backend server down exits 10 after at most 3 attempts" {
+  printf '7\t0\t%s/empty.json\n' "$FIX" > "$SEQUENCE"
+  sf=$(make_state 'build failed at step 3')
+  invoke -u JUDGMENT_API_KEY JUDGMENT_BACKEND=local -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 10 "$status"
+  [ "$(attempts_count)" -eq 3 ]
+}
+
+@test "AC-029-19: local backend daily cap exits 10 with no request and no increment" {
+  sf=$(make_state 'build failed at step 3')
+  invoke -u JUDGMENT_API_KEY JUDGMENT_BACKEND=local JUDGMENT_DAILY_CAP=1 -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 0 "$status"
+  echo 1 > "$(counter_file)"
+  invoke -u JUDGMENT_API_KEY JUDGMENT_BACKEND=local JUDGMENT_DAILY_CAP=1 -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 10 "$status"
+  [ "$(attempts_count)" -eq 1 ]
+  [ "$(cat "$(counter_file)")" -eq 1 ]
+}
+
+@test "AC-029-20: local backend low confidence prints the answer and exits 10" {
+  seq_always 200 low
+  sf=$(make_state 'build failed at step 3')
+  invoke -u JUDGMENT_API_KEY JUDGMENT_BACKEND=local JUDGMENT_MIN_CONFIDENCE=0.8 -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 10 "$status"
+  printf '%s' "$output" | jq -e '.classification.confidence == 0.55'
+}
+
+@test "unit: backend empty string is treated as hosted" {
+  stub_curl_args
+  sf=$(make_state 'build failed at step 3')
+  invoke JUDGMENT_BACKEND= -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 0 "$status"
+  arg_headers 1 | grep -q '^ARG Authorization: Bearer test-key$'
+}
+
+@test "unit: hosted backend still requires JUDGMENT_MODEL (exit 2 on live call)" {
+  sf=$(make_state 'build failed at step 3')
+  invoke -u JUDGMENT_MODEL JUDGMENT_BACKEND=hosted -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 2 "$status"
+  [ "$(attempts_count)" -eq 0 ]
+}
+
+@test "unit: hosted backend still requires JUDGMENT_API_KEY (exit 10 fallback)" {
+  sf=$(make_state 'build failed at step 3')
+  invoke -u JUDGMENT_API_KEY JUDGMENT_BACKEND=hosted -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 10 "$status"
+  [ "$(attempts_count)" -eq 0 ]
+}
+
+@test "unit: local backend without JUDGMENT_MODEL sends the backend default alias" {
+  # OQ-029-03 resolution: unset model in local mode -> the winning backend's
+  # default alias (top-of-script constant citing the spike report).
+  sf=$(make_state 'build failed at step 3')
+  invoke -u JUDGMENT_MODEL -u JUDGMENT_API_KEY JUDGMENT_BACKEND=local -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 0 "$status"
+  [ "$(attempts_count)" -eq 1 ]
+  grep -q '"model": "kev-latest"' "$BODIES"
+}
+
+@test "unit: local backend honors an explicit JUDGMENT_MODEL override" {
+  sf=$(make_state 'build failed at step 3')
+  invoke -u JUDGMENT_API_KEY JUDGMENT_BACKEND=local JUDGMENT_MODEL=custom/edge-case -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 0 "$status"
+  grep -q '"model": "custom/edge-case"' "$BODIES"
+}
+
+@test "unit: dry-run in local mode prints the default alias without a live call" {
+  sf=$(make_state 'build failed at step 3')
+  invoke -u JUDGMENT_MODEL -u JUDGMENT_API_KEY JUDGMENT_BACKEND=local -- --state-file "$sf" --questions "$Q" --dry-run
+  assert_exit_code 0 "$status"
+  [ "$(attempts_count)" -eq 0 ]
+  printf '%s' "$output" | jq -e '.model == "kev-latest"'
+}

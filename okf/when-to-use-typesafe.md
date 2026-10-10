@@ -52,6 +52,56 @@ daily cap, and the rule that a judgment never overrides a deterministic gate.
   per-call quality; cap (`JUDGMENT_DAILY_CAP`) guards spend. Tune threshold
   first; a cap you routinely hit is a wrong-triage-rate bug elsewhere.
 
+## Local backends
+
+The wrapper in `scripts/typed-judgment.sh` can point at a **local judgment
+backend** you run yourself instead of the hosted TypeSafe API — free, offline,
+on your own hardware (`JUDGMENT_BACKEND=local`, spec 029 / ADR 0005 evidence).
+Operator content: the two open-weight backends the spec 029 spike evaluated
+by name —
+
+- **Kev** (`github.com/jaredpalmer/kev`, Apache-2.0): a family of small
+  decision models (0.8B–27B) with a TypeSafe-compatible `/v1/systemone` API.
+  One process, `python -m kev.serve`; on CUDA it serves in bf16. This is the
+  recipe `scripts/judgment-local-up.sh` ships (spike winner, Kev-4B on an
+  RTX 5060 Ti 16GB).
+- **CLM** (`github.com/Contrastive-LM/CLM`, Apache-2.0): bi-encoder decision
+  model (Qwen3-8B encoder + a hot-swappable projection head). Two processes
+  (a vLLM pooling encoder on :8090 and `clm-serve` on :8700); responses carry
+  `billing_units` and an `X-CLM-Latency-Ms` header instead of a body latency.
+
+Both speak the wire format the wrapper's normalizer expects; local mode makes
+the API key optional (the servers are open by default) and the model id
+optional (a default alias is sent). Start/stop/status/health:
+`make judgment-up` / `make judgment-down`, or
+`scripts/judgment-local-up.sh {up|down|status|health}`. Set
+`JUDGMENT_BACKEND=local` plus the printed `JUDGMENT_API_URL` line in your
+gitignored `config/model.local.env`; recalibrate `JUDGMENT_MIN_CONFIDENCE`
+per backend (see the spike report method). General docs stay
+provider-agnostic — the names above belong here and in the ADR evidence
+section only.
+
+### Operator note: VRAM headroom on 16 GB cards
+
+The shipped Kev-4B recipe fits a 16 GB card, but tight: a running desktop
+baseline (~2.4 GB observed) plus weights (~10.8 GB) plus CUDA-graph buffer
+prealloc (~1 GB) can exceed the card and crash torch with
+`torch.OutOfMemoryError` during startup. `scripts/judgment-local-up.sh`
+handles this two ways —
+
+- it default-exports `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`
+  (torch's own suggested remedy; it eliminates the fragmentation failure on
+  this machine). A value you pre-set wins untouched, so override it in your
+  per-machine env if you need different allocator settings;
+- the health wait fail-fasts when the server process dies: `up` exits
+  immediately and prints the log path plus the log's last 15 lines, so the
+  OOM traceback shows up without digging — it no longer burns the full
+  `JUDGMENT_LOCAL_TIMEOUT_SECONDS` polling a dead process.
+
+If you still see the OOM message: close GPU-heavy apps first (browsers with
+GPU accel, IDEs), and the next lever is shrinking Kev's state prefix cache —
+start the server with `KEV_PREFIX_CACHE=0`, then `make judgment-up` again.
+
 ## The jaggedness caveat
 
 Typed-judgment units are **jagged**: strong on the shapes they were built
