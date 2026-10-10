@@ -49,6 +49,9 @@ PY
   export JUDGMENT_LOCAL_UP_CMD="python3 $TMPDIR_HELPER/mock_server.py $PORT"
   export JUDGMENT_LOCAL_TIMEOUT_SECONDS=5
   unset JUDGMENT_DEBUG
+  # Hermeticity (spec 029 amendment): the CUDA-allocator default test needs a
+  # known-unset baseline regardless of the developer shell's env.
+  unset PYTORCH_CUDA_ALLOC_CONF
 }
 
 teardown() {
@@ -205,5 +208,73 @@ SH
   export JUDGMENT_LOCAL_UP_CMD="python3 -c 'import sys; sys.exit(0)'"
   run bash "$SCRIPT" up
   [ "$status" -ne 0 ]
+  [ "$(count_pids)" -eq 0 ]
+}
+
+# ── Spec 029 post-archive amendment: 16GB-VRAM OOM hardening ─────────────────
+# Two live-machine defects, each pinned by a unit test (the amendment record
+# is appended to docs/changes/029-local-judgment-backend.md by the Verifier):
+# (1) plain `make judgment-up` OOM-crashed the Kev server during CUDA-graph
+# buffer prealloc on the 16GB card — the fix default-exports
+# PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True, overridable;
+# (2) the health wait could not distinguish "slow" from "crashed" and burned
+# the full timeout polling a dead process — the fix fail-fasts, dumps the log
+# tail, and cleans up.
+
+# env_probe_server — recipe command that records the value the server process
+# actually received into its log, then serves health like the normal mock.
+env_probe_server() {
+  cat > "$TMPDIR_HELPER/env_probe.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'ALLOC_PROBE[%s]\n' "${PYTORCH_CUDA_ALLOC_CONF-<unset>}"
+exec python3 "$@"
+SH
+  export JUDGMENT_LOCAL_UP_CMD="bash $TMPDIR_HELPER/env_probe.sh $TMPDIR_HELPER/mock_server.py $PORT"
+}
+
+@test "unit: up default-exports PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to the server" {
+  # setup() guarantees PYTORCH_CUDA_ALLOC_CONF is unset here — the default applies
+  env_probe_server
+  run bash "$SCRIPT" up
+  assert_exit_code 0 "$status"
+  bash "$SCRIPT" down >/dev/null
+  grep -qF 'ALLOC_PROBE[expandable_segments:True]' "$JUDGMENT_LOCAL_RUN_DIR/kev.log"
+}
+
+@test "unit: a pre-set PYTORCH_CUDA_ALLOC_CONF reaches the server unchanged (override respected)" {
+  env_probe_server
+  export PYTORCH_CUDA_ALLOC_CONF="max_split_size_mb:128,expandable_segments:False"
+  run bash "$SCRIPT" up
+  assert_exit_code 0 "$status"
+  bash "$SCRIPT" down >/dev/null
+  grep -qF 'ALLOC_PROBE[max_split_size_mb:128,expandable_segments:False]' "$JUDGMENT_LOCAL_RUN_DIR/kev.log"
+}
+
+@test "unit: up fail-fasts when the server process dies — exits before the timeout, dumps the log tail, cleans PID files" {
+  # Mock "server" that crashes immediately, printing an OOM-style traceback to
+  # its log (repro of the live 16GB-card failure). The health timeout is set
+  # far above the crash-detection time so the elapsed assertion can only pass
+  # via the early-exit branch, never by completing the poll loop.
+  cat > "$TMPDIR_HELPER/crasher.sh" <<'SH'
+#!/usr/bin/env bash
+echo "torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 1.00 GiB. GPU 0 has a total capacity of 15.99 GiB (fake repro traceback)" >&2
+exit 1
+SH
+  export JUDGMENT_LOCAL_UP_CMD="bash $TMPDIR_HELPER/crasher.sh"
+  export JUDGMENT_LOCAL_TIMEOUT_SECONDS=30
+  local t0 t1
+  t0=$(date +%s)
+  run --separate-stderr bash "$SCRIPT" up
+  t1=$(date +%s)
+  assert_exit_code 1 "$status"
+  [ $((t1 - t0)) -lt "$JUDGMENT_LOCAL_TIMEOUT_SECONDS" ]
+  # early-exit branch, not the timeout path: the timeout message must not appear
+  [[ "$stderr" != *"timeout"* ]]
+  # clear error naming the dead server and the log path, plus the log tail so
+  # the traceback surfaces without digging
+  [[ "$stderr" == *"server process died"* ]]
+  [[ "$stderr" == *"last 15 lines"* ]]
+  [[ "$stderr" == *"OutOfMemoryError"* ]]
+  # teardown reused: PID files cleaned, nothing left tracked
   [ "$(count_pids)" -eq 0 ]
 }

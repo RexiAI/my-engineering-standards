@@ -7,7 +7,9 @@
 # Subcommands:
 #   up      Start the recipe's process(es), wait (bounded) for the health
 #           endpoint, print the JUDGMENT_* env lines for the per-machine env
-#           file. Idempotent when already running and healthy.
+#           file. Idempotent when already running and healthy. Fails fast
+#           (non-zero, log tail on stderr) if a server process dies during
+#           the wait instead of burning the full timeout.
 #   down    Stop every process started by `up`; remove PID files. Idempotent
 #           when nothing is running.
 #   status  Print "running (pid <n>, port <p>)" or "stopped". Always exit 0.
@@ -112,10 +114,31 @@ read_pid() {
 
 healthy_now() { curl -fsS --max-time 5 "$(health_url)" >/dev/null 2>&1; }
 
-health_wait() { # $1 = seconds budget
-  local deadline=$(( $(date +%s) + $1 ))
+# tracked_processes_alive — 0 while every tracked recipe PID is alive; a
+# missing or dead PID file counts as dead. Reads the PID files without
+# removing them (teardown stays stop_tracked's job). Spec 029 amendment:
+# lets `up` tell "slow" apart from "crashed" instead of burning the health
+# budget polling a dead process (live repro: the 16GB-card torch OOM killed
+# the server in seconds, the old loop waited the full 120s).
+tracked_processes_alive() {
+  local p pid
+  for p in $JUDGMENT_LOCAL_PROCESSES; do
+    pid="$(cat "$(pid_file "$p")" 2>/dev/null)" || return 1
+    pid_alive "$pid" || return 1
+  done
+  return 0
+}
+
+# health_wait <seconds> [watch] — bounded poll for the health endpoint.
+# With "watch" (used by `up` only), returns 2 as soon as a tracked recipe
+# process has died: a crashed server can never become healthy, so waiting
+# is wasted time. Return 1 = timeout, unchanged. The standalone `health`
+# subcommand omits watch (AC-029-35 timeout contract untouched).
+health_wait() {
+  local deadline=$(( $(date +%s) + $1 )) watch="${2:-}"
   while [ "$(date +%s)" -lt "$deadline" ]; do
     healthy_now && return 0
+    if [ -n "$watch" ] && ! tracked_processes_alive; then return 2; fi
     sleep 1
   done
   return 1
@@ -164,6 +187,15 @@ count_running() { # number of recipe processes with a live tracked pid
 start_process() { # $1 = process name; background the recipe command, track its leader pid
   local p="$1"
   info "starting $p (log: $(log_file "$p"))"
+  # Spec 029 amendment (live repro on a 16GB-VRAM card, RTX 5060 Ti): plain
+  # `make judgment-up` crashed the Kev server with torch.OutOfMemoryError
+  # during CUDA-graph buffer prealloc (~1GB) — desktop VRAM baseline (~2.4GB)
+  # + weights (~10.8GB) + allocator fragmentation exceeded the card. torch's
+  # own error suggests the remedy: expandable_segments defeats the
+  # fragmentation failure (confirmed: with it set the server starts healthy
+  # and judgments are correct on this machine). Default-exported here so the
+  # child inherits it; a pre-set value wins untouched (${VAR:-default}).
+  export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
   # The tracked pid is the backgrounded leader; the recipe launcher
   # (`uv run`) waits on its python child instead of exec-ing it, so
   # teardown kills the whole tree via term_tree (spike report §Recipe ops
@@ -183,10 +215,26 @@ stop_tracked() { # stop every tracked process and remove its PID files (silent t
   done
 }
 
-wait_healthy_or_stop() { # bounded health wait; on timeout stop everything and die
+report_startup_crash() { # crash-path diagnostic: name the log, dump its last
+  # ~15 lines so OOM tracebacks surface without digging (spec 029 amendment)
+  local log
+  log="$(log_file "${JUDGMENT_LOCAL_PROCESSES%% *}")"
+  echo "judgment-local-up: server process died during health wait (crashed, not slow) — log: $log" >&2
+  echo "judgment-local-up: last 15 lines of $log:" >&2
+  [ -f "$log" ] && tail -n 15 "$log" >&2
+  return 0
+}
+
+wait_healthy_or_stop() { # bounded health wait; on crash or timeout stop everything and die
   info "waiting up to ${JUDGMENT_LOCAL_TIMEOUT_SECONDS}s for health at $(health_url)"
-  health_wait "$JUDGMENT_LOCAL_TIMEOUT_SECONDS" && return 0
-  stop_tracked
+  local rc=0
+  health_wait "$JUDGMENT_LOCAL_TIMEOUT_SECONDS" watch || rc=$?
+  [ "$rc" -eq 0 ] && return 0
+  stop_tracked   # reused for both branches: PID files removed, processes stopped
+  if [ "$rc" -eq 2 ]; then
+    report_startup_crash
+    exit 1
+  fi
   die "health wait timeout after ${JUDGMENT_LOCAL_TIMEOUT_SECONDS}s (server never answered on $(health_url)); processes stopped, PID files removed — see $(log_file "${JUDGMENT_LOCAL_PROCESSES%% *}")"
 }
 
