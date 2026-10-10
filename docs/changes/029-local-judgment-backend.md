@@ -1867,3 +1867,362 @@ loopCount 2 / phase1Retries 0 / phase2Retries 0 taken from the exported env.)
 | Round | Head | Result | Failing checks | Disposition |
 |---|---|---|---|---|
 | 1 | 5d43e9a | **FAIL** | Validate 113982534241 (pull_request, run 37978439585), Validate 113982511928 (push, run 37978432813) — 13× AC-029 content-contract tests vs the archived-away spike report; PR Review Agent pass | Route to Coder (option A above); fix round 1 of max 3 opens |
+
+---
+
+# Amendment — OOM hardening (human-directed, post-archive)
+
+Scoped stage-4 verification of a post-archive AMENDMENT (human-directed, 4-point
+16GB-VRAM OOM-hardening fix) — **not** a full re-run. Date: 2026-10-10 (UTC) ·
+Branch `spec/029-local-judgment-backend` · draft PR #75, head `925f7f2` (CI
+green at that head) · 3 uncommitted files · **loop 4, phase 2 (retries: phase-1
+0, phase-2 1)**. The prior attempt-1 PASS and the phase-2 round-2 PASS stand for
+everything outside this diff; only the amendment diff was re-verified.
+
+Diff under verification (exactly 3 files, uncommitted, `git status --porcelain`):
+
+- `scripts/judgment-local-up.sh` (+54 −6)
+- `scripts/tests/judgment-local-up.bats` (+71 −0; 14 → 17 tests)
+- `okf/when-to-use-typesafe.md` (+21 −0)
+
+## Overall verdict: **PASS**
+
+All seven amendment gates green. One out-of-scope finding (pre-existing
+`JUDGMENT_*` env leak from this machine's direnv config) reproduced, ruled
+pre-existing via clean-HEAD control, recorded — not fixed, follow-up proposed
+(Stop-and-Ask matrix: "Out-of-scope finding — record it; do not fix; propose a
+follow-up"). No in-scope gate produced a finding.
+
+| # | Check | Result | Summary |
+|---|---|---|---|
+| 1 | Diff review / no unaccounted behavior | **PASS** | exactly the 3 authorized files; every hunk traces to the 4 authorized changes; `typed-judgment.sh` + its bats show ZERO diff (`git diff --exit-code` exit 0); no consumer/agent/general-doc/hosted-path touches |
+| 2 | Test suite (scoped) | **PASS** | `judgment-local-up.bats` 17/17 ok exit 0; both typed-judgment files green with `JUDGMENT_*` stripped (44 + 78 tests, exit 0); leak reproduced with env present and ruled pre-existing via clean-HEAD worktree control |
+| 3 | Script gates | **PASS** | `check-bats-assertions.sh` exit 0 (42 files, no vacuous assertions); `check-scenario-traceability.sh --json` exit 0 `fails: []`; `check-orchestration.sh` exit 0; `check-code-principles.sh -BaseRef HEAD --json` exit 0, fails/warns empty |
+| 4 | Spot check (3 new tests) | **PASS** | env capture real (probe records the env the spawned server process actually received, end-to-end through `start_process` → `nohup bash -c`); override test discriminates (value differs from default); fail-fast test has a real timing assertion (elapsed < 30s timeout, only passable via early-exit) + negative assertion (`stderr != *timeout*`) + log-tail content + PID cleanup; none vacuous |
+| 5 | Complexity of touched functions ≤6 | **PASS** | independent manual count: `tracked_processes_alive` CC 4, `health_wait` CC 5, `start_process` CC 2, `report_startup_crash` CC 2, `wait_healthy_or_stop` CC 4; corroborated by check-code-principles complexity gate exit 0 |
+| 6 | Provider-name scoping | **PASS** (note) | zero new provider names in `agents/`, `skills/`, general `docs/` (working tree ≡ HEAD in that scope); OKF note allowed; amendment also adds Kev/torch/RTX mentions in `scripts/` comments — consistent with HEAD practice (5 script files already carry `kev` at 925f7f2), AC-029-64 scope untouched; `PYTORCH_CUDA_ALLOC_CONF` is a functional env-var name. Note: the tasking phrase "product names only under okf/" is imprecise re scripts/ comments; recorded as observation, not a finding |
+| 7 | AC-029-30..38 contract preservation | **PASS** | `cmd_health` function body byte-identical vs `git show HEAD:scripts/judgment-local-up.sh`; `info "healthy"`, `info "already running and healthy — no duplicate started"`, `info "waiting up to …"`, and the timeout `die "health wait timeout after …"` message byte-identical; `health` subcommand calls `health_wait` without `watch` (AC-029-35 timeout contract untouched); all 14 pre-existing tests still ok |
+
+## Evidence: diff review — scope and zero typed-judgment diff (check 1)
+
+```
+command: git status --porcelain && git diff --stat && git diff --exit-code scripts/typed-judgment.sh scripts/tests/typed-judgment.bats
+ M okf/when-to-use-typesafe.md
+ M scripts/judgment-local-up.sh
+ M scripts/tests/judgment-local-up.bats
+---
+ okf/when-to-use-typesafe.md          | 21 +++++++++++
+ scripts/judgment-local-up.sh         | 60 +++++++++++++++++++++++++++---
+ scripts/tests/judgment-local-up.bats | 71 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 146 insertions(+), 6 deletions(-)
+---
+typed-judgment zero-diff exit=0
+exit: 0
+at: 2026-10-10T12:56:14Z
+```
+
+Hunk-to-authorization trace (full `git diff` read): (a) `start_process`
+default-exports `PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"`
+(overridable, line 198 inside `start_process()` at line 187); (b) `health_wait`
+gains optional `watch` arg + new `tracked_processes_alive` helper → return 2
+fail-fast on dead tracked PID; (c) `wait_healthy_or_stop` branches rc 2 (crash →
+`report_startup_crash` prints log path + `tail -n 15`, then `exit 1`) vs rc 1
+(timeout → unchanged `die`), crash path reuses `stop_tracked`; (d) header
+comment + okf operator note + 3 bats tests + `unset PYTORCH_CUDA_ALLOC_CONF` in
+`setup()`. Nothing else — no unaccounted logic.
+
+## Evidence: full test suite — amendment bats file (check 2)
+
+```
+command: bats scripts/tests/judgment-local-up.bats
+1..17
+ok 1 AC-029-30: up starts the server, waits for health, prints env lines, exits 0
+ok 2 AC-029-31: up is idempotent when the server already runs (no duplicate process)
+ok 3 AC-029-32: down stops the server and removes the PID file
+ok 4 AC-029-33: down when nothing runs is idempotent and reports not running
+ok 5 AC-029-34: status prints running with PID and port, or stopped, both exit 0
+ok 6 AC-029-35: health times out when nothing listens; exit non-zero, stderr reports timeout
+ok 7 AC-029-35b: health exits 0 when the endpoint answers
+ok 8 AC-029-36: refuses to run as root (UID 0) with a diagnostic
+ok 9 AC-029-37: logs and PID files live in the gitignored run dir
+ok 10 unit: stale PID file (process gone) is cleaned by status and reports stopped
+ok 11 unit: stale PID file (process gone) is cleaned by down without error
+ok 12 AC-029-38: Makefile targets judgment-up and judgment-down invoke the script
+ok 13 unit: unknown subcommand is a usage error
+ok 14 unit: up kills its own process and fails cleanly when health never answers
+ok 15 unit: up default-exports PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to the server
+ok 16 unit: a pre-set PYTORCH_CUDA_ALLOC_CONF reaches the server unchanged (override respected)
+ok 17 unit: up fail-fasts when the server process dies — exits before the timeout, dumps the log tail, cleans PID files
+exit: 0
+at: 2026-10-10T12:46:19Z .. 2026-10-10T12:46:36Z
+```
+
+## Evidence: env-leak reproduction — typed-judgment.bats WITH leaked direnv env (check 2)
+
+Verifier shell carried the leak: `JUDGMENT_API_URL=http://localhost:8009/v1/systemone`,
+`JUDGMENT_BACKEND=local`, `JUDGMENT_MIN_CONFIDENCE=0.28` (3 vars).
+
+```
+command: bats scripts/tests/typed-judgment.bats
+not ok 2 AC-028-02: JUDGMENT_API_KEY unset exits 10 without any HTTP request
+#   `assert_no_network_fallback -u JUDGMENT_API_KEY' failed
+# expected exit 10, got 0
+not ok 4 AC-028-04: JUDGMENT_API_KEY empty string exits 10 without any HTTP request
+#   `assert_no_network_fallback JUDGMENT_API_KEY=' failed
+# expected exit 10, got 0
+not ok 26 unit: JUDGMENT_MODEL unset on a live call is a usage error exiting 2
+#   `assert_exit_code 2 "$status"' failed
+# expected exit 2, got 0
+exit: 1
+at: 2026-10-10T12:46:50Z .. 2026-10-10T12:47:01Z
+```
+
+```
+command: bats scripts/tests/typed-judgment-integration.bats
+not ok 33 AC-028-50: typed-judgment.bats passes fully offline — all tests green with no credentials configured and no network
+#   `assert_exit_code 0 "$status"' failed
+# expected exit 0, got 1
+exit: 1
+at: 2026-10-10T12:47:14Z .. 2026-10-10T12:47:38Z
+```
+
+Coder's claim reproduced exactly: 3 hosted-mode tests + AC-028-50 (derivative —
+it nests typed-judgment.bats and expects green).
+
+## Evidence: typed-judgment files WITH JUDGMENT_* stripped (check 2)
+
+```
+command: env -u JUDGMENT_BACKEND -u JUDGMENT_API_URL -u JUDGMENT_MODEL -u JUDGMENT_MIN_CONFIDENCE bats scripts/tests/typed-judgment.bats
+ok 40 unit: hosted backend still requires JUDGMENT_MODEL (exit 2 on live call)
+ok 41 unit: hosted backend still requires JUDGMENT_API_KEY (exit 10 fallback)
+ok 42 unit: local backend without JUDGMENT_MODEL sends the backend default alias
+ok 43 unit: local backend honors an explicit JUDGMENT_MODEL override
+ok 44 unit: dry-run in local mode prints the default alias without a live call
+exit: 0   (44/44)
+at: 2026-10-10T12:47:48Z .. 2026-10-10T12:47:59Z
+```
+
+```
+command: env -u JUDGMENT_BACKEND -u JUDGMENT_API_URL -u JUDGMENT_MODEL -u JUDGMENT_MIN_CONFIDENCE bats scripts/tests/typed-judgment-integration.bats
+ok 75 unit: scripts/tests/judgment-local-up.bats names the up/down/status/health scenarios
+ok 76 unit: typed-judgment.bats names the backend-switch scenarios
+ok 77 AC-029-46: content-contract tests verify the config presence (backend switch, local URL, threshold comment)
+ok 78 AC-029-58: content-contract verifies ADR 0005 exists with the four required sections
+exit: 0   (78/78)
+at: 2026-10-10T12:48:09Z .. 2026-10-10T12:48:30Z
+```
+
+## Evidence: clean-HEAD control — leak ruled pre-existing (check 2)
+
+```
+command: git worktree add /tmp/opencode/head-029 925f7f2 && cd /tmp/opencode/head-029 && bats scripts/tests/typed-judgment.bats   (leaked env present)
+not ok 2 AC-028-02: JUDGMENT_API_KEY unset exits 10 without any HTTP request
+not ok 4 AC-028-04: JUDGMENT_API_KEY empty string exits 10 without any HTTP request
+not ok 26 unit: JUDGMENT_MODEL unset on a live call is a usage error exiting 2
+exit: 1 (same 3 IDs as the working tree)
+at: 2026-10-10T12:48:44Z .. 2026-10-10T12:48:56Z
+```
+
+```
+command: cd /tmp/opencode/head-029 && bats scripts/tests/typed-judgment-integration.bats   (leaked env present)
+not ok 33 AC-028-50: typed-judgment.bats passes fully offline — all tests green with no credentials configured and no network
+exit: 1 (same ID); worktree removed afterwards
+at: 2026-10-10T12:49:38Z
+```
+
+**Out-of-scope ruling (env leak).** Identical failures at clean HEAD `925f7f2`
+without the amendment diff ⇒ the leak is a pre-existing per-machine environment
+condition (this machine's direnv config exports `JUDGMENT_API_URL`,
+`JUDGMENT_BACKEND`, `JUDGMENT_MIN_CONFIDENCE` into every shell; the tests are
+correctly hermetic only when those are unset). Not caused by, and not fixable
+in, this amendment. Recorded, not fixed. Proposed follow-up: machine env
+hygiene (drop the `JUDGMENT_*` exports from the direnv config, or move them
+into `config/agent.local.env`-style scoped loading) — or defensively `unset`
+them in `typed-judgment.bats` `setup()` the way the amendment already does for
+`PYTORCH_CUDA_ALLOC_CONF`. Live Kev server on :8009 (pid 1093787) was left
+running throughout, as instructed; verified alive after all runs (`ps -p
+1093787` → `uv`, up 2h55m).
+
+## Evidence: check-bats-assertions.sh (check 3)
+
+```
+command: scripts/check-bats-assertions.sh
+PASS check-bats-assertions: 42 bats file(s), no vacuous assertions.
+exit: 0
+at: 2026-10-10T12:50:05Z
+```
+
+## Evidence: check-scenario-traceability.sh (check 3)
+
+```
+command: scripts/check-scenario-traceability.sh --json
+{
+  "checks": [1, 2],
+  "passes": [],
+  "fails": []
+}
+exit: 0
+at: 2026-10-10T12:50:05Z
+```
+
+```
+command: scripts/check-scenario-traceability.sh
+Scenario IDs found: 0 live, 281 archived
+✔ Scenario traceability check: every scenario traced, every reference resolves.
+exit: 0
+at: 2026-10-10T12:50:21Z
+```
+
+Spec 029 is archived: 0 live IDs is expected; `passes` is empty because all
+281 traced IDs are archived-side. Exit 0 is the authority.
+
+## Evidence: check-orchestration.sh (check 3)
+
+```
+command: scripts/check-orchestration.sh
+Checking scripts/ references (agents/, commands/, AGENTS.md)...
+Checking docs/ and language-specific/ references (agents/)...
+
+All orchestration references valid.
+exit: 0
+at: 2026-10-10T12:50:22Z
+```
+
+## Evidence: check-code-principles.sh — design-principles gate, blame-scoped to the amendment (check 3.5)
+
+```
+command: scripts/check-code-principles.sh . -BaseRef HEAD --json
+{
+  "tier": "mvp",
+  "gates": ["complexity", "dry", "yagni", "solid", "component-per-file", "property-tests"],
+  "fails": [],
+  "warns": []
+}
+exit: 0
+at: 2026-10-10T12:50:57Z .. 2026-10-10T12:50:59Z
+```
+
+Zero FAIL, zero WARN.
+
+## Evidence: spot check — the 3 new tests genuinely assert (check 4)
+
+Scenarios checked: all 3 amendment tests (15, 16, 17) in
+`scripts/tests/judgment-local-up.bats` (≥2 required; the amendment adds exactly
+3, so all were checked). Findings, from reading the test bodies against the
+implementation:
+
+- **Test 15 (env default)** — `env_probe_server` installs a recipe wrapper that
+  `printf 'ALLOC_PROBE[%s]' "${PYTORCH_CUDA_ALLOC_CONF-<unset>}"` into its own
+  log *from inside the spawned server process*, then `exec`s the mock server.
+  The assertion `grep -qF 'ALLOC_PROBE[expandable_segments:True]' kev.log` can
+  only pass if the value really traveled through `start_process`'s export →
+  `nohup bash -c` → child env. `setup()` unsets the var, so the `${VAR:-default}`
+  default branch is genuinely exercised. Real capture, not a tautology.
+- **Test 16 (override respected)** — pre-sets
+  `max_split_size_mb:128,expandable_segments:False`, a value deliberately
+  *different* from the default; the probe must record it byte-exact. If the
+  script clobbered instead of defaulting, the probe would show the default and
+  the test fails. Discriminating.
+- **Test 17 (fail-fast)** — crasher exits 1 immediately after writing a fake
+  OOM traceback; `JUDGMENT_LOCAL_TIMEOUT_SECONDS=30` while crash detection
+  takes ~1–2s. The timing assertion `[ $((t1-t0)) -lt 30 ]` can only pass via
+  the early-exit branch; `[[ "$stderr" != *"timeout"* ]]` excludes the timeout
+  path; `*server process died*`, `*last 15 lines*`, `*OutOfMemoryError*` prove
+  the message + real log-tail dump (the traceback string only reaches stderr
+  through `tail -n 15 "$log"`); `count_pids -eq 0` proves `stop_tracked` reuse
+  cleaned the PID files. All under bats `set -e` semantics — no vacuous
+  assertion (corroborated mechanically by check-bats-assertions exit 0).
+
+Verdict: PASS — all three assert real behavior; ran green at 12:46:19Z–12:46:36Z
+above (ok 15/16/17).
+
+```
+command: (reading + cross-check of scripts/tests/judgment-local-up.bats lines 213-280 vs scripts/judgment-local-up.sh; no shell command — spot check is an inspection gate)
+exit: n/a
+at: 2026-10-10T12:52:00Z
+```
+
+## Evidence: complexity of touched functions ≤6 — independent measurement (check 5)
+
+Manual cyclomatic count (bash: 1 + decision points — `for`/`while`/`if`/`case`/
+control-flow `&&`/`||`), read from the working-tree source:
+
+| Function | Decision points | CC |
+|---|---|---|
+| `tracked_processes_alive` (new) | for, `\|\| return 1` ×2 | 4 |
+| `health_wait` (modified) | while, `&& return 0`, if, `&& !` | 5 |
+| `start_process` (modified) | `[ -s … ] \|\| die` | 2 |
+| `report_startup_crash` (new) | `[ -f ] && tail` | 2 |
+| `wait_healthy_or_stop` (modified) | `\|\| rc=$?`, `[ ] && return`, if | 4 |
+
+All ≤6. Corroborated by the check-code-principles complexity gate (exit 0,
+`fails: []`) above.
+
+```
+command: sed -n '114,150p;187,245p' scripts/judgment-local-up.sh   (function bodies read; counts manual)
+exit: 0
+at: 2026-10-10T12:51:30Z
+```
+
+## Evidence: provider-name scoping re-grep (check 6)
+
+```
+command: grep -rilE 'kev|contrastive-lm|jaredpalmer' agents/ skills/ docs/ --exclude-dir=changes   (working tree)
+docs/STREAM_PROCESSING.md
+docs/adr/0005-local-judgment-backend.md
+exit: 0
+at: 2026-10-10T12:53:18Z
+```
+
+```
+command: git grep -ilE 'kev|contrastive-lm|jaredpalmer' 925f7f2 -- agents/ skills/ docs/ | grep -v docs/changes   (HEAD control)
+925f7f2:docs/STREAM_PROCESSING.md
+925f7f2:docs/adr/0005-local-judgment-backend.md
+exit: 0
+at: 2026-10-10T12:53:18Z
+```
+
+Working tree ≡ HEAD in the protected scope ⇒ the amendment adds zero provider
+names to `agents/`, `skills/`, general `docs/`. `docs/STREAM_PROCESSING.md` is a
+case-insensitive false positive in both (" Clic**kEv**ent" — Kafka Streams API);
+ADR 0005 is explicitly allowed by the rule (archive line 304). The new OKF
+operator note is allowed OKF content. Observation (not a finding): the amendment
+also adds product names in `scripts/` comments (Kev ×2, torch ×4, RTX 5060 Ti,
+CUDA/PYTORCH — the latter an unavoidable functional env-var name), matching
+HEAD practice where 5 script files already carry `kev`; AC-029-64's protected
+scope is agents/skills/general-docs and is untouched.
+
+## Evidence: AC-029-30..38 contract preservation — byte comparison vs HEAD (check 7)
+
+```
+command: git show HEAD:scripts/judgment-local-up.sh > /tmp/opencode/head-jlu.sh; awk '/^cmd_health\(\)/,/^}/' head vs new | diff
+CMD_HEALTH: BYTE-IDENTICAL
+MSG BYTE-IDENTICAL: info "healthy"
+MSG BYTE-IDENTICAL: already-running info line
+MSG BYTE-IDENTICAL: die "health wait timeout
+MSG BYTE-IDENTICAL: info "waiting up to …" (grep side-by-side, identical)
+exit: 0
+at: 2026-10-10T12:46:00Z
+```
+
+```
+command: grep -c '^@test' <(git show HEAD:scripts/tests/judgment-local-up.bats) ; grep -c '^@test' scripts/tests/judgment-local-up.bats
+HEAD tests: 14
+NEW tests: 17
+exit: 0
+at: 2026-10-10T12:46:10Z
+```
+
+`cmd_health` calls `health_wait "$JUDGMENT_LOCAL_TIMEOUT_SECONDS"` without the
+new `watch` arg ⇒ AC-029-35's timeout contract (wait the full budget, report
+timeout, non-zero) is untouched; the fail-fast path is reachable only from
+`wait_healthy_or_stop` (the `up` path). All 14 pre-existing tests (AC-029-30…38
+included) still ok in the 17/17 run above.
+
+## Telemetry (spec 012)
+
+Recorded via `scripts/record-gate-run.sh` with
+`SPEC_LOOP_COUNT=4 SPEC_PHASE1_RETRIES=0 SPEC_PHASE2_RETRIES=1` exported;
+record: `gatesFailed: []`, `outcome: "pass"`, warnings carrying the env-leak
+finding + ruling and the scoping observation. (Appended to `runs.jsonl`,
+uncommitted — PR Opener pushes.)

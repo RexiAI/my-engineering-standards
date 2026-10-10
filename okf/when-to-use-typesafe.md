@@ -81,6 +81,27 @@ per backend (see the spike report method). General docs stay
 provider-agnostic — the names above belong here and in the ADR evidence
 section only.
 
+### Operator note: VRAM headroom on 16 GB cards
+
+The shipped Kev-4B recipe fits a 16 GB card, but tight: a running desktop
+baseline (~2.4 GB observed) plus weights (~10.8 GB) plus CUDA-graph buffer
+prealloc (~1 GB) can exceed the card and crash torch with
+`torch.OutOfMemoryError` during startup. `scripts/judgment-local-up.sh`
+handles this two ways —
+
+- it default-exports `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`
+  (torch's own suggested remedy; it eliminates the fragmentation failure on
+  this machine). A value you pre-set wins untouched, so override it in your
+  per-machine env if you need different allocator settings;
+- the health wait fail-fasts when the server process dies: `up` exits
+  immediately and prints the log path plus the log's last 15 lines, so the
+  OOM traceback shows up without digging — it no longer burns the full
+  `JUDGMENT_LOCAL_TIMEOUT_SECONDS` polling a dead process.
+
+If you still see the OOM message: close GPU-heavy apps first (browsers with
+GPU accel, IDEs), and the next lever is shrinking Kev's state prefix cache —
+start the server with `KEV_PREFIX_CACHE=0`, then `make judgment-up` again.
+
 ## The jaggedness caveat
 
 Typed-judgment units are **jagged**: strong on the shapes they were built
