@@ -1,3 +1,10 @@
+# [1.33.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.32.0...v1.33.0) (2026-10-13)
+
+
+### Features
+
+* **spec-029:** local judgment backend — Kev-4B on RTX 5060 Ti ([#75](https://github.com/RexiAI/my-engineering-standards/issues/75)) ([1836177](https://github.com/RexiAI/my-engineering-standards/commit/1836177221399e7f05275467519e6dc703f75c9c))
+
 # [1.32.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.31.2...v1.32.0) (2026-10-13)
 
 
