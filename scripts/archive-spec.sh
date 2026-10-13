@@ -5,6 +5,15 @@
 # (review), and now this one-pager. This script writes a single
 # docs/changes/NNN-slug.md and removes specs/NNN-slug/.
 #
+# Evidence preservation: besides the four composed sections (00-informal,
+# 10-tasks, 25-verification, 30-report + the AC headings from 20-acceptance),
+# every REMAINING top-level NN-*.md artifact (e.g. 35-spike-report.md) is
+# embedded verbatim under its own "## <basename>" heading, in filename order,
+# after the composed sections. Content contracts may grep such artifacts
+# post-archive, and archiving must not destroy the evidence they assert
+# against (spec 029 phase-2 fix: the archive commit deleted the spike report
+# while 13 AC-029 tests still read its "^## …" anchors).
+#
 # Primary caller is the spec pipeline's stage 5b (PR Opener): the archive rides
 # inside the spec PR, so the merge lands main with the spec already archived —
 # no post-merge step needed. Humans may also run it manually for legacy specs
@@ -77,6 +86,10 @@ if [ -d "$SPEC_DIR/20-acceptance" ]; then
     | sort -u || true)
 fi
 
+# The four NN-*.md docs whose content is already embedded through the composed
+# sections above — the verbatim-evidence loop must skip them, never re-embed.
+EMBEDDED_DOCS=" 00-informal.md 10-tasks.md 25-verification.md 30-report.md "
+
 # --- Compose the one-pager ---------------------------------------------------
 {
   echo "# $SLUG"
@@ -107,6 +120,19 @@ fi
   echo "## Quality gates"
   echo ""
   echo "$REPORT"
+  # Remaining top-level NN-*.md evidence artifacts (e.g. 35-spike-report.md),
+  # embedded verbatim in filename order so their internal "^## …" anchors stay
+  # grep-matchable in the one-pager. Globs sort lexicographically; the [ -f ]
+  # guard handles the no-match case (literal pattern, not a file).
+  for ev in "$SPEC_DIR"/[0-9][0-9]-*.md; do
+    [ -f "$ev" ] || continue
+    ev_base="${ev##*/}"
+    case "$EMBEDDED_DOCS" in *" $ev_base "*) continue ;; esac
+    echo ""
+    echo "## $ev_base"
+    echo ""
+    cat "$ev"
+  done
 } > "$ARCHIVE"
 
 # --- Cleanup ------------------------------------------------------------------

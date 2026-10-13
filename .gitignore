@@ -32,8 +32,11 @@ config/agent.local.env
 .envrc
 
 # Local cache for machine-generated, never-committed state (spec 028: the
-# typed-judgment daily counter files .cache/judgment-cap-YYYY-MM-DD).
+# typed-judgment daily counter files .cache/judgment-cap-YYYY-MM-DD; spec 029:
+# the local judgment backend run state — PID files and logs — in
+# .cache/judgment/).
 .cache/
+.cache/judgment/
 
 # Local dogfooding scaffold — this repo's own agent/ and command/ symlinked in
 # for testing the spec pipeline against itself (docs/SPEC_PIPELINE.md). Child

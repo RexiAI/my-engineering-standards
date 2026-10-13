@@ -1,4 +1,4 @@
-.PHONY: help validate validate-docs validate-refs validate-all lint format stats test test-scripts test-shell test-java test-go test-js mutation property-tests ci-fast ci ci-full sync-qwen
+.PHONY: help validate validate-docs validate-refs validate-all lint format stats test test-scripts test-shell test-java test-go test-js mutation property-tests ci-fast ci ci-full sync-qwen judgment-up judgment-down
 
 DOCS := AGENTS.md README.md \
   docs/AGENTS_AND_SKILLS.md \
@@ -157,5 +157,12 @@ ci-full: ci   # Full ladder (no E2E in this repo)
 
 sync-qwen:   # Sync Token Plan models from opencode.json → ~/.qwen/settings.json
 	@./scripts/sync-qwen-settings.sh
+
+# --- Local judgment backend (spec 029) ----------------------------------------
+judgment-up:     # Start the local judgment backend and print JUDGMENT_* env lines
+	@./scripts/judgment-local-up.sh up
+
+judgment-down:   # Stop the local judgment backend started by judgment-up
+	@./scripts/judgment-local-up.sh down
 
 

@@ -1,5 +1,12 @@
 # OKF Changelog
 
+## 2026-10-09 — v0.3.0
+**Author:** @pucelano-95
+**Tags:** [typed-judgment, local-judgment-backend, kev, clm, self-hosted, confidence]
+**Summary:** Added the Local backends section (spec 029): Kev and CLM evaluated on target hardware, `JUDGMENT_BACKEND=local` opt-in, `judgment-local-up.sh` recipe ops, per-backend threshold recalibration
+**Links:**
+- [when-to-use-typesafe.md](when-to-use-typesafe.md#local-backends)
+
 ## 2026-09-28 — v0.2.0
 **Author:** @pucelano-95
 **Tags:** [typed-judgment, typesafe, classification, confidence, fallback]

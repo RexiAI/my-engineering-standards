@@ -12,3 +12,4 @@ Proposed → Accepted → Deprecated → Superseded.
 | 0002 | [Provider-agnostic general documentation](0002-provider-agnostic-docs.md) | Accepted |
 | 0003 | [Provider-agnostic PR-review wiring](0003-provider-agnostic-pr-review.md) | Accepted |
 | 0004 | [Typed-judgment layer: opt-in fast-path for probabilistic classification](0004-typed-judgment-layer.md) | Accepted |
+| 0005 | [Local judgment backend: an optional self-hosted compute backend for the typed-judgment layer](0005-local-judgment-backend.md) | Accepted |
