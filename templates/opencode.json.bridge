@@ -1,5 +1,16 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "agent": {
+    "spec-specifier": { "model": "{env:SPEC_SPECIFIER_MODEL}" },
+    "spec-ux": { "model": "{env:SPEC_UX_MODEL}" },
+    "spec-verifier": { "model": "{env:SPEC_VERIFIER_MODEL}" },
+    "spec-mutation-runner": { "model": "{env:SPEC_MUTATION_RUNNER_MODEL}" },
+    "spec-pr-opener": { "model": "{env:SPEC_PR_OPENER_MODEL}" },
+    "spec-coder": { "model": "{env:SPEC_CODER_MODEL}" },
+    "spec-refactorer": { "model": "{env:SPEC_REFACTORER_MODEL}" },
+    "spec-pipeline": { "model": "{env:SPEC_PIPELINE_MODEL}" },
+    "pr-review": { "model": "{env:SPEC_PR_REVIEW_MODEL}" }
+  },
   "instructions": [
     ".standards/AGENTS.md",
     ".standards/okf/context-window-policy.md",

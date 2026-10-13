@@ -1,3 +1,17 @@
+# [1.32.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.31.2...v1.32.0) (2026-10-13)
+
+
+### Features
+
+* typed-judgment layer (spec 028) ([#73](https://github.com/RexiAI/my-engineering-standards/issues/73)) ([6119e1e](https://github.com/RexiAI/my-engineering-standards/commit/6119e1ed0ac1622633fdbfa409394269fbc7a4cc))
+
+## [1.31.2](https://github.com/RexiAI/my-engineering-standards/compare/v1.31.1...v1.31.2) (2026-10-09)
+
+
+### Bug Fixes
+
+* **templates:** bridge child opencode.json wires SPEC_*_MODEL by default ([#74](https://github.com/RexiAI/my-engineering-standards/issues/74)) ([9b7d832](https://github.com/RexiAI/my-engineering-standards/commit/9b7d832896b598cddf0abe8f7cf052ce07f17f18))
+
 ## [1.31.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.31.0...v1.31.1) (2026-09-10)
 
 

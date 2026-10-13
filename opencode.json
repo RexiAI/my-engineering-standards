@@ -12,15 +12,10 @@
     "pr-review": { "model": "{env:SPEC_PR_REVIEW_MODEL}" }
   },
   "provider": {
-    "opencode": {
-      "env": ["OPENCODE_API_KEY"],
-      "options": { "baseURL": "https://opencode.ai/zen/v1" },
-      "models": { "mimo-v2.5-free": {} }
-    },
     "bailian-token-plan-personal": {
       "npm": "@ai-sdk/anthropic",
       "name": "Alibaba Cloud Model Studio",
-      "env": ["BAILIAN_TOKEN_PLAN_API_KEY"],
+      "env": ["OPENCODE_API_KEY"],
       "options": {
         "baseURL": "https://token-plan.ap-southeast-1.maas.aliyuncs.com/apps/anthropic/v1"
       },

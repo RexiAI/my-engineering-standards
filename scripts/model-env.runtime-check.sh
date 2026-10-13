@@ -50,7 +50,7 @@ ok() { PASS_COUNT=$((PASS_COUNT + 1)); echo -e "${GREEN}PASS${NC} $1"; }
 bad() { FAIL_COUNT=$((FAIL_COUNT + 1)); echo -e "${RED}FAIL${NC} $1"; }
 
 # Runtime-built fixture model ids (no inline literal model-id values).
-provider="opencode-""go"
+provider="fake-provider"
 FAST="$provider/""fast""$RANDOM""$RANDOM"
 PLUS="$provider/""plus""$RANDOM""$RANDOM"
 
@@ -64,31 +64,22 @@ resolved_model() {
 }
 
 # expected_for AGENT — the fixture's committed default for that agent: the
-# shared "plus"-tier agents, everything else the "fast" tier.
+# shared "plus"-tier agents, everything else the "fast" tier (roster-driven).
 expected_for() {
-  local agent="$1" a
-  for a in "${MODEL_ENV_PLUS_AGENTS[@]}"; do
-    if [ "$agent" = "$a" ]; then
-      echo "$PLUS"
-      return
-    fi
-  done
-  echo "$FAST"
+  if model_env_is_plus "$1"; then echo "$PLUS"; else echo "$FAST"; fi
 }
 
-# write_example DIR FAST PLUS — fixture example defining all 9 vars
+# write_example DIR FAST PLUS — fixture example defining all 9 vars; tier
+# values derive from the shared roster, never a restated agent list.
 write_example() {
   mkdir -p "$1/config"
   {
-    printf 'SPEC_SPECIFIER_MODEL=%s\n' "$2"
-    printf 'SPEC_UX_MODEL=%s\n' "$2"
-    printf 'SPEC_VERIFIER_MODEL=%s\n' "$3"
-    printf 'SPEC_MUTATION_RUNNER_MODEL=%s\n' "$3"
-    printf 'SPEC_PR_OPENER_MODEL=%s\n' "$3"
-    printf 'SPEC_CODER_MODEL=%s\n' "$2"
-    printf 'SPEC_REFACTORER_MODEL=%s\n' "$2"
-    printf 'SPEC_PIPELINE_MODEL=%s\n' "$2"
-    printf 'SPEC_PR_REVIEW_MODEL=%s\n' "$2"
+    local a var want
+    for a in "${MODEL_ENV_AGENTS[@]}"; do
+      var="$(model_env_var_for_agent "$a")"
+      if model_env_is_plus "$a"; then want="$3"; else want="$2"; fi
+      printf '%s=%s\n' "$var" "$want"
+    done
   } > "$1/config/model.local.env.example"
 }
 
