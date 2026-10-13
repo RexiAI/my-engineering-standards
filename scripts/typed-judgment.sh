@@ -49,16 +49,25 @@
 #           (exit 10) before making any request.
 #
 # API response contract (what this wrapper parses):
-#   {"answers": {"<question-id>": {"answer": ..., "confidence": <0..1>,
+#   {"answers": {"<question-id>": {<answer field>, "confidence": <0..1>?,
 #     "probabilities": {...}?, "usage": <tokens | {total_tokens} | {input,
 #     output}>?, "latency_ms": <ms>?}, ...}}
+#   <answer field> is per question type on the real wire — hosted and local
+#   both answer under "choice", "noul" (which carries NO confidence field —
+#   protocol-correct), or "score"; "answer" is the idealized shape. The
+#   normalized "answer" aliases all four: first present of
+#   answer|choice|noul|score (jq // chain — 0 and 0.0 are answers, not nulls).
 #   Normalized stdout: one JSON object mapping each requested question id to
-#   {answer, confidence, probabilities, usage (total tokens, number),
-#   latency_ms (response value, else client-measured elapsed ms)}.
+#   {answer (the alias above), confidence (null when the response carries
+#   none), probabilities, usage (total tokens, number), latency_ms (response
+#   value, else client-measured elapsed ms)}.
 #
 # Exit codes:
-#   0  — usable answer: HTTP 200, parseable, every question answered, and
-#        every confidence >= JUDGMENT_MIN_CONFIDENCE.
+#   0  — usable answer: HTTP 200, parseable, every requested question
+#        answered (under any answer alias), and every answer that carries a
+#        confidence has it >= JUDGMENT_MIN_CONFIDENCE. Confidence is optional
+#        per protocol: a confidence-less answer (noul) passes the gate — its
+#        probability IS the signal and consumers threshold it themselves.
 #   2  — usage error (missing --questions, unreadable state, no state, live
 #        hosted call without JUDGMENT_MODEL, invalid JUDGMENT_BACKEND value,
 #        unknown flag).
@@ -66,8 +75,10 @@
 #        call), network failure, HTTP 401/422/429/529 after at most 2
 #        exponential-backoff retries (3 total attempts), other non-retryable
 #        error statuses, daily cap exceeded (no network call), unparsable or
-#        incomplete response, or confidence below the threshold (the parsed
-#        answer is still printed on stdout so consumers can record
+#        incomplete response (a requested id missing, answered under none of
+#        the answer aliases, or carrying a non-numeric confidence), or
+#        confidence below the threshold on an answer that carries one (the
+#        parsed answer is still printed on stdout so consumers can record
 #        telemetry). Consumers must preserve their stock procedure on 10.
 set -euo pipefail
 
@@ -240,12 +251,17 @@ call_api() {
   done
 }
 
-# response_valid — HTTP 200 body is JSON with a numeric confidence for every
-# requested question id.
+# response_valid — HTTP 200 body is JSON where every requested question id is
+# answered under one of the wire aliases (answer|choice|noul|score), and any
+# confidence that is present is numeric. Confidence itself is optional per
+# protocol — noul answers carry none (spec 029 spike §Wire compatibility).
 response_valid() {
   jq -e --argjson q "$QUESTIONS" '
     (.answers // {}) as $a |
-    [ $q | keys[] | ($a[.] // empty) | (.confidence | type) == "number" ]
+    [ $q | keys[] | ($a[.] // empty)
+      | select(((.answer // .choice // .noul // .score) != null)
+          and (.confidence == null or (.confidence | type) == "number"))
+    ]
     | length == ($q | keys | length) and length > 0
   ' "$RESP_FILE" >/dev/null 2>&1
 }
@@ -254,7 +270,7 @@ normalize_output() { # $1 = client-measured elapsed ms (latency fallback)
   jq -e --argjson q "$QUESTIONS" --argjson lat "$1" '
     (.answers // {}) as $a |
     reduce ($q | keys[]) as $k ({}; .[$k] = {
-      answer: ($a[$k].answer // null),
+      answer: ($a[$k].answer // $a[$k].choice // $a[$k].noul // $a[$k].score // null),
       confidence: ($a[$k].confidence // null),
       probabilities: ($a[$k].probabilities // {}),
       usage: ($a[$k].usage // 0 |
@@ -265,9 +281,10 @@ normalize_output() { # $1 = client-measured elapsed ms (latency fallback)
   ' "$RESP_FILE"
 }
 
-confidence_usable() { # $1 = normalized JSON
+confidence_usable() { # $1 = normalized JSON — gates only answers that carry a
+  # confidence; confidence-less ones (noul) pass, empty selection -> all() true.
   local min="${JUDGMENT_MIN_CONFIDENCE:-$MIN_CONFIDENCE_DEFAULT}"
-  jq -e --argjson min "$min" '[ .[].confidence ] | all(. >= $min)' <<< "$1" >/dev/null 2>&1
+  jq -e --argjson min "$min" '[ .[].confidence | select(. != null) ] | all(. >= $min)' <<< "$1" >/dev/null 2>&1
 }
 
 fallback() { # $1 = reason — debug line then the documented exit 10

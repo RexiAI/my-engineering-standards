@@ -569,3 +569,124 @@ JSON
   [ "$(attempts_count)" -eq 0 ]
   printf '%s' "$output" | jq -e '.model == "kev-latest"'
 }
+
+# ── Wire-compatibility fix (spec 029 spike report §Wire compatibility, follow-up) ─
+# The real protocol — hosted TypeSafe and local Kev/CLM alike — keys each answer
+# by question type ("choice" / "noul" / "score"; no "answer" field), and noul
+# answers carry NO confidence field (protocol-correct). These tests pin the
+# aliasing (answer = first present of answer|choice|noul|score), the optional
+# confidence, and the response_valid guards that must still reject garbage.
+# Named descriptively without an AC- prefix per scripts/tests/README.md — no
+# acceptance scenario exists for this behavior yet; inventing an ID would
+# defeat scripts/check-scenario-traceability.sh.
+
+@test "wire: choice-shaped response with no answer field normalizes answer, exits 0" {
+  cat > "$FIX/wire_choice.json" <<'JSON'
+{"answers":{"classification":{"choice":"billing","confidence":0.84,
+"probabilities":{"billing":0.84,"infra":0.08,"flake":0.04,"other":0.04},
+"usage":{"input_tokens":120,"output_tokens":18},"latency_ms":66}}}
+JSON
+  seq_always 200 wire_choice
+  sf=$(make_state 'build failed at step 3')
+  invoke -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 0 "$status"
+  printf '%s' "$output" | jq -e '.classification.answer == "billing"'
+  printf '%s' "$output" | jq -e '.classification.confidence == 0.84'
+  printf '%s' "$output" | jq -e '.classification.probabilities.billing == 0.84'
+  printf '%s' "$output" | jq -e '.classification.latency_ms == 66'
+}
+
+@test "wire: noul-shaped response without confidence exits 0, answer is the probability" {
+  cat > "$FIX/wire_noul.json" <<'JSON'
+{"answers":{"u":{"noul":0.93}}}
+JSON
+  seq_always 200 wire_noul
+  sf=$(make_state 'build failed at step 3')
+  invoke -- --state-file "$sf" --questions '{"u":{"type":"noul","instructions":"Probability this failing CI run is a flake","criteria":"0..1"}}'
+  assert_exit_code 0 "$status"
+  printf '%s' "$output" | jq -e '.u.answer == 0.93'
+  printf '%s' "$output" | jq -e '.u.confidence == null'
+}
+
+@test "wire: noul at 0.5 exits 0 — the confidence gate skips null confidences by design" {
+  # Pins the documented semantics: an answer carrying no confidence (noul) is
+  # not thresholded; its probability IS the signal and consumers gate it.
+  cat > "$FIX/wire_noul_half.json" <<'JSON'
+{"answers":{"u":{"noul":0.5}}}
+JSON
+  seq_always 200 wire_noul_half
+  sf=$(make_state 'build failed at step 3')
+  invoke -- --state-file "$sf" --questions '{"u":{"type":"noul","instructions":"Probability this failing CI run is a flake","criteria":"0..1"}}'
+  assert_exit_code 0 "$status"
+  printf '%s' "$output" | jq -e '.u.answer == 0.5'
+  printf '%s' "$output" | jq -e '.u.confidence == null'
+}
+
+@test "wire: score-shaped response exits 0 with answer the numeric score" {
+  cat > "$FIX/wire_score.json" <<'JSON'
+{"answers":{"severity":{"score":1.6,"confidence":0.78,
+"legend":{"1":"cosmetic","3":"degrading","5":"blocker"},
+"probabilities":{"1":0.18,"2":0.62,"3":0.2},"usage":90,"latency_ms":55}}}
+JSON
+  seq_always 200 wire_score
+  sf=$(make_state 'build failed at step 3')
+  invoke -- --state-file "$sf" --questions '{"severity":{"type":"score","instructions":"Rate the incident severity","criteria":"1..5 scale"}}'
+  assert_exit_code 0 "$status"
+  printf '%s' "$output" | jq -e '.severity.answer == 1.6'
+  printf '%s' "$output" | jq -e '.severity.confidence == 0.78'
+  printf '%s' "$output" | jq -e '.severity.usage == 90'
+}
+
+@test "wire: mixed choice+noul request — low choice confidence exits 10 with BOTH answers printed" {
+  # Telemetry property holds under aliasing: finalize_response prints before
+  # the gate, so the noul answer arrives alongside the sub-threshold choice.
+  cat > "$FIX/wire_mixed.json" <<'JSON'
+{"answers":{"classification":{"choice":"flake","confidence":0.55,
+"probabilities":{"flake":0.55,"regression":0.2,"infra":0.15,"config":0.1}},
+"u":{"noul":0.9}}}
+JSON
+  seq_always 200 wire_mixed
+  sf=$(make_state 'build failed at step 3')
+  invoke -- --state-file "$sf" --questions '{"classification":{"type":"choice","instructions":"Classify the failing CI run","criteria":"one of flake/regression/infra/config"},"u":{"type":"noul","instructions":"Probability this is a flake","criteria":"0..1"}}'
+  assert_exit_code 10 "$status"
+  printf '%s' "$output" | jq -e '.classification.answer == "flake"'
+  printf '%s' "$output" | jq -e '.classification.confidence == 0.55'
+  printf '%s' "$output" | jq -e '.u.answer == 0.9'
+  printf '%s' "$output" | jq -e '.u.confidence == null'
+}
+
+@test "wire: answer object with none of answer/choice/noul/score is incomplete, exits 10" {
+  cat > "$FIX/wire_no_answer_field.json" <<'JSON'
+{"answers":{"classification":{"message":"no typed answer field here"}}}
+JSON
+  seq_always 200 wire_no_answer_field
+  sf=$(make_state 'build failed at step 3')
+  invoke -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 10 "$status"
+}
+
+@test "wire: non-numeric confidence is invalid, exits 10" {
+  # response_valid must still reject garbage confidence — the blanket numeric
+  # requirement becomes a conditional one (numeric when present).
+  cat > "$FIX/wire_confidence_string.json" <<'JSON'
+{"answers":{"classification":{"answer":"regression","confidence":"high"}}}
+JSON
+  seq_always 200 wire_confidence_string
+  sf=$(make_state 'build failed at step 3')
+  invoke -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 10 "$status"
+}
+
+@test "unit: noul 0.0 and score 0 survive the alias chain — zero is truthy in jq" {
+  # The // chain only falls through null/false, so a legitimate zero answer
+  # must not normalize to null.
+  cat > "$FIX/wire_zero.json" <<'JSON'
+{"answers":{"u":{"noul":0.0},"severity":{"score":0,"confidence":0.9}}}
+JSON
+  seq_always 200 wire_zero
+  sf=$(make_state 'build failed at step 3')
+  invoke -- --state-file "$sf" --questions '{"u":{"type":"noul","instructions":"Probability this is a flake","criteria":"0..1"},"severity":{"type":"score","instructions":"Rate the incident severity","criteria":"1..5 scale"}}'
+  assert_exit_code 0 "$status"
+  printf '%s' "$output" | jq -e '.u.answer == 0'
+  printf '%s' "$output" | jq -e '.severity.answer == 0'
+}
