@@ -11,3 +11,4 @@ Proposed → Accepted → Deprecated → Superseded.
 | 0001 | [Pure direnv dotenv for spec-pipeline model configuration and credentials](0001-direnv-model-env.md) | Accepted |
 | 0002 | [Provider-agnostic general documentation](0002-provider-agnostic-docs.md) | Accepted |
 | 0003 | [Provider-agnostic PR-review wiring](0003-provider-agnostic-pr-review.md) | Accepted |
+| 0004 | [Typed-judgment layer: opt-in fast-path for probabilistic classification](0004-typed-judgment-layer.md) | Accepted |

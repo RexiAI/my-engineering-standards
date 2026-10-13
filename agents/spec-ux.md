@@ -13,6 +13,7 @@ permission:
   bash:
     "git commit*": ask
     "git push*": ask
+    "scripts/typed-judgment.sh*": allow
     "*": allow
 ---
 
@@ -22,9 +23,50 @@ that doc first if you have not already.
 The `Stop-and-Ask decision matrix` in `docs/SPEC_PIPELINE.md` is authoritative for
 you: resolve every condition listed there per the matrix, never by improvisation.
 
-Load the `design-taste-frontend` skill before doing anything else. Use the `skill` tool
-with `name: design-taste-frontend`. All design decisions you make must follow that skill's
-rules — brief inference, dial values, anti-slop constraints, pre-flight check.
+# Applicability fast-path (typed judgment, opt-in, spec 028)
+
+Before anything else, read `specs/NNN-slug/00-informal.md` and
+`specs/NNN-slug/10-tasks.md` for the spec you were given. Then check whether the
+opt-in typed-judgment fast-path is configured: both `JUDGMENT_API_URL` and
+`JUDGMENT_API_KEY` must be set and non-empty in the environment. If either is
+unset or empty, skip this section entirely — the stock applicability check
+below runs unchanged and your behavior is identical to the pre-integration
+agent (record no judgment telemetry).
+
+When configured, write the concatenation of the **full** content of
+`00-informal.md` and `10-tasks.md` (no truncation of the payload itself) to a
+temp state file and ask exactly one Choice question, before loading the design
+skill:
+
+```bash
+scripts/typed-judgment.sh --state-file "$STATE_FILE" \
+  --questions '{"applicability":{"type":"choice","instructions":"Does this spec have a frontend surface the design-taste-frontend skill applies to? Answer run (yes, design it), skip (pure backend / no visual surface), or ambiguous (genuinely unclear).","criteria":"Applies: landing pages, marketing pages, portfolios, product UI in the browser, redesigns. Does NOT apply: pure backend work, CLI tools, dashboards/admin panels/data tables, native mobile, realtime collab UI, APIs with no visual surface.","options":["run","skip","ambiguous"]}}'
+```
+
+Map the result onto the existing outcomes — the fast-path only picks a path
+faster; it never invents a new one:
+
+- exit 0, answer `"run"` → the spec has a frontend surface: load the
+  `design-taste-frontend` skill and continue exactly as the existing
+  "has frontend surface" path below.
+- exit 0, answer `"skip"` → emit the existing SKIPPED line verbatim
+  (`SKIPPED — no frontend surface detected. …`) and end your turn.
+- exit 0, answer `"ambiguous"` → emit `BLOCKED — <one question>`; you
+  formulate that single question with your own judgment, as today.
+- **exit 10** (confidence below threshold, daily cap, API/network failure, or
+  any other fallback reason) → emit `BLOCKED — <one question>`; you formulate
+  the question as today. Do not fall through to a silent SKIPPED or run.
+
+Record telemetry per call in your turn's run-log section, whatever the exit
+code: `{"judgment":"applicability","answer":<answer or null>,"confidence":<0..1 or null>,"latency_ms":<ms or null>,"tokens":<n or null>,"fallback":<false|true>}`.
+
+# Load the design skill
+
+Load the `design-taste-frontend` skill before doing any design work (the
+applicability fast-path above, when configured, runs first). Use the `skill`
+tool with `name: design-taste-frontend`. All design decisions you make must
+follow that skill's rules — brief inference, dial values, anti-slop
+constraints, pre-flight check.
 
 # Applicability check (first action, always)
 
