@@ -1412,3 +1412,225 @@ literal provider ids), so committing them cannot re-trip the scan.
 | Round | Head | Result | Failing checks | Disposition |
 |---|---|---|---|---|
 | 1 | 7cad7ff | **FAIL** | Validate 115935348556 (pull_request, run 38588085482), Validate 115935330909 (push, run 38588079961) — not ok 54 AC-030-07-03 + not ok 61 AC-030-07 | Route to Coder (option A above); fix round 1 of max 3 opens |
+
+---
+
+# Post-PR CI check (phase 2) — round 2 of max 3
+
+Date: 2026-10-14. Verifier run: **attempt 3, phase 2, round 2** — SCOPED
+re-verification per docs/SPEC_PIPELINE.md §Scoped re-verification and the
+round-1 disposition: round 1 failed solely on the two Self CI `Validate`
+checks (both events), so **only those two checks are re-checked at the new
+head**; unchanged gates' round-1 results stand without re-execution. PR #78
+(draft), https://github.com/RexiAI/my-engineering-standards/pull/78, branch
+`spec/030-e2e-skill-agent`, head `892cecef1ebee4da6a1506cabc3d6e7f1d4ff6d2`
+(fix round 1: `725d885` round-1 record + telemetry, `892cece` the clause-A
+fix). Local HEAD parity confirmed: `git rev-parse HEAD` = the PR `headRefOid` =
+`892cece…`, working tree clean at round start (the round-1 append had been
+committed as `725d885`), so the local confirmations below ran on the exact
+tree CI saw. This round-2 append and its telemetry record stay **uncommitted**
+in the working tree for the PR Opener's final record commit.
+
+Scope handling of the other check: the PR Review Agent's round-1 pass stands
+per the scoped rule, but the workflow re-triggered at the new head — so its
+re-run was polled to terminal state (never ruled on while `pending`; total
+~27 min across bounded polls) and is **success**. Per the dispatch caveat, any
+other terminal-red check at the new head would have been recorded and factored
+in; none exists — every check at `892cece` is green.
+
+Fix verification: `892cece` is exactly round 1's recommended **option A** —
+the `t7_ids_clause` filter in `tests/AC-030-07.sh` extended with
+`|^specs/|^docs/changes/` path prefixes (directory prefixes carry no
+trailing-`:` anchor, as round 1 specified) plus the lifecycle-equivalence
+rationale comment citing SPEC_PIPELINE.md §Archive in the PR and the 028
+phase-2 round-1 precedent (E3). No other file changed.
+
+## Round-2 verdict: **PASS** — phase-2 CI loop closes
+
+| Check | Workflow | Event | Bucket | Run / check id |
+|---|---|---|---|---|
+| Review PR / Review PR | PR Review Agent | pull_request | **pass** (out of scope; re-triggered run polled to terminal) | run 38592973597, check id 115952354000 |
+| Validate | Self CI | pull_request | **pass** (round 1: fail) | run 38592973401, check id **115952352615** |
+| Validate | Self CI | push | **pass** (round 1: fail) | run 38592965534, check id **115952324859** |
+
+Previously-failing tests, **both events** (verbatim from CI logs):
+`ok 54 AC-030-07-03: check-model-env.sh exits 0 and holistic hygiene holds`
+and `ok 61 AC-030-07: T7 full suite (scenarios + units) exits 0`. Per-event
+tally: TAP plan `1..360`, **360 ok / 0 not ok / 0 Makefile:115 errors** —
+`make test-scripts` green (round 1: 358/2 + `make: *** [Makefile:115:
+test-scripts] Error 1`). Event attribution note: the dispatch message labeled
+run 38592973401 as the push event; the run-list API says **38592973401 =
+pull_request, 38592965534 = push** (E4) — the API is authoritative and the
+table follows it.
+
+## Evidence: scoped post-PR CI re-check (phase 2, round 2)
+
+command: git status --porcelain; git rev-parse HEAD; git log --oneline -4; date -u +%Y-%m-%dT%H:%M:%SZ
+exit: 0
+at: 2026-10-14T15:52:32Z
+
+```
+892cecef1ebee4da6a1506cabc3d6e7f1d4ff6d2
+892cece fix(spec 030): exclude pipeline-artifact prose from AC-030-07-03 tracked-tree scan
+725d885 docs(spec 030): record phase-2 round-1 post-PR CI check + gate telemetry
+7cad7ff docs(changes): archive 030-e2e-skill-agent
+57807e8 docs(spec 030): record PR URL and commit count in 30-report.md
+spec/030-e2e-skill-agent
+2026-10-14T15:52:32Z
+```
+
+(`git status --porcelain` printed nothing — clean tree — and
+`git branch --show-current` printed `spec/030-e2e-skill-agent`.)
+
+command: gh pr checks 78 --repo RexiAI/my-engineering-standards --json name,state,bucket,workflow,link
+exit: 0
+at: 2026-10-14T15:52:51Z
+
+```
+[{"bucket":"pending","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/38592973597/job/115952354000","name":"Review PR / Review PR","state":"IN_PROGRESS","workflow":"PR Review Agent"},{"bucket":"pending","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/38592973401/job/115952352615","name":"Validate","state":"IN_PROGRESS","workflow":"Self CI"},{"bucket":"pending","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/38592965534/job/115952324859","name":"Validate","state":"IN_PROGRESS","workflow":"Self CI"}]
+```
+
+command: gh run list --repo RexiAI/my-engineering-standards --branch spec/030-e2e-skill-agent --workflow "Self CI" --json databaseId,event,status,conclusion,headSha,url --jq '.[] | select(.headSha=="892cecef1ebee4da6a1506cabc3d6e7f1d4ff6d2")'
+exit: 0
+at: 2026-10-14T16:03:02Z
+
+```
+{"conclusion":"success","databaseId":38592973401,"event":"pull_request","headSha":"892cecef1ebee4da6a1506cabc3d6e7f1d4ff6d2","status":"completed","url":"https://github.com/RexiAI/my-engineering-standards/actions/runs/38592973401"}
+{"conclusion":"success","databaseId":38592965534,"event":"push","headSha":"892cecef1ebee4da6a1506cabc3d6e7f1d4ff6d2","status":"completed","url":"https://github.com/RexiAI/my-engineering-standards/actions/runs/38592965534"}
+```
+
+command: for r in 38592973401 38592965534; do gh run view $r --log | grep "Run shell gate bats tests" | (count "Z ok N " / "Z not ok N " / Makefile:115 errors); done
+exit: 0
+at: 2026-10-14T16:04:12Z
+
+```
+run=38592973401 ok=360 not_ok=0 make_errors=0
+run=38592965534 ok=360 not_ok=0 make_errors=0
+```
+
+command: gh api repos/RexiAI/my-engineering-standards/commits/892cecef1ebee4da6a1506cabc3d6e7f1d4ff6d2/check-runs --jq '.check_runs[] | {id, name, conclusion, status, html_url}'
+exit: 0
+at: 2026-10-14T16:04:14Z
+
+```
+{"conclusion":null,"html_url":"https://github.com/RexiAI/my-engineering-standards/actions/runs/38592973597/job/115952354000","id":115952354000,"name":"Review PR / Review PR","status":"in_progress"}
+{"conclusion":"success","html_url":"https://github.com/RexiAI/my-engineering-standards/actions/runs/38592973401/job/115952352615","id":115952352615,"name":"Validate","status":"completed"}
+{"conclusion":"success","html_url":"https://github.com/RexiAI/my-engineering-standards/actions/runs/38592965534/job/115952324859","id":115952324859,"name":"Validate","status":"completed"}
+```
+
+(The PR Review Agent entry shows `in_progress` at this timestamp; its terminal
+`success` is E10 below — it was never ruled on while pending.)
+
+command: gh run view 38592973401 --log | grep -E "ok 54 |ok 61 |1\.\.360" (pull_request event; same grep on 38592965534 for push)
+exit: 0
+at: 2026-10-14T16:03:30Z
+
+```
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-14T15:52:30.8130021Z 1..360
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-14T15:52:36.4752616Z ok 54 AC-030-07-03: check-model-env.sh exits 0 and holistic hygiene holds
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-14T15:52:39.7584158Z ok 61 AC-030-07: T7 full suite (scenarios + units) exits 0
+---run2 (push, 38592965534)---
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-14T15:52:28.2788737Z 1..360
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-14T15:52:33.8362194Z ok 54 AC-030-07-03: check-model-env.sh exits 0 and holistic hygiene holds
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-14T15:52:36.9694116Z ok 61 AC-030-07: T7 full suite (scenarios + units) exits 0
+```
+
+command: git show 892cece --format="%H %s" -- tests/AC-030-07.sh (fix diff, key hunk)
+exit: 0
+at: 2026-10-14T16:19:36Z
+
+```
+892cecef1ebee4da6a1506cabc3d6e7f1d4ff6d2 fix(spec 030): exclude pipeline-artifact prose from AC-030-07-03 tracked-tree scan
+-  rest="$(printf '%s\n' "$hits" | grep -vE '^(CHANGELOG\.md|scripts/sync-qwen-settings\.sh|skills/hallmark/references/assets\.md|skills/hallmark/references/custom-craft\.md):' | grep -v '^$' || true)"
++  rest="$(printf '%s\n' "$hits" | grep -vE '^(CHANGELOG\.md|scripts/sync-qwen-settings\.sh|skills/hallmark/references/assets\.md|skills/hallmark/references/custom-craft\.md):|^specs/|^docs/changes/' | grep -v '^$' || true)"
+```
+
+(Plus 13 comment lines recording the lifecycle-equivalence rationale — both
+lifecycle states quote the patterns as their job; SPEC_PIPELINE.md §Archive in
+the PR treats `specs/*/` and `docs/changes/*.md` as the same content in two
+states; directory prefixes carry no trailing-`:` anchor. Stat: 1 file,
++14 −1.)
+
+command: gh pr checks 78 --repo RexiAI/my-engineering-standards --json name,state,bucket,workflow,link   (final bounded poll, all terminal)
+exit: 0
+at: 2026-10-14T16:18:53Z
+
+```
+[{"bucket":"pass","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/38592973597/job/115952354000","name":"Review PR / Review PR","state":"SUCCESS","workflow":"PR Review Agent"},{"bucket":"pass","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/38592973401/job/115952352615","name":"Validate","state":"SUCCESS","workflow":"Self CI"},{"bucket":"pass","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/38592965534/job/115952324859","name":"Validate","state":"SUCCESS","workflow":"Self CI"}]
+```
+
+## Evidence: local confirmation on the pushed tree (independent of CI)
+
+command: bats --tap --filter "AC-030-07" scripts/tests/ac-030-e2e-skill-agent.bats
+exit: 0
+at: 2026-10-14T16:04:16Z
+
+```
+1..4
+ok 1 AC-030-07-01: check-skills.sh exits 0
+ok 2 AC-030-07-02: check-orchestration.sh exits 0
+ok 3 AC-030-07-03: check-model-env.sh exits 0 and holistic hygiene holds
+ok 4 AC-030-07: T7 full suite (scenarios + units) exits 0
+```
+
+command: bash tests/AC-030-07.sh   (full T7 suite)
+exit: 0
+at: 2026-10-14T16:05:34Z
+
+```
+RESULT AC-030-07: passed=8 failed=0
+```
+
+command: non-vacuity probe — clause-A pipeline replayed in-shell: real tree hits through the fixed filter, then a synthetic id planted under a deliverable path (built from the lib's IDP_A fragment; simulation only, no repo writes)
+exit: 0
+at: 2026-10-14T16:05:32Z
+
+```
+total-tracked-hits=19 docs-changes-hits=14
+rest-after-filter(real)=[]
+rest-after-filter(synthetic-injected)=[skills/e2e-testing/SKILL.md:999:simulated gpt-probe]
+PROBE: filter passes clean tree AND still catches deliverable-path hit - not vacuous
+```
+
+The exclusion is **not a vacuous pass**: the fixed filter still flags a planted
+literal under `skills/` (a deliverable path), while the 19 real tracked hits
+(14 in `docs/changes/` — the 4 original archive hits plus this file's round-1
+evidence quotes; 4 allow-listed files; remainder in the allow-listed entries)
+reduce to an empty rest. Deliverables remain strictly clean via
+`u_030_07_deliverables_clean` (no exclusions; `ok` in the suite run above).
+This independently reproduces the Coder's claimed planted-id mutation result.
+
+## Round-2 telemetry
+
+Appended via `bash scripts/record-gate-run.sh` with
+`SPEC_LOOP_COUNT=3 SPEC_PHASE1_RETRIES=0 SPEC_PHASE2_RETRIES=1` exported in the
+invoking shell (subagent shells do not inherit the orchestrator environment).
+`gatesFailed` [] , `outcome` pass, `durationSec` approximate (session start
+~15:51:30Z through the record at 16:20Z). Recorded on branch
+`spec/030-e2e-skill-agent`, not committed — for the PR Opener's final record
+commit.
+
+Telemetry line (appended to `runs.jsonl`, verbatim):
+
+command: SPEC_LOOP_COUNT=3 SPEC_PHASE1_RETRIES=0 SPEC_PHASE2_RETRIES=1 bash scripts/record-gate-run.sh -record '<json>'
+exit: 0
+at: 2026-10-14T16:20:16Z
+
+```json
+{"specSlug":"030-e2e-skill-agent","gatesFailed":[],"warnings":["phase2-round2 SCOPED re-verification: only the two previously-failing Self CI Validate checks re-checked at new head 892cece - both pass (pull_request run 38592973401 check 115952352615; push run 38592965534 check 115952324859); ok 54 AC-030-07-03 + ok 61 AC-030-07, TAP plan 1..360, 360 ok / 0 not ok / 0 make errors per event; make test-scripts green","fix 892cece is exactly round-1 option A: clause-A filter in tests/AC-030-07.sh extended with ^specs/ and ^docs/changes/ path prefixes plus lifecycle-equivalence rationale comment; independently confirmed non-vacuous: real tree passes the filter (19 tracked hits, 14 of them in docs/changes/, empty rest) while a synthetic planted id under a deliverable path survives the filter; local T7 suite passed=8 failed=0 exit 0; bats AC-030-07 filter 4/4 ok","PR Review Agent re-triggered at the new head (out of scoped set; round-1 pass stands per scoped rule) - polled to terminal per the never-rule-on-pending rule: success (run 38592973597 check 115952354000, ~27 min); no red check exists on the actual head, so nothing out-of-scope was carried over silently","event-attribution correction vs the dispatch note: run 38592973401 is the pull_request event and run 38592965534 the push event per the run-list API","durationSec approximate: session start ~15:51:30Z through record time; round-2 one-pager section append + this telemetry record stay uncommitted for the PR Opener final record commit"],"durationSec":1726,"outcome":"pass","runId":"c98e4cf2-8a53-498b-be76-81fa6ef7c21c","loopCount":3,"phase1Retries":0,"phase2Retries":1}
+```
+
+Script output: `record-gate-run: appended record to
+/home/dbueno/projects/my-engineering-standards/runs.jsonl` (runId
+`c98e4cf2-8a53-498b-be76-81fa6ef7c21c` generated by the script; loopCount 3 /
+phase1Retries 0 / phase2Retries 1 taken from the exported env — verified in the
+appended line.) Both `runs.jsonl` telemetry records (round-1 fail, round-2
+pass) are clause-A clean (no literal provider ids), so committing them cannot
+re-trip the scan.
+
+## Round summary (phase 2, cumulative)
+
+| Round | Head | Result | Failing checks | Disposition |
+|---|---|---|---|---|
+| 1 | 7cad7ff | **FAIL** | Validate 115935348556 (pull_request, run 38588085482), Validate 115935330909 (push, run 38588079961) — not ok 54 AC-030-07-03 + not ok 61 AC-030-07 | Routed to Coder (option A) |
+| 2 | 892cece | **PASS** | none — 360 ok / 0 not ok both events; PR Review Agent also green | Phase-2 CI loop **closes**; scoped re-check per §Scoped re-verification |
