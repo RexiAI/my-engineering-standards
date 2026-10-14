@@ -1,3 +1,411 @@
+# 030-e2e-skill-agent
+
+> Spec pipeline archive. Original source: `specs/030-e2e-skill-agent/` (deleted by this script).
+> Archived: 2026-10-14
+
+## Original ask
+
+# 030 — Agentic E2E standard: `e2e-testing` skill + `e2e-runner` agent
+
+## The ask
+
+Add an end-to-end testing standard to this repo, delivered as:
+
+1. A skill: `skills/e2e-testing/SKILL.md` (Agent Skills spec, progressive disclosure).
+2. An agent: `agents/e2e-runner.md` (OpenCode agent spec).
+
+Based on the TesterArmy `e2e` framework and the patterns described in
+https://www.webreactiva.com/blog/e2e-tester-army (article dated 2026-06-10,
+anchored to `e2e` v0.17.0, `@e2e-dev/web` 0.12.0, npm package `e2e`,
+repo github.com/tester-army/e2e, Apache-2.0).
+
+## What `e2e` is (source facts, verified from the article)
+
+TypeScript E2E framework (web + mobile) where each test can carry AI agents:
+
+- `agent.act('<natural-language goal>')` — an actor agent drives the UI toward
+  the goal; web engine is Playwright (pinned `playwright-core` 1.63.0),
+  coexists with `@playwright/test`. The actor sees a redacted text snapshot of
+  the screen (roles, names, texts, states) — never raw HTML, cookies, headers,
+  or env vars; password fields masked; configured secrets replaced by
+  `<secret:name>`. Optional vision (`{ vision: true | 'only' }`).
+- `agent.assert(...)` — a judge model decides pass/fail from **only the
+  instruction and the current screen**; it never sees the actor's steps or
+  summaries (no self-grading). A separate judge model is configurable.
+  Outcomes distinguish `ASSERTION_FAILED` from `ASSERTION_INCONCLUSIVE`.
+- Deterministic Playwright locators + `expect` remain available and mixable
+  in the same test ("choose how much AI each test carries").
+- `agent.waitFor(...)` polls the screen, calls the model only when the
+  observation changes; `agent.extract(...)` returns schema-validated data.
+- The **runner** is the non-AI authority: authorizes each action, counts it
+  against budgets, caps actions at 15s, detects loops (3 consecutive failed
+  actions force a strategy change, 5 force a verdict).
+- Default budgets: `act` 25 model calls / 25 actions / 120s; `waitFor`
+  25/0/30s; `extract` 2/0/30s; `assert` 2/0/30s → `STEP_BUDGET_EXHAUSTED` /
+  `STEP_TIMEOUT`. Per-agent configurable.
+- Verdicts: `passed` / `failed` / `blocked` (blocked = external cause).
+  Exit codes: 1 test failure, 2 config/policy/blocked-credentials,
+  3 engine/app/model-provider/dead-env, 4 internal, 130 interrupted.
+- **Replay cache**: verified `act` steps replay with zero model calls
+  (`replayed` / `handed off` / `missed`). Modes: `read-write` (local default),
+  `read-only` (CI default), `off`. `--strict-cache` fails stale recordings
+  with `REPLAY_STALE` without calling the model. Cache entries are JSON,
+  contain no prompts/screenshots but keep typed non-secret values → reviewable
+  in PRs. Model change does **not** invalidate; instruction/params/target/
+  engine-minor-version changes do. Only `act` caches; judgments always live.
+- **Golden rule**: every `act` must be followed immediately by an
+  `expect`/`agent.assert` — for correctness and because only a verified `act`
+  gets cached. "An agent that achieves the goal doesn't guarantee it took the
+  path your user would take."
+- **Secrets**: `credentials.user('admin')` yields opaque `Secret` values —
+  unreadable from the test; the runner fills the field itself; after a secret
+  is filled, screenshots stop being sent to the model for that attempt.
+  `e2e` does **not** load `.env` files.
+- Sessions (cookies + localStorage + IndexedDB) encrypted on disk, key only in
+  memory, wiped at run end. `test.setup(..., { sessions: ['admin'] }, ...)`
+  with `session.save('admin')` after a deterministic URL check.
+- **Explore mode**: `npx e2e explore '<persona + area>'` — agent plans its own
+  steps, streams findings (location, expected vs observed, repro steps,
+  screenshot). Default 8 steps (1–12), 10 min (3–15), via `--max-steps` /
+  `--timeout`. Findings: `issue` (functional) vs `warning` (cosmetic). Does
+  not replace a regression suite.
+- **Bug bash** (the "army"): several explore runs **in parallel**, each over
+  one area with a distinct persona (novice user, edge cases, error paths…),
+  then a reproduction test per finding. **Only findings whose repro test fails
+  with `ASSERTION_FAILED` count as bugs.**
+- Config: `e2e.config.ts`; tests at `tests/**/*.e2e.ts`; outputs under `.e2e/`
+  (`report.json`, `summary.md`, `failures/` — one markdown page per failed
+  test with code line, steps, last model turns, screen text; `cache/`;
+  `logs/app.log`). Treat `.e2e/` as read-only output.
+- App launch: `targets[].app.command` (shell-less; child inherits only
+  `PATH`/`HOME`/temp), `url` with port `0` + `{port}` substitution for
+  multi-branch parallelism; CI ignores `reuseExisting` → `APP_ALREADY_RUNNING`.
+- Model connectivity: `npx e2e login openai|github-copilot|opencode-console|spacexai`,
+  API keys (`AI_GATEWAY_API_KEY`, `OPENROUTER_API_KEY`), gateways, or local
+  OpenAI-compatible (Ollama). Claude subscriptions unsupported. Model must
+  support **tool calls + images**. `ai` package required. Node 24.8+ (or
+  22.22.3+).
+- CI (GitHub Actions): `pnpm exec e2e-web install chromium --with-deps`, then
+  `npx e2e run --reporter list,junit`, upload `.e2e/report.json` + `junit.xml`.
+  Workers: cores/2 local, **1 in CI**. Retries: 0 local, 1 CI. `test.only`
+  rejected in CI (`ONLY_IN_CI`).
+- Coding-agent workflow imposed by the vendor's own SKILL.md (5 steps):
+  inspect existing state → know the screens before writing (read components or
+  open the app via the MCP server) → write `tests/<feature>.e2e.ts`, one
+  `agent.act` per goal with `expect`/`assert` right behind → run a single file
+  (`npx e2e run tests/<feature>.e2e.ts`) → read `.e2e/failures/` +
+  `report.json`, fix locator/expectation/app. **"Never add a sleep."**
+- Also ships an MCP server (`npx e2e mcp`) whose `locate` tool validates a
+  locator against the live app; each agent session (subagents included) opens
+  its own session.
+- **Telemetry on by default** — opt-out `npx e2e telemetry disable` or
+  `E2E_TELEMETRY_DISABLED=1`.
+- Pre-1.0: API may change between minor versions.
+
+## Decisions (all confirmed by the user as "all defaults")
+
+1. **Hybrid standard**: the *patterns* are the standard (act+expect golden
+   rule, actor/judge isolation, budgets, replay-cache discipline, explore
+   mode, bug-bash confirmation gate); TesterArmy `e2e` is the **reference
+   implementation for TS/Node child repos**. Pin the documented version
+   (0.17.0) in examples and carry an explicit pre-1.0 instability warning.
+2. **One agent, two duties**: `e2e-runner` is (a) test author/maintainer —
+   given user flows or `AC-NNN-NN` acceptance scenarios, writes `*.e2e.ts`,
+   runs single files, reads `.e2e/failures/`, fixes until green; and (b)
+   bug-bash orchestrator (explicit mode) — launches parallel persona
+   explorations with bounded persona count and per-persona step/time budgets,
+   gates every finding through a repro test failing with `ASSERTION_FAILED`.
+3. **Supersession**: repo `agents/e2e-runner.md` supersedes the user-level
+   `~/.config/opencode/agent/e2e-runner.md` (Playwright-based) for repos
+   consuming this standard — same filename so project-level loading wins.
+   The user-level file is **not** touched or deleted by this spec.
+   Likewise the skill name `e2e-testing` intentionally shadows the generic
+   global `e2e-testing` skill in child repos that load this standard.
+4. **No pipeline change**: the skill+agent are standalone, invoked ad hoc or
+   via `/build`-adjacent human request. No new `/build` stage, no gate-catalog
+   change, no GOVERNANCE ADR needed. This operationalizes the AGENTS.md rule
+   "verify agent-delivered work against the live system".
+5. **Stack scope**: TS/Node web + React Native (via `@e2e-dev/mobile`,
+   iOS simulators / Android emulators). Java/Go child repos: the skill
+   contains a short "not for you" pointer to `docs/TESTING.md` (integration /
+   contract layers) instead of pretending coverage.
+6. **Governance**:
+   - No literal model/provider ids in tracked files. The `e2e-runner` agent
+     ships without a `model:` key (ADR 0003 pattern). If `opencode.json`'s
+     agent block gains an `e2e-runner` entry, it must be
+     `{env:SPEC_E2E_RUNNER_MODEL}` and the var must be added to
+     `config/model.local.env.example` (`scripts/check-model-env.sh` requires
+     example and references to match exactly).
+   - Framework-side models: child-repo `e2e.config.ts` reads actor/judge model
+     ids from env (e.g. `E2E_AGENT_MODEL`, `E2E_JUDGE_MODEL` via
+     `process.env`) — never hardcoded in the tracked config. Separate judge
+     model is **recommended, not mandated**.
+   - Skill mandates telemetry opt-out (`E2E_TELEMETRY_DISABLED=1`) in setup.
+   - CI guidance: replay cache `read-only` + `--strict-cache` in CI; upload
+     `.e2e/report.json` + `junit.xml` as artifacts.
+7. **Process**: this spec runs the standard pipeline (`/spec` → human gate →
+   `/build`).
+
+## Deliverables
+
+| File | Kind | Notes |
+|---|---|---|
+| `skills/e2e-testing/SKILL.md` | new | Frontmatter per `docs/AGENTS_AND_SKILLS.md` (name matches dir, description = what + when + triggers, body ≤500 lines). Sections: When to use / Invocation / What it does / What it is not / Exit codes. |
+| `skills/e2e-testing/references/*.md` | new | Progressive disclosure, one level deep: e.g. `setup.md` (init, model connectivity, telemetry opt-out, Node version), `writing-tests.md` (act+expect golden rule, judge isolation, params/unique, sessions/secrets, waitFor/extract), `running-debugging.md` (single-file runs, `.e2e/failures/`, exit codes, budgets, never-sleep, cache modes, `--strict-cache`), `bug-bash.md` (personas, parallel explorations, ASSERTION_FAILED confirmation gate), `ci.md` (GHA snippet, workers/retries, artifacts), `mobile-rn.md` (React Native scope). Vendor docs also ship offline in `node_modules/e2e/docs` / `npx e2e guide [topic]` — reference, don't duplicate wholesale. |
+| `skills/e2e-testing/assets/e2e.config.example.ts` | new | Config template with env-var model indirection, app launch, port-0 pattern, budgets, cache modes, telemetry opt-out comment. |
+| `agents/e2e-runner.md` | new | OpenCode agent frontmatter (`description`, `mode: subagent`, `permission` block; deny `git push*`, deny `git commit*`, deny edits outside `tests/`, `e2e.config.ts`, `.e2e/` read-only). No `model:` key. Body per AGENTS_AND_SKILLS Part 2: role, the one rule, execution steps for both duties (author/maintainer; bug-bash mode), explicit stopping conditions (max 3 fix rounds per failing test file; framework budgets are the inner bound; "re-run until green" is forbidden phrasing — every re-run is a counted attempt), ground-truth requirement (read `.e2e/failures/` + `report.json` after every run, never assume green), output summary contract. |
+| `docs/TESTING.md` | edit | E2E section (new or extended): agentic E2E is the standard for TS/Node + RN child repos; points at `skills/e2e-testing/SKILL.md`; keeps existing Playwright guidance for repos not adopting `e2e`. |
+| `AGENTS.md` | edit | One line in "Reading the Standards": read `skills/e2e-testing/SKILL.md` before writing or running E2E tests in a TS/Node or RN child repo. |
+| `config/model.local.env.example` (+ `opencode.json` agent block) | edit, conditional | Only if an `agent.e2e-runner.model` entry is added: `{env:SPEC_E2E_RUNNER_MODEL}` + matching example var. `scripts/check-model-env.sh` must pass. |
+
+## Hard constraints
+
+- `scripts/check-skills.sh` exits 0 (frontmatter, name-dir match, ≤500-line body, references one level deep).
+- `scripts/check-orchestration.sh` exits 0 (every agent/skill/script/doc reference in `agents/*.md`, `commands/`, `AGENTS.md` resolves; a `docs/[A-Z_]+.md` reference from the agent must exist).
+- `scripts/check-model-env.sh` exits 0 if model wiring is touched.
+- No literal model or provider ids anywhere in tracked files (docs included — switch models by editing gitignored local env).
+- No secrets, tokens, or credentials in any tracked file; the skill must teach the framework's opaque-`Secret` path and forbid inline credentials.
+- Skill and agent follow Anthropic "Building Effective Agents" principles: simplest-thing justification (workflow vs agent choice documented in the agent file), transparency (agent surfaces plan + per-run evidence), poka-yoke tool guidance (absolute paths, single-file runs), ground truth per step, explicit stopping conditions.
+- Bug-bash mode must bound parallelism (persona count cap) and per-persona budgets (`--max-steps`, `--timeout`), and must state that explore findings are not regressions — only `ASSERTION_FAILED` repro tests count.
+
+## Out of scope
+
+- No new `/build` stage, no gate-catalog change, no CI workflow changes to this repo's Self CI.
+- No child-repo workflow templates under `ci/` (follow-up candidate).
+- No `init-ci.sh --with-e2e` flag (follow-up candidate).
+- No modification or deletion of the user-level `~/.config/opencode/agent/e2e-runner.md` or global `e2e-testing` skill.
+- No Java/Go E2E tooling.
+- No hosted-infrastructure integration (`@e2e-dev/kernel`, `@e2e-dev/eas`) beyond a one-line mention.
+
+## Tasks
+
+# 030 — Tasks: Agentic E2E standard (`e2e-testing` skill + `e2e-runner` agent)
+
+Test approach: this repo has no test framework for docs/config deliverables (no
+`tests/` dir, no bats, no package.json). The Coder implements each scenario as a
+plain shell assertion test (bash script with `set -euo pipefail`, using `grep`,
+`wc -l`, `test -f`, and the existing gate scripts). Each test is runnable via
+`bash tests/AC-030-NN.sh` and exits 0 on pass. The test file for each task lives
+alongside the scenario file or in a `tests/` directory the Coder creates.
+
+---
+
+## T1 — Create `skills/e2e-testing/SKILL.md`
+
+**Goal**: New skill entry point following Agent Skills spec. Progressive-disclosure
+hub that points at references/ for depth.
+
+**Files touched**: `skills/e2e-testing/SKILL.md` (new)
+
+**Acceptance criteria**:
+- Frontmatter exists, bounded by `---`, with `name`, `description`, and optionally `license`, `compatibility`, `metadata`.
+- `name` field is exactly `e2e-testing` (matches directory name).
+- `name` is lowercase `[a-z0-9-]`, ≤64 chars, no leading/trailing/consecutive hyphens.
+- `description` is non-empty, ≤1024 chars, includes what the skill does AND when to use it (trigger keywords).
+- Body has sections: "When to use", "Invocation", "What it does", "What it is not", "Exit codes".
+- Body is ≤500 lines.
+- Body mentions the reference implementation pin: `e2e` v0.17.0.
+- Body carries an explicit pre-1.0 instability warning.
+- Body mandates telemetry opt-out (`E2E_TELEMETRY_DISABLED=1`) in setup guidance.
+- Body states the act+expect golden rule.
+- Body contains no literal model or provider ids.
+- Body contains no secrets, tokens, or credentials.
+- Body teaches the framework's opaque-`Secret` path (`credentials.user(...)`) and forbids inline credentials.
+- Body references `skills/e2e-testing/references/` files (one level deep).
+- No "re-run until green" phrasing anywhere in the file.
+- `scripts/check-skills.sh` exits 0 after this task.
+
+**Scenarios**: AC-030-01 (AC-030-01-01 through AC-030-01-12)
+
+---
+
+## T2 — Create `skills/e2e-testing/references/*.md`
+
+**Goal**: Progressive disclosure files — one per topic, referenced from SKILL.md.
+
+**Files touched**:
+- `skills/e2e-testing/references/setup.md` (new)
+- `skills/e2e-testing/references/writing-tests.md` (new)
+- `skills/e2e-testing/references/running-debugging.md` (new)
+- `skills/e2e-testing/references/bug-bash.md` (new)
+- `skills/e2e-testing/references/ci.md` (new)
+- `skills/e2e-testing/references/mobile-rn.md` (new)
+
+**Acceptance criteria**:
+- All six reference files exist.
+- Each file is referenced from `skills/e2e-testing/SKILL.md` by relative path.
+- No reference file contains a relative link to another reference file (one level deep, no nested chains).
+- `setup.md` covers: init, model connectivity (env-var indirection, no literal ids), telemetry opt-out, Node version requirement (24.8+ or 22.22.3+).
+- `writing-tests.md` covers: act+expect golden rule, judge isolation (actor/judge see different data), params/unique, sessions/secrets (opaque `Secret`), `waitFor`/`extract`.
+- `running-debugging.md` covers: single-file runs, `.e2e/failures/` reading, exit codes (1/2/3/4/130), budgets (default and per-agent), never-sleep rule, cache modes (`read-write`/`read-only`/`off`), `--strict-cache`.
+- `bug-bash.md` covers: persona count cap, `--max-steps`/`--timeout` per-persona bounds, ASSERTION_FAILED confirmation gate (only repro tests failing with ASSERTION_FAILED count as bugs), explore findings are not regressions.
+- `ci.md` covers: GHA snippet, workers (cores/2 local, 1 in CI), retries (0 local, 1 CI), `test.only` rejected in CI, replay cache `read-only` + `--strict-cache` in CI, artifacts (`.e2e/report.json` + `junit.xml`).
+- `mobile-rn.md` covers: React Native scope via `@e2e-dev/mobile`, iOS simulators / Android emulators, one-line mention of `@e2e-dev/kernel`/`@e2e-dev/eas`.
+- No reference file contains literal model or provider ids.
+- No reference file contains secrets, tokens, or credentials.
+- No reference file contains "re-run until green" phrasing.
+- `scripts/check-skills.sh` exits 0 (validates no nested reference chains).
+
+**Scenarios**: AC-030-02 (AC-030-02-01 through AC-030-02-08)
+
+---
+
+## T3 — Create `skills/e2e-testing/assets/e2e.config.example.ts`
+
+**Goal**: Config template demonstrating all governance rules.
+
+**Files touched**: `skills/e2e-testing/assets/e2e.config.example.ts` (new)
+
+**Acceptance criteria**:
+- File exists and is valid TypeScript (parseable by `tsc --noEmit` or syntactically valid).
+- Model ids read from `process.env` (e.g. `E2E_AGENT_MODEL`, `E2E_JUDGE_MODEL`) — never hardcoded.
+- Contains the port-0 pattern: `url` with port `0` and `{port}` substitution.
+- Contains app launch via `targets[].app.command` (shell-less).
+- Contains budget configuration (defaults or commented examples).
+- Contains cache mode configuration (`read-write`/`read-only`/`off`).
+- Contains a telemetry opt-out comment (`E2E_TELEMETRY_DISABLED=1`).
+- Tests path configured: `tests/**/*.e2e.ts`.
+- No literal model or provider ids.
+- No secrets, tokens, or credentials.
+- No `.env` file loading (framework does not load `.env` files — config must not suggest it).
+
+**Scenarios**: AC-030-03 (AC-030-03-01 through AC-030-03-05)
+
+---
+
+## T4 — Create `agents/e2e-runner.md`
+
+**Goal**: Agent file with two duties (author/maintainer + bug-bash orchestrator), following OpenCode agent spec and Anthropic principles.
+
+**Files touched**: `agents/e2e-runner.md` (new)
+
+**Acceptance criteria**:
+- YAML frontmatter with `description`, `mode: subagent`, and `permission` block.
+- `permission.bash` denies `git push*` and `git commit*`.
+- `permission.edit` denies edits outside `tests/`, `e2e.config.ts`, and `.e2e/` (read-only).
+- No `model:` key in frontmatter.
+- Body defines: Role, The one rule, Execution steps for both duties (author/maintainer; bug-bash mode), Stopping conditions, Output summary.
+- Workflow vs Agent choice is justified (simplest-thing principle documented).
+- Ground truth requirement: agent reads `.e2e/failures/` + `report.json` after every run, never assumes green.
+- Stopping conditions: max 3 fix rounds per failing test file; framework budgets are the inner bound.
+- "re-run until green" is stated as forbidden phrasing — every re-run is a counted attempt.
+- Bug-bash mode bounds: persona count cap, per-persona `--max-steps`/`--timeout`, ASSERTION_FAILED confirmation gate stated.
+- Poka-yoke tool guidance: absolute paths, single-file runs.
+- Transparency: agent surfaces plan + per-run evidence in output.
+- Output summary contract defined.
+- No literal model or provider ids.
+- No secrets, tokens, or credentials.
+- `scripts/check-orchestration.sh` exits 0 (agent references resolve).
+
+**Scenarios**: AC-030-04 (AC-030-04-01 through AC-030-04-08)
+
+---
+
+## T5 — Doc wiring (`docs/TESTING.md` + `AGENTS.md`)
+
+**Goal**: Wire the new standard into the existing doc surface.
+
+**Files touched**: `docs/TESTING.md` (edit), `AGENTS.md` (edit)
+
+**Acceptance criteria**:
+- `docs/TESTING.md` has a new or extended E2E section stating agentic E2E is the standard for TS/Node + RN child repos.
+- `docs/TESTING.md` section points at `skills/e2e-testing/SKILL.md`.
+- `docs/TESTING.md` keeps existing Playwright guidance for repos not adopting `e2e`.
+- `AGENTS.md` "Reading the Standards" section has a line: read `skills/e2e-testing/SKILL.md` before writing or running E2E tests in a TS/Node or RN child repo.
+- No literal model or provider ids added to either file.
+- `scripts/check-orchestration.sh` exits 0 (doc references resolve).
+
+**Scenarios**: AC-030-05 (AC-030-05-01 through AC-030-05-03)
+
+---
+
+## T6 — Conditional model wiring (explicitly conditional)
+
+**Goal**: If adding `e2e-runner` to `opencode.json`'s agent block, wire it through the
+`{env:SPEC_E2E_RUNNER_MODEL}` pattern consistently across all three files. **This task
+is skipped if the human decides not to add `e2e-runner` to opencode.json** — the
+agent file in T4 has no `model:` key regardless (ADR 0003 pattern), so it functions
+without this task.
+
+**Files touched (only if executed)**:
+- `opencode.json` (edit — add `e2e-runner` entry)
+- `config/model.local.env.example` (edit — add `SPEC_E2E_RUNNER_MODEL` var)
+- `scripts/model-env.vars.sh` (edit — add `e2e-runner` to `MODEL_ENV_AGENTS`, `SPEC_E2E_RUNNER_MODEL` to `MODEL_ENV_VARS`, and case entry in `model_env_var_for_agent()`)
+
+**Acceptance criteria**:
+- `opencode.json` has `e2e-runner` entry with `"model": "{env:SPEC_E2E_RUNNER_MODEL}"` — no literal model id.
+- `config/model.local.env.example` defines `SPEC_E2E_RUNNER_MODEL` with a default value.
+- `scripts/model-env.vars.sh` roster includes `e2e-runner` in `MODEL_ENV_AGENTS` and `SPEC_E2E_RUNNER_MODEL` in `MODEL_ENV_VARS`, and `model_env_var_for_agent()` maps `e2e-runner` → `SPEC_E2E_RUNNER_MODEL`.
+- `scripts/check-model-env.sh` exits 0.
+- No literal model or provider ids in any touched file.
+
+**Scenarios**: AC-030-06 (AC-030-06-01 through AC-030-06-03)
+
+---
+
+## T7 — Gate verification (final holistic check)
+
+**Goal**: Confirm all three gate scripts pass on the final tree.
+
+**Files touched**: none (verification only)
+
+**Acceptance criteria**:
+- `scripts/check-skills.sh` exits 0.
+- `scripts/check-orchestration.sh` exits 0.
+- `scripts/check-model-env.sh` exits 0 (whether T6 was executed or not — must pass in both cases).
+- No literal model or provider ids in any tracked file (full-repo grep).
+- No secrets, tokens, or credentials in any tracked file.
+- No "re-run until green" phrasing in any tracked file under `skills/` or `agents/`.
+
+**Scenarios**: AC-030-07 (AC-030-07-01 through AC-030-07-03)
+
+## Acceptance scenarios
+
+## AC-030-01-01 — Frontmatter exists with required fields
+## AC-030-01-02 — Name matches directory
+## AC-030-01-03 — Name format valid
+## AC-030-01-04 — Description non-empty and within limit
+## AC-030-01-05 — Body line count within limit
+## AC-030-01-06 — Required body sections present
+## AC-030-01-07 — Version pin and pre-1.0 warning present
+## AC-030-01-08 — Telemetry opt-out mandated
+## AC-030-01-09 — Act+expect golden rule stated
+## AC-030-01-10 — Opaque Secret path taught, inline credentials forbidden
+## AC-030-01-11 — No literal model or provider ids
+## AC-030-01-12 — No forbidden phrasing
+## AC-030-02-01 — All six reference files exist
+## AC-030-02-02 — Each reference file is referenced from SKILL.md
+## AC-030-02-03 — No nested reference chains
+## AC-030-02-04 — setup.md content coverage
+## AC-030-02-05 — writing-tests.md content coverage
+## AC-030-02-06 — running-debugging.md content coverage
+## AC-030-02-07 — bug-bash.md content coverage
+## AC-030-02-08 — ci.md and mobile-rn.md content coverage
+## AC-030-03-01 — Config example file exists
+## AC-030-03-02 — Model ids from environment variables
+## AC-030-03-03 — Port-0 pattern and app launch present
+## AC-030-03-04 — Budgets and cache modes configured
+## AC-030-03-05 — Telemetry opt-out and tests path present
+## AC-030-04-01 — Frontmatter has required fields
+## AC-030-04-02 — Permission denies git push and git commit
+## AC-030-04-03 — Permission denies edits outside allowed paths
+## AC-030-04-04 — No model key in frontmatter
+## AC-030-04-05 — Body has required sections
+## AC-030-04-06 — Workflow vs Agent choice justified
+## AC-030-04-07 — Ground truth and stopping conditions
+## AC-030-04-08 — Bug-bash mode bounds and confirmation gate
+## AC-030-05-01 — docs/TESTING.md has agentic E2E section
+## AC-030-05-02 — AGENTS.md Reading the Standards line added
+## AC-030-05-03 — No literal model ids added to docs
+## AC-030-06-01 — opencode.json e2e-runner entry uses env reference
+## AC-030-06-02 — config/model.local.env.example defines the var
+## AC-030-06-03 — scripts/model-env.vars.sh roster updated
+## AC-030-07-01 — check-skills.sh exits 0
+## AC-030-07-02 — check-orchestration.sh exits 0
+## AC-030-07-03 — check-model-env.sh exits 0
+
+## Verification
+
 # 25-verification.md — spec 030 (e2e-skill-agent)
 
 - **Verdict: PASS**
@@ -613,3 +1021,104 @@ spot checks (a)–(d) faithful, additional gates (check-skills,
 check-orchestration, check-model-env, check-bats-assertions) all exit 0, and
 zero literal model ids / secrets / forbidden phrasing in the deliverables.
 Architect (stage 5a) may proceed.
+
+## Quality gates
+
+# Report — spec 030 (e2e-skill-agent)
+
+- **Verifier verdict (carried forward):** PASS (25-verification.md, attempt 1, 2026-10-14)
+- **Mutation score:** skipped — `mvp` tier
+- **Complexity summary (carried from 25-verification.md / Refactorer):** worst measured CC = 6 (≤6 bound); 0 violations; 0 KISS violations; 80 functions measured across the spec-030 shell/bats deliverables
+- **Equivalent mutants:** N/A (mutation testing skipped at `mvp` tier)
+- **Final test status:** green — 255 spec-030 assertions across 7 bash suites + 1 bats wrapper, exit 0
+
+## Tier determination
+
+`mvp`. Independently determined from three converging signals (none trusted from prior stages):
+
+1. `grep 'Conformance tier' AGENTS.md` → no declaration in repo root `AGENTS.md`.
+2. No `AGENTS_<PROJECT>.md` file exists at the repo root (no project-specific tier declaration anywhere).
+3. `make mutation` (Makefile lines 134–141) greps `AGENTS.md`/`AGENTS_*.md` for "Conformance tier: production"; absent → falls through to the else branch which prints "skipped — production tier required (current tier is mvp, see docs/CONFORMANCE_TIERS.md)".
+4. Verifier's independent `check-code-principles.sh --json` run: `"tier": "mvp"`.
+
+Per docs/SPEC_PIPELINE.md §Stop-and-Ask decision matrix ("Project type ambiguous / conformance tier undetectable → defer to the harness default (`mvp` tier)") and docs/CONFORMANCE_TIERS.md (tier not declared → project conforms to the `mvp` floor), the repo's tier is `mvp`.
+
+Per docs/SPEC_PIPELINE.md §Conformance tiers, the Architect's mutation-testing stage runs only at `production` and above. At `mvp`, it is skipped.
+
+## Mutation testing
+
+Not run. `mvp` tier does not require mutation testing (docs/SPEC_PIPELINE.md §Conformance tiers; `make mutation` else-branch). Skip reason recorded as the mutation-score row above.
+
+## Final test status
+
+Spec-030 test suite re-executed by the Mutation Runner after the Verifier's PASS — confirms the spec-030 slice itself is green on this machine in the working tree. The repo-wide `make test` environmental caveat (8 failures from this machine's gitignored `config/agent.local.env` + direnv-loaded `JUDGMENT_*` vars) is proven environmental by the Verifier's three controlled experiments (pristine HEAD worktree with/without deliverables, sanitized env); in a CI-equivalent environment the full suite is 360/360 green. The Mutation Runner cites the Verifier's evidence rather than re-running the full repo suite in a sanitized env — the spec-030 slice under test is the Mutation Runner's gate, and it is green.
+
+command: for n in 01 02 03 04 05 06 07; do bash tests/AC-030-$n.sh; done
+exit: 0
+at: 2026-10-14T15:12:34Z
+
+```
+RESULT AC-030-01: passed=23 failed=0
+RESULT AC-030-02: passed=97 failed=0
+RESULT AC-030-03: passed=21 failed=0
+RESULT AC-030-04: passed=40 failed=0
+RESULT AC-030-05: passed=13 failed=0
+RESULT AC-030-06: passed=4 failed=0
+RESULT AC-030-07: passed=8 failed=0
+total passed=206 failed=0
+```
+
+command: bats --tap scripts/tests/ac-030-e2e-skill-agent.bats
+exit: 0
+at: 2026-10-14T15:12:34Z
+
+```
+ok 1  AC-030-01-01: ...
+...
+ok 49 AC-030-07: T7 full suite (scenarios + units) exits 0
+49 ok, 0 not ok
+```
+
+Spec-030 total: 206 bash-suite assertions + 49 bats tests = **255 spec-030 assertions, all green, exit 0.**
+
+## Gate results (carried from Verifier)
+
+| Gate | Verifier result | Exit |
+|---|---|---|
+| Scenario traceability | PASS (42/42 IDs cited and resolving) | 0 |
+| Full test suite | PASS (360/360 in CI-equivalent env; 8 machine-local environmental failures proven unrelated) | 0 |
+| Complexity | PASS (worst CC=6 ≤6; 0 violations) | 0 |
+| Design-principles | PASS (0 FAIL; 14 WARNs all pre-existing in `ci/templates/`) | 0 |
+| Scenario-to-behavior spot check | PASS (4 spot checks, all faithful) | 0 |
+| check-skills | PASS (1 pre-existing WARN in `skills/hallmark`) | 0 |
+| check-orchestration | PASS | 0 |
+| check-model-env | PASS | 0 |
+| check-bats-assertions | PASS (43 bats files, no vacuous assertions) | 0 |
+| No literal model ids / secrets / forbidden phrase in deliverables | PASS | 0 |
+
+## Remediation record
+
+Per docs/SPEC_PIPELINE.md §Remediation budget: each BLOCK is recorded with phase and attempt count at which it was resolved.
+
+- **Phase 1 (pre-PR) BLOCKs:** none. Verifier PASS at attempt 1.
+- **Phase 2 (post-PR) BLOCKs:** none. Not yet applicable (PR not opened).
+
+**Remediation: 0 BLOCKs total.** Phase-1 retries: 0. Phase-2 retries: 0. The Verifier's first full run produced a PASS verdict; no re-delegation, no re-verification rounds.
+
+## Out-of-scope findings (carried from 25-verification.md, recorded — not fixed)
+
+1. Test hermeticity: 8 repo-suite tests fail on this machine from machine-local state (`JUDGMENT_*` vars + gitignored `config/agent.local.env`); proven environmental; CI unaffected.
+2. Secret scanner echoes matched values verbatim to stdout.
+3. Secret scanner does not scan `skills/` or `tests/`.
+4. `scripts/check-model-env.sh` lacks the execute bit (mode 100644); all callers use `bash`.
+5. Refactorer-recorded SKILL.md/references duplication mandate-conflict.
+6. Traceability script's ERE truncates scenario IDs to task-level granularity.
+
+Per the Stop-and-Ask matrix: recorded, not fixed; propose follow-up specs if warranted.
+
+## PR
+
+(to be appended by the PR Opener after the draft PR opens)
+
+PR: https://github.com/RexiAI/my-engineering-standards/pull/78
+Commit count: 6
