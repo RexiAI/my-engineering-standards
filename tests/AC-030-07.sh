@@ -33,13 +33,26 @@ s_030_07_02() { run_gate "AC-030-07-02" bash scripts/check-orchestration.sh; }
 #   * CHANGELOG.md: historical release notes quoting retired pins.
 #   * scripts/sync-qwen-settings.sh: an API endpoint URL path, not a model id.
 #   * skills/hallmark/references/*.md: third-party design doc URLs.
+#   * specs/ and docs/changes/ path prefixes: the pipeline's own artifact
+#     prose, live and archived alike. Both lifecycle states quote these
+#     patterns as their job — the acceptance scenario lists them and any
+#     faithful verification report quotes them back — and SPEC_PIPELINE.md
+#     §Archive in the PR already treats specs/*/ and docs/changes/*.md as
+#     the same content in two states (the traceability scanner excludes both
+#     from its reference scan for exactly this reason). The archive commit
+#     moves the quoting prose from one prefix to the other, so excluding
+#     only the live state is the defect that tripped the 028 phase-2 round-1
+#     CI failure; this filter follows that fix's shape (option A, phase-2
+#     round-1 diagnosis in docs/changes/030-e2e-skill-agent.md). Directory
+#     prefixes carry no trailing-`:` anchor: git grep lines are `path:line:
+#     content`, so the prefix match alone scopes the whole subtree.
 # Every other tracked match is a violation; deliverable files (below) must be
 # strictly clean with no exclusions.
 # Extracted from s_030_07_03 to keep both under the ≤6 decision-point bound.
 t7_ids_clause() {
   local hits rest
   hits="$(git grep -niE "$ID_PATTERNS" -- . ':(exclude)opencode.json' 2>/dev/null || true)"
-  rest="$(printf '%s\n' "$hits" | grep -vE '^(CHANGELOG\.md|scripts/sync-qwen-settings\.sh|skills/hallmark/references/assets\.md|skills/hallmark/references/custom-craft\.md):' | grep -v '^$' || true)"
+  rest="$(printf '%s\n' "$hits" | grep -vE '^(CHANGELOG\.md|scripts/sync-qwen-settings\.sh|skills/hallmark/references/assets\.md|skills/hallmark/references/custom-craft\.md):|^specs/|^docs/changes/' | grep -v '^$' || true)"
   if [ -z "$rest" ]; then
     pass "AC-030-07-03: tracked-tree scan clean outside the documented pre-existing allow-list"
   else
