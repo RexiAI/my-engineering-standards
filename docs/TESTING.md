@@ -107,6 +107,22 @@ E2E tests run the full service in a Docker container alongside all dependencies 
 
 *Conformance tier for cadence*: `mvp` projects with no staging environment and no cross-service contracts (see docs/CONFORMANCE_TIERS.md) can run E2E on every push/PR instead of weekly — there's no separate contract-test layer to cover PR-time verification, so E2E is doing double duty. `production`+ projects with contract tests covering cross-service compatibility should keep E2E on the weekly schedule against staging and let contract tests cover every PR. See docs/CI_CD.md §Weekly E2E Pipeline for the exact trigger.
 
+### Agentic E2E (the standard for TS/Node + React Native child repos)
+
+Agentic E2E — model-acted, model-judged journeys against the real app via the
+`e2e` framework — is the standard end-to-end layer for TypeScript/Node and
+React Native child repos adopting this spec (spec 030). The full standard —
+setup, the act+expect golden rule, judge isolation, sessions/opaque secrets,
+budgets, replay cache, bug-bash bounds, CI wiring — lives in
+`skills/e2e-testing/SKILL.md` (references one level deep). The `e2e-runner`
+agent (`agents/e2e-runner.md`) operates it.
+
+Everything below in this E2E section (Dockerized-service HTTP E2E, readiness
+polling, bounded retries, the Playwright `retries:` guidance, and the Maestro
+React Native path) remains the guidance for repos not adopting `e2e` and for
+the container-level HTTP E2E layer; adopting agentic E2E adds the journey
+layer, it does not remove this one.
+
 ### React Native E2E (Maestro)
 
 React Native E2E uses [Maestro](https://maestro.mobile.dev/): YAML flows that drive the real binary on a simulator or device (`maestro test .maestro/`). Because it is emulator-dependent it is a scheduled/optional job, not a per-push gate — see docs/CI_CD.md §React Native (Expo). [Detox](https://wix.github.io/Detox/) is the upgrade path for projects that outgrow Maestro's synchronous control. See `language-specific/react-native/TESTING.md` for the RNTL vs Maestro scope split and flow skeletons.
