@@ -1,3 +1,15 @@
+# [1.34.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.33.0...v1.34.0) (2026-10-14)
+
+
+### Bug Fixes
+
+* **judgment:** alias protocol wire fields choice/noul/score into normalized answer ([#76](https://github.com/RexiAI/my-engineering-standards/issues/76)) ([8af331a](https://github.com/RexiAI/my-engineering-standards/commit/8af331af16fce7a665571873a67def0bc30985ab)), closes [#75](https://github.com/RexiAI/my-engineering-standards/issues/75) [#68](https://github.com/RexiAI/my-engineering-standards/issues/68)
+
+
+### Features
+
+* **spec 030:** agentic E2E standard (e2e-testing skill + e2e-runner agent) ([#78](https://github.com/RexiAI/my-engineering-standards/issues/78)) ([b320843](https://github.com/RexiAI/my-engineering-standards/commit/b320843f993908699e7f1660ea1b8e0701581618))
+
 # [1.33.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.32.0...v1.33.0) (2026-10-13)
 
 
