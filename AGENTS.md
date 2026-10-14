@@ -42,6 +42,7 @@ This project structure supports Java, Go, JavaScript/TypeScript, and React Nativ
 - Read `docs/SAGA_PATTERN.md` and `docs/OUTBOX_PATTERN.md` before designing cross-service workflows.
 - Read `docs/SCHEMA_EVOLUTION.md` before designing data models or APIs.
 - Read `docs/CONTRACT_TESTING.md` before writing service integration tests.
+- Read `skills/e2e-testing/SKILL.md` before writing or running E2E tests in a TS/Node or RN child repo — agentic E2E is the standard for that stack (docs/TESTING.md §Agentic E2E).
 - Read `docs/SPEC_PIPELINE.md` before running `/spec` or `/build`, or before writing an informal spec under `specs/`.
 - Read `docs/LOOP_ENGINEERING.md` before designing or running a loop (an automated agent cycle with durable state).
 - Read `docs/AGENTS_AND_SKILLS.md` before creating or modifying any agent in `agents/` or skill in `skills/`/`language-specific/`.
