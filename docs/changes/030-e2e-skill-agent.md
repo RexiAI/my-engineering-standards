@@ -1122,3 +1122,293 @@ Per the Stop-and-Ask matrix: recorded, not fixed; propose follow-up specs if war
 
 PR: https://github.com/RexiAI/my-engineering-standards/pull/78
 Commit count: 6
+
+---
+
+# Post-PR CI check (phase 2) — round 1 of max 3
+
+Date: 2026-10-14. Verifier run: **attempt 2, phase 2, round 1** (phase-2 counter
+independent of phase 1 per docs/SPEC_PIPELINE.md §Post-PR CI check-and-remediate
+loop; phase 1 closed at attempt 1 PASS with zero BLOCKs). PR #78 (draft),
+https://github.com/RexiAI/my-engineering-standards/pull/78, branch
+`spec/030-e2e-skill-agent`, head `7cad7ff2693ebd03dd5aa626ee50ed17137b0e7f`.
+Local HEAD parity confirmed: `git rev-parse HEAD` = the PR `headRefOid` =
+`7cad7ff2693ebd03dd5aa626ee50ed17137b0e7f`; working tree clean except
+`M runs.jsonl` (the uncommitted telemetry appends — phase-1 record and, from
+this run, the phase-2 round-1 record), so the local reproduction below ran on
+the exact tree CI saw.
+
+Spec folder is archived (stage 5b) and no longer exists on the branch, so per
+the orchestrator's archived-spec instruction this phase-2 record is appended to
+this one-pager instead of `specs/030-e2e-skill-agent/25-verification.md`
+(deleted at 5b; its content lives on inside this file). Written without
+committing; the PR Opener handles pushes.
+
+## Round-1 verdict: **FAIL** — Self CI failed on both events; fix round 1 of max 3 opens
+
+Check suite (all three checks were already terminal at the first status query
+~15:27Z — CI finished 15:20Z per log timestamps; no check was ever observed
+`pending`, and none was ruled on as such):
+
+| Check | Workflow | Event | Bucket | Run / check id |
+|---|---|---|---|---|
+| Review PR / Review PR | PR Review Agent | pull_request | **pass** | run 38588085531, check id 115935800469 |
+| Validate | Self CI | pull_request | **fail** | run 38588085482, check id **115935348556** |
+| Validate | Self CI | push | **fail** | run 38588079961, check id **115935330909** |
+
+Both Validate runs failed in the same step (`Run shell gate bats tests
+(spec 001 Track B)` — `make test-scripts`) with the **same two not-ok tests**
+out of TAP plan `1..360`: **358 ok / 2 not ok** — `not ok 54 AC-030-07-03` and
+its cascade `not ok 61 AC-030-07` (the T7 full-suite entry point fails because
+scenario 07-03 inside it fails). Failing lines (verbatim from the
+pull_request-event CI log):
+
+```
+not ok 54 AC-030-07-03: check-model-env.sh exits 0 and holistic hygiene holds
+# (from function `run_scenario' in file scripts/tests/ac-030-e2e-skill-agent.bats, line 22,
+#  in test file scripts/tests/ac-030-e2e-skill-agent.bats, line 213)
+#   `run_scenario 07 AC-030-07-03' failed
+not ok 61 AC-030-07: T7 full suite (scenarios + units) exits 0
+# (from function `run_task_suite' in file scripts/tests/ac-030-e2e-skill-agent.bats, line 30,
+#  in test file scripts/tests/ac-030-e2e-skill-agent.bats, line 243)
+#   `run_task_suite 07' failed
+make: *** [Makefile:115: test-scripts] Error 1
+##[error]Process completed with exit code 2.
+```
+
+## Evidence: post-PR CI check (phase 2, round 1)
+
+command: gh pr checks 78 --repo RexiAI/my-engineering-standards --json name,state,bucket,workflow,link
+exit: 0
+at: 2026-10-14T15:32:37Z
+
+```
+[{"bucket":"pass","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/38588085531/job/115935800469","name":"Review PR / Review PR","state":"SUCCESS","workflow":"PR Review Agent"},{"bucket":"fail","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/38588085482/job/115935348556","name":"Validate","state":"FAILURE","workflow":"Self CI"},{"bucket":"fail","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/38588079961/job/115935330909","name":"Validate","state":"FAILURE","workflow":"Self CI"}]
+```
+
+command: gh api repos/RexiAI/my-engineering-standards/commits/7cad7ff2693ebd03dd5aa626ee50ed17137b0e7f/check-runs --jq '.check_runs[] | select(.conclusion=="failure") | {id, name, conclusion, html_url}'
+exit: 0
+at: 2026-10-14T15:32:40Z
+
+```
+{"conclusion":"failure","html_url":"https://github.com/RexiAI/my-engineering-standards/actions/runs/38588085482/job/115935348556","id":115935348556,"name":"Validate"}
+{"conclusion":"failure","html_url":"https://github.com/RexiAI/my-engineering-standards/actions/runs/38588079961/job/115935330909","id":115935330909,"name":"Validate"}
+```
+
+command: gh run list --repo RexiAI/my-engineering-standards --branch spec/030-e2e-skill-agent --workflow "Self CI" --json databaseId,event,status,conclusion,headSha,url --jq '.[] | select(.headSha=="7cad7ff2693ebd03dd5aa626ee50ed17137b0e7f")'
+exit: 0
+at: 2026-10-14T15:32:43Z
+
+```
+{"conclusion":"failure","databaseId":38588085482,"event":"pull_request","headSha":"7cad7ff2693ebd03dd5aa626ee50ed17137b0e7f","status":"completed","url":"https://github.com/RexiAI/my-engineering-standards/actions/runs/38588085482"}
+{"conclusion":"failure","databaseId":38588079961,"event":"push","headSha":"7cad7ff2693ebd03dd5aa626ee50ed17137b0e7f","status":"completed","url":"https://github.com/RexiAI/my-engineering-standards/actions/runs/38588079961"}
+```
+
+command: gh run view 38588085482 --log-failed 2>&1 | grep -E "not ok 54|not ok 61|1\.\.360|Makefile:115|exit code 2" | grep -v "fails the target"
+exit: 0
+at: 2026-10-14T15:32:48Z
+
+```
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-14T15:19:21.7356743Z 1..360
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-14T15:19:27.5066857Z not ok 54 AC-030-07-03: check-model-env.sh exits 0 and holistic hygiene holds
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-14T15:19:32.9303569Z not ok 61 AC-030-07: T7 full suite (scenarios + units) exits 0
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-14T15:20:38.7880858Z make: *** [Makefile:115: test-scripts] Error 1
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-14T15:20:38.7893199Z ##[error]Process completed with exit code 2.
+```
+
+command: gh run view 38588079961 --log-failed 2>&1 | grep -E "not ok [0-9]+ AC-030|Makefile:115|exit code 2"
+exit: 0
+at: 2026-10-14T15:32:51Z
+
+```
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-14T15:19:28.1419676Z not ok 54 AC-030-07-03: check-model-env.sh exits 0 and holistic hygiene holds
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-14T15:19:31.7512423Z not ok 61 AC-030-07: T7 full suite (scenarios + units) exits 0
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-14T15:20:44.2499085Z make: *** [Makefile:115: test-scripts] Error 1
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-10-14T15:20:44.2506464Z ##[error]Process completed with exit code 2.
+```
+
+The push-event run fails identically: same two tests, same step, same exit.
+
+## Evidence: local reproduction on the pushed tree
+
+command: bats --tap --filter "AC-030-07" scripts/tests/ac-030-e2e-skill-agent.bats
+exit: 1
+at: 2026-10-14T15:31:48Z
+
+```
+1..4
+ok 1 AC-030-07-01: check-skills.sh exits 0
+ok 2 AC-030-07-02: check-orchestration.sh exits 0
+not ok 3 AC-030-07-03: check-model-env.sh exits 0 and holistic hygiene holds
+# (from function `run_scenario' in file scripts/tests/ac-030-e2e-skill-agent.bats, line 22,
+#  in test file scripts/tests/ac-030-e2e-skill-agent.bats, line 213)
+#   `run_scenario 07 AC-030-07-03' failed
+not ok 4 AC-030-07: T7 full suite (scenarios + units) exits 0
+# (from function `run_task_suite' in file scripts/tests/ac-030-e2e-skill-agent.bats, line 30,
+#  in test file scripts/tests/ac-030-e2e-skill-agent.bats, line 243)
+#   `run_task_suite 07' failed
+```
+
+command: bash tests/AC-030-07.sh   (full suite; FAIL/RESULT lines shown)
+exit: 1
+at: 2026-10-14T15:34:34Z
+
+```
+FAIL AC-030-07-03: unexpected literal model/provider id matches: docs/changes/030-e2e-skill-agent.md:715:any tracked file (full-repo grep for `gpt-|claude-|gemini-|openai/|anthropic/|google/|mistral/`,
+RESULT AC-030-07: passed=7 failed=1
+```
+
+command: git grep -niE 'gpt-|claude-|gemini-|openai/|anthropic/|google/|mistral/' -- docs/changes/030-e2e-skill-agent.md; git rev-parse HEAD; git status --porcelain
+exit: 0
+at: 2026-10-14T15:33:07Z
+
+```
+docs/changes/030-e2e-skill-agent.md:715:any tracked file (full-repo grep for `gpt-|claude-|gemini-|openai/|anthropic/|google/|mistral/`,
+docs/changes/030-e2e-skill-agent.md:741:provider-region-hits=1 total-in-file  → line 20: "baseURL": "https://token-plan.ap-southeast-1.maas.aliyuncs.com/apps/anthropic/v1"
+docs/changes/030-e2e-skill-agent.md:745:sync-qwen-settings.sh:48 = an API endpoint URL path (`/apps/anthropic/v1`
+docs/changes/030-e2e-skill-agent.md:747:`ai.google.dev/gemini-api` doc URLs; opencode.json = the single provider-block
+7cad7ff2693ebd03dd5aa626ee50ed17137b0e7f
+ M runs.jsonl
+```
+
+This is a genuine tree defect, **not** a local-env artifact: it reproduces on
+the exact pushed HEAD (parity above) and in CI on both events. All other
+clause-A/B checks inside AC-030-07-03 pass (check-model-env exit 0,
+opencode.json clean outside the provider block, no forbidden re-run phrasing,
+deliverables id-clean, secrets scan clean).
+
+## Evidence: archive provenance of the offending lines
+
+command: git show 7cad7ff -M --stat | grep -E "changes/030|files changed"; git ls-tree 7cad7ff -r --name-only specs/ | wc -l; wc -l < docs/changes/030-e2e-skill-agent.md
+exit: 0
+at: 2026-10-14T15:36:16Z
+
+```
+ .../changes/030-e2e-skill-agent.md                 | 509 +++++++++++++++++++++
+ 11 files changed, 509 insertions(+), 756 deletions(-)
+0
+1124
+```
+
+Archive-commit arithmetic: git rename-detected
+`specs/030-e2e-skill-agent/25-verification.md` (615 lines at `57807e8`,
+deleted at `7cad7ff` per `git log --diff-filter=D`) into
+`docs/changes/030-e2e-skill-agent.md` — 615 + 509 insertions = the 1124-line
+one-pager; the other 10 spec files were deleted outright (756 lines). `specs/`
+holds 0 files at head.
+
+command: git grep -niE 'gpt-|claude-|gemini-|openai/|anthropic/|google/|mistral/' 57807e8 -- specs/030-e2e-skill-agent/25-verification.md | cut -c1-160
+exit: 0
+at: 2026-10-14T15:36:53Z
+
+```
+57807e8:specs/030-e2e-skill-agent/25-verification.md:307:any tracked file (full-repo grep for `gpt-|claude-|gemini-|openai/|anthropic/|google/|mistral/`,
+57807e8:specs/030-e2e-skill-agent/25-verification.md:333:provider-region-hits=1 total-in-file  → line 20: "baseURL": "https://token-plan.ap-southeast-1.maas.a
+57807e8:specs/030-e2e-skill-agent/25-verification.md:337:sync-qwen-settings.sh:48 = an API endpoint URL path (`/apps/anthropic/v1`
+57807e8:specs/030-e2e-skill-agent/25-verification.md:339:`ai.google.dev/gemini-api` doc URLs; opencode.json = the single provider-block
+```
+
+The 4 offending one-pager lines (715/741/745/747) are exactly the phase-1
+verification-report prose (pre-archive lines 307/333/337/339): line 715 quotes
+the grep pattern itself (and therefore self-matches); lines 741/745/747
+describe the pre-existing allow-listed hits they were adjudicating.
+
+## Diagnosis (root cause, verified)
+
+AC-030-07-03 clause A (`t7_ids_clause`, `tests/AC-030-07.sh`) scans **every
+tracked file** for the literal id patterns, minus a 4-entry file allow-list
+(`CHANGELOG.md`, `scripts/sync-qwen-settings.sh`,
+`skills/hallmark/references/assets.md`,
+`skills/hallmark/references/custom-craft.md`) and the opencode.json
+provider-region carve-out. It never excludes the pipeline's own artifact prose
+in either lifecycle state — `specs/` (live) or `docs/changes/` (archived) —
+yet that prose **must** quote the patterns: the acceptance scenario itself
+(pre-archive `20-acceptance/AC-030-07.md:17`) lists them, and any faithful
+verification report quotes them back. The test is therefore self-inconsistent
+against any tree where its own spec has been committed and archived: it cannot
+pass at the very head its pipeline produces.
+
+Why phase 1 passed: `git grep` is tracked-files-only (a caveat the phase-1
+report itself recorded as an out-of-scope finding). During phase 1 every
+pipeline doc was untracked — all six branch commits were authored at stage 5b
+(15:16–15:17Z per commit dates), after the phase-1 evidence timestamps
+(~15:00Z) — so clause A never saw the quoting prose. At the tracked
+pre-archive states (`ad1b2f8..57807e8`) clause A would flag 8 hits across 4
+files under `specs/030-e2e-skill-agent/`; at head `7cad7ff` the spec folder is
+gone and the same prose sits in the tracked one-pager → 4 hits → the CI
+failure. The defect was **latent from authoring and triggered by the archive
+commit itself** — the first failing CI run is on `7cad7ff`, the PR head.
+
+Failure class identical to spec 028's phase-2 round 1 (AC-028-48: archive
+one-pager tripped a scan whose exclusion missed the post-5b location).
+Corroborating design precedent: docs/SPEC_PIPELINE.md already treats `specs/*/`
+(live) and `docs/changes/*.md` (archived) as the same content in two lifecycle
+states, excluding **both** from the traceability reference scan ("Both
+directories are ID *sources* only — each is excluded from the reference scan,
+because scenario markdown and archive one-pagers quote IDs (including
+illustrative ones) in prose"). Clause A's allow-list predates the archive and
+misses both states.
+
+## Routing recommendation: **Coder (behavior)**
+
+Not a Refactorer matter — no complexity/duplication/structure issue; the
+defect is wrong scan-scope behavior in a test clause against the
+post-commit/post-archive tree. Recommended fix (option A): extend the clause-A
+filter in `t7_ids_clause` (`tests/AC-030-07.sh`) to exclude pipeline-artifact
+prose in both lifecycle states — add `specs/` and `docs/changes/` path-prefix
+alternatives to the `grep -vE` allow-list, e.g.
+`^(CHANGELOG\.md|scripts/sync-qwen-settings\.sh|skills/hallmark/references/assets\.md|skills/hallmark/references/custom-craft\.md):|^specs/|^docs/changes/`
+(directory prefixes must not carry the trailing-`:` anchor the file entries
+use), with the lifecycle-equivalence rationale in the clause comment — the
+same shape as 028's fix (`^(okf|config|specs|docs/changes)/`). This is not
+"fix the threshold": the scenario's intent (no literal ids in the repo's live
+surface) is preserved — all 13 deliverable files stay strictly clean under
+`u_030_07_deliverables_clean` (no exclusions), clause B's phrasing scan is
+untouched, and one fix covers both not-ok lines (61 cascades from 54 via
+`run_task_suite 07`).
+
+Alternative (option B, rejected as primary): sanitize the literal ids in the
+one-pager. Conflicts with the archive's verbatim-copy property
+(check-scenario-traceability.sh check 2 resolves IDs against the one-pager as
+the post-archive authority; redacting archived prose weakens that source), and
+it cannot fix the self-quoting problem for future specs.
+
+After the fix: PR Opener commits + pushes (re-triggering CI), then scoped
+re-check — **round 2 re-verifies only the previously-failing checks** (the two
+Self CI `Validate` runs at the new head; specifically `ok 54`/`ok 61` and
+`make test-scripts` green), not the whole suite, per §Scoped re-verification
+and the 028 round-2 precedent.
+
+## Round-1 telemetry
+
+Appended via `bash scripts/record-gate-run.sh` with
+`SPEC_LOOP_COUNT=2 SPEC_PHASE1_RETRIES=0 SPEC_PHASE2_RETRIES=0` exported in the
+invoking shell (subagent shells do not inherit the orchestrator environment).
+`gatesFailed` ["test-suite"] (the CI failure is the bats suite gate inside Self
+CI's Validate job — same mapping as 028 phase 2), `outcome` fail,
+`durationSec` approximate (session start ~15:25Z of untimestamped opening
+queries through the record at 15:38Z). Recorded on branch
+`spec/030-e2e-skill-agent`, not committed.
+
+Telemetry line (appended to `runs.jsonl`, verbatim):
+
+command: SPEC_LOOP_COUNT=2 SPEC_PHASE1_RETRIES=0 SPEC_PHASE2_RETRIES=0 bash scripts/record-gate-run.sh -record '<json>'
+exit: 0
+at: 2026-10-14T15:38:04Z
+
+```json
+{"specSlug":"030-e2e-skill-agent","gatesFailed":["test-suite"],"warnings":["phase2-round1: Self CI Validate failed on both events at head 7cad7ff (run 38588085482 check 115935348556 pull_request; run 38588079961 check 115935330909 push) - not ok 54 AC-030-07-03 + not ok 61 AC-030-07 (cascade from the same scenario) of plan 1..360 (358 ok / 2 not ok); t7_ids_clause tracked-tree id scan flags the archived one-pager docs/changes/030-e2e-skill-agent.md lines 715/741/745/747 = phase-1 verification prose quoting the id patterns verbatim and describing pre-existing allow-listed hits; the allow-list covers 4 pre-existing files but not docs/changes/ or specs/ - latent since authoring (pipeline docs were untracked during phase 1 and git grep is tracked-only - caveat recorded in the phase-1 report), triggered by archive commit 7cad7ff which is the PR head; reproduced locally exit 1 on parity HEAD; routed to Coder (option A: extend the t7_ids_clause filter with specs/ and docs/changes/ path prefixes, per the 028 phase-2 round-1 precedent fix)","PR Review Agent check passed; only Self CI failed","runs.jsonl carries the uncommitted phase-1 telemetry append (+1 line) per orchestrator instruction; this phase-2 record is a second uncommitted append; both are clause-A clean (no literal provider ids)","durationSec approximate: session start ~15:25Z (untimestamped opening queries) through record time"],"durationSec":784,"outcome":"fail","runId":"f3830fc9-b2ea-4d54-8bb0-239d5c73a567","loopCount":2,"phase1Retries":0,"phase2Retries":0}
+```
+
+Script output: `record-gate-run: appended record to
+/home/dbueno/projects/my-engineering-standards/runs.jsonl` (runId
+`f3830fc9-b2ea-4d54-8bb0-239d5c73a567` generated by the script; loopCount 2 /
+phase1Retries 0 / phase2Retries 0 taken from the exported env — verified in the
+appended line.) Both uncommitted `runs.jsonl` appends are clause-A clean (no
+literal provider ids), so committing them cannot re-trip the scan.
+
+## Round summary (phase 2)
+
+| Round | Head | Result | Failing checks | Disposition |
+|---|---|---|---|---|
+| 1 | 7cad7ff | **FAIL** | Validate 115935348556 (pull_request, run 38588085482), Validate 115935330909 (push, run 38588079961) — not ok 54 AC-030-07-03 + not ok 61 AC-030-07 | Route to Coder (option A above); fix round 1 of max 3 opens |
