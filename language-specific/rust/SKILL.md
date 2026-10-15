@@ -115,15 +115,33 @@ reuse, not preemptively (YAGNI — docs/CODING_CONVENTIONS.md §Design Principle
   tabs, 4-space indentation, 100-char max line width, block indent over visual
   indent, trailing commas in multi-line lists. **[official]**
   <https://doc.rust-lang.org/stable/style-guide/index.html>. Do not fight the
-  formatter; no per-repo `rustfmt.toml` forks without a documented reason.
-- **Clippy** is the lint gate: `cargo clippy --all-targets -- -D warnings` must
-  be clean in CI. Lint categories and default levels (correctness = deny;
-  suspicious/style/complexity/perf = warn; pedantic/restriction/nursery/cargo =
-  allow) are documented at
+  formatter. The one sanctioned `rustfmt.toml` setting is
+  `style_edition = "2024"`, which pins formatting to the Edition 2024 style
+  instead of the toolchain default **[official]**
+  <https://doc.rust-lang.org/edition-guide/rust-2024/rustfmt-style-edition.html>.
+  Any other per-repo `rustfmt.toml` fork needs a documented reason.
+- **Clippy** is the lint gate: `cargo clippy --all-targets --all-features
+  -- -D warnings` must be clean in CI. `--all-features` matters — a feature
+  combination that is never compiled is never linted. Lint categories and
+  default levels (correctness = deny; suspicious/style/complexity/perf = warn;
+  pedantic/restriction/nursery/cargo = allow) are documented at
   <https://doc.rust-lang.org/stable/clippy/index.html>. **[official]**
 - Enable the `restriction` lints that encode this repo's always-rules in each
   crate root or `clippy.toml`: `clippy::unwrap_used`, `clippy::expect_used`
   (allow-listed in `#[cfg(test)]` code), `clippy::todo`. **[convention]**
+- **Supply chain**: `cargo deny check` for licence, ban, advisory and sources
+  policy, plus `cargo audit` against the RustSec DB. cargo-deny "lets you lint
+  your project's dependency graph to ensure all your dependencies conform to
+  your expectations and requirements" **[ecosystem]**
+  <https://embarkstudios.github.io/cargo-deny/>, with a maintained Action
+  (`EmbarkStudios/cargo-deny-action@v1`). Neither is part of the Rust
+  toolchain — both are third-party subcommands that must be installed, and CI
+  must fail if they are missing rather than skip silently.
+- **Reproducible CI**: build and test with `--locked` (`cargo build --locked`,
+  `cargo test --locked`) so CI fails when `Cargo.lock` would change instead of
+  quietly resolving newer versions. `--locked` is a documented Cargo flag
+  **[official]** <https://doc.rust-lang.org/stable/cargo/index.html>, and is
+  the form rust-lang uses in its own CI guidance.
 - **Complexity gate**: the repo-wide rule is cyclomatic complexity ≤6 per
   function (docs/CODING_CONVENTIONS.md §Design Principles). Java enforces it
   with PMD, Go with golangci `cyclop`/`gocognit`. **Rust has no official

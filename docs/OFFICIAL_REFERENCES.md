@@ -231,7 +231,9 @@ note these now **redirect** to `pydantic.dev/docs/validation/latest/...`.
 [`mypy.readthedocs.io/en/stable/`](https://mypy.readthedocs.io/en/stable/) ·
 [`docs.python.org/3/`](https://docs.python.org/3/) (+ `/3/library/contextvars.html`, `/3/library/logging.html`) ·
 [`www.python-httpx.org/`](https://www.python-httpx.org/) (+ `/advanced/transports/`) ·
-[`starlette.dev/testclient/`](https://starlette.dev/testclient/)
+[`starlette.dev/testclient/`](https://starlette.dev/testclient/) ·
+[`bandit.readthedocs.io/en/latest/`](https://bandit.readthedocs.io/en/latest/) (PyCQA SAST, Apache-2.0, v1.9.4 line) ·
+[`mutmut.readthedocs.io/en/latest/`](https://mutmut.readthedocs.io/en/latest/) (Python mutation tester; POSIX/fork-only, mutmut 3+ mutates only inside functions)
 
 Ecosystem (linked from fetched pages, not fetched directly):
 [`alembic.sqlalchemy.org/en/latest/`](https://alembic.sqlalchemy.org/en/latest/) ·
@@ -277,7 +279,16 @@ guide): [`tokio.rs`](https://tokio.rs/) ·
 [`docs.rs/thiserror`](https://docs.rs/thiserror/latest/thiserror/) ·
 [`docs.rs/anyhow`](https://docs.rs/anyhow/latest/anyhow/) ·
 [`rustsec.org`](https://rustsec.org/) (source of `cargo-audit`, confirming it is
-third-party rather than built in)
+third-party rather than built in) ·
+[`embarkstudios.github.io/cargo-deny/`](https://embarkstudios.github.io/cargo-deny/)
+(dependency-graph linting for licence/ban/advisory/sources policy; ships
+`EmbarkStudios/cargo-deny-action@v1`)
+
+Rust formatting/toolchain facts verified against `rust-lang` upstream:
+[`rustfmt` style editions](https://doc.rust-lang.org/edition-guide/rust-2024/rustfmt-style-edition.html)
+(`style_edition = "2024"`) and
+[`rust-lang/rustfmt` CI guidance](https://github.com/rust-lang/rustfmt)
+(`cargo build --locked`, `cargo test --locked`, `cargo fmt --all -- --check`).
 
 ---
 
@@ -335,6 +346,27 @@ Recorded here because they are the reason a guide says what it says.
   (line 69). A FastAPI or Rust service containing saga/outbox code therefore
   leaves `SAGA_DETECTED`/`OUTBOX_DETECTED` false, and every downstream gate
   silently skips. This is a coverage hole, not a passing gate.
+- **Extending that detection alone would break Python/Rust repos.** All four
+  downstream gates are hardcoded to Java/Go/Node: `check-saga-timeouts.sh`
+  matches `WithTimeout`/`.go`, `check-saga-tests.sh` matches `.go|.ts|.java`,
+  and `lint-outbox-schema.sh` plus `check-outbox-relay.sh` match
+  `.java|.go|.js|.ts`. Setting `SAGA_DETECTED=true` for a Python service would
+  run gates looking for patterns Python cannot express, producing false
+  failures. **Detection and the four gates must be extended together**, under an
+  ADR — not piecemeal.
+- **`ci/gitlab/frontend/ci-angular.yml` already existed** and is deliberately
+  runner-agnostic (`.angular-unit` runs `npm run test:ci --if-present || npm
+  test`), so it needs no change for Angular's Vitest default — the child repo
+  wires `test:ci`. There is no `child-ci-angular.yml`, and no Python, Rust or
+  Ionic CI template of any kind.
+- **`scripts/check-code-principles.sh` exits clean when it scans nothing.**
+  Lines 307–309 enumerate only `*.java`, `*.go` and `*.ts`/`*.tsx`/`*.js`/`*.jsx`;
+  line 311 then calls `finish_clean` with "No Java, Go, or JS/TS source files
+  found — nothing to check". A Python-only or Rust-only repo therefore passes
+  the design-principles gate without being analysed. Note `finish_clean` is a
+  *shared* helper (`scripts/check-common.sh`) used by several gates and covered
+  by `scripts/tests/check-common.bats`, so the fix belongs in the caller, not
+  the helper.
 - **`cargo-audit` and `cargo-mutants` are third-party subcommands**, not built
   into Cargo. `cargo-mutants` could not be verified against a canonical source
   and is flagged evaluate-first in `language-specific/rust/TESTING.md`.

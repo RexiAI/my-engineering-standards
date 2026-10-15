@@ -152,3 +152,14 @@ file, tests next to the code under test.
 Child repos opt in by adding `language-specific/angular/SKILL.md` to
 their `opencode.json` `instructions` array, alongside any other
 language-specific guides they use.
+
+**CI already exists — do not write a new one.** `ci/gitlab/frontend/ci-angular.yml`
+ships `.angular-unit`, `.angular-lint`, `.angular-build` and `.angular-docker`
+on Node 22 with `npm ci`. It is deliberately runner-agnostic: `.angular-unit`
+runs `npm run test:ci --if-present || npm test`. Satisfy the Vitest mandate
+above by wiring the child repo's `test:ci` script to
+`ng test --no-watch --no-progress` — `ng test` auto-detects `CI=true` and drops
+into single-run mode, and the explicit flags are the documented fallback
+(https://angular.dev/guide/testing). Include the file from the child's
+`.gitlab-ci.yml` and extend the hidden jobs; there is no `child-ci-angular.yml`
+template yet.

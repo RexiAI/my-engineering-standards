@@ -143,6 +143,26 @@ awesome-project/
   and its `max-complexity` setting are documented at
   <https://docs.astral.sh/ruff/settings/>), `[tool.mypy] strict = true`,
   `[tool.pytest.ini_options] testpaths = ["tests"]`.
+- **bandit** for SAST — "a tool designed to find common security issues in
+  Python code… processes each file, builds an AST from it, and runs
+  appropriate plugins against the AST nodes" **[official]**
+  <https://bandit.readthedocs.io/en/latest/> (PyCQA, Apache-2.0, has a
+  dedicated CI/CD section). Run `bandit -r src/` in CI. `docs/SECURITY.md` is
+  the rule source; bandit is the mechanical check. **[convention]**
+- **mutmut** for mutation testing at the `production` conformance tier
+  (`../../docs/CONFORMANCE_TIERS.md`) — "a mutation testing system for Python"
+  **[official]** <https://mutmut.readthedocs.io/en/latest/>: `mutmut run`,
+  review survivors with `mutmut browse`, emit CI stats with
+  `mutmut export-cicd-stats`; configure `[tool.mutmut] source_paths = ["src/"]`.
+  Two constraints that matter in CI: it **requires fork support** (POSIX only —
+  Windows needs WSL), and mutmut 3+ mutates only code *inside functions*
+  (mutmut 2 has a different execution model). **[official]**
+  A mutation gate **must fail when zero mutants were scored** — a score computed
+  over nothing is a false pass. That is the same defect class as
+  `scripts/check-code-principles.sh` exiting clean when it scans no files (see
+  `../../docs/OFFICIAL_REFERENCES.md` §Findings). **[convention]**
+  No Python mutation CI template exists in `ci/templates/` yet; adding one is a
+  gate-catalog change requiring an ADR.
 
 ## Typing
 
