@@ -2,7 +2,7 @@
 
 Testing guide for the React Native stack. The layered test strategy
 (unit / integration / component / E2E) and what each layer proves is
-defined in the root [`docs/TESTING.md`](../../../docs/TESTING.md) and
+defined in the root [`docs/TESTING.md`](../../docs/TESTING.md) and
 inherited here — this file covers the *tools* and *what's mockable*.
 
 ## Frameworks
@@ -136,6 +136,6 @@ with `maestro test .maestro/`.
 
 ## Further Reading
 
-- Layer definitions: [`docs/TESTING.md`](../../../docs/TESTING.md)
+- Layer definitions: [`docs/TESTING.md`](../../docs/TESTING.md)
 - React Native Testing Library docs: https://callstack.github.io/react-native-testing-library/
 - Maestro docs: https://maestro.mobile.dev/
