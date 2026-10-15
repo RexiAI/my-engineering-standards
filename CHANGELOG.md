@@ -1,3 +1,17 @@
+# [1.35.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.34.1...v1.35.0) (2026-10-15)
+
+
+### Features
+
+* **standards:** add Angular, Ionic, Python/FastAPI and Rust stack guides ([#80](https://github.com/RexiAI/my-engineering-standards/issues/80)) ([30bec2d](https://github.com/RexiAI/my-engineering-standards/commit/30bec2d3c1008ff4ed004f73fa8bab4ea20a327c))
+
+## [1.34.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.34.0...v1.34.1) (2026-10-15)
+
+
+### Bug Fixes
+
+* **ci,bootstrap:** caller permissions block + submodule-less-checkout-safe bootstrap ([#79](https://github.com/RexiAI/my-engineering-standards/issues/79)) ([5a32144](https://github.com/RexiAI/my-engineering-standards/commit/5a32144887887aaa862287606cec23761dd0e4ac))
+
 # [1.34.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.33.0...v1.34.0) (2026-10-14)
 
 

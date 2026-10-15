@@ -221,6 +221,10 @@ kamal setup
 #### CI/CD Pipeline Composition
 
 ```yaml
+permissions:
+  contents: read
+  packages: write   # backend-ci pushes the image to GHCR; the deploy job pulls it
+
 jobs:
   backend-ci:
     uses: RexiAI/my-engineering-standards/.github/workflows/ci-go.yml@<commit-sha>  # pinned — see docs/SECURITY.md §CI/CD Supply Chain
@@ -340,6 +344,10 @@ ssh root@<VPS_IP> "dokku letsencrypt:enable my-api"
 #### CI/CD Pipeline Composition
 
 ```yaml
+permissions:
+  contents: read
+  packages: write   # backend-ci pushes the image to GHCR; the deploy job pulls it
+
 jobs:
   backend-ci:
     uses: RexiAI/my-engineering-standards/.github/workflows/ci-go.yml@<commit-sha>  # pinned — see docs/SECURITY.md §CI/CD Supply Chain
@@ -443,6 +451,10 @@ ssh root@<VM_IP> \
 #### CI/CD Pipeline Composition
 
 ```yaml
+permissions:
+  contents: read
+  packages: write   # backend-ci pushes the image to GHCR; the deploy job pulls it
+
 jobs:
   backend-ci:
     uses: RexiAI/my-engineering-standards/.github/workflows/ci-go.yml@<commit-sha>  # pinned — see docs/SECURITY.md §CI/CD Supply Chain
