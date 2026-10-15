@@ -1,3 +1,10 @@
+## [1.35.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.35.0...v1.35.1) (2026-10-15)
+
+
+### Bug Fixes
+
+* **security:** skip gitignored paths in the hardcoded-secrets scan ([#82](https://github.com/RexiAI/my-engineering-standards/issues/82)) ([b4a91a2](https://github.com/RexiAI/my-engineering-standards/commit/b4a91a296a0471b8c26f6373665fc08945601e0f))
+
 # [1.35.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.34.1...v1.35.0) (2026-10-15)
 
 
