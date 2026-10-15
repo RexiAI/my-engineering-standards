@@ -2,8 +2,10 @@
 # check-outbox-relay.sh — Verify outbox relay component and consumer deduplication exist.
 #
 # Checks:
-#   1. Relay component exists (polling @Scheduled / Debezium config / Go ticker / Node cron)
+#   1. Relay component exists (polling @Scheduled / Debezium config / Go ticker /
+#      Node cron / Python polling relay / Rust tokio-interval relay)
 #   2. Consumer deduplication logic exists in event handler code
+#      (Java/Go/Node dedupStore.alreadyProcessed + Python/Rust snake_case equivalents)
 #
 # Usage:
 #   .standards/scripts/check-outbox-relay.sh [SOURCE_DIR]
@@ -67,6 +69,22 @@ NODE_RELAY=$(grep -r 'OutboxRelay\|outboxRelay\|publishPending\|publishOutbox' \
   --include="*.ts" --include="*.js" $GREP_EXCLUDES "$SOURCE_DIR" 2>/dev/null || true)
 [ -n "$NODE_RELAY" ] && RELAY_FOUND=true
 
+# Python (ADR 0006 D3): OutboxRelay/outbox_relay class or a publish_pending/
+#   publish_outbox polling entry point. HOUSE CONVENTION — docs/OUTBOX_PATTERN.md
+#   §Outbox Relay describes the relay's job (poll unpublished rows, publish,
+#   mark published) with a Java example; it names no Python API. These tokens
+#   mirror the Node publishPending/publishOutbox idiom in snake_case.
+PY_RELAY=$(grep -r 'OutboxRelay\|outbox_relay\|OutboxPublisher\|outbox_publisher\|publish_pending\|publish_outbox' \
+  --include="*.py" $GREP_EXCLUDES "$SOURCE_DIR" 2>/dev/null || true)
+[ -n "$PY_RELAY" ] && RELAY_FOUND=true
+
+# Rust (ADR 0006 D3): OutboxRelay/outbox_relay or a publish_pending/publish_outbox
+#   polling fn (typically driven by a tokio::time::interval). HOUSE CONVENTION —
+#   same rationale as Python; docs mandate the relay's behaviour, not a Rust name.
+RS_RELAY=$(grep -r 'OutboxRelay\|outbox_relay\|OutboxPublisher\|outbox_publisher\|publish_pending\|publish_outbox' \
+  --include="*.rs" $GREP_EXCLUDES "$SOURCE_DIR" 2>/dev/null || true)
+[ -n "$RS_RELAY" ] && RELAY_FOUND=true
+
 # Debezium or CDC connector config
 CDC_CONFIG=$(find "$SOURCE_DIR" \
   -name 'debezium*.json' -o -name 'debezium*.yml' -o \
@@ -78,7 +96,8 @@ if $RELAY_FOUND; then
 else
   fail "No outbox relay component detected. " \
        "A relay is required to publish events from the outbox table to the broker. " \
-       "Implement *OutboxRelay with @Scheduled (Java), a ticker (Go), or a cron job (Node). " \
+       "Implement *OutboxRelay with @Scheduled (Java), a ticker (Go), a cron job (Node), " \
+       "a publish_pending/outbox_relay poller (Python), or a tokio-interval outbox_relay (Rust). " \
        "See docs/OUTBOX_PATTERN.md §Outbox Relay."
 fi
 
@@ -88,14 +107,22 @@ echo ""
 # Java:  dedupStore.alreadyProcessed / dedupStore.markProcessed / Redis SETNX
 # Go:    dedupStore.AlreadyProcessed / dedupStore.MarkProcessed / redis.SetNX
 # Node:  dedupStore.alreadyProcessed / dedupStore.markProcessed / redis.setNX
+# Python (ADR 0006 D3): dedup_store.already_processed / mark_processed / setnx
+# Rust   (ADR 0006 D3): dedup_store.already_processed / mark_processed / set_nx
+#   The Python/Rust snake_case method names are HOUSE CONVENTIONS — the docs'
+#   §Idempotent Event Processing example is Java (alreadyProcessed/markProcessed);
+#   the *requirement* (check-before-process dedup) is what's mandated.
 #
 # Must be found in PRODUCTION code — test files legitimately reference dedup
 # calls (mocks/assertions) without that proving production code implements it.
+# ADR 0006 D3 adds Python (test_*.py / *_test.py / conftest.py) and Rust
+# (*_test.rs) excludes; the tests/ dir is already excluded above.
 DEDUP_TEST_EXCLUDES="$GREP_EXCLUDES \
   --exclude-dir=src/test --exclude-dir=test --exclude-dir=tests \
   --exclude-dir=__tests__ \
   --exclude=*Test.java --exclude=*_test.go --exclude=*.test.ts --exclude=*.test.js \
-  --exclude=*.spec.ts --exclude=*.spec.js"
+  --exclude=*.spec.ts --exclude=*.spec.js \
+  --exclude=test_*.py --exclude=*_test.py --exclude=conftest.py --exclude=*_test.rs"
 
 DEDUP_FOUND=false
 
@@ -113,6 +140,16 @@ GO_DEDUP=$(grep -r 'AlreadyProcessed\|MarkProcessed\|SetNX\|DedupStore\|Deduplic
 NODE_DEDUP=$(grep -r 'alreadyProcessed\|markProcessed\|setNX\|dedupStore\|deduplicationStore\|DedupStore' \
   --include="*.ts" --include="*.js" $DEDUP_TEST_EXCLUDES "$SOURCE_DIR" 2>/dev/null || true)
 [ -n "$NODE_DEDUP" ] && DEDUP_FOUND=true
+
+# Python
+PY_DEDUP=$(grep -r 'already_processed\|mark_processed\|alreadyProcessed\|markProcessed\|dedup_store\|DedupStore\|set_if_absent\|setnx\|SETNX' \
+  --include="*.py" $DEDUP_TEST_EXCLUDES "$SOURCE_DIR" 2>/dev/null || true)
+[ -n "$PY_DEDUP" ] && DEDUP_FOUND=true
+
+# Rust
+RS_DEDUP=$(grep -r 'already_processed\|mark_processed\|AlreadyProcessed\|MarkProcessed\|dedup_store\|DedupStore\|set_nx\|setnx\|SetNX' \
+  --include="*.rs" $DEDUP_TEST_EXCLUDES "$SOURCE_DIR" 2>/dev/null || true)
+[ -n "$RS_DEDUP" ] && DEDUP_FOUND=true
 
 if $DEDUP_FOUND; then
   pass "Consumer deduplication logic found"

@@ -5,6 +5,10 @@
 #   Java:  @Timeout annotation or resilience4j TimeLimiterConfig per @SagaHandler method
 #   Go:    context.WithTimeout in *SagaHandler functions
 #   Node:  timeout property in sagaStep() calls
+#   Python (ADR 0006 D3): asyncio.timeout / asyncio.wait_for / httpx|requests
+#          timeout= kwarg in saga handler files
+#   Rust (ADR 0006 D3): tokio::time::timeout / a timeout(..) call with a
+#          Duration bound in saga handler files
 #
 # Usage:
 #   .standards/scripts/check-saga-timeouts.sh [SOURCE_DIR]
@@ -39,6 +43,8 @@ echo ""
 HAS_JAVA=false
 HAS_GO=false
 HAS_NODE=false
+HAS_PYTHON=false
+HAS_RUST=false
 
 # Use find-native exclusions (not grep --exclude-dir flags)
 FIND_PRUNE='( -name node_modules -o -name target -o -name vendor -o -name .git -o -name dist )'
@@ -46,6 +52,8 @@ FIND_PRUNE='( -name node_modules -o -name target -o -name vendor -o -name .git -
 [ -n "$(find "$SOURCE_DIR" $FIND_PRUNE -prune -o -name '*.java' -print 2>/dev/null | head -1)" ] && HAS_JAVA=true
 [ -n "$(find "$SOURCE_DIR" $FIND_PRUNE -prune -o -name '*.go' -print 2>/dev/null | head -1)" ] && HAS_GO=true
 [ -n "$(find "$SOURCE_DIR" $FIND_PRUNE -prune -o \( -name '*.ts' -o -name '*.js' \) -print 2>/dev/null | head -1)" ] && HAS_NODE=true
+[ -n "$(find "$SOURCE_DIR" $FIND_PRUNE -prune -o -name '*.py' -print 2>/dev/null | head -1)" ] && HAS_PYTHON=true
+[ -n "$(find "$SOURCE_DIR" $FIND_PRUNE -prune -o -name '*.rs' -print 2>/dev/null | head -1)" ] && HAS_RUST=true
 
 # ── Java: @SagaHandler methods must have @Timeout or resilience4j TimeLimiter ─
 if $HAS_JAVA; then
@@ -162,6 +170,97 @@ if $HAS_NODE; then
     fi
   else
     warn "Node: No sagaStep() calls found — skipping Node timeout check."
+  fi
+  echo ""
+fi
+
+# ── Python: saga handler files must use asyncio.timeout / asyncio.wait_for /
+#    an httpx|requests timeout= kwarg ─────────────────────────────────────────
+# Identifying tokens (saga_handler / saga_orchestrator / SagaOrchestrator /
+# SagaState / saga_step) and the accepted timeout idioms are HOUSE CONVENTIONS
+# chosen by ADR 0006 D3. docs/SAGA_PATTERN.md §Saga Timeout mandates that every
+# step has a timeout but shows only a Java table; it names no Python API. The
+# check mirrors the Go branch: the timeout must appear in the SAME file or the
+# SAME DIRECTORY as the saga code (cheap "same module" approximation, no import
+# resolution). Comment lines (# ...) are excluded so a TODO cannot satisfy it.
+if $HAS_PYTHON; then
+  SAGA_HANDLER_PY=$(grep -rl 'saga_handler\|saga_orchestrator\|SagaOrchestrator\|SagaState\|saga_step\|SagaStep' \
+    --include="*.py" $GREP_EXCLUDES "$SOURCE_DIR" 2>/dev/null | \
+    grep -v 'test_\|_test\.py\|/tests\?/\|conftest\.py' || true)
+
+  if [ -n "$SAGA_HANDLER_PY" ]; then
+    echo "Python: found saga handler code in:"
+    echo "$SAGA_HANDLER_PY" | sed 's/^/  /'
+
+    MISSING_TIMEOUT_PY=""
+    while IFS= read -r handler_file; do
+      [ -z "$handler_file" ] && continue
+      dir=$(dirname "$handler_file")
+      # asyncio.timeout / asyncio.wait_for / bare wait_for( / a timeout= kwarg
+      # (httpx|requests) — in the same file or a sibling .py in the same dir.
+      DIR_TIMEOUT=$(grep -lE 'asyncio\.timeout|asyncio\.wait_for|\bwait_for\(|timeout[[:space:]]*=' \
+        "$dir"/*.py 2>/dev/null | grep -v 'test_\|_test\.py\|conftest\.py' | \
+        while read -r tf; do grep -E 'asyncio\.timeout|asyncio\.wait_for|\bwait_for\(|timeout[[:space:]]*=' "$tf" | grep -qv '^[[:space:]]*#' && echo "$tf"; done || true)
+      if [ -z "$DIR_TIMEOUT" ]; then
+        MISSING_TIMEOUT_PY="${MISSING_TIMEOUT_PY}  ${handler_file}\n"
+      fi
+    done <<< "$SAGA_HANDLER_PY"
+
+    if [ -z "$MISSING_TIMEOUT_PY" ]; then
+      pass "Python: asyncio.timeout/asyncio.wait_for/timeout= found in same file/directory as saga handler code"
+    else
+      fail "Python: saga handler files with no asyncio.timeout / asyncio.wait_for / " \
+           "timeout= kwarg in the same file or directory:"$'\n'"${MISSING_TIMEOUT_PY}" \
+           "Each saga step must have a timeout. See docs/SAGA_PATTERN.md §Saga Timeout."
+    fi
+  else
+    warn "Python: No saga handler code found — skipping Python timeout check."
+  fi
+  echo ""
+fi
+
+# ── Rust: saga handler files must use tokio::time::timeout / a timeout(..) call
+#    with a Duration bound ─────────────────────────────────────────────────────
+# Identifying tokens (SagaHandler / saga_handler / SagaOrchestrator / SagaState /
+# Compensable / saga_step) and the accepted timeout call are HOUSE CONVENTIONS
+# chosen by ADR 0006 D3. docs/SAGA_PATTERN.md §Saga Timeout mandates a per-step
+# timeout but names no Rust API; language-specific/rust/PATTERNS.md points at
+# `tokio::time::timeout` as the ecosystem idiom. A bare `Duration` is NOT
+# accepted on its own — it must accompany a timeout call, so a Duration used for
+# something else cannot masquerade as a step timeout. Same file/directory scope
+# as the Go and Python branches; `//` comment lines excluded.
+if $HAS_RUST; then
+  SAGA_HANDLER_RS=$(grep -rl 'SagaHandler\|saga_handler\|SagaOrchestrator\|SagaState\|Compensable\|saga_step' \
+    --include="*.rs" $GREP_EXCLUDES "$SOURCE_DIR" 2>/dev/null || true)
+
+  if [ -n "$SAGA_HANDLER_RS" ]; then
+    echo "Rust: found saga handler code in:"
+    echo "$SAGA_HANDLER_RS" | sed 's/^/  /'
+
+    MISSING_TIMEOUT_RS=""
+    while IFS= read -r handler_file; do
+      [ -z "$handler_file" ] && continue
+      dir=$(dirname "$handler_file")
+      # tokio::time::timeout / time::timeout / a timeout( or .timeout( call,
+      # in the same file or a sibling .rs in the same dir, on a non-comment line.
+      DIR_TIMEOUT=$(grep -lE 'tokio::time::timeout|time::timeout|\.timeout\(|\btimeout\(|with_timeout|timeout_duration' \
+        "$dir"/*.rs 2>/dev/null | \
+        while read -r tf; do grep -E 'tokio::time::timeout|time::timeout|\.timeout\(|\btimeout\(|with_timeout|timeout_duration' "$tf" | grep -qv '^[[:space:]]*//' && echo "$tf"; done || true)
+      if [ -z "$DIR_TIMEOUT" ]; then
+        MISSING_TIMEOUT_RS="${MISSING_TIMEOUT_RS}  ${handler_file}\n"
+      fi
+    done <<< "$SAGA_HANDLER_RS"
+
+    if [ -z "$MISSING_TIMEOUT_RS" ]; then
+      pass "Rust: tokio::time::timeout (or a timeout(..) call) found in same file/directory as saga handler code"
+    else
+      fail "Rust: saga handler files with no tokio::time::timeout / timeout(..) call " \
+           "in the same file or directory:"$'\n'"${MISSING_TIMEOUT_RS}" \
+           "Saga steps must enforce a timeout (e.g. tokio::time::timeout with a Duration bound). " \
+           "See docs/SAGA_PATTERN.md §Saga Timeout."
+    fi
+  else
+    warn "Rust: No saga handler code found — skipping Rust timeout check."
   fi
   echo ""
 fi

@@ -76,3 +76,64 @@ teardown() {
   [ "$before" = "$after" ]
   [ -d "$TMPDIR_HELPER" ]
 }
+
+# ── ADR 0006 D2: detection fires for .py and .rs changed files ─────────────────
+# Before D2 the CODE_FILES filter and migration-name case stopped at
+# java/go/ts/js/sql/xml, so Python/Rust saga+outbox code was invisible. These
+# tests use a single-commit repo (detect falls back to `git ls-files`).
+
+@test "detect-saga-outbox: saga_step in a .py file sets SAGA_DETECTED=true" {
+  local repo="$TMPDIR_HELPER/pyrepo"
+  mkdir -p "$repo"
+  git -C "$repo" init -q
+  git -C "$repo" config user.email "test@test.com"
+  git -C "$repo" config user.name "test"
+  printf 'from saga import saga_step\n\n@saga_step(compensate=release)\nasync def reserve(ctx): ...\n' > "$repo/order_saga.py"
+  git -C "$repo" add .
+  git -C "$repo" commit -qm "init"
+  run --separate-stderr bash -c "cd '$repo' && bash '$REPO_ROOT/scripts/detect-saga-outbox.sh'"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"SAGA_DETECTED=true"* ]]
+}
+
+@test "detect-saga-outbox: Compensable impl in a .rs file sets SAGA_DETECTED=true" {
+  local repo="$TMPDIR_HELPER/rsrepo"
+  mkdir -p "$repo"
+  git -C "$repo" init -q
+  git -C "$repo" config user.email "test@test.com"
+  git -C "$repo" config user.name "test"
+  printf 'pub struct OrderSagaHandler;\nimpl Compensable for OrderSagaHandler {}\n' > "$repo/order_saga.rs"
+  git -C "$repo" add .
+  git -C "$repo" commit -qm "init"
+  run --separate-stderr bash -c "cd '$repo' && bash '$REPO_ROOT/scripts/detect-saga-outbox.sh'"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"SAGA_DETECTED=true"* ]]
+}
+
+@test "detect-saga-outbox: OutboxRelay in a .py file sets OUTBOX_DETECTED=true" {
+  local repo="$TMPDIR_HELPER/pyoutbox"
+  mkdir -p "$repo"
+  git -C "$repo" init -q
+  git -C "$repo" config user.email "test@test.com"
+  git -C "$repo" config user.name "test"
+  printf 'class OutboxRelay:\n    def publish_pending(self): ...\n' > "$repo/outbox_relay.py"
+  git -C "$repo" add .
+  git -C "$repo" commit -qm "init"
+  run --separate-stderr bash -c "cd '$repo' && bash '$REPO_ROOT/scripts/detect-saga-outbox.sh'"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"OUTBOX_DETECTED=true"* ]]
+}
+
+@test "detect-saga-outbox: publish_pending in a .rs file sets OUTBOX_DETECTED=true" {
+  local repo="$TMPDIR_HELPER/rsoutbox"
+  mkdir -p "$repo"
+  git -C "$repo" init -q
+  git -C "$repo" config user.email "test@test.com"
+  git -C "$repo" config user.name "test"
+  printf 'pub struct OutboxRelay;\nimpl OutboxRelay { pub async fn publish_pending(&self) {} }\n' > "$repo/outbox_relay.rs"
+  git -C "$repo" add .
+  git -C "$repo" commit -qm "init"
+  run --separate-stderr bash -c "cd '$repo' && bash '$REPO_ROOT/scripts/detect-saga-outbox.sh'"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"OUTBOX_DETECTED=true"* ]]
+}

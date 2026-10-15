@@ -53,16 +53,26 @@ echo ""
 # ── Check 1: Saga integration tests ───────────────────────────────────────────
 if [ "${SAGA_DETECTED:-false}" = "true" ]; then
 
-  # Find saga test files
+  # Find saga test files.
+  # Python/Rust naming (ADR 0006 D3) — HOUSE CONVENTIONS: pytest discovers
+  # `test_*.py`, and Rust integration tests live under a `tests/` directory
+  # (`tests/*saga*.rs`). docs/SAGA_PATTERN.md §Required Tests fixes the
+  # *requirement* (an integration test proving compensation) and lists Java/Go/TS
+  # example names; it mandates no Python/Rust filename, so these globs encode the
+  # ecosystem conventions rather than a documented standard. Inline Rust
+  # `#[cfg(test)] mod tests` are unit tests and intentionally do NOT satisfy the
+  # integration-test requirement (mirrors the gate's existing integration focus).
   SAGA_TEST_FILES=$(find "$SOURCE_DIR" \
     \( -name '*SagaTest*' -o -name '*saga*test*' -o -name '*saga*_test*' -o \
-       -name 'saga.integration.test.*' -o -name '*saga*.integration.*' \) \
+       -name 'saga.integration.test.*' -o -name '*saga*.integration.*' -o \
+       -name 'test_*saga*.py' -o -path '*/tests/*saga*.rs' \) \
     -not -path '*/node_modules/*' -not -path '*/target/*' \
     -not -path '*/vendor/*' -not -path '*/.git/*' 2>/dev/null || true)
 
   if [ -z "$SAGA_TEST_FILES" ]; then
     fail "Saga code detected but no saga integration test file found. " \
-         "Required: *SagaTest*, *saga*_test.go, or saga.integration.test.ts. " \
+         "Required: *SagaTest*, *saga*_test.go, saga.integration.test.ts, " \
+         "test_*saga*.py (pytest), or tests/*saga*.rs (Rust). " \
          "See docs/SAGA_PATTERN.md §Required Tests and " \
          "ci/templates/tests/SagaIntegrationTestTemplate.java (or .go / .ts)."
   else
@@ -123,15 +133,19 @@ fi
 # ── Check 2: Outbox integration tests ─────────────────────────────────────────
 if [ "${OUTBOX_DETECTED:-false}" = "true" ]; then
 
+  # Python/Rust naming (ADR 0006 D3) — HOUSE CONVENTIONS, same rationale as the
+  # saga globs above (pytest `test_*outbox*.py`, Rust `tests/*outbox*.rs`).
   OUTBOX_TEST_FILES=$(find "$SOURCE_DIR" \
     \( -name '*OutboxTest*' -o -name '*outbox*test*' -o -name '*outbox*_test*' -o \
-       -name 'outbox.integration.test.*' -o -name '*outbox*.integration.*' \) \
+       -name 'outbox.integration.test.*' -o -name '*outbox*.integration.*' -o \
+       -name 'test_*outbox*.py' -o -path '*/tests/*outbox*.rs' \) \
     -not -path '*/node_modules/*' -not -path '*/target/*' \
     -not -path '*/vendor/*' -not -path '*/.git/*' 2>/dev/null || true)
 
   if [ -z "$OUTBOX_TEST_FILES" ]; then
     fail "Outbox code detected but no outbox integration test file found. " \
-         "Required: *OutboxTest*, *outbox*_test.go, or outbox.integration.test.ts. " \
+         "Required: *OutboxTest*, *outbox*_test.go, outbox.integration.test.ts, " \
+         "test_*outbox*.py (pytest), or tests/*outbox*.rs (Rust). " \
          "See docs/OUTBOX_PATTERN.md §Required Tests and " \
          "ci/templates/tests/OutboxIntegrationTestTemplate.java (or .go / .ts)."
   else

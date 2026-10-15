@@ -1,11 +1,19 @@
 #!/bin/bash
-# lint-outbox-schema.sh — Validate outbox table SQL migration files.
+# lint-outbox-schema.sh — Validate outbox table migration files.
 #
-# Scans SQL migration files for outbox table definition and verifies:
+# Scans migration files for an outbox table definition and verifies:
 #   1. Required columns exist: event_id, event_type, payload, aggregate_type,
 #                              aggregate_id, created_at, published_at
 #   2. Partial index on published_at IS NULL exists
 #   3. A cleanup mechanism is defined (DELETE with TTL or scheduled job reference)
+#
+# Languages (ADR 0006 D3):
+#   SQL / Rust sqlx / diesel  → *.sql migrations (CREATE TABLE ... outbox)
+#   Java Flyway               → *.sql migrations
+#   Python Alembic / SQLModel → *.py migrations (op.create_table('outbox', ...)
+#                               or a `class Outbox` / __tablename__ = "outbox")
+#   The required-column set and the partial-index requirement are IDENTICAL for
+#   every language — extending coverage does not weaken them.
 #
 # Usage:
 #   .standards/scripts/lint-outbox-schema.sh [MIGRATIONS_DIR]
@@ -13,8 +21,9 @@
 # MIGRATIONS_DIR defaults to searching common migration paths:
 #   src/main/resources/db/migration/   (Flyway/Java)
 #   db/migrations/                     (Go)
-#   migrations/                        (Node)
+#   migrations/                        (Node / Rust sqlx / diesel)
 #   database/migrations/               (Node)
+#   alembic/versions/ , versions/      (Python Alembic / SQLModel)
 #
 # Exit codes:
 #   0 — all checks pass
@@ -42,6 +51,9 @@ SEARCH_DIRS=(
   "migrations"
   "database/migrations"
   "prisma/migrations"
+  "alembic/versions"
+  "alembic"
+  "versions"
 )
 
 MIGRATION_DIR=""
@@ -69,8 +81,16 @@ fi
 
 echo "Scanning migrations in: $MIGRATION_DIR"
 
-# Find SQL files containing outbox table definitions
-OUTBOX_FILES=$(grep -rl --include="*.sql" 'CREATE TABLE.*outbox\|create table.*outbox' "$MIGRATION_DIR" 2>/dev/null || true)
+# Find migration files containing an outbox table definition.
+# SQL (*.sql): CREATE TABLE ... outbox — covers Java Flyway, Go, Node, and Rust
+#   sqlx/diesel (both write plain .sql migrations).
+OUTBOX_FILES_SQL=$(grep -rl --include="*.sql" 'CREATE TABLE.*outbox\|create table.*outbox' "$MIGRATION_DIR" 2>/dev/null || true)
+# Python (*.py): Alembic op.create_table('outbox', ...) or a SQLModel/SQLAlchemy
+#   declarative `class Outbox` / __tablename__ = "outbox". HOUSE CONVENTION per
+#   ADR 0006 D3 — docs/OUTBOX_PATTERN.md §Database Schema shows the required
+#   table but no Python ORM spelling.
+OUTBOX_FILES_PY=$(grep -rlEi --include="*.py" 'create_table\(.*outbox|__tablename__.*outbox|class[[:space:]]+[A-Za-z_]*outbox' "$MIGRATION_DIR" 2>/dev/null || true)
+OUTBOX_FILES=$(printf '%s\n%s\n' "$OUTBOX_FILES_SQL" "$OUTBOX_FILES_PY" | sed '/^[[:space:]]*$/d' | sort -u)
 
 if [ -z "$OUTBOX_FILES" ]; then
   warn "No outbox table definition found in $MIGRATION_DIR. Skipping schema lint."
@@ -102,11 +122,46 @@ extract_outbox_block() {
        inblock {print; if ($0 ~ /\);[ \t]*$/) {inblock=0}}' "$1"
 }
 
+# Python (Alembic/SQLModel) outbox block — HOUSE CONVENTION per ADR 0006 D3.
+# Handles both migration spellings:
+#   op.create_table('outbox', ...) closed by a lone ')' line, and
+#   a declarative `class Outbox(...)` / __tablename__ = "outbox" body, which ends
+#   at the next top-level (column-0) statement.
+extract_outbox_block_py() {
+  awk 'BEGIN{IGNORECASE=1; inblock=0; mode=""; started=0}
+       !inblock && /create_table/ && /outbox/ {inblock=1; mode="call"}
+       !inblock && ((/class[ \t]/ && /outbox/) || (/__tablename__/ && /outbox/)) {inblock=1; mode="class"}
+       inblock {
+         if (mode == "call") { print; if ($0 ~ /^[ \t]*\)/) {inblock=0} }
+         else { if (started && $0 ~ /^[^ \t#]/) {inblock=0} else {print; started=1} }
+       }' "$1"
+}
+
+# outbox_block_for <file> — dispatch on extension: Python uses the py extractor;
+# everything else (*.sql, incl. Rust sqlx/diesel) uses the SQL extractor.
+outbox_block_for() {
+  case "$1" in
+    *.py) extract_outbox_block_py "$1" ;;
+    *)    extract_outbox_block "$1" ;;
+  esac
+}
+
+# comment_prefix_re <file> — line-comment regex so a column name mentioned only
+# in a comment does not satisfy the requirement. SQL '--', Python '#', Rust '//'.
+comment_prefix_re() {
+  case "$1" in
+    *.py) printf '%s' '^[[:space:]]*#' ;;
+    *.rs) printf '%s' '^[[:space:]]*//' ;;
+    *)    printf '%s' '^[[:space:]]*--' ;;
+  esac
+}
+
 for col in "${REQUIRED_COLUMNS[@]}"; do
   found=false
   for f in $OUTBOX_FILES; do
-    # Exclude SQL comment lines (-- ...) to avoid matching column names mentioned in comments
-    if extract_outbox_block "$f" | grep -i "$col" | grep -qv '^\s*--'; then
+    cre=$(comment_prefix_re "$f")
+    # Exclude comment lines to avoid matching column names mentioned in comments
+    if outbox_block_for "$f" | grep -i "$col" | grep -qv "$cre"; then
       found=true
       break
     fi
@@ -121,19 +176,22 @@ done
 echo ""
 
 # ── Check 2: Partial index on published_at IS NULL ────────────────────────────
-# Pattern: CREATE INDEX ... WHERE published_at IS NULL
+# Pattern: CREATE INDEX ... WHERE published_at IS NULL (SQL / Rust sqlx / diesel)
+# or Alembic op.create_index(..., postgresql_where=sa.text('published_at IS NULL')).
+# The requirement is identical for every language — coverage is extended, not relaxed.
 INDEX_FOUND=false
 for f in $OUTBOX_FILES; do
-  # Exclude SQL comment lines when checking for partial index
+  cre=$(comment_prefix_re "$f")
+  # Exclude comment lines when checking for partial index
   if grep -i 'WHERE.*published_at.*IS NULL\|where.*published_at.*is null' "$f" \
-     | grep -qv '^\s*--'; then
+     | grep -qv "$cre"; then
     INDEX_FOUND=true
     break
   fi
 done
-# Also check separate index migration files — exclude comment lines
-INDEX_IN_SEPARATE=$(grep -rl --include="*.sql" 'published_at.*IS NULL\|published_at.*is null' "$MIGRATION_DIR" 2>/dev/null \
-  | while read -r f; do grep -i 'published_at.*IS NULL' "$f" | grep -v '^\s*--' | grep -q . && echo "$f"; done || true)
+# Also check separate index migration files (*.sql or *.py) — exclude comment lines
+INDEX_IN_SEPARATE=$(grep -rlE --include="*.sql" --include="*.py" 'published_at.*IS NULL|published_at.*is null' "$MIGRATION_DIR" 2>/dev/null \
+  | while read -r f; do cre=$(comment_prefix_re "$f"); grep -i 'published_at.*IS NULL' "$f" | grep -v "$cre" | grep -q . && echo "$f"; done || true)
 [ -n "$INDEX_IN_SEPARATE" ] && INDEX_FOUND=true
 
 if $INDEX_FOUND; then
@@ -149,18 +207,23 @@ echo ""
 # Look for: DELETE from outbox with date/interval condition, or a scheduled cleanup reference
 CLEANUP_FOUND=false
 
-# Direct DELETE in migration or app code
-for f in $(find "$MIGRATION_DIR" -name "*.sql" 2>/dev/null); do
+# Direct DELETE in a migration file (*.sql, or *.py via Alembic op.execute, or
+# *.rs via an embedded sqlx/diesel DELETE)
+for f in $(find "$MIGRATION_DIR" \( -name "*.sql" -o -name "*.py" -o -name "*.rs" \) 2>/dev/null); do
   if grep -qi 'DELETE.*outbox.*published_at\|delete.*from.*outbox.*where.*published' "$f"; then
     CLEANUP_FOUND=true
     break
   fi
 done
 
-# Scheduled cleanup in source code (Java @Scheduled, Go ticker, Node setInterval/cron)
+# Scheduled cleanup in source code (Java @Scheduled, Go ticker, Node setInterval/
+# cron, Python Celery/apscheduler, Rust tokio interval) — ADR 0006 D3 adds the
+# *.py and *.rs includes; the DELETE ... outbox ... published_at pattern itself is
+# the documented cleanup form (docs/OUTBOX_PATTERN.md §Cleanup) and is unchanged.
 SOURCE_CLEANUP=$(grep -r \
   'DELETE.*outbox.*published_at\|outbox.*delete.*published\|published.*interval\|published_at.*INTERVAL' \
   --include="*.java" --include="*.go" --include="*.ts" --include="*.js" \
+  --include="*.py" --include="*.rs" \
   . 2>/dev/null | grep -v 'node_modules\|target\|vendor\|\.git' || true)
 
 [ -n "$SOURCE_CLEANUP" ] && CLEANUP_FOUND=true
