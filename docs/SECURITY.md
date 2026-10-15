@@ -183,6 +183,22 @@ SHA, bump deliberately, never track `@main`. This repo's own
 consumer-facing workflows do this (`.github/workflows/pr-review.yml`,
 `scripts/init-ci.sh`'s `STANDARDS_PIN`).
 
+### Caller workflows must grant what a reusable workflow declares
+
+A `workflow_call` workflow's `permissions:` block is a request, capped by its
+caller: the callee's token is the callee's declaration intersected with the
+calling workflow's `permissions:` block — and when the caller declares
+nothing, the org/repo default `GITHUB_TOKEN` permissions apply. A callee that
+requests more than the caller allows fails the **entire run at startup**
+(`startup_failure`, no jobs, no logs) with an annotation like `The workflow
+is requesting 'packages: write', but is only allowed 'packages: read'`. Since
+the org default is commonly read-only, an explicit caller-side `permissions:`
+block is mandatory, not hygiene. `scripts/init-ci.sh` emits one in every
+generated child `ci.yml` (union of the wired callees); see
+`docs/CI_CD.md §Reusable-workflow permissions` for the sizing table. When
+hand-writing a caller, grant exactly the union of the callees' declared
+permissions — least privilege, but never less than the callees need.
+
 ### Binaries fetched by a script must be checksum-verified
 
 A workflow that `curl`s a release tarball and executes it (this repo's

@@ -340,6 +340,28 @@ generate_github_ci() {
 
   mkdir -p "$PROJECT_ROOT/.github/workflows"
 
+  # Caller-side permission cap (docs/SECURITY.md §CI/CD Supply Chain §Caller
+  # workflows must grant what a reusable workflow declares). A called workflow
+  # can never hold more GITHUB_TOKEN permissions than its CALLER grants; when
+  # the callee declares more than the caller allows, GitHub fails the run at
+  # startup ("The workflow is requesting 'packages: write', but is only
+  # allowed 'packages: read'") — which is what happens under an org-default
+  # read-only token when this block is omitted. Grant the union of what the
+  # callees wired below declare:
+  #   ci-<backend> / ci-<frontend>: contents: read, packages: write
+  #   ci-deploy-*:                  contents: read, packages: read
+  #   ci-release:                   contents: write, issues: write, pull-requests: write
+  #   ci-pr-review:                 contents: read, pull-requests: write
+  local contents_perm="read"
+  local extra_perms=""
+  if [ "$WITH_RELEASE_FLAG" = "true" ]; then
+    contents_perm="write"
+    extra_perms="  issues: write
+  pull-requests: write"
+  elif [ "$WITH_PR_REVIEW_FLAG" = "true" ]; then
+    extra_perms="  pull-requests: write"
+  fi
+
   cat > "$target" << EOF
 name: CI
 
@@ -350,8 +372,14 @@ on:
     branches: [main]
   workflow_dispatch:
 
-jobs:
+permissions:
+  contents: ${contents_perm}
+  packages: write
 EOF
+  if [ -n "$extra_perms" ]; then
+    printf '%s\n' "$extra_perms" >> "$target"
+  fi
+  printf '\njobs:\n' >> "$target"
 
   if [ "$saga_enabled" = "true" ]; then
     echo "  NOTE: saga/outbox CI gates are GitLab-only right now; GitHub Actions workflow has no gate job." >&2
