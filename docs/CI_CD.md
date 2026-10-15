@@ -131,6 +131,16 @@ your-project/                                ← Child repo (e.g. monorepo with 
 The child's `ci.yml` calls orthogonal reusable workflows — one per layer:
 
 ```yaml
+# Caller-side permission cap — the union of everything the callees below
+# declare (write implies read). A callee requesting more than this block
+# allows fails the ENTIRE run at startup. See §Reusable-workflow permissions
+# below and docs/SECURITY.md §CI/CD Supply Chain.
+permissions:
+  contents: write      # ci-release.yml (tags / releases)
+  packages: write      # ci-*.yml docker push to GHCR
+  issues: write        # ci-release.yml
+  pull-requests: write # ci-release.yml / ci-pr-review.yml
+
 jobs:
   # ── Backend CI ──
   backend-ci:
@@ -165,6 +175,34 @@ jobs:
       target-url: https://staging.example.com
 ```
 
+### Reusable-workflow permissions (caller-side cap)
+
+A called workflow's `permissions:` block is a *request*, capped by its caller:
+the callee's `GITHUB_TOKEN` gets the callee's declaration intersected with the
+caller's own `permissions:` block — and when the caller declares nothing, the
+org/repo **default** token permissions apply. If a callee requests more than
+the caller allows, GitHub fails the run **at startup**: no jobs, no logs, a
+`startup_failure` conclusion whose one annotation reads:
+
+```
+Error calling workflow '…ci-nextjs.yml@<sha>'. The workflow is requesting
+'packages: write', but is only allowed 'packages: read'.
+```
+
+Orgs commonly run a read-only default `GITHUB_TOKEN`, so a caller without an
+explicit `permissions:` block is broken by default. Every caller `init-ci.sh`
+generates therefore carries one, sized to the union of the callees it wires:
+
+| Callees wired | Caller `permissions:` block |
+|---|---|
+| any `ci-<lang>` / `ci-<frontend>` (always) | `contents: read` + `packages: write` |
+| `+ --with-release` | `contents: write`, `issues: write`, `pull-requests: write` |
+| `+ --with-pr-review` | `pull-requests: write` |
+| `ci-deploy-*` | covered (`packages: read` ⊆ `write`) |
+
+Hand-writing a caller? Read each callee's top-level `permissions:` key and
+grant the union — never rely on the org default.
+
 ## Toolchain Versions
 
 **Never hardcode a language runtime version in more than one place.** The version manifest a language's own tooling already reads (`go.mod`, `.nvmrc`, `.java-version`, `.python-version`) is the single source of truth. CI, Dockerfiles, and reusable workflow inputs all resolve from it — none of them declare a version independently.
@@ -190,6 +228,9 @@ on:
   schedule:
     - cron: '0 6 * * 1'   # weekly, Monday 06:00 UTC
   workflow_dispatch: {}
+permissions:
+  contents: write       # rewrites the manifest file on a branch
+  pull-requests: write  # opens the bump PR
 jobs:
   bump:
     uses: RexiAI/my-engineering-standards/.github/workflows/ci-toolchain-bump.yml@<commit-sha>  # pinned — see docs/SECURITY.md §CI/CD Supply Chain
@@ -345,6 +386,9 @@ on:
   schedule:
     - cron: '0 2 * * 0'
 
+permissions:
+  contents: read
+
 jobs:
   e2e:
     uses: RexiAI/my-engineering-standards/.github/workflows/ci-e2e-weekly.yml@<commit-sha>  # pinned — see docs/SECURITY.md §CI/CD Supply Chain
@@ -465,7 +509,10 @@ files they reference, with no other information needed.
    standards repo) declares `GH_TOKEN` `required: true` and has no internal
    default-branch gate — the `if:` above (a push to the default branch) must
    live on the caller's job, and the secret key must be exactly `GH_TOKEN`
-   (GitHub errors on an undeclared secret).
+   (GitHub errors on an undeclared secret). The caller workflow must also
+   grant `permissions: contents: write, issues: write, pull-requests: write`
+   — `ci-release.yml` declares them, and a caller that allows less fails the
+   whole run at startup (see §Reusable-workflow permissions).
 3. **Add the secret.** On GitHub Actions, add a `GH_TOKEN` secret with
    `contents: write` (repo → Settings → Secrets and variables → Actions). On
    GitLab, the include path is `ci/gitlab/shared/ci-release.yml`: add
