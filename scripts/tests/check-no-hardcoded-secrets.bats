@@ -48,3 +48,53 @@ teardown() { teardown_tmpdir; }
   [ "$status" -eq 0 ]
   [[ "$output" == *"PASS"* ]]
 }
+
+# The two tests below pin the gitignore-awareness added for the defect where
+# config/agent.local.env — gitignored, and meant to hold real credentials per
+# AGENTS.md §Per-machine agent environment — was flagged on every correctly
+# configured developer machine, making AC-001-05 and agent-env.selftest
+# permanently red locally while CI stayed green.
+#
+# The second test is the important one: skipping ignored paths must NOT become a
+# way to smuggle a secret in. `git check-ignore` consults the index, so a
+# force-added (tracked) path is never reported ignored and is still scanned.
+
+@test "check-no-hardcoded-secrets: a gitignored, untracked credentials file is not a violation" {
+  mkdir -p "$TMPDIR_HELPER/config"
+  git -C "$TMPDIR_HELPER" init -q .
+  printf 'config/agent.local.env\n' > "$TMPDIR_HELPER/.gitignore"
+  printf 'API_TOKEN=%s\n' 'realliteralvalue123' > "$TMPDIR_HELPER/config/agent.local.env"
+  # Precondition: git really does ignore it, otherwise this test proves nothing.
+  run git -C "$TMPDIR_HELPER" check-ignore -q config/agent.local.env
+  [ "$status" -eq 0 ]
+  run bash "$REPO_ROOT/scripts/check-no-hardcoded-secrets.sh" "$TMPDIR_HELPER"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"PASS"* ]]
+}
+
+@test "check-no-hardcoded-secrets: a gitignored file that is force-added IS still caught (no bypass)" {
+  mkdir -p "$TMPDIR_HELPER/config"
+  git -C "$TMPDIR_HELPER" init -q .
+  printf 'config/agent.local.env\n' > "$TMPDIR_HELPER/.gitignore"
+  printf 'API_TOKEN=%s\n' 'realliteralvalue123' > "$TMPDIR_HELPER/config/agent.local.env"
+  git -C "$TMPDIR_HELPER" add -f config/agent.local.env
+  # Precondition: the path is ignored by pattern yet tracked in the index.
+  run git -C "$TMPDIR_HELPER" ls-files --error-unmatch config/agent.local.env
+  [ "$status" -eq 0 ]
+  run bash "$REPO_ROOT/scripts/check-no-hardcoded-secrets.sh" "$TMPDIR_HELPER"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"config/agent.local.env:1"* ]]
+  [[ "$output" == *"secret-style assignment"* ]]
+}
+
+@test "check-no-hardcoded-secrets: a non-git scratch root still scans every file" {
+  # Guards the graceful-degradation path: the bats scratch roots and --self-test
+  # are not git work trees, so nothing may be filtered there.
+  mkdir -p "$TMPDIR_HELPER/scripts"
+  printf 'API_TOKEN=%s\n' 'realliteralvalue123' > "$TMPDIR_HELPER/scripts/leak.sh"
+  run git -C "$TMPDIR_HELPER" rev-parse --is-inside-work-tree
+  [ "$status" -ne 0 ]
+  run bash "$REPO_ROOT/scripts/check-no-hardcoded-secrets.sh" "$TMPDIR_HELPER"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"scripts/leak.sh:1"* ]]
+}
