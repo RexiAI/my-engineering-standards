@@ -30,10 +30,30 @@ if [ ! -d "$STANDARDS_DIR" ]; then
     exit 1
 fi
 
-# 1. Symlink AGENTS.md
-if [ ! -f "$REPO_ROOT/AGENTS.md" ] || [ -L "$REPO_ROOT/AGENTS.md" ]; then
-    ln -sf .standards/AGENTS.md "$REPO_ROOT/AGENTS.md"
-    echo "[SYMLINK] .standards/AGENTS.md -> AGENTS.md"
+# 1. AGENTS.md — a real pointer file, never a symlink. CI and hosting
+#    platforms (GitHub Actions, Vercel) check out WITHOUT initializing
+#    submodules; a dangling AGENTS.md symlink there crashes tools that stat
+#    the repo root — Next.js >= 15.5 reads AGENTS.md at build startup and dies
+#    with ENOENT on a broken link, before compiling anything. The pointer file
+#    keeps agents one hop from the full standards and has nothing to drift.
+if [ -L "$REPO_ROOT/AGENTS.md" ]; then
+    rm "$REPO_ROOT/AGENTS.md"
+    echo "[REPLACE] AGENTS.md symlink -> real pointer file"
+fi
+if [ ! -f "$REPO_ROOT/AGENTS.md" ]; then
+    cat > "$REPO_ROOT/AGENTS.md" << 'AGENTS_POINTER_EOF'
+# Engineering Standards (pointer)
+
+This repo follows the shared engineering standards maintained in the
+`.standards/` git submodule. This file is a real file, not a symlink, on
+purpose: CI and hosting platforms check out without initializing submodules,
+and a dangling `AGENTS.md` symlink crashes builds that stat it (Next.js
+>= 15.5 fails with ENOENT at startup).
+
+Run `git submodule update --init --recursive`, then read the full standards
+index at [.standards/AGENTS.md](.standards/AGENTS.md).
+AGENTS_POINTER_EOF
+    echo "[WRITE] AGENTS.md (pointer to .standards/AGENTS.md)"
 else
     echo "[SKIP] AGENTS.md already exists (manual backup required to replace)"
 fi
@@ -52,12 +72,14 @@ else
     fi
 fi
 
-# 3. Symlink OKF (Operational Knowledge Framework)
-if [ ! -d "$REPO_ROOT/okf" ]; then
-    ln -sf .standards/okf "$REPO_ROOT/okf"
-    echo "[SYMLINK] .standards/okf -> okf"
-else
-    echo "[SKIP] okf/ already exists"
+# 3. OKF (Operational Knowledge Framework) — consumed in place at
+#    .standards/okf/ (opencode.json's instructions list points there).
+#    Deliberately NO root symlink: same dangling-link hazard as AGENTS.md —
+#    root-scanning build tools stat every repo-root entry and die with ENOENT
+#    on a broken link in submodule-less checkouts (GitHub Actions, Vercel).
+if [ -L "$REPO_ROOT/okf" ]; then
+    rm "$REPO_ROOT/okf"
+    echo "[REMOVE] okf symlink — reference .standards/okf/ directly"
 fi
 
 # 3b. Symlink (default) or copy (--copy-agents) spec pipeline agents + commands
@@ -137,6 +159,24 @@ for env_pat in model.local.env agent.local.env; do
         echo "  [APPEND] $env_pat -> config/.gitignore"
     fi
 done
+
+# 3e. Line-ending normalization. Machines with core.autocrlf=true otherwise
+# get CRLF working trees on fresh clones, which trips prettier --check
+# (endOfLine lf) and every line-ending-sensitive formatter gate in CI — the
+# same bug class this repo fixed for itself in v1.4.1.
+if [ ! -f "$REPO_ROOT/.gitattributes" ]; then
+    cat > "$REPO_ROOT/.gitattributes" << 'GITATTR_EOF'
+# Normalize line endings regardless of core.autocrlf: LF everywhere except
+# explicit Windows scripts.
+* text=auto eol=lf
+*.sh text eol=lf
+Makefile* text eol=lf
+*.bat text eol=crlf
+GITATTR_EOF
+    echo "[WRITE] .gitattributes (LF normalization)"
+else
+    echo "[SKIP] .gitattributes already exists"
+fi
 
 # 4. Copy PR template
 mkdir -p "$REPO_ROOT/.github"
@@ -309,8 +349,8 @@ echo ""
 echo "=== Bootstrap complete ==="
 echo "Next steps:"
 echo "  1. Review and commit the new files:"
-echo "     git add .standards AGENTS.md opencode.json okf .github/ config/.gitignore Makefile"
+echo "     git add .standards AGENTS.md opencode.json .gitattributes .github/ config/.gitignore Makefile"
 echo "  2. OpenCode will auto-discover AGENTS.md and load instructions from .standards/"
 echo "  3. Run session hygiene check: ./session-start-check.sh"
 echo "  4. Push and verify CI pipeline runs"
-echo "  5. Read OKF practices: open okf/index.md (after commit, markdown render)"
+echo "  5. Read OKF practices: open .standards/okf/ (context policy, RAG, rot detection)"
