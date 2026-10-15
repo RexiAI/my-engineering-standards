@@ -194,11 +194,13 @@ class ItemFactory:
 - **[convention] Mutation testing applies at the `production` conformance
   tier** ([`docs/CONFORMANCE_TIERS.md`](../../docs/CONFORMANCE_TIERS.md),
   `docs/TESTING.md §Mutation Testing`). That section standardizes
-  PiTest/Gremlins/Stryker for Java/Go/JS; **a repo-wide Python mutator has
-  not been selected yet** — choosing one for a `production`-tier Python
-  service requires an ADR (`templates/ADR.md`) and a slot in that table, and
-  any new CI gate built around it is a gate-catalog change that also needs an
-  ADR first (`docs/GOVERNANCE.md §ADR Requirement`).
+  PiTest/Gremlins/Stryker for Java/Go/JS. **ADR 0006 selected `mutmut` as the
+  Python mutator**
+  ([`docs/adr/0006-python-rust-gate-coverage.md`](../../docs/adr/0006-python-rust-gate-coverage.md)),
+  with the config and the ≥80% / zero-mutant-fails gate in
+  `ci/templates/mutmut-pyproject.toml`. Like the other mutation assets it is
+  opt-in and periodic, not per-PR. `docs/TESTING.md §Mutation Testing`'s tool
+  table still lacks a Python row — a docs follow-up, not a gate change.
 
 ## Layer Boundaries (inherited)
 

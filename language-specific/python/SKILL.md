@@ -147,13 +147,16 @@ awesome-project/
   Python code… processes each file, builds an AST from it, and runs
   appropriate plugins against the AST nodes" **[official]**
   <https://bandit.readthedocs.io/en/latest/> (PyCQA, Apache-2.0, has a
-  dedicated CI/CD section). Run `bandit -r src/` in CI. `docs/SECURITY.md` is
+  dedicated CI/CD section). Run `bandit -r app/` in CI, matching this guide's
+  project layout; `ci/templates/child-ci-python.yml` does the same.
+  `docs/SECURITY.md` is
   the rule source; bandit is the mechanical check. **[convention]**
 - **mutmut** for mutation testing at the `production` conformance tier
   (`../../docs/CONFORMANCE_TIERS.md`) — "a mutation testing system for Python"
   **[official]** <https://mutmut.readthedocs.io/en/latest/>: `mutmut run`,
   review survivors with `mutmut browse`, emit CI stats with
-  `mutmut export-cicd-stats`; configure `[tool.mutmut] source_paths = ["src/"]`.
+  `mutmut export-cicd-stats`; configure `[tool.mutmut] source_paths = ["app/"]`
+  for this guide's layout (the official docs' example uses `src/`).
   Two constraints that matter in CI: it **requires fork support** (POSIX only —
   Windows needs WSL), and mutmut 3+ mutates only code *inside functions*
   (mutmut 2 has a different execution model). **[official]**
@@ -161,8 +164,11 @@ awesome-project/
   over nothing is a false pass. That is the same defect class as
   `scripts/check-code-principles.sh` exiting clean when it scans no files (see
   `../../docs/OFFICIAL_REFERENCES.md` §Findings). **[convention]**
-  No Python mutation CI template exists in `ci/templates/` yet; adding one is a
-  gate-catalog change requiring an ADR.
+  `ci/templates/mutmut-pyproject.toml` carries the config plus the ≥80% and
+  zero-mutant-fails gate; ADR 0006 D4 selected mutmut as the Python mutator.
+  Like the other mutation assets (`mutation.mk`, `pitest-profile.xml`,
+  `stryker.conf.json`) it is opt-in and periodic rather than per-PR, matching
+  the `production` conformance tier.
 
 ## Typing
 
@@ -250,16 +256,16 @@ Child repos opt in by adding `language-specific/python/SKILL.md` to their
 `opencode.json` `instructions` array, alongside any other language-specific
 guides they use.
 
-**No Python saga/outbox CI gate templates exist yet, and detection does not scan
-Python.** `scripts/detect-saga-outbox.sh` filters changed files to
-`\.(java|go|ts|js|sql|xml)$` (line 79) and allows only
-`*.java|*.go|*.ts|*.js|*.sql|*.xml` for migration names (line 69). A FastAPI
-service carrying saga or outbox code therefore leaves `SAGA_DETECTED` and
-`OUTBOX_DETECTED` false, and every downstream gate (`check-saga-timeouts.sh`,
-`check-saga-tests.sh`, `lint-outbox-schema.sh`, `check-outbox-relay.sh`)
-silently skips. **That is a coverage hole, not a passing gate** — apply
-`docs/SAGA_PATTERN.md` and `docs/OUTBOX_PATTERN.md` by review until a Python gate
-exists. `ci/templates/` covers Java, Go and Node only; adding a Python gate
-changes the gate catalog and requires an ADR first
-(`docs/GOVERNANCE.md §ADR Requirement`). This directory is deliberately
-docs-only — track it as a follow-up, don't improvise a gate script.
+**Python saga/outbox coverage now exists** (ADR 0006 D2+D3).
+`scripts/detect-saga-outbox.sh` scans `.py` — including Alembic migrations whose
+filename lacks "outbox", via `create_table.*outbox` and `__tablename__.*outbox`
+patterns — and all four gates understand Python idioms: `asyncio.timeout` /
+`asyncio.wait_for` / a `timeout=` kwarg for step timeouts, a decorator or
+`compensate=` kwarg for compensation, Alembic/SQLModel migrations for the outbox
+schema (the 7 required columns and the partial index on `published_at IS NULL`
+are unchanged, not relaxed), and `OutboxRelay` / `publish_pending` plus
+`already_processed` / `mark_processed` / `dedup_store` for the relay and
+consumer dedup. Integration tests must be named `test_*saga*.py` or
+`test_*outbox*.py`. CI wiring is `ci/templates/child-ci-python.yml`. These token
+patterns are **house convention**, not mandates from `docs/SAGA_PATTERN.md` /
+`docs/OUTBOX_PATTERN.md`, which specify behaviour rather than spellings.
