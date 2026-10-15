@@ -1,7 +1,7 @@
 # React Native — Patterns
 
 Day-to-day app code patterns. This is the deep material the
-[`AGENTS.md`](./AGENTS.md) index points to. Update rules, project shape,
+[`SKILL.md`](./SKILL.md) index points to. Update rules, project shape,
 and CI gates live in the index; this file is for how to use the stack.
 
 ## State

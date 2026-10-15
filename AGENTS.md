@@ -28,7 +28,22 @@ Before coding in any child repo, read the relevant docs from this submodule. The
 
 ## Language Selection
 
-This project structure supports Java, Go, JavaScript/TypeScript, and React Native. Before writing code, read the language-specific `SKILL.md` in `language-specific/<lang>/` for conventions relevant to that stack.
+This project structure supports Java, Go, JavaScript/TypeScript (including NestJS backends), Python/FastAPI, Rust, Angular, Ionic/Capacitor, and React Native. Before writing code, read the language-specific `SKILL.md` in `language-specific/<lang>/` for conventions relevant to that stack.
+
+| Stack | Guide | Deep dives |
+|---|---|---|
+| Java | `language-specific/java/SKILL.md` | — |
+| Go | `language-specific/go/SKILL.md` | — |
+| JavaScript / TypeScript, NestJS | `language-specific/javascript/SKILL.md` | `PATTERNS.md`, `TESTING.md` |
+| Angular | `language-specific/angular/SKILL.md` | `PATTERNS.md`, `TESTING.md` |
+| Ionic / Capacitor | `language-specific/ionic/SKILL.md` | `PATTERNS.md`, `TESTING.md`, `NATIVE.md` |
+| Python / FastAPI | `language-specific/python/SKILL.md` | `PATTERNS.md`, `TESTING.md` |
+| Rust | `language-specific/rust/SKILL.md` | `PATTERNS.md`, `TESTING.md` |
+| React Native | `language-specific/react-native/SKILL.md` | `PATTERNS.md`, `TESTING.md`, `NATIVE.md` |
+
+Mobile stacks overlap: read `language-specific/react-native/SKILL.md` for the native-component model, `language-specific/ionic/SKILL.md` for the web-tech-plus-Capacitor model. Each states when the other is the better fit. An Ionic+Angular project reads both `language-specific/ionic/` and `language-specific/angular/`.
+
+Every guide is distilled from official upstream documentation at a pinned version. The pins, source URLs, licences, and the upstream findings that constrain each guide are recorded in `docs/OFFICIAL_REFERENCES.md` — consult it before trusting a version-specific claim, and update it when you refresh a guide.
 
 ## Reading the Standards
 
@@ -47,6 +62,7 @@ This project structure supports Java, Go, JavaScript/TypeScript, and React Nativ
 - Read `docs/LOOP_ENGINEERING.md` before designing or running a loop (an automated agent cycle with durable state).
 - Read `docs/AGENTS_AND_SKILLS.md` before creating or modifying any agent in `agents/` or skill in `skills/`/`language-specific/`.
 - Read `docs/GOVERNANCE.md` before changing pipeline roles, the gate catalog, or billing constraints — trust tiers, model-assignment discipline, and the ADR requirement live there.
+- Read `docs/OFFICIAL_REFERENCES.md` before citing external framework documentation, before trusting a version-specific claim in any `language-specific/` guide, or before refreshing a guide against new upstream releases.
 
 ## Model Configuration
 

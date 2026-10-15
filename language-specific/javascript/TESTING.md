@@ -2,7 +2,7 @@
 
 The layered test strategy (unit / integration / component / E2E) and
 what each layer proves is defined in the root
-[`docs/TESTING.md`](../../../docs/TESTING.md) and inherited here —
+[`docs/TESTING.md`](../../docs/TESTING.md) and inherited here —
 this file covers the *tools* and the *examples* for each layer.
 
 ## Layer / Framework Table
@@ -74,5 +74,5 @@ Run all tests: `npm test` (or `npm run test -- --coverage` for coverage).
   mock the network boundary with `msw`.
 - E2E tests run the real binary and exercise the full stack.
 
-See [`docs/TESTING.md`](../../../docs/TESTING.md) for the full layer
+See [`docs/TESTING.md`](../../docs/TESTING.md) for the full layer
 definitions and the rationale.

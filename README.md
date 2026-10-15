@@ -64,6 +64,7 @@ my-engineering-standards/
 │   ├── IDEMPOTENCY.md           # Retry-safe endpoints
 │   ├── MESSAGE_DELIVERY.md      # Queues, DLQ, reliability
 │   ├── OBSERVABILITY.md         # Tracing, metrics, alerting
+│   ├── OFFICIAL_REFERENCES.md   # Upstream doc sources + version pins per stack
 │   ├── OUTBOX_PATTERN.md        # Reliable event publishing
 │   ├── RESILIENCE.md            # Circuit breaker, retry, timeout
 │   ├── SAGA_PATTERN.md          # Distributed transaction coordination
@@ -84,13 +85,24 @@ my-engineering-standards/
 ├── skills/
 │   ├── design-taste-frontend/   # Anti-slop frontend design skill (vendored)
 │   │   └── SKILL.md
-│   └── hallmark/                # Anti-AI-slop design system (v1.2.0)
+│   └── hallmark/                # Anti-AI-slop design system (v1.2.0, vendored, MIT)
 │       ├── SKILL.md             # 66-gate slop test, 21 macrostructures, 20 themes
-│       └── references/          # genre files, components, verbs, upgrade techniques
-├── language-specific/
-│   ├── java/AGENTS.md           # Spring Boot, Maven
-│   ├── go/AGENTS.md             # Gin, Makefile
-│   └── javascript/AGENTS.md     # NestJS, React
+│       ├── LICENSE              # Upstream MIT notice (github.com/Nutlope/hallmark)
+│       ├── references/          # genre files, components, verbs, upgrade techniques
+│       ├── site/                # Vendored theme data the skill reads at runtime
+│       │   ├── css/tokens.css   #   OKLCH palettes + per-theme axis values (21 themes)
+│       │   ├── examples/        #   cobalt-01 canonical build
+│       │   └── _tests/          #   03-maple-bakery, 05-tracejam-saas worked examples
+│       └── docs/                # recipes.md, study-examples.md (human reading)
+├── language-specific/           # One guide per stack; SKILL.md is the small entry
+│   ├── java/SKILL.md            # Spring Boot, Maven (+ checkstyle/pmd/spotbugs)
+│   ├── go/SKILL.md              # Go, golangci (+ golangci.yml)
+│   ├── javascript/SKILL.md      # TypeScript, React/Vite, Next.js, NestJS 12
+│   ├── angular/SKILL.md         # Angular v22 (+ PATTERNS, TESTING)
+│   ├── ionic/SKILL.md           # Ionic v9 + Capacitor (+ PATTERNS, TESTING, NATIVE)
+│   ├── python/SKILL.md          # Python 3.10+, FastAPI, uv/ruff/mypy/pytest
+│   ├── rust/SKILL.md            # Rust 1.99, edition 2024 (+ PATTERNS, TESTING)
+│   └── react-native/SKILL.md    # Expo, TypeScript (+ PATTERNS, TESTING, NATIVE)
 ├── okf/                         # Operational Knowledge Framework (AI practices)
 │   ├── index.md                 # Root index
 │   ├── log.md                   # Changelog

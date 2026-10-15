@@ -1,7 +1,7 @@
 # JavaScript / TypeScript — Patterns
 
 Day-to-day patterns for React (Vite), Next.js (App Router), and NestJS
-backends. The index ([`AGENTS.md`](./AGENTS.md)) sets build system,
+backends. The index ([`SKILL.md`](./SKILL.md)) sets build system,
 project structure, and CI gates; this file is the how.
 
 ## React Patterns
