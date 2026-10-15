@@ -188,6 +188,177 @@ JAVA
   [[ "$output" != *"-name ci "* ]]
   [[ "$output" != *"-name ci)"* ]]
   run bash "$REPO_ROOT/scripts/check-code-principles.sh" "$REPO_ROOT/ci"
-  [[ "$output" != *"No Java, Go, or JS/TS source files found"* ]]
+  [[ "$output" != *"scanned for extensions: java, go, ts, tsx, js, jsx, py, rs"* ]]
   [[ "$output" == *"Checking design principles in:"* ]]
+}
+
+# ── ADR 0006: Python/Rust coverage (D1), visible zero-file scan (D5),
+#    warn-only rollout (D6) ──────────────────────────────────────────────────
+
+@test "ADR-0006 D5: zero-file scan enumerates scanned extensions and still exits 0" {
+  mkdir -p "$TMPDIR_HELPER/empty"
+  run --separate-stderr bash "$REPO_ROOT/scripts/check-code-principles.sh" "$TMPDIR_HELPER/empty"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"No source files found"* ]]
+  [[ "$output" == *"scanned for extensions: java, go, ts, tsx, js, jsx, py, rs"* ]]
+  [[ "$output" == *"--require-language"* ]]
+}
+
+@test "ADR-0006 D1/D6: Python complexity finding is an approximate WARN, exit 0" {
+  mkdir -p "$TMPDIR_HELPER/py/src"
+  cat > "$TMPDIR_HELPER/py/src/complex_py.py" <<'PY'
+def complex_branching(a):
+    total = 0
+    if a == 1:
+        total += 1
+    if a == 2:
+        total += 2
+    if a == 3:
+        total += 3
+    if a == 4:
+        total += 4
+    if a == 5:
+        total += 5
+    if a == 6:
+        total += 6
+    if a == 7:
+        total += 7
+    return total
+PY
+  run --separate-stderr bash "$REPO_ROOT/scripts/check-code-principles.sh" "$TMPDIR_HELPER/py"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"WARN"* ]]
+  [[ "$output" == *"Cyclomatic complexity >6 (python)"* ]]
+  [[ "$output" == *"complex_py.py"* ]]
+  [[ "$output" == *"approximate"* ]]
+  [[ "$output" == *"0 FAIL(s)"* ]]
+}
+
+@test "ADR-0006 D1/D6: Rust complexity finding is an approximate WARN, exit 0" {
+  mkdir -p "$TMPDIR_HELPER/rs/src"
+  cat > "$TMPDIR_HELPER/rs/src/complex_rs.rs" <<'RS'
+pub fn classify(x: i32) -> i32 {
+    if x == 1 { return 1; }
+    if x == 2 { return 2; }
+    if x == 3 { return 3; }
+    if x == 4 { return 4; }
+    if x == 5 { return 5; }
+    if x == 6 { return 6; }
+    if x == 7 { return 7; }
+    return 0;
+}
+RS
+  run --separate-stderr bash "$REPO_ROOT/scripts/check-code-principles.sh" "$TMPDIR_HELPER/rs"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"WARN"* ]]
+  [[ "$output" == *"Cyclomatic complexity >6 (rust)"* ]]
+  [[ "$output" == *"complex_rs.rs"* ]]
+  [[ "$output" == *"approximate"* ]]
+  [[ "$output" == *"0 FAIL(s)"* ]]
+}
+
+@test "ADR-0006 D6: Python/Rust findings stay WARN and exit 0 even with --blocking complexity" {
+  # complexity IS in the blocking set here; D6 warn-phase demotion must still
+  # keep .py/.rs findings at WARN (exit 0), proving the demotion happens
+  # before the blocking-set check.
+  mkdir -p "$TMPDIR_HELPER/pyrs/src"
+  cat > "$TMPDIR_HELPER/pyrs/src/branchy.py" <<'PY'
+def many_branches(a):
+    if a == 1:
+        return 1
+    if a == 2:
+        return 2
+    if a == 3:
+        return 3
+    if a == 4:
+        return 4
+    if a == 5:
+        return 5
+    if a == 6:
+        return 6
+    if a == 7:
+        return 7
+    return 0
+PY
+  cat > "$TMPDIR_HELPER/pyrs/src/branchy.rs" <<'RS'
+pub fn many_branches(x: i32) -> i32 {
+    if x == 1 { return 1; }
+    if x == 2 { return 2; }
+    if x == 3 { return 3; }
+    if x == 4 { return 4; }
+    if x == 5 { return 5; }
+    if x == 6 { return 6; }
+    if x == 7 { return 7; }
+    return 0;
+}
+RS
+  run --separate-stderr bash "$REPO_ROOT/scripts/check-code-principles.sh" --blocking complexity "$TMPDIR_HELPER/pyrs"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Cyclomatic complexity >6 (python)"* ]]
+  [[ "$output" == *"Cyclomatic complexity >6 (rust)"* ]]
+  [[ "$output" == *"0 FAIL(s)"* ]]
+  [[ "$output" != *"1 FAIL(s)"* ]]
+}
+
+@test "ADR-0006 D1: component-per-file does not fire for Python/Rust" {
+  # A Python module with many top-level classes/functions and a Rust file with
+  # many pub fns: the JS/TS component-model gate must not report on them.
+  mkdir -p "$TMPDIR_HELPER/cpf/src"
+  cat > "$TMPDIR_HELPER/cpf/src/widgets.py" <<'PY'
+class Alpha:
+    pass
+
+
+class Beta:
+    pass
+
+
+class Gamma:
+    pass
+
+
+class Delta:
+    pass
+PY
+  cat > "$TMPDIR_HELPER/cpf/src/widget.rs" <<'RS'
+pub fn alpha() -> u8 { 1 }
+pub fn beta() -> u8 { 2 }
+pub fn gamma() -> u8 { 3 }
+pub fn delta() -> u8 { 4 }
+pub fn epsilon() -> u8 { 5 }
+RS
+  run --separate-stderr bash "$REPO_ROOT/scripts/check-code-principles.sh" "$TMPDIR_HELPER/cpf"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"Component-per-file: $TMPDIR_HELPER"* ]]
+  [[ "$output" != *"exported components"* ]]
+  [[ "$output" != *"god file"* ]]
+}
+
+@test "ADR-0006 D5: --require-language python exits 1 when no Python files exist" {
+  mkdir -p "$TMPDIR_HELPER/reqabsent/src"
+  cat > "$TMPDIR_HELPER/reqabsent/src/Foo.java" <<'JAVA'
+public class Foo {}
+JAVA
+  run --separate-stderr bash "$REPO_ROOT/scripts/check-code-principles.sh" --require-language python "$TMPDIR_HELPER/reqabsent"
+  [ "$status" -eq 1 ]
+  [[ "$output$stderr" == *"--require-language python"* ]]
+  [[ "$output$stderr" == *"no matching source files found"* ]]
+}
+
+@test "ADR-0006 D5: --require-language python exits 0 when Python files exist" {
+  mkdir -p "$TMPDIR_HELPER/reqpresent/src"
+  cat > "$TMPDIR_HELPER/reqpresent/src/foo.py" <<'PY'
+def foo():
+    return 1
+PY
+  run --separate-stderr bash "$REPO_ROOT/scripts/check-code-principles.sh" --require-language python "$TMPDIR_HELPER/reqpresent"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"--require-language python: matching source files found"* ]]
+}
+
+@test "ADR-0006 D5: --require-language with an unknown language exits 2" {
+  mkdir -p "$TMPDIR_HELPER/reqbad"
+  run --separate-stderr bash "$REPO_ROOT/scripts/check-code-principles.sh" --require-language ruby "$TMPDIR_HELPER/reqbad"
+  [ "$status" -eq 2 ]
+  [[ "$output$stderr" == *"unknown --require-language value: 'ruby'"* ]]
 }
