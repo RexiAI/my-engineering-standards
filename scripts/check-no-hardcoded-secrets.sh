@@ -96,13 +96,43 @@ is_ignored_rhs() {
   return 1
 }
 
+# is_git_ignored ROOT FILE — 0 when git ignores FILE within ROOT.
+#
+# Ignored paths are skipped because they cannot reach a commit, and
+# config/agent.local.env is *meant* to hold real credentials (AGENTS.md
+# §Per-machine agent environment: copy the example, fill in the real values,
+# never commit it). Flagging it made AC-001-05 and three agent-env.selftest
+# cases fail on every correctly-configured developer machine while CI stayed
+# green — a permanently red local gate trains people to ignore red, which is how
+# a real leak eventually gets waved through.
+#
+# This is not a bypass. `git check-ignore` consults the index by default, so a
+# tracked path is never reported as ignored: `git add -f config/agent.local.env`
+# makes it tracked and it is then scanned like any other file. scripts/guard-env.sh
+# separately refuses to commit that path at all.
+#
+# When ROOT is not inside a git work tree — the scratch dirs used by the bats
+# tests and by --self-test — GIT_REPO_OK is empty, nothing is filtered, and every
+# file is scanned exactly as before.
+is_git_ignored() {
+  local root="$1" file="$2"
+  [ -n "${GIT_REPO_OK:-}" ] || return 1
+  git -C "$root" check-ignore -q -- "$file" 2>/dev/null
+}
+
 # scan_root ROOT — walk the scoped dirs under ROOT and report class-1
 # (literal token prefix) and class-2 (secret-style assignment) matches.
 scan_root() {
-  local root="$1" dir file text rhs
+  # GIT_REPO_OK is local here but visible to is_git_ignored via bash dynamic
+  # scoping; resolving it once per root avoids a rev-parse per file.
+  local root="$1" dir file text rhs GIT_REPO_OK=""
+  if git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    GIT_REPO_OK=1
+  fi
   for dir in $DIRS; do
     [ -d "$root/$dir" ] || continue
     while IFS= read -r -d '' file; do
+      if is_git_ignored "$root" "$file"; then continue; fi
       # Class 1: literal token prefixes
       while IFS= read -r hit; do
         report_hit "$root" "$file" "${hit%%:*}" "literal token prefix"
