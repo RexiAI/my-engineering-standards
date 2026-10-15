@@ -1,3 +1,10 @@
+## [1.34.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.34.0...v1.34.1) (2026-10-15)
+
+
+### Bug Fixes
+
+* **ci,bootstrap:** caller permissions block + submodule-less-checkout-safe bootstrap ([#79](https://github.com/RexiAI/my-engineering-standards/issues/79)) ([5a32144](https://github.com/RexiAI/my-engineering-standards/commit/5a32144887887aaa862287606cec23761dd0e4ac))
+
 # [1.34.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.33.0...v1.34.0) (2026-10-14)
 
 
