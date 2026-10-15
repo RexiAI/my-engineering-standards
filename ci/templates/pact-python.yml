@@ -1,0 +1,40 @@
+# Pact contract testing setup for Python
+# Copy this reference to your project and install pact-python:
+#   uv add --dev pact-python
+#
+# pact-python 4.x requires Python >= 3.11 (pact-python/4.0.0 release notes) —
+# one minor above the stack's 3.10 floor (language-specific/python/SKILL.md).
+# Contract tests are a multi-service-tier gate (docs/CONFORMANCE_TIERS.md); a
+# single-service repo leaves tests/pact/ absent and the tolerant contract-test
+# job in child-ci-python.yml stays green.
+#
+# Requires a running Pact broker (see ci/templates/pact-broker-local.yml).
+#
+# Provider verification test (e.g., tests/pact/test_provider.py):
+#
+# import os
+# from pact import Verifier
+#
+# def test_provider_from_broker():
+#     verifier = (
+#         Verifier("my-service")                        # provider name
+#         .add_transport(url="http://localhost:8080")   # running provider
+#         .broker_source(
+#             os.environ["PACT_BROKER_URL"],
+#             token=os.environ.get("PACT_BROKER_TOKEN"),
+#         )
+#         .state_handler(                               # URL-based provider states
+#             "http://localhost:8080/_pact/setup",
+#             teardown=True,
+#             body=True,
+#         )
+#     )
+#     verifier.verify()
+#
+# Local pact files instead of a broker: .add_source("./pacts/").
+# API verified against https://docs.pact.io/implementation_guides/python/docs/provider
+#
+# CI integration (GitHub Actions step):
+#   - run: uv run pytest tests/pact 2>/dev/null || echo "No contract tests configured"
+#     env:
+#       PACT_BROKER_URL: ${{ secrets.PACT_BROKER_URL }}
