@@ -16,7 +16,10 @@ inherited from the root `AGENTS.md` and are not restated here.
 - **Runtime**: Node.js 22+.
 - **Package manager**: npm.
 - **Frontend**: React 17+ (Vite) or Next.js 15+ (App Router, public web).
-- **Backend**: NestJS with TypeORM or Prisma (SQL).
+- **Backend**: NestJS 12 (`@nestjs/core` 12.1.3) with TypeORM or Prisma (SQL).
+  - NestJS 12's own floor is Node `>= 20`; the repo floor of Node 22+ already satisfies it. Do not lower the repo floor to match upstream.
+  - `@nestjs/core` 12 ships as ESM (`"type": "module"`), with `rxjs` ^7.1.0 and `reflect-metadata` ^0.1.12 || ^0.2.0 as peer dependencies. A CommonJS-only NestJS setup is a legacy configuration, not the supported path.
+  - Official docs: <https://docs.nestjs.com/>. Version pins and the exact pages consulted are recorded in [`../../docs/OFFICIAL_REFERENCES.md`](../../docs/OFFICIAL_REFERENCES.md).
 
 ## Commands
 
