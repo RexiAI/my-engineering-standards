@@ -132,11 +132,18 @@ reuse, not preemptively (YAGNI — docs/CODING_CONVENTIONS.md §Design Principle
   (<https://rust-lang.github.io/rust-clippy/master/index.html#cognitive_complexity>):
   `restriction` group, **allow by default**, default threshold **25**
   (configurable via `cognitive-complexity-threshold` in `clippy.toml`). It
-  measures cognitive complexity at a much looser default, so it is an advisory
-  aid, not an equivalent gate. The binding mechanical gate for Rust repos
-  remains the language-agnostic heuristic in `scripts/check-code-principles.sh`;
-  enabling `-W clippy::cognitive_complexity` with a tightened threshold is
-  recommended as a review signal. **[official lint, convention usage]**
+   measures cognitive complexity at a much looser default, so it is an advisory
+   aid, not an equivalent gate. **Rust currently has no mechanical complexity
+   gate in this repo.** `scripts/check-code-principles.sh` enumerates only
+   `*.java`, `*.go`, and `*.ts`/`*.tsx`/`*.js`/`*.jsx` (lines 307–309) and
+   exits *clean* with "No Java, Go, or JS/TS source files found" when none
+   match (line 311) — so a Rust-only repo passes that gate **without being
+   checked at all**. Do not rely on it. Until a Rust-aware gate exists, ≤6 is
+   enforced by review; enable `-W clippy::cognitive_complexity` with a
+   tightened threshold as the interim mechanical signal. Extending the script
+   to `*.rs` is a gate-catalog change and requires an ADR first
+   (`docs/GOVERNANCE.md §ADR Requirement`).
+   **[official lint; convention usage; gate gap verified against the script]**
 
 ## Always-Rules
 

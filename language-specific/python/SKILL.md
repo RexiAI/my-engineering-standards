@@ -229,3 +229,17 @@ awesome-project/
 Child repos opt in by adding `language-specific/python/SKILL.md` to their
 `opencode.json` `instructions` array, alongside any other language-specific
 guides they use.
+
+**No Python saga/outbox CI gate templates exist yet, and detection does not scan
+Python.** `scripts/detect-saga-outbox.sh` filters changed files to
+`\.(java|go|ts|js|sql|xml)$` (line 79) and allows only
+`*.java|*.go|*.ts|*.js|*.sql|*.xml` for migration names (line 69). A FastAPI
+service carrying saga or outbox code therefore leaves `SAGA_DETECTED` and
+`OUTBOX_DETECTED` false, and every downstream gate (`check-saga-timeouts.sh`,
+`check-saga-tests.sh`, `lint-outbox-schema.sh`, `check-outbox-relay.sh`)
+silently skips. **That is a coverage hole, not a passing gate** — apply
+`docs/SAGA_PATTERN.md` and `docs/OUTBOX_PATTERN.md` by review until a Python gate
+exists. `ci/templates/` covers Java, Go and Node only; adding a Python gate
+changes the gate catalog and requires an ADR first
+(`docs/GOVERNANCE.md §ADR Requirement`). This directory is deliberately
+docs-only — track it as a follow-up, don't improvise a gate script.

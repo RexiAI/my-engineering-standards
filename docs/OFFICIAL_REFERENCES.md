@@ -315,14 +315,26 @@ Recorded here because they are the reason a guide says what it says.
   lifespan events. Sources:
   [`/tutorial/testing/`](https://fastapi.tiangolo.com/tutorial/testing/),
   [`/advanced/async-tests/`](https://fastapi.tiangolo.com/advanced/async-tests/).
-- **No official Rust cyclomatic-complexity gate exists.** Clippy ships
-  `clippy::cognitive_complexity`, but it is in the `restriction` group,
-  **allow-by-default**, threshold 25, and the Clippy team's own docs now express
-  doubt about the metric. The binding complexity gate here is the
-  language-agnostic heuristic in `scripts/check-code-principles.sh`; the Clippy
-  lint is opt-in advisory at a tightened threshold. This is *not* equivalent to
+- **No official Rust cyclomatic-complexity gate exists — and neither does an
+  in-repo one.** Clippy ships `clippy::cognitive_complexity`, but it is in the
+  `restriction` group, **allow-by-default**, threshold 25, and the Clippy team's
+  own docs now express doubt about the metric. Separately,
+  `scripts/check-code-principles.sh` enumerates only `*.java`, `*.go` and
+  `*.ts`/`*.tsx`/`*.js`/`*.jsx` (lines 307–309) and exits *clean* with "No
+  Java, Go, or JS/TS source files found" when none match (line 311) — so it
+  **does not analyse Rust or Python at all**. Rust complexity is therefore
+  review-enforced for now, with `-W clippy::cognitive_complexity` at a tightened
+  threshold as the interim mechanical signal; Python is covered by ruff `C901`
+  configured per-project, which *is* real enforcement. Neither is equivalent to
   PMD (`language-specific/java/`) or golangci `cyclop`/`gocognit`
-  (`language-specific/go/`).
+  (`language-specific/go/`). Extending the script to `*.rs`/`*.py` is a
+  gate-catalog change requiring an ADR.
+- **`scripts/detect-saga-outbox.sh` does not scan Python or Rust.** Its
+  `CODE_FILES` filter is `\.(java|go|ts|js|sql|xml)$` (line 79) and its
+  migration-name check allows only `*.java|*.go|*.ts|*.js|*.sql|*.xml`
+  (line 69). A FastAPI or Rust service containing saga/outbox code therefore
+  leaves `SAGA_DETECTED`/`OUTBOX_DETECTED` false, and every downstream gate
+  silently skips. This is a coverage hole, not a passing gate.
 - **`cargo-audit` and `cargo-mutants` are third-party subcommands**, not built
   into Cargo. `cargo-mutants` could not be verified against a canonical source
   and is flagged evaluate-first in `language-specific/rust/TESTING.md`.
