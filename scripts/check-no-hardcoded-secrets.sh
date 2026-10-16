@@ -31,6 +31,12 @@
 # this file — and the selftest under scripts/, both in scope — stays clean; a
 # literal fixture would fail the check it proves.
 #
+# Class-2 findings print the variable NAME and the value's LENGTH, never the
+# value itself. Echoing a detected credential would leak it into terminal
+# scrollback, agent transcripts, CI logs and PR annotations at the exact moment
+# it is found (issue #72, finding 2) — the scanner would become the fastest way
+# to publish the secret it exists to catch.
+#
 # Usage:
 #   scripts/check-no-hardcoded-secrets.sh [PROJECT_ROOT]
 #   scripts/check-no-hardcoded-secrets.sh --self-test
@@ -143,7 +149,13 @@ scan_root() {
         text="${hit#*:}"
         rhs="${text#*=}"
         if is_ignored_rhs "$rhs"; then continue; fi
-        report_hit "$root" "$file" "${hit%%:*}" "secret-style assignment: $text"
+        # Redact the value. Echoing it would leak the credential into terminal
+        # scrollback, agent transcripts, CI logs and PR annotations at the exact
+        # moment it is discovered — issue #72 finding 2. The variable name and
+        # the value's length are kept: enough to locate and triage the finding,
+        # and the length alone separates a real token from a stub.
+        report_hit "$root" "$file" "${hit%%:*}" \
+          "secret-style assignment: ${text%%=*}=<redacted ${#rhs} chars>"
       done < <(grep -nE "$ASSIGN_RE" "$file" || true)
     done < <(find "$root/$dir" -type f -not -path "*/docs/changes/*" -print0 2>/dev/null || true)
   done
