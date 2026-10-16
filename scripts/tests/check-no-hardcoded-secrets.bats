@@ -98,3 +98,35 @@ teardown() { teardown_tmpdir; }
   [ "$status" -eq 1 ]
   [[ "$output" == *"scripts/leak.sh:1"* ]]
 }
+
+# Issue #72 finding 2: the scanner echoed the matched credential value verbatim,
+# leaking it into terminal scrollback, agent transcripts, CI logs and PR
+# annotations at the moment of detection. A finding must stay actionable — file,
+# line, variable name, value length — without publishing the secret.
+@test "check-no-hardcoded-secrets: the matched secret VALUE is never printed" {
+  mkdir -p "$TMPDIR_HELPER/config"
+  printf 'API_TOKEN=%s\n' 'SuperSecretValueThatMustNeverAppear' \
+    > "$TMPDIR_HELPER/config/leak.env"
+  run bash "$REPO_ROOT/scripts/check-no-hardcoded-secrets.sh" "$TMPDIR_HELPER"
+  [ "$status" -eq 1 ]
+  # Still locatable and triageable...
+  [[ "$output" == *"config/leak.env:1"* ]]
+  [[ "$output" == *"secret-style assignment"* ]]
+  [[ "$output" == *"API_TOKEN="* ]]
+  [[ "$output" == *"redacted"* ]]
+  # ...but the value itself must not appear anywhere in the output.
+  [[ "$output" != *"SuperSecretValueThatMustNeverAppear"* ]]
+}
+
+@test "check-no-hardcoded-secrets: a literal token prefix is reported without echoing the line" {
+  # Class 1 never printed the matched text, but pin it so a future refactor
+  # cannot reintroduce the leak through this path either.
+  mkdir -p "$TMPDIR_HELPER/scripts"
+  printf 'X="%s%s"\n' 'ghp' '_SuperSecretTokenBodyThatMustNeverAppear' \
+    > "$TMPDIR_HELPER/scripts/prefix.sh"
+  run bash "$REPO_ROOT/scripts/check-no-hardcoded-secrets.sh" "$TMPDIR_HELPER"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"scripts/prefix.sh:1"* ]]
+  [[ "$output" == *"literal token prefix"* ]]
+  [[ "$output" != *"SuperSecretTokenBodyThatMustNeverAppear"* ]]
+}
