@@ -1,3 +1,10 @@
+## [1.36.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.36.0...v1.36.1) (2026-10-16)
+
+
+### Bug Fixes
+
+* **loop:** parent the daily-triage state commit on loop-state, not main ([#83](https://github.com/RexiAI/my-engineering-standards/issues/83)) ([5458fed](https://github.com/RexiAI/my-engineering-standards/commit/5458fedeeccdbcd650f46edbe01a026deb5b294d)), closes [#77](https://github.com/RexiAI/my-engineering-standards/issues/77) [#77](https://github.com/RexiAI/my-engineering-standards/issues/77) [#71](https://github.com/RexiAI/my-engineering-standards/issues/71)
+
 # [1.36.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.35.1...v1.36.0) (2026-10-16)
 
 
