@@ -1,3 +1,10 @@
+## [1.36.2](https://github.com/RexiAI/my-engineering-standards/compare/v1.36.1...v1.36.2) (2026-10-16)
+
+
+### Bug Fixes
+
+* **security:** redact detected credential values from scanner output ([#84](https://github.com/RexiAI/my-engineering-standards/issues/84)) ([987026d](https://github.com/RexiAI/my-engineering-standards/commit/987026dc7472fedb2b41cd7d34f0abf336642445)), closes [#82](https://github.com/RexiAI/my-engineering-standards/issues/82)
+
 ## [1.36.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.36.0...v1.36.1) (2026-10-16)
 
 
