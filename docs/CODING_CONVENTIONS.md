@@ -72,6 +72,30 @@ defect; a WARN is a review hint to verify before merging.
   inward. Domain/engine code must never import infrastructure (store,
   repository, persistence, DB clients). See `docs/ARCHITECTURE.md`.
 
+### Structural cleanliness for web surfaces
+
+Three rules born of a real regression review (2026-10-15, a spec-pipeline child
+repo whose owner's verdict on the shipped code was "slop"; the findings below
+were its core):
+
+- **No regex post-processing of assembled markup.** Build attributes and child
+  nodes *before* assembling the HTML string. `html.replace(/(<input\b[^]*?)>/, …)`
+  style surgery reassembles markup after escaping, defeating sink discipline
+  (see SECURITY.md §Escape User Data in Outbound HTML), and cannot be linted.
+- **HTTP boundaries return Results, not throws, for expected failures.**
+  Missing config, stopped pipeline, unknown id: return values mapped to one
+  structured error shape and one status contract per surface. A route that
+  answers two body shapes under 200 while its siblings answer 503 for the same
+  condition is a defect (see ARCHITECTURE.md §Error Handling).
+- **One mapper per report shape.** When CLI, JSON API and HTML form render the
+  same service result, the mapping lives in one shared function; per-surface
+  copies drift (DRY).
+
+Enforcement today: god-file promotion is opt-in via `STRICT_GOD_FILE=1` in
+`scripts/check-code-principles.sh`; the two rules above are review-enforced
+pending mechanical checks. Promotion criteria and the rejected alternative
+(prescribing a web framework such as NestJS) are recorded in ADR 0005.
+
 ### Base rules
 
 - **Prefer composition over inheritance.** Use interfaces and delegation instead of abstract base classes. For tests, use plain `@BeforeEach` + helper methods instead of `AbstractBaseTestSuite` base classes.
