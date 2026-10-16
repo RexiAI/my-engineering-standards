@@ -1,0 +1,43 @@
+# Pact contract testing setup for Rust
+# The official Rust implementation is pact-foundation/pact-reference
+# (https://docs.pact.io/implementation_guides/rust — Pact spec v1–v4; crates
+# published on crates.io, actively released). Contract tests are a
+# multi-service-tier gate (docs/CONFORMANCE_TIERS.md).
+#
+# Requires a running Pact broker (see ci/templates/pact-broker-local.yml).
+#
+# Consumer tests — add the DSL to Cargo.toml dev-dependencies:
+#
+# [dev-dependencies]
+# pact_consumer = "~1.4.0"
+#
+# They are ordinary #[tokio::test] functions building interactions with
+# PactBuilder (https://docs.pact.io/implementation_guides/rust/pact_consumer);
+# pact files land in target/pacts (override with PACT_OUTPUT_DIR). They run as
+# part of `cargo test`, so child-ci-rust.yml's contract-test job uses the name
+# filter `cargo test --locked pact` — zero matches exits green, no fallback
+# needed.
+#
+# Provider verification — standalone CLI (single binary `pact-verifier` from
+# the pact_verifier_cli crate; this is the Rust provider path docs.pact.io
+# recommends):
+#
+#   cargo install pact_verifier_cli
+#
+# Run against the live provider (flags and env-var bindings from the official
+# pact_verifier_cli README):
+#
+#   pact-verifier \
+#     --provider-name my-service \
+#     --port 8080 \
+#     --broker-url "$PACT_BROKER_URL" \
+#     --token "$PACT_BROKER_TOKEN" \
+#     --publish --provider-version "$GITHUB_SHA"
+#
+# Local pact files instead of a broker: --dir ./pacts (or --file <path>).
+# Provider states: --state-change-url http://localhost:8080/_pact/setup.
+#
+# CI integration (GitHub Actions step):
+#   - run: cargo test --locked pact
+#     env:
+#       PACT_BROKER_URL: ${{ secrets.PACT_BROKER_URL }}

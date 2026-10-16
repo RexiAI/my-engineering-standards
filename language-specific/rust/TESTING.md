@@ -197,9 +197,12 @@ Both are `production`-tier per [`docs/CONFORMANCE_TIERS.md`](../../docs/CONFORMA
 and docs/TESTING.md — not required at `mvp`.
 
 - **Property testing [ecosystem]:** docs/TESTING.md names tools for Java/Go/JS
-  but not yet Rust; this guide nominates **`proptest`**
-  (<https://docs.rs/proptest>) as the Rust convention (candidate: it is used as
-  a dev-dependency by Tokio itself). Use for invariants — "result is never
+  but not Rust; this guide nominates **`proptest`**
+  (<https://docs.rs/proptest>) as the Rust convention (it is used as a
+  dev-dependency by Tokio itself; `quickcheck` is also accepted).
+  `scripts/check-code-principles.sh` now detects `proptest`/`quickcheck` in
+  source or `Cargo.toml` and warns when neither is present (ADR 0006 D1,
+  warn-only during that ADR's D6 phase). Use for invariants — "result is never
   negative", "operation is idempotent" — not arbitrary properties.
 - **Mutation testing [ecosystem]:** docs/TESTING.md names PiTest/Gremlins/
   Stryker for the other languages. The Rust candidate is **`cargo-mutants`**

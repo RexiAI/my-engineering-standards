@@ -1,0 +1,62 @@
+# cargo-mutants mutation-testing config — copy to .cargo/mutants.toml at the
+# child project root. That is the tool's default config location and the book
+# recommends checking it in so `cargo mutants` needs no other options
+# (https://mutants.rs/print.html#config-file). Native-config-file pattern, same
+# as stryker.conf.json.
+#
+# Conformance tier: production (docs/CONFORMANCE_TIERS.md). Run periodically
+# and pre-release, never on every PR (docs/TESTING.md §Mutation Testing;
+# language-specific/rust/TESTING.md §Property & Mutation Testing). That is why
+# child-ci-rust.yml does not wire this in, exactly as mutation.mk (Go),
+# pitest-profile.xml (Java) and stryker.conf.json (JS/TS) stay out of the
+# default pipelines.
+#
+# Usage:
+#   cargo install --locked cargo-mutants   # official install (https://mutants.rs/)
+#   cargo mutants                          # results + logs land in mutants.out/
+#
+# Gate: `cargo mutants` exits 0 only when every viable mutant was caught;
+# exit 2 = missed mutants, 3 = test timeouts, 4 = baseline already failing
+# (the book's exit-code table). That built-in gate is STRICTER than the house
+# floor (mutation score >= 80%, docs/TESTING.md §Mutation Testing). A repo
+# calibrating to exactly 80% during the ADR 0006 D6 warn phase can compute the
+# score from mutants.out/outcomes.json (fields: caught, missed, timeout,
+# unviable, total_mutants) — but the book marks that file's format
+# "subject to change", so pin the cargo-mutants version when parsing it, and
+# fail the gate when zero mutants were scored: a score computed over nothing
+# is a false pass (the zero-file rule ADR 0006 D5 applies to every gate).
+#
+# Keys below are from the official example config
+# (https://github.com/sourcefrog/cargo-mutants/blob/main/examples/custom_config.toml).
+
+# Mutate application code only, never test code — the cargo-mutants analogue
+# of stryker.conf.json's "!src/**/*.test.ts" exclusions.
+examine_globs = ["src/**/*.rs"]
+exclude_globs = ["tests/**/*.rs"]
+
+# Exercise every feature combination under mutation — same rationale as
+# `clippy --all-features` (language-specific/rust/SKILL.md §Linting &
+# Formatting): a feature combination that is never compiled is never tested.
+all_features = true
+
+# Keep Cargo's reproducibility guarantee inside mutation runs too (SKILL.md
+# §Linting & Formatting, "Reproducible CI"). Passed to every cargo invocation.
+additional_cargo_args = ["--locked"]
+
+# Don't score mutations of logging/panic macros — tracing is the house logging
+# facade (SKILL.md §Always-Rules) and mutated log strings are noise, the same
+# category the official example config skips.
+skip_calls = [
+    "println!",
+    "eprintln!",
+    "debug!",
+    "info!",
+    "warn!",
+    "error!",
+    "trace!",
+    "panic!",
+    "unreachable!",
+    "todo!",
+    "unimplemented!",
+]
+skip_calls_defaults = true

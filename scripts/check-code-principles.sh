@@ -3,9 +3,18 @@
 # KISS, DRY, YAGNI, SOLID, cyclomatic complexity, and property-test coverage.
 #
 # Works on any code the standards allow: Java, Go, JavaScript/TypeScript (incl.
-# React Native). It reads source files directly and applies the same heuristics
-# to every language, so it runs in a child repo without any project-specific
-# linter configuration.
+# React Native), and — per docs/adr/0006-python-rust-gate-coverage.md (D1) —
+# Python and Rust. It reads source files directly and applies the same
+# heuristics to every language, so it runs in a child repo without any
+# project-specific linter configuration.
+#
+# ADR 0006 D6 rollout: Python and Rust coverage is WARN-ONLY for one release.
+# Findings in .py/.rs files never change the exit status (see WARN_ONLY_LANGS
+# below); Java/Go/JS-TS behavior is unchanged. The Python and Rust complexity
+# heuristics are approximations — Python comprehensions/decorator stacks and
+# Rust match arms/generic bounds/closures can inflate naive counts — so their
+# findings say so explicitly. `component-per-file` is a JS/TS component-model
+# concept and is NOT applied to Python or Rust (ADR 0006 D1).
 #
 # Checks and what each flags:
 #   Complexity   — methods/functions with >6 decision points (if/for/while/
@@ -33,7 +42,9 @@
 #                  the anti-pattern.
 #   Property tests — at `production` tier and above, each present language must
 #                  use its property-testing framework (jqwik / testing.quick /
-#                  fast-check). See docs/TESTING.md §Property Testing.
+#                  fast-check; Python hypothesis and Rust proptest/quickcheck
+#                  during the ADR 0006 warn phase). See docs/TESTING.md
+#                  §Property Testing.
 #
 # This is a heuristic gate, not a proof. It catches the common shapes the
 # principles forbid and points at exact file:line evidence; it does not parse
@@ -44,6 +55,14 @@
 #   .standards/scripts/check-code-principles.sh [SOURCE_DIR] [--tier mvp|production|multi-service]
 #                                           [--gates <list>] [--warn-as-error] [--json]
 #                                           [-ReportPath <file>] [-BaseRef <ref>] [--blocking <gates>]
+#                                           [--require-language <lang>]
+#
+# --require-language <lang> (ADR 0006 D5): opt-in strictness for child repos
+# that know what they are. Exits 1 when zero files of <lang> are found under
+# SOURCE_DIR, exits 0 (normal run) when at least one is present. Valid names:
+# java, go, node (aliases: js, ts, javascript, typescript), python (py),
+# rust (rs). Without this flag a zero-file scan still exits 0 — a hard failure
+# would break docs-only repos and uncovered languages (ADR 0006 Alternative A).
 #
 # SOURCE_DIR defaults to the current directory. --tier overrides auto-detection
 # from the project's AGENTS_*.md "Conformance tier:" declaration (see
@@ -82,10 +101,15 @@
 #   Override with --blocking <comma-list> or the
 #   PRINCIPLES_BLOCKING_GATES environment variable (flag wins over env
 #   over default); an unknown gate name or an empty value exits 2.
+#   Language scoping (ADR 0006 D6): python and rust are in WARN_ONLY_LANGS —
+#   their findings are demoted to WARN before the blocking set is consulted,
+#   so no --blocking value can make a .py/.rs finding fail during the warn
+#   phase. Promote by removing the language from WARN_ONLY_LANGS (phase 2).
 #
 # Exit codes:
 #   0 — no FAILs (WARNs may exist), or no source files to check
-#   1 — at least one FAIL (or a WARN with --warn-as-error)
+#   1 — at least one FAIL (or a WARN with --warn-as-error), or
+#       --require-language <lang> named a language with zero files found
 #   2 — could not perform the check for a non-finding reason: a required tool
 #       (find/xargs/awk/grep/sed/tr/sort/wc/head/mktemp/rm) is missing, the
 #       source directory is unusable, or a usage error (unknown option, unknown
@@ -132,6 +156,30 @@ BASE_REF_SET=false
 BLOCKING_ARG=""
 BLOCKING_ARG_SET=false
 BLOCKING_SET="complexity property-tests component-per-file"
+REQUIRE_LANG=""
+REQUIRE_LANG_SET=false
+
+# ── ADR 0006 D6 warn phase ────────────────────────────────────────────────────
+# Languages listed here are warn-only for one release: classify()/
+# classify_blame() demote every finding in their files to WARN before the
+# blocking set is consulted, so new-language coverage cannot change the exit
+# status. PATH TO PROMOTION (phase 2): remove the language from this list —
+# nothing else gates on it — and update the header docs above.
+WARN_ONLY_LANGS="python rust"
+is_warn_only_lang() { # is_warn_only_lang <lang> — 0 while <lang> is in the D6 warn phase
+  local l
+  [ -n "${1:-}" ] || return 1
+  for l in $WARN_ONLY_LANGS; do [ "$l" = "$1" ] && return 0; done
+  return 1
+}
+lang_of_file() { # lang_of_file <path> — analyzer language for a file extension ("" = legacy language)
+  case "$1" in
+    *.py) echo python ;;
+    *.rs) echo rust ;;
+    *) echo "" ;;
+  esac
+}
+
 fail() { # fail <message> [file] [line]
   local msg="$1" loc=""
   [ -n "${2:-}" ] && loc=" ($2${3:+:$3})"
@@ -184,6 +232,7 @@ while [ $# -gt 0 ]; do
       tier) TIER="${2:-}"; shift $(( $# > 1 ? 2 : 1 )) ;;
       warn-as-error) WARN_AS_ERROR=true; shift ;;
       blocking) BLOCKING_ARG="${2:-}"; BLOCKING_ARG_SET=true; shift $(( $# > 1 ? 2 : 1 )) ;;
+      require-language) REQUIRE_LANG="${2:-}"; REQUIRE_LANG_SET=true; shift $(( $# > 1 ? 2 : 1 )) ;;
       BaseRef) BASE_REF="${2:-}"; BASE_REF_SET=true; shift $(( $# > 1 ? 2 : 1 )) ;;
       gates) GATES_SET=true; GATES="${2:-}"; shift $(( $# > 1 ? 2 : 1 )) ;;
       json) JSON=true; shift ;;
@@ -201,6 +250,21 @@ done
 if [ "$BASE_REF_SET" = true ] && [ -z "$BASE_REF" ]; then
   echo "Error: -BaseRef requires a value (the git ref to diff against)" >&2
   exit 2
+fi
+
+# ── --require-language validation (ADR 0006 D5) ──────────────────────────────
+if [ "$REQUIRE_LANG_SET" = true ]; then
+  if [ -z "$REQUIRE_LANG" ]; then
+    echo "Error: --require-language requires a language name (java, go, node, python, rust)" >&2
+    exit 2
+  fi
+  case "$REQUIRE_LANG" in
+    java|go|node|python|rust) ;;
+    js|ts|javascript|typescript) REQUIRE_LANG=node ;;
+    py) REQUIRE_LANG=python ;;
+    rs) REQUIRE_LANG=rust ;;
+    *) echo "Error: unknown --require-language value: '$REQUIRE_LANG' (valid: java, go, node, python, rust)" >&2; exit 2 ;;
+  esac
 fi
 
 # ── Blocking set (which gates may emit FAIL) ─────────────────────────────────
@@ -307,9 +371,33 @@ FIND_PRUNE='( -name node_modules -o -name target -o -name vendor -o -name .git -
 JAVA_FILES=$(find "$SOURCE_DIR" $FIND_PRUNE -prune -o -name '*.java' -print 2>/dev/null || true)
 GO_FILES=$(find "$SOURCE_DIR" $FIND_PRUNE -prune -o -name '*.go' -print 2>/dev/null || true)
 NODE_FILES=$(find "$SOURCE_DIR" $FIND_PRUNE -prune -o \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \) -print 2>/dev/null || true)
+PY_FILES=$(find "$SOURCE_DIR" $FIND_PRUNE -prune -o -name '*.py' -print 2>/dev/null || true)
+RS_FILES=$(find "$SOURCE_DIR" $FIND_PRUNE -prune -o -name '*.rs' -print 2>/dev/null || true)
 
-[ -z "$JAVA_FILES" ] && [ -z "$GO_FILES" ] && [ -z "$NODE_FILES" ] && {
-  finish_clean "No Java, Go, or JS/TS source files found under $SOURCE_DIR — nothing to check."
+# --require-language (ADR 0006 D5): the caller declared the language this repo
+# is written in — zero files of it is a failure (exit 1), not a silent pass.
+if [ "$REQUIRE_LANG_SET" = true ]; then
+  REQ_FOUND=""
+  case "$REQUIRE_LANG" in
+    java) REQ_FOUND="$JAVA_FILES" ;;
+    go) REQ_FOUND="$GO_FILES" ;;
+    node) REQ_FOUND="$NODE_FILES" ;;
+    python) REQ_FOUND="$PY_FILES" ;;
+    rust) REQ_FOUND="$RS_FILES" ;;
+  esac
+  if [ -z "$REQ_FOUND" ]; then
+    echo "ERROR: --require-language $REQUIRE_LANG: no matching source files found under $SOURCE_DIR — expected at least one" >&2
+    exit 1
+  fi
+  say "--require-language $REQUIRE_LANG: matching source files found under $SOURCE_DIR"
+fi
+
+# ADR 0006 D5: enumerate exactly which extensions were scanned so a repo in an
+# uncovered language visibly reports that nothing matched, instead of implying
+# it was checked. Still exit 0 by default (Alternative A — hard-failing zero
+# files — breaks docs-only repos and uncovered languages).
+[ -z "$JAVA_FILES" ] && [ -z "$GO_FILES" ] && [ -z "$NODE_FILES" ] && [ -z "$PY_FILES" ] && [ -z "$RS_FILES" ] && {
+  finish_clean "No source files found under $SOURCE_DIR — scanned for extensions: java, go, ts, tsx, js, jsx, py, rs; none matched, so nothing was analysed. If this repo uses another language it is NOT covered by this gate; pass --require-language <lang> to fail instead of silently passing."
 }
 
 say "Checking design principles in: $SOURCE_DIR (tier: $TIER)"
@@ -319,8 +407,13 @@ say ""
 NONTEST_JAVA=$(echo "$JAVA_FILES" | grep -vE '/test/|/tests/|src/test/' || true)
 NONTEST_GO=$(echo "$GO_FILES" | grep -vE '_test\.go$' || true)
 NONTEST_NODE=$(echo "$NODE_FILES" | grep -vE '\.(test|spec)\.(ts|tsx|js|jsx)$|/test/|/tests/|__tests__/' || true)
+# Python: pytest/unittest conventions (test_*.py, *_test.py, tests/ dirs, conftest).
+NONTEST_PY=$(echo "$PY_FILES" | grep -vE '/tests?/|(^|/)test_[^/]*\.py$|_test\.py$|(^|/)conftest\.py$' || true)
+# Rust: the tests/ integration dir. #[cfg(test)] modules inside src/ cannot be
+# filtered by filename — same approximation the other languages already make.
+NONTEST_RS=$(echo "$RS_FILES" | grep -vE '/tests?/|(^|/)tests?\.rs$' || true)
 
-ALL_NONTEST="$NONTEST_JAVA $NONTEST_GO $NONTEST_NODE"
+ALL_NONTEST="$NONTEST_JAVA $NONTEST_GO $NONTEST_NODE $NONTEST_PY $NONTEST_RS"
 ALL_NONTEST=$(echo "$ALL_NONTEST" | tr ' ' '\n' | sed '/^$/d' | sort -u)
 
 # ── Complexity + KISS analyzer (awk) ─────────────────────────────────────────
@@ -352,6 +445,13 @@ function clean(s,   i,n,c,out,q) {
 function ismethodstart(h, lang,   l) {
   sub(/^[ \t]+/,"",h); l=h
   if (lang=="go") return (h ~ /^func[ \t]+[A-Za-z_]/) ? 1 : 0
+  if (lang=="rust") {
+    # Rust: `fn name(...) [-> T] {` with the opening brace at end of line.
+    # Approximate: `match x {` and closures are not method starts; a `{` on a
+    # later line (long where-clauses) is missed — undercount, never a false
+    # positive.
+    return (h ~ /(^|[ \t])fn[ \t]+[A-Za-z0-9_]/ && h ~ /\{[ \t]*$/) ? 1 : 0
+  }
   if (h ~ /(^|[^A-Za-z0-9_])(if|for|while|switch|catch|else|do|case|return|try|throw)([^A-Za-z0-9_]|$)/) return 0
   if (lang=="node" && h ~ /=>[ \t]*\{/) return 1
   return (h ~ /\)[ \t]*\{/) ? 1 : 0
@@ -361,6 +461,11 @@ function name_of(h, lang,   p,pre) {
     sub(/^[ \t]*func[ \t]*/,"",h)
     if (h ~ /^\(/) sub(/^\([^)]*\)[ \t]*/,"",h)
     sub(/\(.*/,"",h); sub(/[ \t].*/,"",h)
+    return h
+  }
+  if (lang=="rust") {
+    sub(/^[ \t]*(pub([ \t]*\([^)]*\))?[ \t]+)?((async|unsafe|const|extern)[ \t]+)*fn[ \t]+/,"",h)
+    sub(/[<(].*/,"",h); sub(/[ \t].*/,"",h)
     return h
   }
   p=index(h,"("); if (p==0) return "?"
@@ -373,7 +478,15 @@ function tokens(line,   c) {
   c += gsub(/(^|[^A-Za-z0-9_])(if|for|while|switch|catch|case)([^A-Za-z0-9_]|$)/," ",line)
   c += gsub(/&&/," ",line)
   c += gsub(/\|\|/," ",line)
-  c += gsub(/\?/," ",line)
+  if (LANG=="rust") {
+    # Rust has no ternary `?` (postfix `?` is the try operator — not a branch),
+    # but `match`/`loop` and each `=>` arm are decision points. Approximate:
+    # `||` is also the zero-arg closure form, which overcounts here.
+    c += gsub(/(^|[^A-Za-z0-9_])(match|loop)([^A-Za-z0-9_]|$)/," ",line)
+    c += gsub(/=>/," ",line)
+  } else {
+    c += gsub(/\?/," ",line)
+  }
   return c
 }
 function begin_method(line, lang, dbefore,   d) {
@@ -425,6 +538,92 @@ END { while (top>=0) end_method() }
 AWK
 )"
 
+# ── Python complexity + KISS analyzer (awk, indent-based) ────────────────────
+# Python has no braces, so the analyzer above cannot serve it: function bodies
+# are tracked by indentation instead of brace depth. Heuristic and approximate
+# (ADR 0006): comprehension `for`/`if` clauses count as decision points (they
+# are branches, but a dense comprehension inflates the count); decorator stacks
+# and multi-line signatures are handled only approximately; blank/comment lines
+# do not count toward body length. Findings for python are emitted as warnings
+# that say they are approximate (D6 warn phase).
+complexity_awk_py="$(cat <<'AWK'
+function cleanpy(s,   i,n,c,out,q) {
+  out=""; i=1; n=length(s)
+  while (i<=n) {
+    c=substr(s,i,1)
+    if (c=="#") break
+    if (c=="\"" || c=="'") { q=c; i++
+      while (i<=n) {
+        if (substr(s,i,1)=="\\") { i+=2; continue }
+        if (substr(s,i,1)==q) { i++; break }
+        i++
+      }
+      continue
+    }
+    out=out c; i++
+  }
+  return out
+}
+function pyname(h,   t) {
+  t=h
+  sub(/^[ \t]*(async[ \t]+)?def[ \t]+/,"",t)
+  sub(/\(.*/,"",t); sub(/[ \t:].*/,"",t)
+  return t
+}
+function pyparams(h,   p,c,i,n,instr,ch) {
+  p=index(h,"("); if (p==0) return 0
+  n=length(h); c=0; instr=0
+  for (i=p+1; i<=n; i++) {
+    ch=substr(h,i,1)
+    if (ch=="(") instr++
+    else if (ch==")") { if (instr==0) break; instr-- }
+    else if (ch=="," && instr==0) c++
+  }
+  return c+1
+}
+function pytokens(line,   c) {
+  # Decision keywords. `and`/`or` short-circuit like &&/||; the inline ternary
+  # `a if b else c` and comprehension `for`/`if` clauses are counted wherever
+  # they appear — deliberate overcount, flagged as approximate in the message.
+  c += gsub(/(^|[^A-Za-z0-9_])(if|elif|for|while|except|and|or)([^A-Za-z0-9_]|$)/," ",line)
+  return c
+}
+function begin_py(line, indent) {
+  top++
+  STACK[top,"i"] = indent
+  STACK[top,"n"] = pyname(line)
+  STACK[top,"l"] = FNR
+  STACK[top,"c"] = 1
+  STACK[top,"lines"] = 1
+  STACK[top,"params"] = pyparams(line)
+}
+function end_py( ) {
+  if (top<0) return
+  if (STACK[top,"c"] > 6)
+    printf "%s:%d:%d:%s:CC=%d\n", FILENAME, STACK[top,"l"], FNR, STACK[top,"n"], STACK[top,"c"]
+  if (STACK[top,"lines"] > 20)
+    printf "%s:%d:%d:%s:KISS_LINES=%d\n", FILENAME, STACK[top,"l"], FNR, STACK[top,"n"], STACK[top,"lines"]
+  if (STACK[top,"params"] > 6)
+    printf "%s:%d:%d:%s:KISS_PARAMS=%d\n", FILENAME, STACK[top,"l"], FNR, STACK[top,"n"], STACK[top,"params"]
+  top--
+}
+FNR==1 { top=-1 }
+{
+  if ($0 ~ /^[ \t]*$/) next
+  line=cleanpy($0)
+  if (line ~ /^[ \t]*$/) next
+  indent=match(line,/[^ \t]/)-1
+  while (top>=0 && indent <= STACK[top,"i"]) end_py()
+  if (line ~ /^[ \t]*(async[ \t]+)?def[ \t]+[A-Za-z0-9_]/) begin_py(line, indent)
+  if (top>=0) {
+    STACK[top,"c"] += pytokens(line)
+    STACK[top,"lines"]++
+  }
+}
+END { while (top>=0) end_py() }
+AWK
+)"
+
 # split_loc <file:line> — split an analyzer location into LOC_FILE / LOC_LINE.
 split_loc() {
   LOC_FILE="${1%%:*}"
@@ -451,10 +650,17 @@ run_complexity_kiss() {
   local lang="$1"; shift
   local files=("$@")
   [ "${#files[@]}" -eq 0 ] && return 0
-  local out rc
+  local out rc prog="$complexity_awk" approx=""
+  case "$lang" in
+    python)
+      prog="$complexity_awk_py"
+      approx=" [approximate heuristic — comprehension/decorator forms can inflate the count; ADR 0006 warn phase]" ;;
+    rust)
+      approx=" [approximate heuristic — match arms/generic bounds/closures can inflate the count; ADR 0006 warn phase]" ;;
+  esac
   # No `|| true` swallow: an awk/xargs failure means the check could not run —
   # that is a tooling failure (exit 2), never a silent PASS (AC-007-03-07).
-  out=$(printf '%s\n' "${files[@]}" | xargs awk -v LANG="$lang" "$complexity_awk" 2>&1) || rc=$?
+  out=$(printf '%s\n' "${files[@]}" | xargs awk -v LANG="$lang" "$prog" 2>&1) || rc=$?
   if [ "${rc:-0}" -ne 0 ]; then
     echo "ERROR: complexity/KISS analyzer failed to run (awk/xargs) — cannot complete the check" >&2
     exit 2
@@ -467,9 +673,9 @@ run_complexity_kiss() {
     s=$(printf '%s' "$line" | cut -d: -f2)
     e=$(printf '%s' "$line" | cut -d: -f3)
     case "$line" in
-      *CC=*) emit "$(classify "complexity" "fail" "$f" "$s" "$e")" "Cyclomatic complexity >6 ($lang): $line" "$f" "$s" ;;
-      *KISS_LINES=*) emit "$(classify "complexity" "warn" "$f" "$s" "$e")" "Method body >20 lines ($lang): $line" "$f" "$s" ;;
-      *KISS_PARAMS=*) emit "$(classify "complexity" "warn" "$f" "$s" "$e")" "Method with >6 parameters ($lang): $line" "$f" "$s" ;;
+      *CC=*) emit "$(classify "complexity" "fail" "$f" "$s" "$e" "$lang")" "Cyclomatic complexity >6 ($lang): $line$approx" "$f" "$s" ;;
+      *KISS_LINES=*) emit "$(classify "complexity" "warn" "$f" "$s" "$e" "$lang")" "Method body >20 lines ($lang): $line$approx" "$f" "$s" ;;
+      *KISS_PARAMS=*) emit "$(classify "complexity" "warn" "$f" "$s" "$e" "$lang")" "Method with >6 parameters ($lang): $line$approx" "$f" "$s" ;;
     esac
   done <<< "$out"
 }
@@ -506,7 +712,7 @@ check_dry() {
     while IFS=$'\t' read -r count win loc; do
       dfile=$(printf '%s' "$loc" | sed -E 's/:[0-9]+$//')
       dline=$(printf '%s' "$loc" | sed -nE 's/.*:([0-9]+)$/\1/p')
-      sev=$(classify "dry" "warn" "$dfile" "$dline" "$dline")
+      sev=$(classify "dry" "warn" "$dfile" "$dline" "$dline" "$(lang_of_file "$dfile")")
       if [ "$sev" = none ]; then continue; fi
       emit "$sev" "Possible duplication (${count}x identical 4-line block, first at $loc): ${win//$'\x1f'/ /}" "$dfile" "$dline"
     done < "$tmp"
@@ -584,6 +790,57 @@ check_yagni() {
         done < <(grep -nE '^\s*(export\s+)?interface[ \t]+' "$f" 2>/dev/null || true)
       done
       ;;
+    python)
+      # ABC/Protocol with exactly one concrete subclass = premature abstraction.
+      # Approximate: subclassing detected textually, no import resolution.
+      for f in $files; do
+        [ -f "$f" ] || continue
+        local lniface ln iface
+        while IFS= read -r lniface; do
+          [ -z "$lniface" ] && continue
+          ln=${lniface%%:*}
+          iface=${lniface#*:}
+          name=$(echo "$iface" | grep -oE 'class[ \t]+[A-Za-z0-9_]+' | awk '{print $2}' || true)
+          [ -z "$name" ] && continue
+          impls=$(grep -rE "class[ \t]+[A-Za-z0-9_]+[ \t]*\([^)]*\b$name\b" $GREP_EXCLUDES "$SOURCE_DIR" --include="*.py" 2>/dev/null | wc -l | tr -d ' ' || true)
+          if [ "$impls" -eq 1 ]; then
+            emit "$(classify "yagni" "fail" "$f" "$ln" "$ln" "$lang")" "YAGNI: Python ABC/Protocol $name has exactly one concrete subclass (premature abstraction) — $f:$ln" "$f" "$ln"
+            found=true
+          fi
+        done < <(grep -nE '^[ \t]*class[ \t]+[A-Za-z0-9_]+[ \t]*\([^)]*(ABC|Protocol)[^)]*\)' "$f" 2>/dev/null || true)
+        # Empty bodies: `pass` / `...` as the whole statement (approximate —
+        # `pass` in an except branch is legitimate, hence WARN-level review hint).
+        while IFS=: read -r ln _; do
+          emit "$(classify "yagni" "warn" "$f" "$ln" "$ln" "$lang")" "Empty body (pass/...) ($lang): $f:$ln" "$f" "$ln"
+          found=true
+        done < <(grep -nE '^[ \t]*(pass|\.\.\.)[ \t]*(#.*)?$' "$f" 2>/dev/null | grep -vE 'test' || true)
+      done
+      ;;
+    rust)
+      # Trait with exactly one `impl ... Trait for` = premature abstraction.
+      # Approximate: textual impl count, derive-macro and blanket impls counted
+      # as written.
+      for f in $files; do
+        [ -f "$f" ] || continue
+        local lniface ln iface
+        while IFS= read -r lniface; do
+          [ -z "$lniface" ] && continue
+          ln=${lniface%%:*}
+          iface=${lniface#*:}
+          name=$(echo "$iface" | grep -oE 'trait[ \t]+[A-Za-z0-9_]+' | awk '{print $2}' || true)
+          [ -z "$name" ] && continue
+          impls=$(grep -rE "impl(<[^{;]*>)?[^{;]*\b$name\b[ \t]*for\b" $GREP_EXCLUDES "$SOURCE_DIR" --include="*.rs" 2>/dev/null | wc -l | tr -d ' ' || true)
+          if [ "$impls" -eq 1 ]; then
+            emit "$(classify "yagni" "fail" "$f" "$ln" "$ln" "$lang")" "YAGNI: Rust trait $name has exactly one implementation (premature abstraction) — $f:$ln" "$f" "$ln"
+            found=true
+          fi
+        done < <(grep -nE '^[ \t]*(pub([ \t]*\([^)]*\))?[ \t]+)?trait[ \t]+[A-Za-z0-9_]+' "$f" 2>/dev/null || true)
+        while IFS=: read -r ln _; do
+          emit "$(classify "yagni" "warn" "$f" "$ln" "$ln" "$lang")" "Empty body or empty block ($lang): $f:$ln" "$f" "$ln"
+          found=true
+        done < <(grep -nE '\{\s*\}' "$f" 2>/dev/null | grep -vE '//|test' || true)
+      done
+      ;;
   esac
   $found || pass "YAGNI ($lang): no premature abstractions detected"
 }
@@ -601,6 +858,8 @@ check_solid_srp() {
     case "$lang" in
       java) methods=$(grep -cE '^\s*(public|protected|private)\s+.*\(' "$f" 2>/dev/null | tr -d ' ') || methods=0 ;;
       node) methods=$(grep -cE '^\s*(public|private|protected|async\s+)?[A-Za-z0-9_$]+\s*\([^)]*\)\s*\{' "$f" 2>/dev/null | tr -d ' ') || methods=0 ;;
+      python) methods=$(grep -cE '^[ \t]*(async[ \t]+)?def[ \t]+' "$f" 2>/dev/null | tr -d ' ') || methods=0 ;;
+      rust) methods=$(grep -cE '^[ \t]*(pub([ \t]*\([^)]*\))?[ \t]+)?((async|unsafe|const)[ \t]+)*fn[ \t]+' "$f" 2>/dev/null | tr -d ' ') || methods=0 ;;
       *) methods=0 ;;
     esac
     # Tightened SRP for TSX/JSX: >300 lines OR >8 components (god-file via component count).
@@ -610,7 +869,7 @@ check_solid_srp() {
         *.tsx|*.jsx)
           comp_count=$( (grep -E '^\s*(export\s+)?(default\s+)?(function\s+[A-Z]|const\s+[A-Z][A-Za-z0-9_]*\s*[:=][^;]*=>|const\s+[A-Z][A-Za-z0-9_]*\s*=\s*React\.(memo|forwardRef)|class\s+[A-Z])' "$f" 2>/dev/null || true) | wc -l | tr -d ' ') || comp_count=0
           if [ "$lines" -gt 300 ] || [ "$comp_count" -gt 8 ] || [ "$lines" -gt 400 ] || [ "$methods" -gt 15 ]; then
-            emit "$(classify "solid" "warn" "$f" "" "")" "SRP: possible god file ($lang) — $f: ${lines} lines, ${methods} methods, ${comp_count} components (TSX threshold: 300 lines / 8 components; general: 400 lines / 15 methods) — split by responsibility" "$f"
+            emit "$(classify "solid" "warn" "$f" "" "" "$lang")" "SRP: possible god file ($lang) — $f: ${lines} lines, ${methods} methods, ${comp_count} components (TSX threshold: 300 lines / 8 components; general: 400 lines / 15 methods) — split by responsibility" "$f"
             found=true
           fi
           continue
@@ -618,7 +877,7 @@ check_solid_srp() {
       esac
     fi
     if [ "$lines" -gt 400 ] || [ "$methods" -gt 15 ]; then
-      emit "$(classify "solid" "warn" "$f" "" "")" "SRP: possible god file ($lang) — $f: ${lines} lines, ${methods} methods (split by responsibility)" "$f"
+      emit "$(classify "solid" "warn" "$f" "" "" "$lang")" "SRP: possible god file ($lang) — $f: ${lines} lines, ${methods} methods (split by responsibility)" "$f"
       found=true
     fi
   done
@@ -632,25 +891,54 @@ check_solid_ocp() {
   local res r eif ocpfile ocpline eifline
   for f in $files; do
     [ -f "$f" ] || continue
-    # switch with >=4 cases (word-boundary: matches `switch x {` Go form too)
-    res=$(awk '
-      /(^|[^A-Za-z0-9_])switch([^A-Za-z0-9_]|$)/ { swnr=FNR; cases=0; insw=1 }
-      insw && /case[ \t]+/ { cases++ }
-      insw && /^\s*\}/ { if (cases>=4) printf "%s:%d:switch with %d cases\n", FILENAME, swnr, cases; insw=0 }
-    ' "$f" 2>/dev/null || true)
-    while IFS= read -r r; do
-      [ -n "$r" ] || continue
-      ocpfile=$(printf '%s' "$r" | cut -d: -f1)
-      ocpline=$(printf '%s' "$r" | cut -d: -f2)
-      emit "$(classify "solid" "warn" "$ocpfile" "$ocpline" "$ocpline")" "OCP: type-dispatch switch should be polymorphic ($lang) — $r" "$ocpfile" "$ocpline"
-      found=true
-    done <<< "$res"
-    eif=$(grep -cE '^\s*else[ \t]+if' "$f" 2>/dev/null || true)
-    if [ "${eif:-0}" -ge 4 ]; then
-      eifline=$(grep -nE '^\s*else[ \t]+if' "$f" 2>/dev/null | head -1 | cut -d: -f1)
-      emit "$(classify "solid" "warn" "$f" "$eifline" "$eifline")" "OCP: ${eif}-branch if/else chain ($lang) — $f (consider polymorphism or a lookup)" "$f" "$eifline"
-      found=true
-    fi
+    case "$lang" in
+      python)
+        # if/elif dispatch chain (approximate: statement-leading elif only)
+        eif=$(grep -cE '^[ \t]*elif' "$f" 2>/dev/null || true)
+        if [ "${eif:-0}" -ge 4 ]; then
+          eifline=$(grep -nE '^[ \t]*elif' "$f" 2>/dev/null | head -1 | cut -d: -f1)
+          emit "$(classify "solid" "warn" "$f" "$eifline" "$eifline" "$lang")" "OCP: ${eif}-branch if/elif chain ($lang) — $f (consider polymorphism or a dispatch dict)" "$f" "$eifline"
+          found=true
+        fi
+        ;;
+      rust)
+        # match with >=4 `=>` arms (approximate: arm counting is heuristic and
+        # nested matches attribute arms to the outer match)
+        res=$(awk '
+          /(^|[^A-Za-z0-9_])match([^A-Za-z0-9_]|$)/ { swnr=FNR; arms=0; insw=1 }
+          insw { arms += gsub(/=>/," ") }
+          insw && /^[ \t]*\}/ { if (arms>=4) printf "%s:%d:match with %d arms\n", FILENAME, swnr, arms; insw=0 }
+        ' "$f" 2>/dev/null || true)
+        while IFS= read -r r; do
+          [ -n "$r" ] || continue
+          ocpfile=$(printf '%s' "$r" | cut -d: -f1)
+          ocpline=$(printf '%s' "$r" | cut -d: -f2)
+          emit "$(classify "solid" "warn" "$ocpfile" "$ocpline" "$ocpline" "$lang")" "OCP: type-dispatch match should be polymorphic ($lang, approximate arm count) — $r" "$ocpfile" "$ocpline"
+          found=true
+        done <<< "$res"
+        ;;
+      *)
+        # switch with >=4 cases (word-boundary: matches `switch x {` Go form too)
+        res=$(awk '
+          /(^|[^A-Za-z0-9_])switch([^A-Za-z0-9_]|$)/ { swnr=FNR; cases=0; insw=1 }
+          insw && /case[ \t]+/ { cases++ }
+          insw && /^\s*\}/ { if (cases>=4) printf "%s:%d:switch with %d cases\n", FILENAME, swnr, cases; insw=0 }
+        ' "$f" 2>/dev/null || true)
+        while IFS= read -r r; do
+          [ -n "$r" ] || continue
+          ocpfile=$(printf '%s' "$r" | cut -d: -f1)
+          ocpline=$(printf '%s' "$r" | cut -d: -f2)
+          emit "$(classify "solid" "warn" "$ocpfile" "$ocpline" "$ocpline" "$lang")" "OCP: type-dispatch switch should be polymorphic ($lang) — $r" "$ocpfile" "$ocpline"
+          found=true
+        done <<< "$res"
+        eif=$(grep -cE '^\s*else[ \t]+if' "$f" 2>/dev/null || true)
+        if [ "${eif:-0}" -ge 4 ]; then
+          eifline=$(grep -nE '^\s*else[ \t]+if' "$f" 2>/dev/null | head -1 | cut -d: -f1)
+          emit "$(classify "solid" "warn" "$f" "$eifline" "$eifline" "$lang")" "OCP: ${eif}-branch if/else chain ($lang) — $f (consider polymorphism or a lookup)" "$f" "$eifline"
+          found=true
+        fi
+        ;;
+    esac
   done
   $found || pass "SOLID-OCP ($lang): no large type-dispatch chains"
 }
@@ -658,40 +946,68 @@ check_solid_ocp() {
 check_solid_lsp() {
   local files="$1"; local lang="$2"
   [ -z "$files" ] && return 0
+  local pat label
   case "$lang" in
-    java|node) ;;
-    *) return 0 ;;
+    java|node) pat='instanceof'; label='instanceof' ;;
+    python) pat='isinstance[ \t]*\('; label='isinstance' ;;
+    *) return 0 ;;  # go/rust: no idiomatic runtime type-test dispatch to count
   esac
   local found=false
   local f c
   for f in $files; do
     [ -f "$f" ] || continue
-    c=$(grep -c 'instanceof' "$f" 2>/dev/null || true)
+    c=$(grep -cE "$pat" "$f" 2>/dev/null || true)
     if [ "$c" -ge 3 ]; then
-      emit "$(classify "solid" "warn" "$f" "" "")" "LSP: ${c} instanceof checks in one file ($lang) — $f (suggests broken substitutability or type dispatch)" "$f"
+      emit "$(classify "solid" "warn" "$f" "" "" "$lang")" "LSP: ${c} ${label} checks in one file ($lang) — $f (suggests broken substitutability or type dispatch)" "$f"
       found=true
     fi
   done
-  $found || pass "SOLID-LSP ($lang): no heavy instanceof dispatch"
+  $found || pass "SOLID-LSP ($lang): no heavy ${label} dispatch"
 }
 
 check_solid_isp() {
   local files="$1"; local lang="$2"
   [ -z "$files" ] && return 0
   local found=false
-  local res r ispfile ispline
+  local res r ispfile ispline prog label
+  case "$lang" in
+    python)
+      # Protocol/ABC with >5 methods (approximate: ends at the next column-0
+      # statement, so nested classes are mis-attributed)
+      label="Protocol/ABC"
+      prog='
+        /^[ \t]*class[ \t]+[A-Za-z0-9_]+[ \t]*\(.*(ABC|Protocol)/ { iw=1; nr=FNR; methods=0; next }
+        iw && /^[^ \t#]/ { if (methods>5) printf "%s:%d:Protocol/ABC with %d methods\n", FILENAME, nr, methods; iw=0; next }
+        iw && /^[ \t]*(async[ \t]+)?def[ \t]/ { methods++ }
+      '
+      ;;
+    rust)
+      # trait with >5 required/provided fns (approximate: ends at the first
+      # column-indented closing brace)
+      label="trait"
+      prog='
+        /^[ \t]*(pub([ \t]*\([^)]*\))?[ \t]+)?trait[ \t]+[A-Za-z0-9_]+/ { iw=1; nr=FNR; methods=0; next }
+        iw && /^[ \t]*\}/ { if (methods>5) printf "%s:%d:trait with %d methods\n", FILENAME, nr, methods; iw=0; next }
+        iw && /(^|[^A-Za-z0-9_])fn[ \t]+[A-Za-z0-9_]/ { methods++ }
+      '
+      ;;
+    *)
+      label="interface"
+      prog='
+        /^[ \t]*(public[ \t]+)?interface[ \t]+[A-Za-z0-9_]+/ { iw=1; nr=FNR; methods=0; next }
+        iw && /^[ \t]*\}/ { if (methods>5) printf "%s:%d:interface with %d methods\n", FILENAME, nr, methods; iw=0; next }
+        iw && /\([^)]*\)[ \t]*(;|\{|$)/ { methods++ }
+      '
+      ;;
+  esac
   for f in $files; do
     [ -f "$f" ] || continue
-    res=$(awk '
-      /^[ \t]*(public[ \t]+)?interface[ \t]+[A-Za-z0-9_]+/ { iw=1; nr=FNR; methods=0; next }
-      iw && /^[ \t]*\}/ { if (methods>5) printf "%s:%d:interface with %d methods\n", FILENAME, nr, methods; iw=0; next }
-      iw && /\([^)]*\)[ \t]*(;|\{|$)/ { methods++ }
-    ' "$f" 2>/dev/null || true)
+    res=$(awk "$prog" "$f" 2>/dev/null || true)
     while IFS= read -r r; do
       [ -n "$r" ] || continue
       ispfile=$(printf '%s' "$r" | cut -d: -f1)
       ispline=$(printf '%s' "$r" | cut -d: -f2)
-      emit "$(classify "solid" "warn" "$ispfile" "$ispline" "$ispline")" "ISP: fat interface (>5 methods) — $r (split by role)" "$ispfile" "$ispline"
+      emit "$(classify "solid" "warn" "$ispfile" "$ispline" "$ispline" "$lang")" "ISP: fat ${label} (>5 methods) — $r (split by role)" "$ispfile" "$ispline"
       found=true
     done <<< "$res"
   done
@@ -710,7 +1026,7 @@ check_solid_dip() {
             hit=$(grep -nE '^\s*import\s+.*\.(infrastructure|persistence|repository)\.' "$f" 2>/dev/null || true)
             if [ -n "$hit" ]; then
               dln=$(printf '%s\n' "$hit" | head -1 | cut -d: -f1)
-              emit "$(classify "solid" "fail" "$f" "$dln" "$dln")" "DIP: domain/engine code imports infrastructure ($lang) — $f:$dln" "$f" "$dln"
+              emit "$(classify "solid" "fail" "$f" "$dln" "$dln" "$lang")" "DIP: domain/engine code imports infrastructure ($lang) — $f:$dln" "$f" "$dln"
               found=true
             fi
             ;;
@@ -724,7 +1040,7 @@ check_solid_dip() {
             hit=$(grep -nE '^\s*"[^"]*/(store|infra|repository)[^"]*"' "$f" 2>/dev/null || true)
             if [ -n "$hit" ]; then
               dln=$(printf '%s\n' "$hit" | head -1 | cut -d: -f1)
-              emit "$(classify "solid" "fail" "$f" "$dln" "$dln")" "DIP: domain/engine code imports store/infra/repository ($lang) — $f:$dln" "$f" "$dln"
+              emit "$(classify "solid" "fail" "$f" "$dln" "$dln" "$lang")" "DIP: domain/engine code imports store/infra/repository ($lang) — $f:$dln" "$f" "$dln"
               found=true
             fi
             ;;
@@ -738,7 +1054,35 @@ check_solid_dip() {
             hit=$(grep -nE "from\s+['\"].*(/store|/infra|/repository|/repositories|/infrastructure)" "$f" 2>/dev/null || true)
             if [ -n "$hit" ]; then
               dln=$(printf '%s\n' "$hit" | head -1 | cut -d: -f1)
-              emit "$(classify "solid" "fail" "$f" "$dln" "$dln")" "DIP: domain/engine code imports infrastructure ($lang) — $f:$dln" "$f" "$dln"
+              emit "$(classify "solid" "fail" "$f" "$dln" "$dln" "$lang")" "DIP: domain/engine code imports infrastructure ($lang) — $f:$dln" "$f" "$dln"
+              found=true
+            fi
+            ;;
+        esac
+      done
+      ;;
+    python)
+      for f in $PY_FILES; do
+        case "$f" in
+          */domain/*|*/engine/*|*/core/*)
+            hit=$(grep -nE '^[ \t]*(from|import)[ \t]+[A-Za-z0-9_.]*(infrastructure|persistence|repository)' "$f" 2>/dev/null || true)
+            if [ -n "$hit" ]; then
+              dln=$(printf '%s\n' "$hit" | head -1 | cut -d: -f1)
+              emit "$(classify "solid" "fail" "$f" "$dln" "$dln" "$lang")" "DIP: domain/engine code imports infrastructure ($lang) — $f:$dln" "$f" "$dln"
+              found=true
+            fi
+            ;;
+        esac
+      done
+      ;;
+    rust)
+      for f in $RS_FILES; do
+        case "$f" in
+          */domain/*|*/engine/*|*/core/*)
+            hit=$(grep -nE '^[ \t]*use[ \t]+[^;]*(infra|infrastructure|repository|store|persistence)' "$f" 2>/dev/null || true)
+            if [ -n "$hit" ]; then
+              dln=$(printf '%s\n' "$hit" | head -1 | cut -d: -f1)
+              emit "$(classify "solid" "fail" "$f" "$dln" "$dln" "$lang")" "DIP: domain/engine code imports store/infra/repository ($lang) — $f:$dln" "$f" "$dln"
               found=true
             fi
             ;;
@@ -817,9 +1161,16 @@ check_component_per_file() {
 }
 
 # ── Property tests (production tier and above) ───────────────────────────────
+PROP_TESTS_SKIP_SAID=false
 check_property_tests() {
   case "$TIER" in
-    mvp) say "Property tests: skipped (project tier is $TIER — production+ required)"; return 0 ;;
+    mvp)
+      # Once per run, not once per language — the skip reason is tier, not lang.
+      if [ "$PROP_TESTS_SKIP_SAID" = false ]; then
+        say "Property tests: skipped (project tier is $TIER — production+ required)"
+        PROP_TESTS_SKIP_SAID=true
+      fi
+      return 0 ;;
   esac
   local lang="$1"
   local src
@@ -852,6 +1203,36 @@ check_property_tests() {
           pass "Property tests ($lang): fast-check in use"
         else
           fail "Property tests ($lang): no fast-check property tests found (required at $TIER tier)"
+        fi
+      fi
+      ;;
+    python)
+      # ADR 0006 D6 warn phase: absence is a WARN (never fail) for one release.
+      # Like the other languages, property-tests is a presence check and is
+      # never blame-scoped. Framework: hypothesis (de-facto Python standard;
+      # docs/TESTING.md does not yet name one for Python).
+      src=$PY_FILES
+      if [ -n "$src" ]; then
+        if grep -rE '\bhypothesis\b|@given\(' $GREP_EXCLUDES "$SOURCE_DIR" --include="*.py" >/dev/null 2>&1 \
+           || grep -qE 'hypothesis' "$SOURCE_DIR/pyproject.toml" 2>/dev/null \
+           || grep -qE '^hypothesis' "$SOURCE_DIR"/requirements*.txt 2>/dev/null; then
+          pass "Property tests ($lang): hypothesis in use"
+        else
+          warn "Property tests ($lang): no hypothesis property tests found (required at $TIER tier) — WARN only during the ADR 0006 D6 warn phase"
+        fi
+      fi
+      ;;
+    rust)
+      # ADR 0006 D6 warn phase: absence is a WARN (never fail) for one release.
+      # Framework: proptest (nominated by language-specific/rust/TESTING.md);
+      # quickcheck also accepted.
+      src=$RS_FILES
+      if [ -n "$src" ]; then
+        if grep -rE '\bproptest\b|\bquickcheck\b' $GREP_EXCLUDES "$SOURCE_DIR" --include="*.rs" >/dev/null 2>&1 \
+           || grep -qE '^(proptest|quickcheck)' "$SOURCE_DIR/Cargo.toml" 2>/dev/null; then
+          pass "Property tests ($lang): proptest/quickcheck in use"
+        else
+          warn "Property tests ($lang): no proptest/quickcheck property tests found (required at $TIER tier) — WARN only during the ADR 0006 D6 warn phase"
         fi
       fi
       ;;
@@ -924,10 +1305,11 @@ ranges_overlap() { # ranges_overlap <absfile> <start> <end> — 0 if any added r
   return 1
 }
 
-classify_blame() { # classify_blame <gate> <file> <start> <end> → fail|warn|none under -BaseRef
-  local gate="$1" file="$2" start="$3" end="$4" af
+classify_blame() { # classify_blame <gate> <file> <start> <end> [lang] → fail|warn|none under -BaseRef
+  local gate="$1" file="$2" start="$3" end="$4" lang="${5:-}" af
   af=$(abs_of "$file")
   if ! file_touched "$af"; then echo none; return; fi
+  if is_warn_only_lang "$lang"; then echo warn; return; fi  # ADR 0006 D6 warn phase
   if ! is_blocking "$gate"; then echo warn; return; fi
   if file_fully_added "$af"; then echo fail; return; fi
   if [ -z "$start" ]; then echo fail; return; fi  # file-level: touched ⇒ overlap
@@ -935,12 +1317,13 @@ classify_blame() { # classify_blame <gate> <file> <start> <end> → fail|warn|no
   echo warn
 }
 
-classify() { # classify <gate> <legacy> <file> <start> <end> → fail|warn|none
-  local gate="$1" legacy="$2"
+classify() { # classify <gate> <legacy> <file> <start> <end> [lang] → fail|warn|none
+  local gate="$1" legacy="$2" lang="${6:-}"
   if [ -n "$BASE_REF" ]; then
-    classify_blame "$gate" "$3" "$4" "$5"
+    classify_blame "$gate" "$3" "$4" "$5" "$lang"
     return
   fi
+  if is_warn_only_lang "$lang"; then echo warn; return; fi  # ADR 0006 D6 warn phase
   if is_blocking "$gate"; then echo "$legacy"; else echo warn; fi
 }
 
@@ -1029,6 +1412,8 @@ if contains_gate complexity; then
   run_complexity_kiss java $NONTEST_JAVA
   run_complexity_kiss go $NONTEST_GO
   run_complexity_kiss node $NONTEST_NODE
+  run_complexity_kiss python $NONTEST_PY
+  run_complexity_kiss rust $NONTEST_RS
   say ""
 fi
 
@@ -1043,6 +1428,8 @@ if contains_gate yagni; then
   check_yagni "$NONTEST_JAVA" java
   check_yagni "$NONTEST_GO" go
   check_yagni "$NONTEST_NODE" node
+  check_yagni "$NONTEST_PY" python
+  check_yagni "$NONTEST_RS" rust
   say ""
 fi
 
@@ -1051,19 +1438,30 @@ if contains_gate solid; then
   check_solid_srp "$NONTEST_JAVA" java
   check_solid_srp "$NONTEST_GO" go
   check_solid_srp "$NONTEST_NODE" node
+  check_solid_srp "$NONTEST_PY" python
+  check_solid_srp "$NONTEST_RS" rust
   check_solid_ocp "$NONTEST_JAVA" java
   check_solid_ocp "$NONTEST_GO" go
   check_solid_ocp "$NONTEST_NODE" node
+  check_solid_ocp "$NONTEST_PY" python
+  check_solid_ocp "$NONTEST_RS" rust
   check_solid_lsp "$NONTEST_JAVA" java
   check_solid_lsp "$NONTEST_NODE" node
+  check_solid_lsp "$NONTEST_PY" python
   check_solid_isp "$NONTEST_JAVA" java
   check_solid_isp "$NONTEST_NODE" node
+  check_solid_isp "$NONTEST_PY" python
+  check_solid_isp "$NONTEST_RS" rust
   check_solid_dip java
   check_solid_dip go
   check_solid_dip node
+  check_solid_dip python
+  check_solid_dip rust
   say ""
 fi
 
+# component-per-file is JS/TS-scoped by design (ADR 0006 D1) — never run for
+# Python or Rust.
 if contains_gate component-per-file; then
   say "--- Component-per-file ---"
   check_component_per_file "$NONTEST_NODE"
@@ -1075,6 +1473,8 @@ if contains_gate property-tests; then
   check_property_tests java
   check_property_tests go
   check_property_tests node
+  check_property_tests python
+  check_property_tests rust
   say ""
 fi
 
