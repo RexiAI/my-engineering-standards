@@ -7,33 +7,33 @@ trust tiers and model-assignment rules: `docs/GOVERNANCE.md`.
 
 ## Components
 
-| Component | Path | Role |
-|---|---|---|
-| `media-image` | `agents/media-image.md` | text→image, image edit/merge |
-| `media-video` | `agents/media-video.md` | t2v / i2v / kf2v / reference-to-video / edit, ffmpeg assembly |
-| `media-voice` | `agents/media-voice.md` | TTS, ASR, turn-based voice chat, realtime launcher |
-| `media-producer` | `agents/media-producer.md` | storyboard-gated end-to-end video pipeline; delegates to the three above |
-| voice-chat app | `scripts/media/voice-chat/` | full-duplex realtime voice (Node ≥ 22, WS) |
-| installer | `scripts/media/install.mjs` | copies agents + app into the opencode global dir |
-| smoke | `scripts/media/smoke-media.mjs` | structure + `bl --dry-run` validation, zero credits |
+| Component        | Path                            | Role                                                                     |
+| ---------------- | ------------------------------- | ------------------------------------------------------------------------ |
+| `media-image`    | `agents/media-image.md`         | text→image, image edit/merge                                             |
+| `media-video`    | `agents/media-video.md`         | t2v / i2v / kf2v / reference-to-video / edit, ffmpeg assembly            |
+| `media-voice`    | `agents/media-voice.md`         | TTS, ASR, turn-based voice chat, realtime launcher                       |
+| `media-producer` | `agents/media-producer.md`      | storyboard-gated end-to-end video pipeline; delegates to the three above |
+| voice-chat app   | `scripts/media/voice-chat/`     | full-duplex realtime voice (Node ≥ 22, WS)                               |
+| installer        | `scripts/media/install.mjs`     | copies agents + app into the opencode global dir                         |
+| smoke            | `scripts/media/smoke-media.mjs` | structure + `bl --dry-run` validation, zero credits                      |
 
-Model choice inside every agent is *bl profile default or user-named*; the
+Model choice inside every agent is _bl profile default or user-named_; the
 agents themselves inherit your primary opencode model (never pinned in
 frontmatter — governance rule, see `docs/GOVERNANCE.md §Model-Assignment
 Discipline`).
 
 ## Feature matrix (Token-Plan key, probed 2026-10-16)
 
-| Capability | Command surface | Token-Plan `sk-sp-` key | Notes |
-|---|---|---|---|
-| Text/image/vision chat | `bl text chat`, `bl omni --text-only` | ✅ | provider + CLI both wired |
-| Image generate | `bl image generate` | ✅ | returns local file **and** remote URL |
-| Image edit | `bl image edit` | ✅ with URL input | local `--image` path needs upload → ❌ |
-| TTS | `bl speech synthesize --model qwen-audio-3.0-tts-plus --voice longanqian` | ✅ | `--voice` is required |
-| ASR | `bl speech recognize --model qwen-audio-3.0-asr-flash` | ✅ URL input | local file ❌ (upload policy 401); one ≤5 min file per sync call |
-| Video generate/ref | `bl video generate / ref` (async task) | ✅ | most expensive call — confirm before spend |
-| Local-file upload (any) | implicit `oss://` temp storage | ❌ | the single auth gap for file inputs |
-| Realtime voice WS | `api-ws/v1/realtime` (`voice-chat.mjs`) | ❌ | `sk-sp-` rejected on all regional hosts; model is WS-only (400 on HTTP) |
+| Capability              | Command surface                                                           | Token-Plan `sk-sp-` key | Notes                                                                   |
+| ----------------------- | ------------------------------------------------------------------------- | ----------------------- | ----------------------------------------------------------------------- |
+| Text/image/vision chat  | `bl text chat`, `bl omni --text-only`                                     | ✅                      | provider + CLI both wired                                               |
+| Image generate          | `bl image generate`                                                       | ✅                      | returns local file **and** remote URL                                   |
+| Image edit              | `bl image edit`                                                           | ✅ with URL input       | local `--image` path needs upload → ❌                                  |
+| TTS                     | `bl speech synthesize --model qwen-audio-3.0-tts-plus --voice longanqian` | ✅                      | `--voice` is required                                                   |
+| ASR                     | `bl speech recognize --model qwen-audio-3.0-asr-flash`                    | ✅ URL input            | local file ❌ (upload policy 401); one ≤5 min file per sync call        |
+| Video generate/ref      | `bl video generate / ref` (async task)                                    | ✅                      | most expensive call — confirm before spend                              |
+| Local-file upload (any) | implicit `oss://` temp storage                                            | ❌                      | the single auth gap for file inputs                                     |
+| Realtime voice WS       | `api-ws/v1/realtime` (`voice-chat.mjs`)                                   | ❌                      | `sk-sp-` rejected on all regional hosts; model is WS-only (400 on HTTP) |
 
 Two ways to close the ❌ rows: a **standard DashScope `sk-` API key** (exported
 as `BAILIAN_API_KEY` / `DASHSCOPE_API_KEY`, or configured in a second `bl`
@@ -82,7 +82,7 @@ offer it.
 - `InvalidApiKey` at "get upload policy" → you used a **local path** with a
   Token-Plan key. Pass the remote URL (or a standard key).
 - `Missing required flag: --voice` → run `bl speech synthesize --list-voices
-  --model <id>`; `longanqian` is a safe default for the 3.0-TTS family.
+--model <id>`; `longanqian` is a safe default for the 3.0-TTS family.
 - realtime `401 InvalidApiKey` on WS → key type, not the key: WS needs a
   standard `sk-`.
 - Windows mic silent → `--list-devices`, pass the exact `--device` name

@@ -47,7 +47,7 @@ batch the user just approved — never expand it silently.
    Poll interval ≥ 10 s. A failed task: read its error, fix the prompt/params,
    re-run — max 3 attempts per clip, then report and stop.
 4. **Verify ground truth.** `ffprobe -v error -show_entries
-   format=duration:stream=width,height <file>` — report actual duration and
+format=duration:stream=width,height <file>` — report actual duration and
    resolution, don't echo the requested ones.
 5. **Assemble (when asked).** Concatenate clips with the ffmpeg concat demuxer
    (uniform codecs: re-encode to a common `scale`/rate first if ffprobe

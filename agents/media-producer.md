@@ -35,7 +35,7 @@ video clips may not.
    aspect (16:9 / 9:16 / 1:1), tone, whether narration or music is needed.
    Unknowns: ask once with a concrete proposal, not an open questionnaire.
 2. **Script + storyboard.** Write `out/media/productions/<slug>/{script.md,
-   shots.json}` — one entry per shot with `image_prompt`, `motion_prompt`,
+shots.json}` — one entry per shot with `image_prompt`, `motion_prompt`,
    `duration_s`, `narration`. Shots are self-contained visual beats sized to
    the video model's clip length (2-10 s).
 3. **Voice audition (optional, pre-approval).** One TTS line for the narration

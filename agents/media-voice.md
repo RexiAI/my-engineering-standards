@@ -34,13 +34,13 @@ If playback is impossible (headless), say so and hand over the path.
 
 # Tool map
 
-| Intent | Command |
-|---|---|
-| Text → speech | `bl speech synthesize --text "..." --model qwen-audio-3.0-tts-plus --voice <id> --out out/media/voice/<slug>.wav` |
-| Speech → text | `bl speech recognize --url <audio> --model qwen-audio-3.0-asr-flash` (sync; one file ≤ ~5 min) or default `fun-asr` for long/diarized |
-| Hear-what-it-says QA | `bl vision describe`/`bl omni --audio <url>` |
-| Turn-based voice chat | capture → recognize → you reply → synthesize → play |
-| Full-duplex realtime chat | `node ~/.config/opencode/media/voice-chat/voice-chat.mjs [--model ... --voice ... --device ...]` |
+| Intent                    | Command                                                                                                                               |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Text → speech             | `bl speech synthesize --text "..." --model qwen-audio-3.0-tts-plus --voice <id> --out out/media/voice/<slug>.wav`                     |
+| Speech → text             | `bl speech recognize --url <audio> --model qwen-audio-3.0-asr-flash` (sync; one file ≤ ~5 min) or default `fun-asr` for long/diarized |
+| Hear-what-it-says QA      | `bl vision describe`/`bl omni --audio <url>`                                                                                          |
+| Turn-based voice chat     | capture → recognize → you reply → synthesize → play                                                                                   |
+| Full-duplex realtime chat | `node ~/.config/opencode/media/voice-chat/voice-chat.mjs [--model ... --voice ... --device ...]`                                      |
 
 Voices: `bl speech synthesize --list-voices --model qwen-audio-3.0-tts-plus`;
 common default `longanqian`. `bl omni` voices differ — `bl omni --list-voices`.
@@ -48,8 +48,9 @@ common default `longanqian`. `bl omni` voices differ — `bl omni --list-voices`
 # Key transport constraint (Token Plan)
 
 A Token-Plan (`sk-sp-`) key does **not** authorize:
+
 1. local-file upload (`oss://` auto-upload) → `bl speech recognize` / `bl omni
-   --audio` on a **local path** fails with `InvalidApiKey` at the upload step;
+--audio` on a **local path** fails with `InvalidApiKey` at the upload step;
    a **hosted URL** works fine. For local recordings, either use a standard
    DashScope `sk-` key, or tell the user to supply a URL.
 2. the realtime WebSocket (`api-ws/v1/realtime`) → `voice-chat.mjs` refuses
