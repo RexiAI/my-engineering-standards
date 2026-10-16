@@ -14,3 +14,4 @@ Proposed → Accepted → Deprecated → Superseded.
 | 0004 | [Typed-judgment layer: opt-in fast-path for probabilistic classification](0004-typed-judgment-layer.md) | Accepted |
 | 0005 | [Local judgment backend: an optional self-hosted compute backend for the typed-judgment layer](0005-local-judgment-backend.md) | Accepted |
 | 0006 | [Extend the gate catalog to Python and Rust without adding gate names](0006-python-rust-gate-coverage.md) | Proposed |
+| 0007 | [Media agent family: global opencode agents driving the Bailian `bl` CLI, with a URL-chained pipeline and a separate realtime voice app](0007-media-agent-family.md) | Accepted |
