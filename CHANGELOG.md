@@ -1,3 +1,10 @@
+# [1.36.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.35.1...v1.36.0) (2026-10-16)
+
+
+### Features
+
+* **gates:** Python and Rust coverage in the design-principles and saga/outbox gates (ADR 0006) ([#81](https://github.com/RexiAI/my-engineering-standards/issues/81)) ([bbeda9a](https://github.com/RexiAI/my-engineering-standards/commit/bbeda9a0895d6e662f1c256d714d92d447251953)), closes [#80](https://github.com/RexiAI/my-engineering-standards/issues/80)
+
 ## [1.35.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.35.0...v1.35.1) (2026-10-15)
 
 
