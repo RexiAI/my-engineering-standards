@@ -1,3 +1,10 @@
+## [1.36.3](https://github.com/RexiAI/my-engineering-standards/compare/v1.36.2...v1.36.3) (2026-10-17)
+
+
+### Bug Fixes
+
+* **tests:** make the judgment-layer tests hermetic against direnv credentials ([#88](https://github.com/RexiAI/my-engineering-standards/issues/88)) ([8f0b1b0](https://github.com/RexiAI/my-engineering-standards/commit/8f0b1b03c32294160259933a44dbade87c6c6636)), closes [#82](https://github.com/RexiAI/my-engineering-standards/issues/82)
+
 ## [1.36.2](https://github.com/RexiAI/my-engineering-standards/compare/v1.36.1...v1.36.2) (2026-10-16)
 
 
