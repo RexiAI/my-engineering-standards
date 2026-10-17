@@ -539,6 +539,21 @@ editable files in `.opencode/agents/` and `.opencode/commands/` instead of a
 symlink. You own the copies after that — re-run with the same flag after a
 submodule update to pull in changes; it will not overwrite or merge your edits.
 
+### Consumer-side agent catalogs stay unpinned too
+
+The no-`model:` rule covers every agent definition this repo ships **and** the
+consumer-side catalogs those agents get copied into (global
+`~/.config/opencode/agent/`, ECC-style installs). A frontmatter pin in a local
+catalog silently wins over the consumer's `opencode.json` roster and
+hard-couples every run to one vendor: on 2026-10-15 a catalog of 27 pinned
+agents (`github-copilot/*`, `ollama/*`) broke every pinned-agent invocation on
+a provider that does not serve those ids (`Model not found`), while unpinned
+agents ran fine. Strip `model:` lines from catalog copies; the resolution order
+is the consumer `opencode.json` `{env:SPEC_*_MODEL}` roster, then harness
+inheritance. `scripts/check-agent-models.sh` enforces the repo surface in
+self-ci (ADR 0004) and doubles as the audit tool for any catalog you install:
+`check-agent-models.sh <catalog-root>`.
+
 ## PR review model wiring
 
 No agent pins a model in tracked files (ADR 0003). The spec-pipeline agents
