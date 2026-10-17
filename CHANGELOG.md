@@ -1,3 +1,10 @@
+# [1.38.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.37.0...v1.38.0) (2026-10-17)
+
+
+### Features
+
+* **media:** global media agent family — image, video, voice, producer (+ realtime voice app, Windows bootstrap, ADR 0007) ([#87](https://github.com/RexiAI/my-engineering-standards/issues/87)) ([1dc8ecb](https://github.com/RexiAI/my-engineering-standards/commit/1dc8ecbb485c35c2bcf5cfdb03ad4ef9fa3cb27c))
+
 # [1.37.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.36.3...v1.37.0) (2026-10-17)
 
 
