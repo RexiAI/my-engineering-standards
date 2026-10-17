@@ -1,3 +1,10 @@
+# [1.37.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.36.3...v1.37.0) (2026-10-17)
+
+
+### Features
+
+* **gates:** mechanical model-agnosticism check for agent definitions ([#85](https://github.com/RexiAI/my-engineering-standards/issues/85)) ([edefb91](https://github.com/RexiAI/my-engineering-standards/commit/edefb91689bf8f96276df304bb4e644a15f58b91))
+
 ## [1.36.3](https://github.com/RexiAI/my-engineering-standards/compare/v1.36.2...v1.36.3) (2026-10-17)
 
 
