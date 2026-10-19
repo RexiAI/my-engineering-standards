@@ -1,0 +1,64 @@
+name: CI - Vercel production deploy verification (post-merge)
+
+# Spec 031: after a PR merges to main, verify the Vercel production deployment
+# the Git integration built for the merged commit — query the Vercel API, run a
+# health check against the production URL, and record the result in the job log.
+# Skip semantics (exit 0 with a reason) vs the VERCEL_TOKEN configuration defect
+# (exit non-zero) are defined in scripts/verify-production-deploy.sh and
+# docs/SPEC_PIPELINE.md §Production deploy verification (post-merge).
+#
+# This lane is independent of the GHCR container path (ci-nextjs.yml et al.):
+# it never touches the image push, and the container path does not invoke it —
+# neither cancels the other.
+#
+# Child repos wire this in via their own workflow calling it, mirroring the
+# other ci-*.yml templates (docs/DEPLOYMENT.md §Frontend: Vercel).
+
+on:
+  workflow_call:
+    inputs:
+      sha:
+        description: Commit SHA to verify (defaults to the push SHA).
+        required: false
+        type: string
+      health-path:
+        description: Path appended to the production deployment URL for the health check.
+        required: false
+        type: string
+        default: "/"
+    secrets:
+      VERCEL_TOKEN:
+        description: Vercel API token. Missing/invalid token FAILS the run (configuration defect, not a skip).
+        required: false
+      VERCEL_ORG_ID:
+        description: Vercel team/organisation id (optional).
+        required: false
+      VERCEL_PROJECT_ID:
+        description: Vercel project id. Unset means no Vercel lane is linked — recorded as a skip.
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-vercel-verify-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify-production:
+    # post-merge only: production verification runs for main pushes
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify the Vercel production deployment for the merged commit
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_HEALTH_PATH: ${{ inputs.health-path }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          ./.standards/scripts/verify-production-deploy.sh "${{ inputs.sha || github.sha }}"
