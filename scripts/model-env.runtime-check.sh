@@ -95,6 +95,7 @@ write_refs() {
     "spec-verifier": { "model": "{env:SPEC_VERIFIER_MODEL}" },
     "spec-mutation-runner": { "model": "{env:SPEC_MUTATION_RUNNER_MODEL}" },
     "spec-pr-opener": { "model": "{env:SPEC_PR_OPENER_MODEL}" },
+    "spec-deployer": { "model": "{env:SPEC_DEPLOYER_MODEL}" },
     "spec-coder": { "model": "{env:SPEC_CODER_MODEL}" },
     "spec-refactorer": { "model": "{env:SPEC_REFACTORER_MODEL}" },
     "spec-pipeline": { "model": "{env:SPEC_PIPELINE_MODEL}" },
