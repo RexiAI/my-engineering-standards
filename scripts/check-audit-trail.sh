@@ -27,6 +27,13 @@
 #   AC-015-15 — the PR Opener runs the gate before opening the PR
 #   AC-015-16 — Self-CI runs the gate when a spec folder is present
 #
+# Spec 031 extends the folder contract with the deploy-lane artifact (checked
+# by a separate function, NOT a sixth Verifier check):
+#   AC-031-18 — frontend repo: 40-deploy.md required, non-empty
+#   AC-031-19 — non-frontend repo: a present 40-deploy.md must carry the
+#               `Verdict: SKIPPED` skip reason
+#   AC-031-21 — frontend repo: missing 40-deploy.md exits non-zero
+#
 # Evidence-block contract (AC-015-04): for each of the five runnable Verifier
 # checks — scenario traceability, full test suite, complexity gate,
 # design-principles gate, scenario-to-behavior spot check — 25-verification.md
@@ -117,6 +124,53 @@ check_design_if_present() { # check_design_if_present <specs_dir> <slug>
   fi
 }
 
+# frontend_repo <project-root> — deploy-lane repo class detection (spec 031,
+# same filesystem signals as docs/SPEC_PIPELINE.md and agents/spec-deployer.md):
+# a vercel.json, or a package.json declaring a frontend framework dependency.
+# The third signal (connected Vercel Git integration) needs platform auth, so
+# the gate keys off the two deterministic ones.
+frontend_repo() {
+  local root="$1"
+  [ -f "$root/vercel.json" ] && return 0
+  if [ -f "$root/package.json" ]; then
+    grep -qE '"(next|react|@angular/core|@ionic/angular)"[[:space:]]*:' "$root/package.json" && return 0
+  fi
+  return 1
+}
+
+# check_deploy_artifact <specs_dir> <slug> — the 40-deploy.md deploy-lane
+# contract (spec 031 Task 4). This is deliberately a SEPARATE function, not a
+# sixth entry in FIVE_CHECKS (AC-031-20): the five Verifier checks are the
+# Verifier's; 40-deploy.md is the Deploy Verifier's (stage 5c). Frontend repos:
+# required, non-empty. Non-frontend repos: if present it must carry the
+# `Verdict: SKIPPED` skip reason; absence is tolerated pre-5c (the stage-5b
+# audit run happens before the deploy lane exists) — ponytail ceiling: the
+# gate cannot distinguish "pre-5c" from "5c skipped writing it"; upgrade path:
+# a `--require-deploy` flag once 5d owns the final gate run (follow-up spec).
+check_deploy_artifact() {
+  local specs_dir="$1" slug="$2"
+  local f="$specs_dir/$slug/40-deploy.md"
+  local root
+  root="$(dirname "$specs_dir")"
+  if frontend_repo "$root"; then
+    if [ ! -f "$f" ]; then
+      fail "$slug: missing 40-deploy.md (frontend deploy evidence, AC-031-21)"
+    elif [ ! -s "$f" ]; then
+      fail "$slug: empty 40-deploy.md (frontend deploy evidence)"
+    else
+      pass "$slug: 40-deploy.md present and non-empty (AC-031-18)"
+    fi
+  elif [ -f "$f" ]; then
+    if [ ! -s "$f" ]; then
+      fail "$slug: empty 40-deploy.md"
+    elif grep -qE '^Verdict:[[:space:]]*SKIPPED' "$f"; then
+      pass "$slug: 40-deploy.md skip reason acceptable for a non-frontend repo (AC-031-19): $(grep -m1 -E '^Verdict:' "$f")"
+    else
+      fail "$slug: non-frontend 40-deploy.md must carry a 'Verdict: SKIPPED' skip reason"
+    fi
+  fi
+}
+
 # evidence_block <file> <checkname> — prints the first evidence block whose
 # `## Evidence:` heading names <checkname> (case-insensitive), or nothing.
 evidence_block() {
@@ -193,6 +247,7 @@ check_folder() { # check_folder <slug> <specs_dir> — returns 0/1
   check_nonempty_file "$specs_dir" "$slug" "25-verification.md" "AC-015-11"
   check_nonempty_file "$specs_dir" "$slug" "30-report.md" "AC-015-12"
   check_design_if_present "$specs_dir" "$slug"
+  check_deploy_artifact "$specs_dir" "$slug"
   if [ -s "$folder/25-verification.md" ]; then
     check_verifier_evidence "$specs_dir" "$slug"
   fi
