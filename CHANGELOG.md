@@ -1,3 +1,10 @@
+## [1.38.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.38.0...v1.38.1) (2026-10-19)
+
+
+### Bug Fixes
+
+* **ci:** wire GH_TOKEN into the daily-triage loop step ([#91](https://github.com/RexiAI/my-engineering-standards/issues/91)) ([3fd2872](https://github.com/RexiAI/my-engineering-standards/commit/3fd2872aad4cb3ef540e84398ae991c073e0eff1)), closes [#71](https://github.com/RexiAI/my-engineering-standards/issues/71) [#77](https://github.com/RexiAI/my-engineering-standards/issues/77) [#71](https://github.com/RexiAI/my-engineering-standards/issues/71)
+
 # [1.38.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.37.0...v1.38.0) (2026-10-17)
 
 
