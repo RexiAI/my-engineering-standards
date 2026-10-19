@@ -11,7 +11,7 @@
 #              matrix` section: authoritative declaration, all 11 condition
 #              rows with deterministic actions, the dirty-tree STOP semantics,
 #              and no Confluence reference.
-#   AC-009-02  each of the 8 pipeline agents references the matrix section
+#   AC-009-02  each of the 9 pipeline agents references the matrix section
 #              title and states it is authoritative; no other agent file is
 #              changed.
 #   AC-009-03  no pipeline agent's permission.edit allows editing
@@ -59,6 +59,7 @@ AGENT_FILES=(
   spec-verifier.md
   spec-mutation-runner.md
   spec-pr-opener.md
+  spec-deployer.md
 )
 
 # Forbidden gate-config paths: the gate script itself (incl. the `.standards/`
@@ -228,7 +229,7 @@ for f in "${AGENT_FILES[@]}"; do
   fi
 done
 if [ "$AGENTS_OK" -eq 1 ]; then
-  pass "AC-009-02-01 — all 8 pipeline agents reference the matrix section title"
+  pass "AC-009-02-01 — all 9 pipeline agents reference the matrix section title"
 fi
 
 AUTH_OK=1
@@ -259,9 +260,9 @@ if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   done < <(git -C "$ROOT" status --porcelain -- agents/ || true)
 fi
 if [ -z "$EXTRA_AGENTS" ]; then
-  pass "AC-009-02-03 — no changed agent file outside the 8 pipeline agents"
+  pass "AC-009-02-03 — no changed agent file outside the 9 pipeline agents"
 else
-  fail "AC-009-02-03 — unexpected changed agent file(s):$EXTRA_AGENTS (only the 8 pipeline agents may change)"
+  fail "AC-009-02-03 — unexpected changed agent file(s):$EXTRA_AGENTS (only the 9 pipeline agents may change)"
 fi
 
 echo ""

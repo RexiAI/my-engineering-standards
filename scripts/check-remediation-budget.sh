@@ -4,7 +4,8 @@
 # and orchestrator (spec 008).
 #
 # The pipeline's gate-failure loops are capped: max 3 fix attempts per phase,
-# two independent phases (pre-PR and post-PR), with exhaustion stopping the
+# three independent phases (pre-PR, post-PR CI, and deploy verification — spec
+# 031 adds the third), with exhaustion stopping the
 # pipeline and escalating to the human. This spec changes markdown prompts
 # and docs only, so the check script is the test carrier — grep-based content
 # assertions over the files the spec touches, so
