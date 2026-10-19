@@ -16,4 +16,4 @@ Each run appends one JSON line shaped as follows:
 Entries older than 30 days are pruned. Append-only means append new entries and
 prune old entries only — no in-place edits of a run's entry.
 
-{ "run_id": "2026-08-20-064701", "pattern": "daily-triage", "duration_s": 240, "items_found": 1, "actions_taken": 1, "escalations": 1, "tokens_estimate": 35000, "outcome": "action_required" }
+{ "run_id": "2026-10-19-120435", "pattern": "daily-triage", "duration_s": 720, "items_found": 7, "actions_taken": 3, "escalations": 1, "tokens_estimate": 55000, "outcome": "action_required" }
