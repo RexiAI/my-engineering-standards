@@ -324,8 +324,8 @@ fi
 echo ""
 
 # AC-024-01-12 — Spec-pipeline agents untouched
-SPEC_AGENTS=(spec-coder spec-mutation-runner spec-pipeline spec-pr-opener \
-  spec-refactorer spec-specifier spec-ux spec-verifier)
+SPEC_AGENTS=(spec-coder spec-deployer spec-mutation-runner spec-pipeline \
+  spec-pr-opener spec-refactorer spec-specifier spec-ux spec-verifier)
 MISSING_SPEC=()
 for a in "${SPEC_AGENTS[@]}"; do
   [ -f "$ROOT_DIR/agents/$a.md" ] || MISSING_SPEC+=("$a")
@@ -335,7 +335,7 @@ EXTRA_SPEC="$(find "$ROOT_DIR/agents" -maxdepth 1 -name 'spec-*.md' -printf '%f\
       case " ${SPEC_AGENTS[*]} " in *" $n "*) ;; *) echo "$n" ;; esac
     done || true)"
 if [ "${#MISSING_SPEC[@]}" -eq 0 ] && [ -z "$EXTRA_SPEC" ]; then
-  pass "AC-024-01-12: exactly the 8 spec-pipeline agents exist under agents/, none added"
+  pass "AC-024-01-12: exactly the 9 spec-pipeline agents exist under agents/, none added (spec 031 added spec-deployer)"
 else
   fail "AC-024-01-12: spec-pipeline agent set changed — missing: ${MISSING_SPEC[*]:-}, extra: $EXTRA_SPEC"
 fi
