@@ -528,3 +528,43 @@ as a separate step — no coordination needed.
 | DigitalOcean Basic | $4/mo | Simple, reliable |
 | Vultr | $5/mo | Global regions |
 | AWS EC2 t4g.nano | $3.60/mo | ARM, free tier eligible |
+
+### Frontend: Vercel
+
+Frontend child repos (Angular, React, Next.js, Ionic web) deploy through Vercel
+instead of a self-hosted backend. Vercel's **Git integration is the source of
+truth** for builds and deployments: a push to a branch produces a preview
+deployment, and a merge to the production branch produces the production
+deployment — the pipeline never triggers a build itself.
+
+**CLI role — observation/sync only.** Agents and CI may run `vercel inspect`,
+`vercel logs`, `vercel ls`, `vercel env pull`, `vercel env add`, `vercel pull`,
+and `vercel domains`. They **never run** `vercel deploy` or `vercel deploy
+--prod`: a CLI deploy alongside the Git integration double-builds the same
+commit, races the integration, and leaves orphaned deployments no branch or PR
+owns. The prohibition is mechanically mirrored by the `vercel deploy*` bash
+deny in `agents/spec-deployer.md`.
+
+**Credential pattern.** `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and
+`VERCEL_PROJECT_ID` follow the repo's per-machine convention: commented
+placeholders in `config/agent.local.env.example`, real values only in the
+gitignored `config/agent.local.env` loaded via direnv, CI secrets in child
+repos. The token travels as an environment variable, never as a `--token` flag
+(process lists and logs leak it). `scripts/guard-env.sh` and
+`scripts/check-no-hardcoded-secrets.sh` enforce the boundary.
+
+**Two lanes, neither cancels the other.** The GHCR container path
+(`.github/workflows/ci-nextjs.yml` and siblings) keeps building and pushing
+images exactly as before. The Vercel lane adds: (1) stage 5c deploy
+verification against the live preview URL (`docs/SPEC_PIPELINE.md §Deploy
+verification loop (phase 3)`) and (2) a post-merge production check —
+`.github/workflows/ci-vercel-production-verify.yml` running
+`scripts/verify-production-deploy.sh`, which queries the Vercel API for the
+deployment built from the merged commit, health-checks the production URL, and
+records the result. Repos without a linked Vercel project skip with a reason;
+a missing `VERCEL_TOKEN` is a configuration defect and fails loudly.
+
+**Cost.** Vercel builds cost money: every phase-3 round re-triggers a real
+cloud build on the account that owns the linked project. The bounded phase-3
+budget (max 3, spec 031) caps the spend per spec run. See
+`docs/adr/0008-vercel-deploy-lane.md`.
