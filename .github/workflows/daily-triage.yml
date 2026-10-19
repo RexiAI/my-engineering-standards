@@ -92,6 +92,18 @@ jobs:
         if: steps.provider-check.outputs.not-configured != 'true'
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          # The skill's mandated `gh` calls — the loop-pause-all kill-switch
+          # label check, issue create/comment, PR and workflow-run inspection —
+          # authenticate from GH_TOKEN. Without it every one of them fails, and
+          # the loop has only been working by accident: it recovers the job
+          # token from the git credentials actions/checkout persists. A
+          # `persist-credentials: false` hardening pass would silently remove
+          # that recovery and break the kill-switch check with it (issues #71
+          # and #77 item 3). Wiring the token explicitly removes the accident.
+          # The `permissions:` block above already grants contents/issues write
+          # and pull-requests/actions read, which is what these calls need, so
+          # no permission change is required.
+          GH_TOKEN: ${{ github.token }}
         run: |
           /tmp/opencode-bin/opencode run \
             --dir "$GITHUB_WORKSPACE" \
