@@ -771,4 +771,237 @@ fabricated.
 ## PR
 
 PR: https://github.com/RexiAI/my-engineering-standards/pull/93
-Commit count: 13
+Commit count: 15
+
+---
+
+# Post-PR CI check (phase 2) — round 1 of max 3
+
+Verifier invocation 2 (phase 2, round 1 of max 3). A previous invocation of this
+check was cancelled before recording anything — this section is the first phase-2
+record for this spec. The phase-1 verdict stands: **PASS (attempt 1)**, not
+re-run; this invocation is the scoped post-PR CI check only. Information barrier
+held: no `specs/*/00-informal.md` read (including the stale copy in abandoned
+reflog commit `b569042` — not checked out, not read).
+
+PR: https://github.com/RexiAI/my-engineering-standards/pull/93 (draft, base
+`main`, head `spec/031-vercel-deploy-lane`, head SHA
+`64dfb9f54dfb31f5a44c085670eba8d98eadae7c`, 13 commits, pushed twice: C1–C12
+head `0910252`, then archive commit C13 `64dfb9f`).
+
+**Round-1 verdict: FAIL.** Both Self CI `Validate` runs against head SHA
+`64dfb9f` (pull_request + push events) failed at step 25
+`Check security-hardening deliverables` (`scripts/check-security-hardening.sh`,
+exit 1): **AC-026-13 mutable third-party Action ref** at
+`.github/workflows/ci-vercel-production-verify.yml:53` (`uses: actions/checkout@v4`)
+— a file added by this change set itself (commit `64a64e9`, task 7). This is a
+**genuine FAIL, distinct from the expected `check-specs-archived` intermediate**:
+that check (step 16) is **green at head** — the archive commit resolved it as
+designed. Routing below (→ Coder).
+
+## Per-check outcome — round 1 (head SHA `64dfb9f`)
+
+| Check (workflow / name) | Run | Event | Bucket | Verdict |
+|---|---|---|---|---|
+| Self CI / Validate | 39272653874 (check id 118128734889) | pull_request | fail | **FAIL** (genuine, at head) |
+| Self CI / Validate | 39272644053 (check id 118128698166) | push | fail | **FAIL** (same step, same SHA) |
+| PR Review Agent / Review PR | 39272654342 | pull_request | cancel | CANCELLED (terminal; not Self CI; not ruled on — phase-2 authority is the Self CI Validate checks) |
+
+No polling was required: every check was already terminal at first query
+(2026-10-21T20:48:50Z); both Validate runs completed 2026-10-19T14:52Z. No check
+is `pending`; nothing remains outstanding for round 1.
+
+Expected intermediate (C12 `0910252`, superseded — **not** the PR verdict): runs
+39272481340 (pull_request) / 39272438615 (push) failed `check-specs-archived`
+exactly as the pipeline design predicts — the intermediate push carried a
+finished spec (`30-report.md`) without its archive because archiving is
+deliberately the final commit. Recorded separately below and kept distinct from
+the genuine head failure.
+
+## Evidence: Post-PR CI — gh pr checks (terminal)
+
+command: gh pr checks 93 --json name,state,bucket,workflow,link
+exit: 0
+at: 2026-10-21T20:48:50Z
+
+[{"bucket":"cancel","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/39272654342/job/118128951629","name":"Review PR / Review PR","state":"CANCELLED","workflow":"PR Review Agent"},{"bucket":"fail","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/39272653874/job/118128734889","name":"Validate","state":"FAILURE","workflow":"Self CI"},{"bucket":"fail","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/39272644053/job/118128698166","name":"Validate","state":"FAILURE","workflow":"Self CI"}]
+
+## Evidence: Post-PR CI — Self CI runs on the branch
+
+command: gh run list --branch spec/031-vercel-deploy-lane --workflow "Self CI" --json databaseId,headSha,status,conclusion,event,createdAt
+exit: 0
+at: 2026-10-21T20:48:51Z
+
+[{"conclusion":"failure","createdAt":"2026-10-19T14:50:59Z","databaseId":39272653874,"event":"pull_request","headSha":"64dfb9f54dfb31f5a44c085670eba8d98eadae7c","status":"completed"},{"conclusion":"failure","createdAt":"2026-10-19T14:50:55Z","databaseId":39272644053,"event":"push","headSha":"64dfb9f54dfb31f5a44c085670eba8d98eadae7c","status":"completed"},{"conclusion":"failure","createdAt":"2026-10-19T14:49:51Z","databaseId":39272481340,"event":"pull_request","headSha":"0910252dcf8b92b90c423520ce8d9fa7c22bfcea","status":"completed"},{"conclusion":"failure","createdAt":"2026-10-19T14:49:33Z","databaseId":39272438615,"event":"push","headSha":"0910252dcf8b92b90c423520ce8d9fa7c22bfcea","status":"completed"}]
+
+## Evidence: Post-PR CI — failing check IDs at head SHA
+
+command: gh api repos/RexiAI/my-engineering-standards/commits/64dfb9f54dfb31f5a44c085670eba8d98eadae7c/check-runs --jq '.check_runs[] | select(.conclusion=="failure") | {id, name, conclusion}'
+exit: 0
+at: 2026-10-21T20:49:38Z
+
+{"conclusion":"failure","id":118128734889,"name":"Validate"}
+{"conclusion":"failure","id":118128698166,"name":"Validate"}
+
+## Evidence: Post-PR CI — head-SHA failure log (run 39272653874, pull_request)
+
+command: gh run view 39272653874 --log-failed 2>/dev/null | sed -e 's/\x1b\[[0-9;]*m//g' | rtk grep -E "AC-026-13: mutable|✘ Security|##\[error\]Process"
+exit: 0
+at: 2026-10-21T20:55:40Z
+
+(Full --log-failed output is 58 lines, one failing step only; representative
+excerpt below, first captured 2026-10-19T14:52Z run time. Color-code artifacts
+present in the log stream as emitted are reproduced as captured.)
+
+50:Validate	Check security-hardening deliverables	2026-10-19T14:52:11.0201280Z ^[[0;31mFAIL^[[0m AC-026-13: mutable third-party Action ref(s) found: ./.github/workflows/ci-vercel-production-verify.yml:      - uses: actions/checkout@v4
+56:Validate	Check security-hardening deliverables	2026-10-19T14:52:11.0426764Z ^[[0;31m✘ Security hardening check: 1 violation(s). Fix before merging.^[[0m
+58:Validate	Check security-hardening deliverables	2026-10-19T14:52:11.0453480Z ##[error]Process completed with exit code 1.
+
+All other AC-026-NN lines in the same step are PASS — exactly 1 violation.
+
+## Evidence: Post-PR CI — head-SHA step states (run 39272653874)
+
+command: gh run view 39272653874 --json jobs --jq '.jobs[].steps[] | [.number, .name, .status, .conclusion] | @tsv'
+exit: 0
+at: 2026-10-21T20:50:53Z
+
+(Representative excerpt of the 33-step Validate job, tabs as emitted; steps 1–8,
+11–15, 17–24 all completed success.)
+
+9	make validate-all	completed	success
+10	Check design-gate blame scoping (scratch repos)	completed	success
+16	Check finished specs are archived	completed	success
+25	Check security-hardening deliverables	completed	failure
+26	Check remediation budget	completed	skipped
+27	Install shellcheck	completed	skipped
+28	shellcheck scripts and templates	completed	skipped
+29	Install bats-core	completed	skipped
+30	Run shell gate bats tests (spec 001 Track B)	completed	skipped
+31	Run gate selftests	completed	skipped
+32	Check scenario traceability (live tree)	completed	skipped
+33	Validate YAML syntax (.github, ci)	completed	skipped
+
+Step 16 green at head confirms the expected C12 archive failure is resolved by
+C13. Steps 26–33 were SKIPPED downstream of the step-25 failure — the round-2
+scoped re-check must confirm them green within the same Validate checks.
+
+## Evidence: Post-PR CI — push-event run fails identically (run 39272644053)
+
+command: gh run view 39272644053 --log-failed 2>&1 | rtk grep -E "FAIL AC|✘ Security|##\[error\]"
+exit: 0
+at: 2026-10-21T20:52:21Z
+
+1452:Validate	UNKNOWN STEP	2026-10-19T14:52:07.0163461Z ^[[0;31m✘ Security hardening check: 1 violation(s). Fix before merging.^[[0m
+1454:Validate	UNKNOWN STEP	2026-10-19T14:52:07.0178610Z ##[error]Process completed with exit code 1.
+
+## Evidence: Post-PR CI — expected C12 intermediate (run 39272481340, superseded)
+
+command: gh run view 39272481340 --log-failed 2>/dev/null | sed -e 's/\x1b\[[0-9;]*m//g' | rtk grep -E "\[FAIL\] 031|##\[error\]Process"
+exit: 0
+at: 2026-10-21T20:55:42Z
+
+677:Validate	UNKNOWN STEP	2026-10-19T14:50:06.6339284Z ^[[31m  [FAIL] 031-vercel-deploy-lane is finished (has 30-report.md) but not archived — missing docs/changes/031-vercel-deploy-lane.md^[[0m
+680:Validate	UNKNOWN STEP	2026-10-19T14:50:06.6353364Z ##[error]Process completed with exit code 1.
+
+Exactly the expected intermediate failure class (finished spec carried pre-archive
+because archiving is the final commit). Superseded by C13, where the same check
+passes; **not** the PR verdict and not folded into the genuine head failure.
+
+## Evidence: Post-PR CI — failing file provenance and repo pinning convention
+
+command: rtk git log --oneline main..HEAD -- .github/workflows/ci-vercel-production-verify.yml && rtk grep -n "uses: actions/checkout" .github/workflows/ci-vercel-production-verify.yml .github/workflows/self-ci.yml
+exit: 0
+at: 2026-10-21T20:55:43Z
+
+64a64e9 feat(deploy-lane): post-merge production deploy verification (task 7)
+.github/workflows/ci-vercel-production-verify.yml:53:      - uses: actions/checkout@v4
+.github/workflows/self-ci.yml:18:      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+
+## Evidence: Post-PR CI — PR Review Agent run at head (cancelled)
+
+command: gh run list --branch spec/031-vercel-deploy-lane --workflow "PR Review Agent" --json databaseId,headSha,status,conclusion,createdAt
+exit: 1
+at: 2026-10-21T20:55:43Z
+
+could not resolve to a unique workflow; found: ci-pr-review.yml pr-review.yml
+
+(Ambiguous workflow-name lookup; superseded by the by-id query below.)
+
+command: gh run view 39272654342 --json databaseId,workflowName,headSha,status,conclusion,event,createdAt
+exit: 0
+at: 2026-10-21T20:56:15Z
+
+{"conclusion":"cancelled","createdAt":"2026-10-19T14:50:59Z","databaseId":39272654342,"event":"pull_request","headSha":"64dfb9f54dfb31f5a44c085670eba8d98eadae7c","status":"completed","workflowName":"PR Review Agent"}
+
+Terminal (cancelled). Not the Self CI workflow; the phase-2 authority
+(docs/SPEC_PIPELINE.md §Post-PR CI check-and-remediate loop) is the PR's CI
+checks — Self CI `Validate`. Recorded, not ruled on, not folded into the verdict;
+the orchestrator may re-trigger the review agent after the fix round if it wants
+a review pass before merge.
+
+## Diagnosis
+
+- Failing gate: `scripts/check-security-hardening.sh` (spec 026, AC-026-13 — no
+  mutable third-party Action refs; SHA pinning required). CI step 25, exit 1,
+  1 violation.
+- Cause: `.github/workflows/ci-vercel-production-verify.yml:53` carries
+  `uses: actions/checkout@v4` — a mutable tag ref.
+- Provenance: the file was added by this change set — commit `64a64e9`
+  `feat(deploy-lane): post-merge production deploy verification (task 7)`
+  (evidence above). It is the only mutable ref flagged; the change set's other
+  new files are docs (`docs/adr/0008-vercel-deploy-lane.md`,
+  `docs/changes/031-vercel-deploy-lane.md`).
+- Fix convention is visible in the gate's own workflow:
+  `.github/workflows/self-ci.yml:18` —
+  `uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0`.
+- Known pre-existing noise did NOT touch CI: step 9 `make validate-all` and step
+  10 `Check design-gate blame scoping` are green at head, consistent with the
+  blame-scoped design gate (the plain local `--json` 1-FAIL/16-WARN set is
+  pre-existing, out of scope, flagged to Architect in phase 1 — recorded in the
+  phase-1 telemetry warnings).
+- Id-scan safety of this appendix: `tests/AC-030-07.sh:55` excludes
+  `docs/changes/` from the tracked-tree literal-id scan, and the traceability
+  scanner excludes `specs/`/`docs/changes/` from its reference scan (comment at
+  `tests/AC-030-07.sh:40-42`), so quoting `AC-026-13` here creates no
+  030-class round-2 hazard.
+
+## Routing (route, do not fix)
+
+- **Behavioral → Coder.** The defect is the content of a deliverable added by
+  this change set (a mutable tag ref where the gate requires a SHA-pinned ref),
+  deterministic from the gate's exit code — not a structural/complexity matter,
+  so not Refactorer territory. Fix: pin `actions/checkout` in
+  `.github/workflows/ci-vercel-production-verify.yml` to the full commit SHA per
+  the `self-ci.yml:18` convention (retaining a `# vX.Y.Z` comment). The Verifier
+  writes no production code; the PR Opener owns the round-2 commit + push.
+- **Round-2 scoped re-check (next Verifier invocation):** re-query only the
+  previously failing checks — Self CI `Validate` at the new head SHA: step 25
+  green, **and** steps 26–33 (skipped in round 1) green within the same runs.
+  No phase-1 re-run; unchanged gates stand.
+
+## Budget and counters
+
+- Phase-2 round **1 of max 3** consumed → this FAIL is a re-delegation signal,
+  **not** a pipeline stop (docs/SPEC_PIPELINE.md §Remediation budget).
+- Telemetry exported before `scripts/record-gate-run.sh` (bash form, mode 644):
+  `SPEC_LOOP_COUNT=2 SPEC_PHASE1_RETRIES=0 SPEC_PHASE2_RETRIES=0` — verified
+  against the ledger first: `runs.jsonl` ends with the phase-1 record
+  `f256d674-ac9b-486d-8031-99290bfdbf40` (`outcome=pass`, `loopCount=1`,
+  `phase1Retries=0`, `phase2Retries=0`); the cancelled invocation wrote nothing.
+- Typed-judgment fast-path **not invoked** (orchestrator reports ADR 0004
+  exit-10 fallback; stock procedure run unchanged; no `judgment_fallback` claim
+  needed since no call was made).
+
+## Dirty paths to route to the PR Opener (Verifier commits nothing)
+
+1. `docs/changes/031-vercel-deploy-lane.md` — this appended phase-2 section.
+2. `runs.jsonl` — one telemetry row appended via `scripts/record-gate-run.sh`.
+
+Neither is committed, stashed, or cleaned up by the Verifier; commit + push
+belong to the PR Opener together with the Coder's round-2 fix.
+
+**Verdict (phase-2 round 1): FAIL** — failing checks: Self CI `Validate`
+check ids 118128734889 (run 39272653874, pull_request) and 118128698166
+(run 39272644053, push) at head SHA `64dfb9f`; reason: AC-026-13 mutable Action
+ref `actions/checkout@v4` in `.github/workflows/ci-vercel-production-verify.yml:53`;
+routing: Coder (behavioral), PR Opener re-pushes, Verifier re-checks scoped.
