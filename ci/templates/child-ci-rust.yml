@@ -1,0 +1,185 @@
+# Generated CI for Rust project
+# Template: ci/templates/child-ci-rust.yml
+#
+# Self-contained, unlike child-ci-{go,java,node}.yml: those delegate to reusable
+# workflows in the standards repo, and no ci-rust.yml reusable workflow exists
+# yet (ADR 0006 D4 scopes this change to ci/templates/ only). Job names, the
+# push-vs-PR split, the needs chain, permissions, concurrency and the action
+# pins below mirror .github/workflows/ci-go.yml, so this file collapses into a
+# thin delegator unchanged once a ci-rust.yml reusable workflow lands.
+#
+# Toolchain per language-specific/rust/SKILL.md: cargo fmt --check,
+# clippy --all-targets --all-features -- -D warnings, cargo test --locked,
+# cargo audit, cargo deny check. Mutation testing (cargo-mutants) is a
+# production-tier gate and is deliberately NOT wired into this pipeline —
+# same as Gremlins/PiTest/Stryker in the other templates (docs/TESTING.md
+# §Mutation Testing: periodic runs, never every PR). See
+# ci/templates/mutants.toml.
+#
+# No coverage gate: Rust coverage tooling is unselected in this repo
+# (language-specific/rust/TESTING.md §Coverage — advisory, "evaluate before
+# adopting"), and ADR 0006 D4 lists none.
+#
+# deploy-on-main is not an input here (no workflow_call): delete the deploy and
+# docker jobs for the child-ci-go.yml `deploy-on-main: false` equivalent.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # unit-test, lint and security run in parallel with no `needs` between them
+  # (docs/CI_CD.md §CI Job Orchestration — Parallel Feedback).
+  unit-test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+      # SHA must be within master's history (dtolnay/rust-toolchain README
+      # §Choice of full-length commit SHA) and pairs with an explicit
+      # `toolchain:` input; bump deliberately, never track a branch.
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master @ 2026-10-15
+        with:
+          toolchain: stable
+          components: clippy, rustfmt
+        # The child repo's rust-toolchain.toml stays the single source of truth
+        # for the version (docs/CI_CD.md §Toolchain Versions): rustup applies
+        # it as an override for every cargo invocation in the tree (rustup book
+        # §Overrides), so `toolchain: stable` here only bootstraps the runner
+        # default — no version is duplicated.
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      # One `cargo test` runs unit tests, tests/ integration tests AND
+      # doc-tests (SKILL.md §Commands) — that is why this workflow has no
+      # separate integration-test job, unlike ci-go.yml. `--locked` fails when
+      # Cargo.lock would change instead of quietly re-resolving (SKILL.md
+      # §Linting & Formatting, "Reproducible CI").
+      - run: cargo test --locked
+
+  lint:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master @ 2026-10-15
+        with:
+          toolchain: stable
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      # The CI formatting gate (SKILL.md §Commands). Multi-crate workspaces
+      # want `cargo fmt --all --check` to cover every member.
+      - run: cargo fmt --check
+      # The lint gate exactly as SKILL.md §Linting & Formatting mandates —
+      # --all-features matters: a feature combination that is never compiled
+      # is never linted.
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master @ 2026-10-15
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      # cargo-audit and cargo-deny are third-party subcommands, NOT part of the
+      # Rust toolchain (SKILL.md §Linting & Formatting). Both are installed
+      # fail-loud: a `cargo install` error fails the step, because a security
+      # gate that silently skipped and reported green would be worse than no
+      # gate. Do not add `|| true` / `|| echo` fallbacks here.
+      - run: cargo install cargo-audit # RustSec advisory scan of Cargo.lock (https://rustsec.org/)
+      - run: cargo audit
+      # Maintained action for cargo-deny (SKILL.md §Linting & Formatting); it
+      # runs `cargo deny check` (licence/ban/advisory/sources). Commit a
+      # deny.toml — `cargo deny init` generates the default config
+      # (https://embarkstudios.github.io/cargo-deny/).
+      - uses: EmbarkStudios/cargo-deny-action@3f4a782664881cf5725d0ffd23969fcce89fd868 # v1.6.3
+
+  contract-test:
+    name: Contract Tests
+    needs: [unit-test, lint]
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master @ 2026-10-15
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      # Consumer-side pact tests (pact_consumer crate) are ordinary cargo
+      # tests; the `pact` name filter exits green when nothing matches, so the
+      # `|| echo "No contract tests configured"` fallback ci-go.yml needs for
+      # undefined make targets would only swallow real failures here.
+      # Contract tests are a multi-service-tier gate
+      # (docs/CONFORMANCE_TIERS.md); provider verification via the
+      # pact-verifier CLI — see ci/templates/pact-rust.yml.
+      - run: cargo test --locked pact
+        env:
+          PACT_BROKER_URL: ${{ secrets.PACT_BROKER_URL }}
+
+  deploy:
+    name: Build & Release
+    needs: [unit-test, lint, security, contract-test]
+    if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master @ 2026-10-15
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      # The ci-go.yml `make build` analogue: release profile (SKILL.md
+      # §Build System) with --locked for reproducible builds.
+      - run: cargo build --release --locked
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: binary
+          # Narrow this to the actual binary (e.g. target/release/my-service) —
+          # target/release/ also holds build intermediates.
+          path: target/release/
+
+  docker:
+    name: Docker Build & Push
+    needs: [unit-test, lint, security, contract-test]
+    if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          # The reusable workflows take docker-registry/docker-image-name
+          # inputs; hardcoded GHCR defaults here — edit both places below if
+          # your registry or image path differs.
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_TOKEN }}
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.9.0
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=sha,prefix=,suffix=,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+      - name: Build & Push
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.1
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

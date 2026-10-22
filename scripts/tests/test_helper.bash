@@ -32,6 +32,25 @@ TEST_HELPER_LOADED=1
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_COMMON_DIR \
       GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_QUARANTINE_PATH
 
+# Hermeticity: the judgment layer's tests assert behaviour when its credentials
+# and backend selection are ABSENT — AC-028-02 ("JUDGMENT_API_KEY unset exits 10
+# without any HTTP request"), AC-028-04 (empty string), AC-028-50 ("passes fully
+# offline with no credentials configured") and the JUDGMENT_MODEL usage-error
+# unit case. On a developer machine direnv loads config/model.local.env and
+# config/agent.local.env into the shell, so those variables ARE set and all four
+# tests fail — while CI, which has none of them, stays green. The tests were
+# asserting a precondition they never enforced, which made a red local suite
+# normal and eroded its signal.
+#
+# Unset exactly these four and nothing else:
+#   - GITHUB_TOKEN / GH_TOKEN must stay. Unsetting them was observed to break
+#     AC-030-01-06 ("required body sections present").
+#   - OPENCODE_API_KEY and SPEC_*_MODEL must stay; check-model-env.sh verifies
+#     their resolution and AC-030-07-03 asserts it exits 0.
+# Tests that need a judgment variable set it explicitly on the invocation under
+# test, which is unaffected by this.
+unset JUDGMENT_API_KEY JUDGMENT_MODEL JUDGMENT_BACKEND JUDGMENT_API_URL
+
 # Resolve repo root from helper location (scripts/tests/test_helper.bash → repo root)
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 export REPO_ROOT

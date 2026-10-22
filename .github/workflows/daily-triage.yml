@@ -92,6 +92,18 @@ jobs:
         if: steps.provider-check.outputs.not-configured != 'true'
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          # The skill's mandated `gh` calls — the loop-pause-all kill-switch
+          # label check, issue create/comment, PR and workflow-run inspection —
+          # authenticate from GH_TOKEN. Without it every one of them fails, and
+          # the loop has only been working by accident: it recovers the job
+          # token from the git credentials actions/checkout persists. A
+          # `persist-credentials: false` hardening pass would silently remove
+          # that recovery and break the kill-switch check with it (issues #71
+          # and #77 item 3). Wiring the token explicitly removes the accident.
+          # The `permissions:` block above already grants contents/issues write
+          # and pull-requests/actions read, which is what these calls need, so
+          # no permission change is required.
+          GH_TOKEN: ${{ github.token }}
         run: |
           /tmp/opencode-bin/opencode run \
             --dir "$GITHUB_WORKSPACE" \
@@ -100,6 +112,15 @@ jobs:
       # Persist state to loop-state. Staging is limited to the two state files;
       # any other change fails the workflow (report-only enforcement). Pushes to
       # loop-state, never to main. Skips the commit when neither file changed.
+      #
+      # The commit is parented on origin/loop-state, NOT on main. loop-state
+      # forked from main at 56e2b77 (2026-08-20) and carries its own state
+      # commits, so a commit whose parent chain runs through main is always a
+      # non-fast-forward push to loop-state and is rejected outright. That
+      # rejection is why the loop silently lost STATE.md and loop-run-log.md on
+      # every run since 2026-08-21 — issue #77 records 38+ consecutive failures
+      # and loop-state frozen at 1e019c5 for ~57 days. Parenting on loop-state
+      # makes every push a fast-forward. Never --force, never to main.
       - name: Commit and push state to loop-state
         if: steps.provider-check.outputs.not-configured != 'true'
         run: |
@@ -113,12 +134,39 @@ jobs:
             echo "$other"
             exit 1
           fi
-          # Skip the commit when neither state file changed.
-          if git diff --quiet -- STATE.md loop-run-log.md \
-             && [ -z "$(git status --porcelain -- STATE.md loop-run-log.md)" ]; then
-            echo "No state changes; skipping commit."
+          # Park the run's state outside the repo. Checking out loop-state
+          # replaces the working tree with that branch's older snapshot, so the
+          # freshly written state would otherwise be clobbered.
+          run_state="$(mktemp -d)"
+          for f in STATE.md loop-run-log.md; do
+            [ -f "$f" ] && cp "$f" "$run_state/$f"
+          done
+          git checkout -- STATE.md loop-run-log.md 2>/dev/null || true
+          rm -f STATE.md loop-run-log.md
+
+          if git ls-remote --exit-code origin loop-state >/dev/null 2>&1; then
+            git fetch -q origin loop-state
+            git checkout -q -B loop-state-run FETCH_HEAD
+          else
+            # First run ever: branch from the current tree so loop-state starts
+            # with the same shape later runs expect.
+            echo "No origin/loop-state yet - bootstrapping from the current tree."
+            git checkout -q -b loop-state-run
+          fi
+
+          for f in STATE.md loop-run-log.md; do
+            [ -f "$run_state/$f" ] && cp "$run_state/$f" "$f"
+          done
+          rm -rf "$run_state"
+
+          git add STATE.md loop-run-log.md
+          # Compared against loop-state's own content now, which is the
+          # meaningful baseline: a run that rewrites the same state should not
+          # produce an empty commit.
+          if git diff --cached --quiet; then
+            echo "No state changes relative to loop-state; skipping commit."
             exit 0
           fi
-          git add STATE.md loop-run-log.md
-          git commit -m "chore(loop): daily triage state update"
+          git commit -q -m "chore(loop): daily triage state update"
+          # Fast-forward push to loop-state only. Never main, never --force.
           git push origin HEAD:loop-state

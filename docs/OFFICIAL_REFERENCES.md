@@ -296,6 +296,18 @@ Rust formatting/toolchain facts verified against `rust-lang` upstream:
 
 Recorded here because they are the reason a guide says what it says.
 
+> **Status note.** The three gate-coverage findings below — that
+> `check-code-principles.sh` did not analyse Python or Rust, that
+> `detect-saga-outbox.sh` did not scan them, and that the silent clean exit hid
+> both — were **addressed by ADR 0006**
+> ([`docs/adr/0006-python-rust-gate-coverage.md`](./adr/0006-python-rust-gate-coverage.md))
+> on branch `feat/python-rust-gate-coverage`. They are kept verbatim as the
+> record of what was found and why the ADR was necessary. Read them as
+> historical: both scripts now scan `.py` and `.rs`, in a warn-only phase per
+> ADR 0006 D6, and the zero-file message now enumerates the extensions it
+> scanned. The ordering constraint they document — detection and the four
+> downstream gates must change together — still applies to any future language.
+
 - **Angular's default test runner is Vitest**, not Jest and not Karma — the CLI
   default builder is `@angular/build:unit-test` (jsdom). Karma is legacy with an
   experimental migration path. Source: [`/guide/testing`](https://angular.dev/guide/testing)

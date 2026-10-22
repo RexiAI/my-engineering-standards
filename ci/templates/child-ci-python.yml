@@ -1,0 +1,230 @@
+# Generated CI for Python project
+# Template: ci/templates/child-ci-python.yml
+#
+# Self-contained, unlike child-ci-{go,java,node}.yml: those delegate to reusable
+# workflows in the standards repo, and no ci-python.yml reusable workflow exists
+# yet (ADR 0006 D4 scopes this change to ci/templates/ only). Job names, the
+# push-vs-PR split, the needs chain, permissions, concurrency and the action
+# pins below mirror .github/workflows/ci-go.yml, so this file collapses into a
+# thin delegator unchanged once a ci-python.yml reusable workflow lands.
+#
+# Toolchain per language-specific/python/SKILL.md: uv, ruff, mypy --strict,
+# pytest (with coverage floor), bandit. Mutation testing (mutmut) is a
+# production-tier gate and is deliberately NOT wired into this pipeline —
+# same as Gremlins/PiTest/Stryker in the other templates (docs/TESTING.md
+# §Mutation Testing: periodic runs, never every PR). See
+# ci/templates/mutmut-pyproject.toml.
+#
+# deploy-on-main is not an input here (no workflow_call): delete the deploy and
+# docker jobs for the child-ci-go.yml `deploy-on-main: false` equivalent.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Coverage floor for the unit suite (ADR 0006 D4: "pytest with a coverage
+  # floor"). docs/TESTING.md §Code Coverage treats line coverage as advisory
+  # and states no number; 80 is the repo's only documented test-quality floor
+  # (mutation coverage >= 80%, docs/TESTING.md §Mutation Testing), so it is the
+  # consistent default. Declared once here per docs/CI_CD.md §Toolchain
+  # Versions' one-place rule — adjust per repo in this file only.
+  COVERAGE_FLOOR: "80"
+
+jobs:
+  # unit-test, lint, typecheck and security run in parallel with no `needs`
+  # between them (docs/CI_CD.md §CI Job Orchestration — Parallel Feedback).
+  unit-test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          # .python-version is the single source of truth for the runtime
+          # (docs/CI_CD.md §Toolchain Versions); ci-toolchain-bump.yml keeps it
+          # fresh. Commit it (uv python pin writes it).
+          python-version-file: .python-version
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0 — the pin uv's own CI guide publishes; bump deliberately, never track a branch
+        with:
+          enable-cache: true # house caching convention (setup-go/setup-node use cache:)
+      # Exact CI invocation from https://docs.astral.sh/uv/guides/integration/github/
+      # — --locked fails when uv.lock is out of date, the uv analogue of
+      # `npm ci` / `cargo --locked` (uv.lock is committed, SKILL.md §Build System).
+      - run: uv sync --locked --all-extras --dev
+      # tests/unit + app/ per the SKILL.md §Project Structure layout. No
+      # passWithNoTests-style tolerance: unit tests are required at every tier
+      # (docs/CONFORMANCE_TIERS.md), a missing suite must fail loudly, and a
+      # coverage floor computed over zero tests would be a false pass (the
+      # ADR 0006 D5 zero-file rule).
+      - run: uv run pytest tests/unit --cov=app --cov-report=term --cov-report=xml --cov-fail-under="$COVERAGE_FLOOR"
+
+  lint:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version-file: .python-version
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked --all-extras --dev
+      # ruff is the only linter/formatter (SKILL.md §Linting & Formatting).
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+
+  typecheck:
+    # Separate job, per the ci-react-native.yml precedent for a typecheck gate.
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version-file: .python-version
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked --all-extras --dev
+      # --strict on the command line (ADR 0006 D4) so the gate holds even if
+      # [tool.mypy] strict = true is missing from pyproject.toml.
+      - run: uv run mypy --strict app
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version-file: .python-version
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked --all-extras --dev
+      # bandit SAST (SKILL.md §Linting & Formatting; docs/SECURITY.md is the
+      # rule source). SKILL.md writes `bandit -r src/` — src/ is the generic
+      # path from bandit's docs; the guide's FastAPI layout keeps application
+      # code in app/, so -r targets app/ here. bandit is a dev dependency
+      # (uv add --dev bandit); uv sync above fails loudly if it is missing.
+      - run: uv run bandit -r app/
+
+  contract-test:
+    name: Contract Tests
+    needs: [unit-test, lint]
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version-file: .python-version
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked --all-extras --dev
+      # Tolerant idiom from ci-{go,node,java}.yml: contract tests are a
+      # multi-service-tier gate (docs/CONFORMANCE_TIERS.md), so absence is not
+      # a failure. Setup reference: ci/templates/pact-python.yml.
+      - run: uv run pytest tests/pact 2>/dev/null || echo "No contract tests configured"
+        env:
+          PACT_BROKER_URL: ${{ secrets.PACT_BROKER_URL }}
+
+  integration-test:
+    name: Integration Tests
+    needs: [contract-test]
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version-file: .python-version
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked --all-extras --dev
+      # The npm `--if-present` equivalent: an honest no-op when the child has
+      # no integration suite yet, while real failures still fail (no
+      # `2>/dev/null ||` swallowing — cf. the honest-skip gate in
+      # ci-react-native.yml's eas-build job).
+      - run: |
+          if [ -d tests/integration ]; then
+            uv run pytest tests/integration
+          else
+            echo "No integration tests configured"
+          fi
+
+  deploy:
+    name: Build & Release
+    needs: [unit-test, lint, typecheck, security, contract-test, integration-test]
+    if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version-file: .python-version
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked --all-extras --dev
+      # uv build = the ci-go.yml `make build` analogue: wheel + sdist into
+      # dist/ (https://docs.astral.sh/uv/guides/integration/github/). Service
+      # repos that ship only a container can delete this job — the image below
+      # is then the sole artifact. No registry-publish step: like the release
+      # bot (docs/CI_CD.md §Release Process), publishing needs repo-owned
+      # credentials; wire `uv publish` + Trusted Publishing per that guide.
+      - run: uv build
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dist
+          path: dist/
+
+  docker:
+    name: Docker Build & Push
+    needs: [unit-test, lint, typecheck, security, contract-test, integration-test]
+    if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          # The reusable workflows take docker-registry/docker-image-name
+          # inputs; hardcoded GHCR defaults here — edit both places below if
+          # your registry or image path differs.
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_TOKEN }}
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.9.0
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=sha,prefix=,suffix=,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+      - name: Build & Push
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.1
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

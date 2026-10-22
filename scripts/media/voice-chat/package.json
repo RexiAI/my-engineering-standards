@@ -1,0 +1,7 @@
+{
+  "name": "voice-chat",
+  "private": true,
+  "type": "module",
+  "description": "Full-duplex realtime voice chat (DashScope Qwen-Audio Realtime) for the media-voice agent. Requires a standard DashScope sk- key.",
+  "engines": { "node": ">=22" }
+}

@@ -1,4 +1,4 @@
-.PHONY: help validate validate-docs validate-refs validate-all lint format stats test test-scripts test-shell test-java test-go test-js mutation property-tests ci-fast ci ci-full sync-qwen judgment-up judgment-down
+.PHONY: help validate validate-docs validate-refs validate-all lint format stats test test-scripts test-shell test-java test-go test-js mutation property-tests ci-fast ci ci-full sync-qwen judgment-up judgment-down install-media uninstall-media smoke-media
 
 DOCS := AGENTS.md README.md \
   docs/AGENTS_AND_SKILLS.md \
@@ -6,7 +6,7 @@ DOCS := AGENTS.md README.md \
   docs/CONFORMANCE_TIERS.md \
   docs/CONTRACT_TESTING.md docs/DATA_STORAGE_DECISIONS.md \
   docs/DEPLOYMENT.md docs/EVENTUAL_CONSISTENCY.md docs/GIT_WORKFLOW.md \
-  docs/IDEMPOTENCY.md docs/LOOP_ENGINEERING.md docs/MESSAGE_DELIVERY.md docs/OBSERVABILITY.md \
+  docs/IDEMPOTENCY.md docs/LOOP_ENGINEERING.md docs/MEDIA_AGENTS.md docs/MESSAGE_DELIVERY.md docs/OBSERVABILITY.md \
   docs/OUTBOX_PATTERN.md docs/RESILIENCE.md docs/SAGA_PATTERN.md \
   docs/SCALABILITY.md docs/SCHEMA_EVOLUTION.md docs/SECURITY.md \
   docs/STREAM_PROCESSING.md docs/TESTING.md docs/SPEC_PIPELINE.md
@@ -33,6 +33,8 @@ help:
 	@echo "  format         Format with prettier"
 	@echo "  stats          Show file sizes"
 	@echo "  sync-qwen      Sync Token Plan models to Qwen CLI settings"
+	@echo "  install-media  Install media agents + voice-chat into ~/.config/opencode (Linux/macOS/Windows via node)"
+	@echo "  uninstall-media Remove them; smoke-media  Zero-credit smoke (structure + bl --dry-run)"
 	@echo ""
 	@echo "Releases: handled by Semantic Release CI after merge to main."
 	@echo "  See docs/CI_CD.md §Release Process and ci/templates/releaserc.json."
@@ -157,6 +159,16 @@ ci-full: ci   # Full ladder (no E2E in this repo)
 
 sync-qwen:   # Sync Token Plan models from opencode.json → ~/.qwen/settings.json
 	@./scripts/sync-qwen-settings.sh
+
+# --- Media agent family (ADR 0007) --------------------------------------------
+install-media:   # Copy media agents + voice-chat app into the opencode global config dir
+	@node scripts/media/install.mjs
+
+uninstall-media:   # Remove installed media agents + voice-chat app
+	@node scripts/media/install.mjs --uninstall
+
+smoke-media:   # Zero-credit structural smoke (agents, voice-chat, bl dry-runs)
+	@node scripts/media/smoke-media.mjs
 
 # --- Local judgment backend (spec 029) ----------------------------------------
 judgment-up:     # Start the local judgment backend and print JUDGMENT_* env lines

@@ -151,17 +151,17 @@ reuse, not preemptively (YAGNI — docs/CODING_CONVENTIONS.md §Design Principle
   `restriction` group, **allow by default**, default threshold **25**
   (configurable via `cognitive-complexity-threshold` in `clippy.toml`). It
    measures cognitive complexity at a much looser default, so it is an advisory
-   aid, not an equivalent gate. **Rust currently has no mechanical complexity
-   gate in this repo.** `scripts/check-code-principles.sh` enumerates only
-   `*.java`, `*.go`, and `*.ts`/`*.tsx`/`*.js`/`*.jsx` (lines 307–309) and
-   exits *clean* with "No Java, Go, or JS/TS source files found" when none
-   match (line 311) — so a Rust-only repo passes that gate **without being
-   checked at all**. Do not rely on it. Until a Rust-aware gate exists, ≤6 is
-   enforced by review; enable `-W clippy::cognitive_complexity` with a
-   tightened threshold as the interim mechanical signal. Extending the script
-   to `*.rs` is a gate-catalog change and requires an ADR first
-   (`docs/GOVERNANCE.md §ADR Requirement`).
-   **[official lint; convention usage; gate gap verified against the script]**
+   aid, not an equivalent gate. `scripts/check-code-principles.sh` **does** now
+   scan `*.rs` (ADR 0006 D1), but during that ADR's D6 warn phase Rust findings
+   are emitted as **approximate warnings and never change the exit status** — so
+   the gate cannot yet block a Rust PR. Treat ≤6 as review-enforced, with the
+   script's warnings and `-W clippy::cognitive_complexity` at a tightened
+   threshold as the mechanical signals. Rust complexity counting is genuinely
+   approximate: `match` arms, generic bounds and closures inflate naive counts,
+   and the script says so in every warning it emits. Promotion to blocking is a
+   one-line change (`WARN_ONLY_LANGS` in that script) once the thresholds are
+   calibrated against real repos.
+   **[official lint; convention usage; gate behaviour per ADR 0006]**
 
 ## Always-Rules
 
@@ -226,7 +226,16 @@ For a child repo adopting this standard:
 5. Declare the conformance tier (docs/CONFORMANCE_TIERS.md); property and
    mutation testing apply at `production` tier only.
 
-**No Rust saga/outbox CI gate templates exist yet** (`ci/templates/` covers
-Java, Go, Node). Adding a Rust gate changes the gate catalog, which requires an
-ADR first (docs/GOVERNANCE.md §ADR Requirement) — this directory is
-deliberately docs-only. Track it as a follow-up, don't improvise a gate script.
+**Rust saga/outbox coverage now exists** (ADR 0006 D2+D3).
+`scripts/detect-saga-outbox.sh` scans `.rs`, and all four gates understand Rust
+idioms: `tokio::time::timeout` for step timeouts, a `compensate` fn or
+`impl Compensable` for compensation, `sqlx`/`diesel` `.sql` migrations for the
+outbox schema — the 7 required columns and the partial index on
+`published_at IS NULL` are unchanged, not relaxed — and `OutboxRelay` /
+`outbox_relay` plus a snake_case dedup store for the relay. Integration tests
+must live in `tests/*saga*.rs` or `tests/*outbox*.rs`; inline `#[cfg(test)]`
+unit-test modules do **not** satisfy that gate. CI wiring is
+`ci/templates/child-ci-rust.yml`, mutation config `ci/templates/mutants.toml`.
+These token patterns are **house convention**, not mandates from
+`docs/SAGA_PATTERN.md` / `docs/OUTBOX_PATTERN.md`, which specify behaviour
+rather than spellings.

@@ -1,0 +1,52 @@
+# mutmut mutation-testing config — merge the [tool.mutmut] section below into
+# the child project's pyproject.toml. Fragment pattern, same as
+# pitest-profile.xml is a pom.xml fragment; mutmut reads pyproject.toml
+# natively (https://mutmut.readthedocs.io/en/latest/#configuration).
+#
+# Conformance tier: production (docs/CONFORMANCE_TIERS.md). Mutation runs are
+# slow — run periodically and pre-release, never on every PR
+# (docs/TESTING.md §Mutation Testing). That is why child-ci-python.yml does not
+# wire this in, exactly as mutation.mk (Go), pitest-profile.xml (Java) and
+# stryker.conf.json (JS/TS) stay out of the default pipelines.
+#
+# Constraints from the official docs that shape CI usage:
+# - fork support required: POSIX only — Windows needs WSL. GitHub's
+#   ubuntu-latest runners satisfy this; do not add windows/macos matrix legs.
+# - mutmut 3+ mutates ONLY code inside functions (mutmut 2 has a different
+#   execution model) — the score describes function bodies, not module-level
+#   code, so it is not comparable to a line-coverage percentage.
+#
+# Usage:
+#   uv add --dev mutmut
+#   uv run mutmut run                  # resumable; state lives in mutants/
+#   uv run mutmut browse               # review survivors interactively
+#   uv run mutmut export-cicd-stats    # writes mutants/mutmut-cicd-stats.json
+#
+# Gate — target mutation score >= 80% (docs/TESTING.md §Mutation Testing), and
+# it MUST fail when zero mutants were scored: a score computed over nothing is
+# a false pass (language-specific/python/SKILL.md §Linting & Formatting; same
+# defect class as ADR 0006 D5). mutmut has no threshold flag, so the gate
+# parses the stats file — the formula below is mutmut's own (its `badge`
+# command computes score = (killed + timeout) / (total - skipped)):
+#
+#   python3 - <<'PY'
+#   import json, sys
+#   s = json.load(open("mutants/mutmut-cicd-stats.json"))
+#   tested = s["total"] - s["skipped"]
+#   if tested <= 0:
+#       sys.exit("mutmut gate: zero mutants scored — refusing to pass")
+#   score = (s["killed"] + s["timeout"]) / tested * 100
+#   print(f"mutation score: {score:.1f}% "
+#         f"({s['killed']} killed, {s['survived']} survived, {tested} tested)")
+#   if score < 80:
+#       sys.exit(f"mutmut gate: {score:.1f}% < 80%")
+#   PY
+
+[tool.mutmut]
+# Values must be arrays in pyproject.toml (official docs §Configuration — the
+# setup.cfg form takes plain strings). The official example uses "src/"; the
+# guide's FastAPI layout (language-specific/python/SKILL.md §Project Structure)
+# keeps application code in app/ and fast tests in tests/unit — point both keys
+# at your actual source and unit-test paths.
+source_paths = ["app/"]
+pytest_add_cli_args_test_selection = ["tests/unit"]
