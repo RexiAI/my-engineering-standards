@@ -771,7 +771,7 @@ fabricated.
 ## PR
 
 PR: https://github.com/RexiAI/my-engineering-standards/pull/93
-Commit count: 15
+Commit count: 16
 
 ---
 
@@ -1005,3 +1005,343 @@ check ids 118128734889 (run 39272653874, pull_request) and 118128698166
 (run 39272644053, push) at head SHA `64dfb9f`; reason: AC-026-13 mutable Action
 ref `actions/checkout@v4` in `.github/workflows/ci-vercel-production-verify.yml:53`;
 routing: Coder (behavioral), PR Opener re-pushes, Verifier re-checks scoped.
+
+---
+
+# Post-PR CI check (phase 2) — round 2 of max 3 (scoped re-check)
+
+Verifier invocation 3 (phase 2, round 2 of max 3). Scoped re-check per
+docs/SPEC_PIPELINE.md §Remediation budget and §Post-PR CI check-and-remediate
+loop: only the round-1 failing check (Self CI `Validate` at the new head SHA) and
+what that failure masked (steps 26–33, skipped in round 1) were re-run. The
+phase-1 verdict **PASS (attempt 1)** and the round-1 evidence section above are
+left intact and unmodified; no phase-1 gate was re-executed. Information barrier
+held: no `specs/*/00-informal.md` read (including the stale copy in abandoned
+reflog commit `b569042` — not checked out, not read). `specs/031-vercel-deploy-lane/`
+no longer exists and was not recreated; this archived one-pager is the artifact.
+
+PR: https://github.com/RexiAI/my-engineering-standards/pull/93 (draft, base
+`main`, head `spec/031-vercel-deploy-lane`, head SHA
+`88b7ace52d7c938d89d4154a02f43eb424240fb6`, 15 commits over `origin/main`
+`cae6767`). Round-2 fix under verification: commit `22c2234` (SHA-pin of
+`actions/checkout`); commit `88b7ace` carries the round-1 evidence + telemetry row
+and the 13→15 commit-count update.
+
+**Round-2 verdict: PASS (Self CI).** Both Self CI `Validate` runs at head
+`88b7ace` completed with `conclusion: success`, and steps 25–33 each report
+`success` — i.e. the steps round 1 never reached (remediation budget, shellcheck
+install+run, bats install+run, gate selftests, scenario traceability on the live
+tree, YAML validation) **genuinely executed and passed**, they were not skipped.
+Exactly one error annotation exists in the whole Validate job log and it belongs to
+the non-blocking shellcheck step (`continue-on-error: true`, `self-ci.yml:228`) —
+recorded as a finding below, not as a CI FAIL. The `PR Review Agent` check was
+still `pending` at the polling bound; it is not a Self CI check and carries no
+phase-2 verdict authority (round-1 precedent: cancelled there, not ruled on).
+
+## Per-check outcome — round 2 (head SHA `88b7ace`)
+
+| Check (workflow / name) | Run (job) | Event | Bucket | Verdict |
+|---|---|---|---|---|
+| Self CI / Validate | 39678612357 (job 119494905580) | pull_request | pass | **PASS** (steps 25–33 all `success`) |
+| Self CI / Validate | 39678605487 (job 119494883712) | push | pass | **PASS** (steps 25–33 all `success`) |
+| PR Review Agent / Review PR | 39678612431 (job 119494906363) | pull_request | pending | **PENDING** at bound (created 21:25:04Z; still `IN_PROGRESS` at 21:35:40Z after a 300 s bounded watch, and at 21:40:05Z — ≈15 min elapsed; not Self CI, not ruled on) |
+
+Superseded history, referenced for continuity only and **not** setting the verdict:
+head `64dfb9f` runs 39272653874 / 39272644053 (round-1 FAIL, step 25 AC-026-13) and
+the C12 intermediates at `0910252` runs 39272481340 / 39272438615 (expected
+`check-specs-archived` intermediate). No failing check exists at `88b7ace`, so no
+`check-runs` failure-ID capture was required this round.
+
+## Evidence: Post-PR CI — local state verified before writing (head, branch, clean tree, commit count)
+
+command: git rev-parse HEAD; git branch --show-current; git status --porcelain; git rev-list --count origin/main..HEAD; git rev-parse origin/main
+exit: 0
+at: 2026-10-21T21:41:52Z
+
+88b7ace52d7c938d89d4154a02f43eb424240fb6
+spec/031-vercel-deploy-lane
+porcelain=[]
+15
+cae6767ffce54d40d9f3058ea42a2270c4c473e1
+
+## Evidence: Post-PR CI — gh pr checks (round 2; Self CI terminal, PR Review Agent pending)
+
+command: gh pr checks 93 --json name,state,bucket,workflow,link
+exit: 0
+at: 2026-10-21T21:40:05Z
+
+[{"bucket":"pending","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/39678612431/job/119494906363","name":"Review PR / Review PR","state":"IN_PROGRESS","workflow":"PR Review Agent"},{"bucket":"pass","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/39678612357/job/119494905580","name":"Validate","state":"SUCCESS","workflow":"Self CI"},{"bucket":"pass","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/39678605487/job/119494883712","name":"Validate","state":"SUCCESS","workflow":"Self CI"}]
+
+Earlier query in the same round (first poll, both Validate runs still in flight):
+
+command: gh pr checks 93 --json name,state,bucket,workflow,link
+exit: 0
+at: 2026-10-21T21:28:09Z
+
+[{"bucket":"pending","name":"Review PR / Review PR","state":"IN_PROGRESS","workflow":"PR Review Agent"},{"bucket":"pending","name":"Validate","state":"IN_PROGRESS","workflow":"Self CI"},{"bucket":"pending","name":"Validate","state":"IN_PROGRESS","workflow":"Self CI"}]
+
+Polling was bounded, not open-ended: `timeout 880 gh run watch 39678612357
+--interval 30 --exit-status` returned `watch_exit=0` at 2026-10-21T21:29:02Z
+(run completed); `timeout 300 gh run watch 39678612431 --interval 45
+--exit-status` returned `watch_exit=124` (bound hit) at 2026-10-21T21:35:40Z with
+the PR Review Agent run still `in_progress`.
+
+## Evidence: Post-PR CI — Self CI runs on the branch (head-SHA runs identified)
+
+command: gh run list --branch spec/031-vercel-deploy-lane --workflow "Self CI" --json databaseId,event,status,conclusion,headSha,createdAt --limit 8
+exit: 0
+at: 2026-10-21T21:28:10Z
+
+[{"conclusion":"","createdAt":"2026-10-21T21:25:04Z","databaseId":39678612357,"event":"pull_request","headSha":"88b7ace52d7c938d89d4154a02f43eb424240fb6","status":"in_progress"},{"conclusion":"","createdAt":"2026-10-21T21:25:01Z","databaseId":39678605487,"event":"push","headSha":"88b7ace52d7c938d89d4154a02f43eb424240fb6","status":"in_progress"},{"conclusion":"failure","createdAt":"2026-10-19T14:50:59Z","databaseId":39272653874,"event":"pull_request","headSha":"64dfb9f54dfb31f5a44c085670eba8d98eadae7c","status":"completed"},{"conclusion":"failure","createdAt":"2026-10-19T14:50:55Z","databaseId":39272644053,"event":"push","headSha":"64dfb9f54dfb31f5a44c085670eba8d98eadae7c","status":"completed"},{"conclusion":"failure","createdAt":"2026-10-19T14:49:51Z","databaseId":39272481340,"event":"pull_request","headSha":"0910252dcf8b92b90c423520ce8d9fa7c22bfcea","status":"completed"},{"conclusion":"failure","createdAt":"2026-10-19T14:49:33Z","databaseId":39272438615,"event":"push","headSha":"0910252dcf8b92b90c423520ce8d9fa7c22bfcea","status":"completed"}]
+
+## Evidence: Post-PR CI — head-SHA run conclusion (run 39678612357, pull_request)
+
+command: gh run view 39678612357 --json status,conclusion,headSha,event --jq '{status,conclusion,headSha,event}'
+exit: 0
+at: 2026-10-21T21:40:49Z
+
+{"conclusion":"success","event":"pull_request","headSha":"88b7ace52d7c938d89d4154a02f43eb424240fb6","status":"completed"}
+
+## Evidence: Post-PR CI — steps 25–33 conclusions (run 39678612357, pull_request) — the steps round 1 never reached
+
+command: gh run view 39678612357 --json jobs --jq '.jobs[] | .steps[] | select(.number>=25 and .number<=33) | "\(.number)\t\(.conclusion // .status)\t\(.name)"'
+exit: 0
+at: 2026-10-21T21:40:50Z
+
+25	success	Check security-hardening deliverables
+26	success	Check remediation budget
+27	success	Install shellcheck
+28	success	shellcheck scripts and templates
+29	success	Install bats-core
+30	success	Run shell gate bats tests (spec 001 Track B)
+31	success	Run gate selftests
+32	success	Check scenario traceability (live tree)
+33	success	Validate YAML syntax (.github, ci)
+
+Full step list of the same job (all 33 steps + post-steps `success`, none
+`skipped`) was read in this round via
+`gh run view 39678612357 --json jobs --jq '.jobs[] | .steps[] | "\(.number)\t\(.conclusion // .status)\t\(.name)"'`
+(exit 0, at 2026-10-21T21:29:20Z): steps 1–24 `success` (Set up job; checkout
+`actions/checkout@11d5960a326750d5838078e36cf38b85af677262`; setup-python; Install
+PyYAML; CRLF check; CI sweeper; model-agnostic agents; `bash -n` parse; step 9
+`make validate-all`; step 10 design-gate blame scoping; gate list consistency;
+orchestration references; non-vacuous bats assertions; post-PR CI loop mechanics;
+skills specification; step 16 finished-specs-archived; spec audit trails; step 18
+`make lint`; pinned opencode + model-env resolution; agent env guard / hardcoded
+secrets; loop files; Daily Triage; PR Babysitter; PR review agent deliverables),
+then 25–33 as above, then 65/66 post-steps and 67 `Complete job` — all `success`.
+
+## Evidence: Post-PR CI — steps 25–33 conclusions (run 39678605487, push)
+
+command: gh run view 39678605487 --json jobs --jq '.jobs[] | .steps[] | select(.number>=24 and .number<=33) | "\(.number)\t\(.conclusion // .status)\t\(.name)"'
+exit: 0
+at: 2026-10-21T21:40:51Z
+
+24	success	Check PR review agent deliverables
+25	success	Check security-hardening deliverables
+26	success	Check remediation budget
+27	success	Install shellcheck
+28	success	shellcheck scripts and templates
+29	success	Install bats-core
+30	success	Run shell gate bats tests (spec 001 Track B)
+31	success	Run gate selftests
+32	success	Check scenario traceability (live tree)
+33	success	Validate YAML syntax (.github, ci)
+
+Push-event run conclusion, same head SHA:
+
+command: gh run view 39678605487 --json status,conclusion,headSha,event --jq '{status,conclusion,headSha,event}'
+exit: 0
+at: 2026-10-21T21:29:20Z
+
+{"conclusion":"success","event":"push","headSha":"88b7ace52d7c938d89d4154a02f43eb424240fb6","status":"completed"}
+
+## Evidence: Post-PR CI — step 25 AC-026-13 now passes (the round-1 failure is closed)
+
+command: gh run view --job 119494905580 --log | awk -F'\t' '$2=="Check security-hardening deliverables"' | grep -E "AC-026-13"
+exit: 0
+at: 2026-10-21T21:40:53Z
+
+^[[0;32mPASS^[[0m AC-026-13: every third-party Action in .github/workflows/*.yml is SHA-pinned
+^[[0;32mPASS^[[0m AC-026-13: no live workflow/script/template references this repo's own workflows via @main
+^[[0;32mPASS^[[0m self-citation: script cites every AC-026-NN scenario ID (AC-026-01 … AC-026-13)
+
+(ANSI colour markers reproduced verbatim as they appear in the log; the log was
+captured to a scratch file `/tmp/opencode/r2job.log`, 3397 lines, excerpted, and
+deleted at the end of this round. Round 1's failing line —
+`FAIL AC-026-13: mutable third-party Action ref(s) found … uses: actions/checkout@v4`
+— does not occur anywhere in the round-2 job log.)
+
+The fix under verification, in the local tree at head:
+
+command: grep -n "uses:" .github/workflows/ci-vercel-production-verify.yml
+exit: 0
+at: 2026-10-21T21:40:05Z
+
+53:      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+
+## Evidence: Post-PR CI — the only error annotation in the Validate job is the non-blocking shellcheck step
+
+command: gh run view --job 119494905580 --log | grep -F "##[error]" | awk -F'\t' '{print $2}' | sort | uniq -c
+exit: 0
+at: 2026-10-21T21:40:53Z
+
+      1 shellcheck scripts and templates
+
+Raw line:
+
+[step: shellcheck scripts and templates] 2026-10-21T21:26:41.6618224Z ##[error]Process completed with exit code 1.
+
+Every other step in the job carries no error annotation, so the `success`
+conclusions above are real passes, not swallowed failures — the single swallowed
+one is shellcheck, which is `continue-on-error: true` by design
+(`.github/workflows/self-ci.yml:228`) and therefore cannot fail the job.
+
+## Evidence: Post-PR CI — step 30 bats (first execution on this branch; round 1 skipped it)
+
+command: gh run view --job 119494905580 --log | awk -F'\t' '$2=="Run shell gate bats tests (spec 001 Track B)"' | grep -E "1\.\.[0-9]+|^.*ok 241 "
+exit: 0
+at: 2026-10-21T21:40:53Z
+
+1..473
+ok_count=473 not_ok_count=0
+ok 241 check-pr-review: clean repo exits 0 and prints its documented clean line
+
+TAP plan `1..473` with 473 `ok` lines and 0 `not ok` lines. Spec-031 scenarios are
+inside that suite and green, e.g. `ok 92 AC-031-45 — preview build timeout records
+FAIL with the timeout reason and consumes a phase-3 round`, `ok 93 AC-031-46`,
+`ok 94 AC-031-47`, `ok 95 AC-031-48`, `ok 111 AC-031-36 — phase 3 does not start on
+a phase-2 FAIL verdict`.
+
+## Evidence: Post-PR CI — steps 31 / 32 / 33 (first execution on this branch; round 1 skipped them)
+
+command: gh run view --job 119494905580 --log | awk -F'\t' '$2=="Run gate selftests" || $2=="Check scenario traceability (live tree)" || $2=="Validate YAML syntax (.github, ci)"' | grep -E "pass: [0-9]+|Scenario traceability check|\[OK\]"
+exit: 0
+at: 2026-10-21T21:40:53Z
+
+  pass: 39  fail: 0  skipped-by-007-dependency: 0
+^[[0;32m✔ Scenario traceability check: every scenario traced, every reference resolves.^[[0m
+56
+
+Step 31 gate selftests: `pass: 39 fail: 0 skipped-by-007-dependency: 0`. Step 32
+scenario traceability on the live tree: every scenario traced, every reference
+resolves. Step 33 YAML validation: 56 `[OK]` file lines, no failure line, e.g.
+`[OK] ci/gitlab/backend/ci-go.yml`.
+
+## Findings recorded this round (record, do not fix — Stop-and-Ask matrix rows "Out-of-scope finding" / "Design gate WARN")
+
+1. **shellcheck findings — non-blocking, `continue-on-error: true` (`self-ci.yml:228`); NOT a CI FAIL.**
+   Step 28 exited 1 over the repo-wide `shellcheck scripts/*.sh templates/*.sh`
+   invocation (the step is not blame-scoped). 35 distinct files flagged; aggregate
+   by code: SC2086 ×55, SC2016 ×38, SC2034 ×23, SC2317 ×18, SC1091 ×9, SC2001 ×8,
+   SC2015 ×4, SC2094 ×4, SC2318 ×4, SC2013 ×2, SC2012 ×2, SC2044 ×2, SC2053 ×2,
+   SC2295 ×3, and SC2012/SC2126/SC2128/SC2163/SC2178/SC2181/SC2206/SC2207 ×1 each.
+   **29 flagged locations fall in 7 files that this change set touched**
+   (`git diff --name-only origin/main...HEAD` ∩ shellcheck-flagged files):
+   `scripts/check-audit-trail.sh:104,117`; `scripts/check-model-env.sh:65,127`;
+   `scripts/check-pr-review.sh:259,438,444,607,625,682,750`;
+   `scripts/check-stop-and-ask-matrix.sh:160,161,164,169,173,174,175,179`;
+   `scripts/model-env.runtime-check.sh:130,160,161`;
+   `scripts/model-env.selftest.sh:150,284,419,541,551`;
+   `scripts/model-env.vars.sh:17,31`. Per-file codes: SC2016 ×8 in
+   `check-stop-and-ask-matrix.sh`, SC2016 ×5 in `check-pr-review.sh`, SC2016 ×3 in
+   `model-env.selftest.sh`, SC1091 ×3 in `model-env.runtime-check.sh`, SC2034 ×2 in
+   `model-env.vars.sh`, SC2318 ×2 in `check-audit-trail.sh`, plus single SC2163 /
+   SC2086 / SC2053 / SC2013 / SC2086 / SC2016. Whether each is diff-introduced or
+   pre-existing is **undetermined this round**: the CI step is repo-wide while the
+   design gate is blame-scoped, and shellcheck is not installed locally (phase-1
+   note stands), so no local re-run was possible. Out of scope → propose a
+   follow-up spec (quote-hygiene sweep of `scripts/*.sh`); flagged to the Architect.
+2. **`AC-024-01-12` passes vacuously in CI.** bats 241
+   (`check-pr-review: clean repo exits 0 …`) is green here, as expected: under CI's
+   `fetch-depth: 1` there is no `origin/main`, so `check-pr-review.sh:342-347`
+   yields an empty `TOUCHED` and the check's "change set modifies `agents/spec-*`"
+   clause **never fires**. A green CI therefore does not exercise that clause; in a
+   full local clone the same test fails for the same reason (diff base missing
+   under shallow fetch semantics, not a behavior defect). Recorded as an
+   out-of-scope finding — not fixed this round, and not a round-2 FAIL: the
+   divergence is pre-existing CI-harness scope, and the Coder reproduced exit 0
+   under a real `--depth 1` clone. Follow-up: make the PR-review gate's diff base
+   shallow-clone-aware (or fetch `origin/main` in CI) so the clause is actually
+   exercised.
+3. **Design-principles local noise did not fail CI** — as predicted. Step 9
+   `make validate-all` and step 10 `Check design-gate blame scoping (scratch repos)`
+   are green at head, consistent with the blame-scoped gate (the plain local
+   `bash scripts/check-code-principles.sh --json` 1-FAIL/16-WARN set lives in
+   untouched files such as `skills/hallmark/site/examples/cobalt-01/script.js:
+   CC=10`; blame-scoped `-BaseRef HEAD --json` exits 0). Phase-1 WARNs remain
+   flagged to the Architect; no new WARN arose from CI.
+4. **Execute-bit gap persists (028 W5 lineage).** Several `scripts/*.sh` are mode
+   644, so `./scripts/x.sh` yields exit **126**; every script invocation this round
+   used the `bash scripts/x.sh` form, including `bash scripts/record-gate-run.sh`
+   for telemetry.
+5. **PR Review Agent check still `pending` at the bound.** Run 39678612431
+   (job 119494906363) `IN_PROGRESS` from 21:25:04Z through 21:40:05Z (≈15 min)
+   after a 300 s bounded watch. `pending` is neither pass nor fail; it is not a
+   Self CI check and holds no phase-2 verdict authority. Recorded so the
+   orchestrator can re-query it independently before merging the draft PR.
+6. **No unaccounted behavior in the round-2 delta.** The delta over round 1 is
+   `22c2234` (one-line SHA-pin of `actions/checkout` in
+   `.github/workflows/ci-vercel-production-verify.yml:53`, exactly the routed fix)
+   and `88b7ace` (round-1 evidence + one `runs.jsonl` telemetry row + the 13→15
+   commit-count correction in this one-pager). No production logic was added, so
+   nothing in the delta lacks a task/scenario trace.
+
+## Typed-judgment fast-path
+
+**Not invoked.** ADR 0004 applies: the orchestrator reports exit 10 (fallback) on
+every call — the spec-028 wrapper (and the shipped example at
+`skills/ci-triage/SKILL.md:81`) sends `criteria` as a string while the spec-029
+backend requires a dict (Choice) or list (Score), so it rejects the payload with
+HTTP 422. Exit 10 means "no fast-path exists": the stock procedure above was run
+unchanged. The wrapper/backend contract mismatch is a diagnosed out-of-scope
+defect (spec 028 ↔ spec 029), not fixed this round; because no call was made, no
+`judgment_fallback` claim is recorded, and a typed judgment could never carry gate
+authority in any case — the verdict here is transcribed from CI state, step
+conclusions, and log lines.
+
+## Budget and counters
+
+- Phase-2 round **2 of max 3** consumed, verdict **PASS** → the phase-2
+  post-PR CI loop is green; **1 round of the phase-2 budget remains unused** and no
+  further remediation is required. Phase-1 budget untouched (PASS at attempt 1, 0
+  retries). Phase ordering (docs/SPEC_PIPELINE.md §Remediation budget): phase 3
+  (deploy verification) may now start — that is the orchestrator's call, and the
+  still-pending PR Review Agent check is not a phase-2 gate.
+- Telemetry exported in-shell **before** invoking the writer:
+  `export SPEC_LOOP_COUNT=3 SPEC_PHASE1_RETRIES=0 SPEC_PHASE2_RETRIES=1`. Verified
+  against the ledger tail first, not trusted: `runs.jsonl` ends with the round-1
+  record `3b32f832-db69-4947-8bff-57cd598fcf10` (`outcome=fail`, `loopCount=2`,
+  `phase1Retries=0`, `phase2Retries=0`), preceded by the phase-1 record
+  `f256d674-ac9b-486d-8031-99290bfdbf40` (`outcome=pass`, `loopCount=1`,
+  `phase1Retries=0`, `phase2Retries=0`). The ledger agrees with the derivation:
+  this is the third Verifier invocation, phase 1 used zero retries, and one
+  phase-2 remediation round was already consumed. No divergence to report.
+- `gatesFailed` for this round: **none** (`[]`) — every Self CI check at head is
+  green, so `outcome=pass`; the shellcheck and vacuous-`TOUCHED` items are carried
+  as `warnings`, not as gate failures.
+
+## Dirty paths to route to the PR Opener (Verifier commits nothing)
+
+1. `docs/changes/031-vercel-deploy-lane.md` — this appended round-2 section (the
+   committed round-1 evidence above is byte-for-byte untouched).
+2. `runs.jsonl` — one telemetry row appended via `bash scripts/record-gate-run.sh`.
+
+Neither is committed, stashed, reverted, or cleaned up by the Verifier
+(`git commit*` / `git push*` are denied to this agent); commit + push belong to the
+PR Opener. Scratch files used for log capture (`/tmp/opencode/r2job.log`,
+`/tmp/opencode/r2w.log`, `/tmp/opencode/r2pr.log`, `/tmp/opencode/bats.log`,
+`/tmp/opencode/scfiles.txt`, `/tmp/opencode/changed.txt`) are outside the repo and
+were deleted.
+
+**Verdict (phase-2 round 2): PASS** — Self CI `Validate` at head SHA
+`88b7ace52d7c938d89d4154a02f43eb424240fb6` is green on **both** events
+(pull_request run 39678612357 / job 119494905580; push run 39678605487 / job
+119494883712), step 25 `Check security-hardening deliverables` now reports
+`PASS AC-026-13` (round-1 failure closed by the `22c2234` SHA-pin), and steps
+26–33 — remediation budget, shellcheck install, shellcheck run, bats install, bats
+suite (473/473 ok), gate selftests (39 pass / 0 fail), scenario traceability on the
+live tree, YAML validation (56 OK) — **executed and passed, not skipped**.
+`PR Review Agent` remains PENDING at the polling bound and is not ruled on.
+Findings 1–6 above are recorded, not fixed; nothing is routed to the Coder or the
+Refactorer this round.
