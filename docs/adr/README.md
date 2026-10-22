@@ -16,3 +16,4 @@ Proposed → Accepted → Deprecated → Superseded.
 | 0006 | [Extend the gate catalog to Python and Rust without adding gate names](0006-python-rust-gate-coverage.md)                                                            | Proposed |
 | 0007 | [Media agent family: global opencode agents driving the Bailian `bl` CLI, with a URL-chained pipeline and a separate realtime voice app](0007-media-agent-family.md) | Accepted |
 | 0008 | [Vercel deploy lane: a spec-deployer stage (5c), the 40-deploy.md gate artifact, and a split pipeline tail (5a/5b/5c/5d)](0008-vercel-deploy-lane.md) | Accepted |
+| 0010 | [Stage-split deploy-artifact gate: --require-deploy for the stage-5d final run](0010-audit-trail-require-deploy-flag.md) | Accepted |

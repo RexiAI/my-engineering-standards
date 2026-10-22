@@ -88,3 +88,14 @@ teardown() { teardown_tmpdir; }
   [[ "$flat" == *"No Vercel project linked to this repository — manual setup required"* ]]
   [[ "$flat" == *"the pipeline does not fail"* ]]
 }
+
+# Added on fix/audit-trail-require-deploy (ADR 0010): --require-deploy is the
+# stage-5d final gate for FRONTEND repos only; non-frontend behavior must stay
+# byte-identical under the flag — absence is always tolerated there.
+@test "unit — --require-deploy does not fail a non-frontend repo missing 40-deploy.md (non-frontend behavior is flag-independent)" {
+  local root="$TMPDIR_HELPER/be"
+  mkdir -p "$root/specs"
+  seed_folder "$root/specs/903-be"
+  run bash -c "cd '$root' && bash '$GATE' --require-deploy 903-be specs"
+  [ "$status" -eq 0 ]
+}

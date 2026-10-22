@@ -32,7 +32,10 @@
 #   AC-031-18 — frontend repo: 40-deploy.md required, non-empty
 #   AC-031-19 — non-frontend repo: a present 40-deploy.md must carry the
 #               `Verdict: SKIPPED` skip reason
-#   AC-031-21 — frontend repo: missing 40-deploy.md exits non-zero
+#   AC-031-21 — frontend repo: missing 40-deploy.md exits non-zero, but only
+#               with --require-deploy (the stage-5d final-gate invocation).
+#               Without the flag the absence is tolerated: stage 5b runs this
+#               gate pre-push, before stage 5c can write the artifact.
 #
 # Evidence-block contract (AC-015-04): for each of the five runnable Verifier
 # checks — scenario traceability, full test suite, complexity gate,
@@ -44,6 +47,7 @@
 #
 # Usage:
 #   scripts/check-audit-trail.sh <slug> [SPECS_DIR]
+#   scripts/check-audit-trail.sh --require-deploy <slug> [SPECS_DIR]
 #   scripts/check-audit-trail.sh --selftest
 #
 # Exit codes:
@@ -61,6 +65,7 @@ NC='\033[0m'
 
 VIOLATIONS=0
 SELFTEST_FAILURES=0
+REQUIRE_DEPLOY=0 # set by --require-deploy: a frontend repo's missing 40-deploy.md fails (stage 5d)
 
 pass() { echo -e "${GREEN}PASS${NC} $*"; }
 fail() { echo -e "${RED}FAIL${NC} $*"; VIOLATIONS=$((VIOLATIONS + 1)); }
@@ -69,6 +74,7 @@ usage() {
   cat <<'EOF'
 Usage:
   scripts/check-audit-trail.sh <slug> [SPECS_DIR]
+  scripts/check-audit-trail.sh --require-deploy <slug> [SPECS_DIR]
   scripts/check-audit-trail.sh --selftest
 
 Verify a spec folder carries the audit-trail evidence required by
@@ -76,6 +82,12 @@ docs/SPEC_PIPELINE.md §Audit contract: 10-tasks.md, 20-acceptance/ with a
 scenario heading, 25-verification.md, 30-report.md (and non-empty 15-design.md
 when present), plus per-check evidence blocks in 25-verification.md. --selftest
 exercises every negative case against temp fixtures.
+
+--require-deploy is the stage-5d final-gate invocation: a frontend repo's
+missing 40-deploy.md fails (AC-031-21). Without it — the stage-5b pre-push run
+— that absence is tolerated because stage 5c cannot have written the artifact
+yet; a present-but-empty or malformed 40-deploy.md fails either way. See
+docs/SPEC_PIPELINE.md §The gate and ADR 0010.
 EOF
 }
 
@@ -142,11 +154,25 @@ frontend_repo() {
 # contract (spec 031 Task 4). This is deliberately a SEPARATE function, not a
 # sixth entry in FIVE_CHECKS (AC-031-20): the five Verifier checks are the
 # Verifier's; 40-deploy.md is the Deploy Verifier's (stage 5c). Frontend repos:
-# required, non-empty. Non-frontend repos: if present it must carry the
-# `Verdict: SKIPPED` skip reason; absence is tolerated pre-5c (the stage-5b
-# audit run happens before the deploy lane exists) — ponytail ceiling: the
-# gate cannot distinguish "pre-5c" from "5c skipped writing it"; upgrade path:
-# a `--require-deploy` flag once 5d owns the final gate run (follow-up spec).
+# required, non-empty — a MISSING one fails only with --require-deploy (the
+# stage-5d final gate); the default run (stage 5b pre-push) tolerates it
+# because stage 5c has not run yet, while a present-but-empty artifact fails
+# either way. Non-frontend repos: if present it must carry the
+# `Verdict: SKIPPED` skip reason; absence is always tolerated. This implements
+# spec 031's documented upgrade path ("--require-deploy once 5d owns the final
+# gate run") — see ADR 0010.
+# deploy_missing_verdict <slug> — how an absent frontend 40-deploy.md is
+# judged: a violation at the stage-5d final gate (--require-deploy, AC-031-21),
+# tolerated at the stage-5b pre-push run (stage 5c has not written it yet).
+deploy_missing_verdict() {
+  local slug="$1"
+  if [ "$REQUIRE_DEPLOY" -eq 1 ]; then
+    fail "$slug: missing 40-deploy.md (frontend deploy evidence, AC-031-21)"
+  else
+    pass "$slug: 40-deploy.md absent — tolerated pre-5c (stage 5d re-runs with --require-deploy, AC-031-21)"
+  fi
+}
+
 check_deploy_artifact() {
   local specs_dir="$1" slug="$2"
   local f="$specs_dir/$slug/40-deploy.md"
@@ -154,7 +180,7 @@ check_deploy_artifact() {
   root="$(dirname "$specs_dir")"
   if frontend_repo "$root"; then
     if [ ! -f "$f" ]; then
-      fail "$slug: missing 40-deploy.md (frontend deploy evidence, AC-031-21)"
+      deploy_missing_verdict "$slug"
     elif [ ! -s "$f" ]; then
       fail "$slug: empty 40-deploy.md (frontend deploy evidence)"
     else
@@ -431,6 +457,15 @@ selftest() {
 }
 
 main() {
+  local filtered=() arg
+  for arg in "$@"; do
+    if [ "$arg" = "--require-deploy" ]; then
+      REQUIRE_DEPLOY=1
+    else
+      filtered+=("$arg")
+    fi
+  done
+  set -- ${filtered[@]+"${filtered[@]}"}
   if [ $# -lt 1 ] || [ -z "$1" ]; then
     usage
     exit 2

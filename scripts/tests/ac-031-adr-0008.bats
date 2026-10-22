@@ -40,6 +40,24 @@ teardown() { teardown_tmpdir; }
   [[ "$output" == *"Accepted"* ]]
 }
 
-@test "unit — 0008 is the highest ADR number in docs/adr (next after 0007)" {
-  ls "$REPO_ROOT/docs/adr" | grep -E '^[0-9]{4}-' | sort | tail -1 | grep -q '^0008'
+# Amended on fix/audit-trail-require-deploy (ADR 0010): this case pinned "0008
+# highest" at spec 031's writing time, but the ADR Requirement in
+# docs/GOVERNANCE.md makes later ADRs mandatory for later gate changes (0009
+# arrives with PR #95, 0010 records this fix's --require-deploy split). The
+# durable intent — 0008 exists and every ADR file carries a 4-digit number —
+# is what is asserted now; no case deleted.
+@test "unit — docs/adr carries the numbered 0008 file and all ADR files use 4-digit numbers (0008 pinned at spec 031's time)" {
+  ls "$REPO_ROOT/docs/adr" | grep -qE '^0008-[a-z0-9-]+\.md$'
+  ! ls "$REPO_ROOT/docs/adr" | grep -E '^[0-9]{4}-' | grep -vE '^[0-9]{4}-[A-Za-z0-9._-]+\.md$' | grep -q .
+}
+
+@test "unit — ADR 0010 (--require-deploy gate split) exists, carries every template heading, and is indexed" {
+  local a="$REPO_ROOT/docs/adr/0010-audit-trail-require-deploy-flag.md"
+  [ -f "$a" ]
+  for h in "## Title" "## Status" "## Context" "## Decision" "### Alternatives Considered" "## Consequences" "## Compliance" "## Notes"; do
+    grep -qxF -- "$h" "$a"
+  done
+  run grep -F '| 0010 |' "$IDX"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"(0010-audit-trail-require-deploy-flag.md)"* ]]
 }

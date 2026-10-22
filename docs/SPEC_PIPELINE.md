@@ -154,6 +154,17 @@ without `30-report.md` are skipped: their pipeline finishing is outside the
 job's control and must not fail CI. A finished-but-incomplete spec still
 fails the gate — the step never hands the script an unfinished folder.
 
+`--require-deploy` splits the deploy-artifact rule by stage (ADR 0010;
+implements the upgrade path spec 031's gate comment documented). Stage 5b (the
+PR Opener) runs the gate **without** the flag, pre-push: a *missing*
+`40-deploy.md` in a frontend repo is tolerated there, because stage 5c (the
+Deploy Verifier) can only write it after the PR opens — while a present-but-
+empty or malformed artifact still fails, preserving AC-031-19's guarantee.
+Stage 5d (the Archiver, same agent) runs the gate **with** `--require-deploy`
+as the pipeline's final gate, where a missing frontend `40-deploy.md` exits
+non-zero (AC-031-21) at the stage where it can actually be satisfied.
+Non-frontend behavior is flag-independent.
+
 ## Archive in the PR
 
 The `specs/NNN-slug/` folder is pipeline scratch. It belongs on the PR branch

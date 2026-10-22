@@ -109,14 +109,40 @@ teardown() { teardown_tmpdir; }
   done
 }
 
-@test "AC-031-21 — frontend spec with 30-report.md but no 40-deploy.md exits non-zero naming the file" {
+# Amended on fix/audit-trail-require-deploy (ADR 0010): AC-031-21's missing-artifact
+# requirement is only satisfiable after stage 5c writes 40-deploy.md, and stage 5b
+# runs this gate pre-push — so the scenario is exercised via the stage-5d
+# --require-deploy invocation (the upgrade path documented in spec 031's own gate
+# comment). The no-flag default is covered by the unit case below.
+@test "AC-031-21 — frontend spec with 30-report.md but no 40-deploy.md exits non-zero naming the file (--require-deploy, stage 5d final gate)" {
+  local root="$TMPDIR_HELPER/fe-repo"
+  mkdir -p "$root/specs"
+  printf '{}' > "$root/vercel.json"
+  seed_folder "$root/specs/901-fe"
+  run bash -c "cd '$root' && bash '$GATE' --require-deploy 901-fe specs"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"missing 40-deploy.md"* ]]
+}
+
+@test "unit — default run (stage 5b pre-push): frontend spec missing 40-deploy.md exits 0, absence tolerated pre-5c" {
   local root="$TMPDIR_HELPER/fe-repo"
   mkdir -p "$root/specs"
   printf '{}' > "$root/vercel.json"
   seed_folder "$root/specs/901-fe"
   run bash -c "cd '$root' && bash '$GATE' 901-fe specs"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"40-deploy.md absent"* ]]
+}
+
+@test "unit — frontend spec with present-but-empty 40-deploy.md still fails under the default run (AC-031-19 guarantee preserved)" {
+  local root="$TMPDIR_HELPER/fe-repo"
+  mkdir -p "$root/specs"
+  printf '{}' > "$root/vercel.json"
+  seed_folder "$root/specs/901-fe"
+  : > "$root/specs/901-fe/40-deploy.md"
+  run bash -c "cd '$root' && bash '$GATE' 901-fe specs"
   [ "$status" -ne 0 ]
-  [[ "$output" == *"missing 40-deploy.md"* ]]
+  [[ "$output" == *"empty 40-deploy.md"* ]]
 }
 
 @test "unit — empty 40-deploy.md fails as empty" {
