@@ -1,3 +1,10 @@
+## [1.39.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.39.0...v1.39.1) (2026-10-22)
+
+
+### Bug Fixes
+
+* **judgment:** make the local backend fast-path reachable from ci-triage ([#94](https://github.com/RexiAI/my-engineering-standards/issues/94)) ([c660f49](https://github.com/RexiAI/my-engineering-standards/commit/c660f49b0aba613d641aaa85778e71667f780ee8))
+
 # [1.39.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.38.2...v1.39.0) (2026-10-22)
 
 
