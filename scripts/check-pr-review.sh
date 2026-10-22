@@ -24,7 +24,10 @@
 #   AC-024-01-09  findings grounded in the diff and the repo's standards
 #   AC-024-01-10  Reviewed-SHA marker contract
 #   AC-024-01-11  check-model-env.sh still exits 0
-#   AC-024-01-12  spec-pipeline agents untouched
+#   AC-024-01-12  spec-pipeline agents untouched — or changed only with a
+#                 docs/adr/*.md record in the same change set (ADR 0009
+#                 amendment); base ref resolves in shallow clones, and an
+#                 unresolvable base fails loudly instead of passing vacuously
 #   AC-024-02-01  shared workflow exists as a workflow_call reusable
 #   AC-024-02-02  comment-only permissions, no content-modifying step
 #   AC-024-02-03  optional secret; empty key skips the job cleanly
@@ -339,12 +342,50 @@ if [ "${#MISSING_SPEC[@]}" -eq 0 ] && [ -z "$EXTRA_SPEC" ]; then
 else
   fail "AC-024-01-12: spec-pipeline agent set changed — missing: ${MISSING_SPEC[*]:-}, extra: $EXTRA_SPEC"
 fi
-TOUCHED="$(git -C "$ROOT_DIR" diff --name-only origin/main HEAD 2>/dev/null \
-  || git -C "$ROOT_DIR" diff --name-only HEAD^ HEAD 2>/dev/null || true)"
-if [ -z "$(printf '%s\n' "$TOUCHED" | grep '^agents/spec-' || true)" ]; then
-  pass "AC-024-01-12: no agents/spec-*.md file is modified in the change set"
+# change_base — resolve the ref the change set diffs against, in a way that
+# works in the shallow CI clones (actions/checkout default fetch-depth: 1)
+# where origin/main does not exist and the old HEAD^ fallback yielded an empty
+# change set, making this guard pass vacuously on every PR. Order: an explicit
+# GITHUB_BASE_SHA (the pull_request payload's base sha, exported by the
+# caller); then a depth-1 fetch of GITHUB_BASE_REF, diffing against the
+# fetched tip; then origin/main in a full clone. Returns 1 when no base can be
+# resolved — the caller must then FAIL, never report a vacuous PASS.
+change_base() {
+  if [ -n "${GITHUB_BASE_SHA:-}" ] \
+     && git -C "$ROOT_DIR" rev-parse --verify -q "${GITHUB_BASE_SHA}^{commit}" >/dev/null 2>&1; then
+    printf '%s' "$GITHUB_BASE_SHA"; return 0
+  fi
+  if [ -n "${GITHUB_BASE_REF:-}" ]; then
+    local sha=""
+    if git -C "$ROOT_DIR" fetch -q --depth=1 origin "$GITHUB_BASE_REF" 2>/dev/null; then
+      sha="$(git -C "$ROOT_DIR" rev-parse --verify -q "FETCH_HEAD^{commit}" 2>/dev/null || true)"
+    fi
+    if [ -n "$sha" ]; then printf '%s' "$sha"; return 0; fi
+  fi
+  local ref=""
+  ref="$(git -C "$ROOT_DIR" rev-parse --verify -q origin/main 2>/dev/null || true)"
+  [ -n "$ref" ] && { printf '%s' "$ref"; return 0; }
+  return 1
+}
+
+CHANGE_BASE="$(change_base || true)"
+if [ -z "$CHANGE_BASE" ]; then
+  fail "AC-024-01-12: cannot resolve a base ref for the change set — a check that cannot determine the change set must not report PASS (in CI export GITHUB_BASE_SHA or GITHUB_BASE_REF; locally the repo needs an origin/main remote ref)"
 else
-  fail "AC-024-01-12: change set modifies agents/spec-*.md: $(printf '%s\n' "$TOUCHED" | grep '^agents/spec-')"
+  # Diff base against the working tree (equal to HEAD on a clean CI checkout)
+  # plus untracked paths, so an in-progress change set is evaluated honestly.
+  TOUCHED="$( { git -C "$ROOT_DIR" diff --name-only "$CHANGE_BASE" 2>/dev/null
+                git -C "$ROOT_DIR" ls-files --others --exclude-standard 2>/dev/null; } \
+    | grep -v '^$' | sort -u || true)"
+  SPEC_TOUCHED="$(printf '%s\n' "$TOUCHED" | grep '^agents/spec-' || true)"
+  ADR_TOUCHED="$(printf '%s\n' "$TOUCHED" | grep '^docs/adr/' || true)"
+  if [ -z "$SPEC_TOUCHED" ]; then
+    pass "AC-024-01-12: no agents/spec-*.md file is modified in the change set"
+  elif [ -n "$ADR_TOUCHED" ]; then
+    pass "AC-024-01-12: change set modifies agents/spec-*.md as a documented pipeline change — the same change set adds or modifies a docs/adr/*.md record (ADR 0009 amendment: deliberate, documented changes pass; undocumented ones fail)"
+  else
+    fail "AC-024-01-12: change set modifies agents/spec-*.md without adding or modifying a docs/adr/*.md record — changes to the shipped pipeline surface must be deliberate and documented in an ADR in the same change set (ADR 0009): $SPEC_TOUCHED"
+  fi
 fi
 
 echo ""

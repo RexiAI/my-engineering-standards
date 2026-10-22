@@ -27,20 +27,28 @@ you: resolve every condition listed there per the matrix, never by improvisation
 
 Before anything else, read `specs/NNN-slug/00-informal.md` and
 `specs/NNN-slug/10-tasks.md` for the spec you were given. Then check whether the
-opt-in typed-judgment fast-path is configured: both `JUDGMENT_API_URL` and
-`JUDGMENT_API_KEY` must be set and non-empty in the environment. If either is
-unset or empty, skip this section entirely — the stock applicability check
-below runs unchanged and your behavior is identical to the pre-integration
-agent (record no judgment telemetry).
+opt-in typed-judgment fast-path is configured: `JUDGMENT_API_URL` must be set
+and non-empty in the environment, and `JUDGMENT_API_KEY` must additionally be
+set and non-empty **unless** JUDGMENT_BACKEND is local — the local backend
+serves open and needs no key. That is the same rule `scripts/typed-judgment.sh`
+itself applies, so a consumer that demands a key in local mode is stricter than
+the script it calls and silently skips a working fast-path. If the requirement
+for the active backend is not met, skip this section entirely — the stock
+applicability check below runs unchanged and your behavior is identical to the
+pre-integration agent (record no judgment telemetry).
 
 When configured, write the concatenation of the **full** content of
 `00-informal.md` and `10-tasks.md` (no truncation of the payload itself) to a
 temp state file and ask exactly one Choice question, before loading the design
-skill:
+skill. The criteria field must be a JSON **object keyed by the option names**,
+not a string — that is the shape the judgment API's Choice question requires,
+and a string is rejected with HTTP 422, which the wrapper surfaces as exit 10
+(fallback), so the mistake is silent rather than loud. The options array is
+retained as the declared choice set; the API ignores extra keys:
 
 ```bash
 scripts/typed-judgment.sh --state-file "$STATE_FILE" \
-  --questions '{"applicability":{"type":"choice","instructions":"Does this spec have a frontend surface the design-taste-frontend skill applies to? Answer run (yes, design it), skip (pure backend / no visual surface), or ambiguous (genuinely unclear).","criteria":"Applies: landing pages, marketing pages, portfolios, product UI in the browser, redesigns. Does NOT apply: pure backend work, CLI tools, dashboards/admin panels/data tables, native mobile, realtime collab UI, APIs with no visual surface.","options":["run","skip","ambiguous"]}}'
+  --questions '{"applicability":{"type":"choice","instructions":"Does this spec have a frontend surface the design-taste-frontend skill applies to? Answer run (yes, design it), skip (pure backend / no visual surface), or ambiguous (genuinely unclear).","criteria":{"run":"a frontend surface the skill applies to: landing pages, marketing pages, portfolios, product UI in the browser, or redesigns of any of these","skip":"no frontend surface: pure backend work, CLI tools, dashboards/admin panels/data tables, native mobile, realtime collab UI, or APIs with no visual surface","ambiguous":"genuinely unclear whether the spec has a frontend surface the skill applies to"},"options":["run","skip","ambiguous"]}}'
 ```
 
 Map the result onto the existing outcomes — the fast-path only picks a path

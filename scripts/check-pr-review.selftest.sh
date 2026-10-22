@@ -13,6 +13,12 @@
 # Scenario traceability: the AC-024 IDs below are the tests for the
 # 20-acceptance scenarios.
 #
+# The AC-024-01-12 change-set guard is exercised here too, against a hermetic
+# scratch git repo: undocumented spec-agent change fails, an ADR in the same
+# change set passes, and an unresolvable base fails loudly instead of passing
+# vacuously (ADR 0009 amendment — the shallow-clone CI case cannot be
+# reproduced with the static gate alone, so it is pinned here).
+#
 # Usage:
 #   bash scripts/check-pr-review.selftest.sh
 # Exit codes:
@@ -80,6 +86,76 @@ if [ "$WITHOUT_COUNT" -eq 0 ]; then
 else
   bad "AC-024-04-05: OPENCODE_API_KEY must never be prompted without --with-pr-review (got $WITHOUT_COUNT)"
 fi
+
+echo ""
+echo "== AC-024-01-12 change-set guard — hermetic git fixtures (ADR 0009 amendment) =="
+
+# seed_gate_repo — a scratch repo carrying exactly the 8 spec-pipeline agent
+# files at a committed base, so only the change-set clause is under test.
+# Verdict lines are grepped from full output (other checks may legitimately
+# fail in the minimal fixture; the FAIL/PASS color prefix is escape-coded,
+# so assertions match from the AC ID onward).
+GATE="$TMP/gate"
+seed_gate_repo() {
+  local a
+  mkdir -p "$GATE/agents" "$GATE/docs/adr"
+  for a in spec-coder spec-mutation-runner spec-pipeline spec-pr-opener \
+    spec-refactorer spec-specifier spec-ux spec-verifier; do
+    printf '# agent\n' > "$GATE/agents/$a.md"
+  done
+  git -C "$GATE" init -q
+  git -C "$GATE" config user.email "test@example.com"
+  git -C "$GATE" config user.name "Test"
+  git -C "$GATE" add -A
+  git -C "$GATE" commit -qm "base"
+}
+seed_gate_repo
+GATE_BASE="$(git -C "$GATE" rev-parse HEAD)"
+
+# gate_out — run the guard against the fixture with the given base env.
+# The script exits non-zero for the fixture's other legitimately-missing
+# artifacts; the verdict line under test is grepped from the output, so the
+# status is swallowed (|| true) under the file's set -e.
+gate_out() {
+  env GITHUB_BASE_SHA="${1:-}" GITHUB_BASE_REF= \
+    bash "$ROOT/scripts/check-pr-review.sh" "$GATE" 2>&1 || true
+}
+
+# (a) undocumented spec-agent change must FAIL the clause
+printf '# changed agent\n' > "$GATE/agents/spec-ux.md"
+OUT="$(gate_out "$GATE_BASE")"
+case "$OUT" in
+  *"AC-024-01-12: change set modifies agents/spec-*.md without adding or modifying a docs/adr/*.md"*)
+    ok "AC-024-01-12: spec-agent change without an ADR in the set fails the guard" ;;
+  *)
+    bad "AC-024-01-12: spec-agent change without an ADR did not fail the guard" ;;
+esac
+
+# (b) same change PLUS an untracked docs/adr/*.md must PASS (documented change)
+printf '# ADR\n' > "$GATE/docs/adr/0099-selftest-documented-change.md"
+OUT="$(gate_out "$GATE_BASE")"
+case "$OUT" in
+  *"AC-024-01-12: change set modifies agents/spec-*.md as a documented pipeline change"*)
+    ok "AC-024-01-12: spec-agent change with an ADR in the same set passes the guard" ;;
+  *)
+    bad "AC-024-01-12: documented spec-agent change did not pass the guard" ;;
+esac
+
+# (c) no resolvable base (no GITHUB_BASE_*, no origin/main remote ref) must
+# FAIL LOUDLY — the old code passed vacuously on exactly this state
+OUT="$(gate_out "")"
+case "$OUT" in
+  *"AC-024-01-12: cannot resolve a base ref for the change set"*)
+    ok "AC-024-01-12: unresolvable base fails loudly, never a vacuous PASS" ;;
+  *)
+    bad "AC-024-01-12: unresolvable base did not fail loudly" ;;
+esac
+case "$OUT" in
+  *"AC-024-01-12: no agents/spec-*.md file is modified"*)
+    bad "AC-024-01-12: unresolvable base still emitted the vacuous clean line" ;;
+  *)
+    ok "AC-024-01-12: no vacuous clean line when the base is unresolvable" ;;
+esac
 
 echo ""
 echo "selftest: $PASS_COUNT passed, $FAIL_COUNT failed"
