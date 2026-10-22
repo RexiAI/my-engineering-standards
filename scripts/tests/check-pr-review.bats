@@ -69,10 +69,26 @@ seed_gate_repo() { # a scratch repo with the exact 8-agent spec roster committed
   local repo
   repo="$(seed_gate_repo)"
   printf '# changed agent\n' > "$repo/agents/spec-ux.md"
-  # no remote/origin/main, no GITHUB_BASE_* — the old code passed vacuously here
-  run env GITHUB_BASE_SHA= GITHUB_BASE_REF= bash "$REPO_ROOT/scripts/check-pr-review.sh" "$repo"
+  # no remote/origin/main, no GITHUB_BASE_* — the old code passed vacuously here.
+  # GITHUB_EVENT_NAME is pinned to pull_request so the expectation is hermetic:
+  # CI exports it, and a non-pull_request event legitimately skips this clause.
+  run env GITHUB_BASE_SHA= GITHUB_BASE_REF= GITHUB_EVENT_NAME=pull_request \
+    bash "$REPO_ROOT/scripts/check-pr-review.sh" "$repo"
   [[ "$output" == *"AC-024-01-12: cannot resolve a base ref for the change set"* ]]
   [[ "$output" != *"AC-024-01-12: no agents/spec-*.md file is modified"* ]]
+}
+
+@test "unit: AC-024-01-12 skips the change-set clause on a non-pull_request CI event" {
+  local repo
+  repo="$(seed_gate_repo)"
+  printf '# changed agent\n' > "$repo/agents/spec-ux.md"
+  # A push/schedule/workflow_dispatch event has no base ref by definition, and at
+  # fetch-depth 1 there is no HEAD^ either. The pull_request run of the same
+  # workflow evaluates the clause, so skipping here is not a vacuous PASS.
+  run env GITHUB_BASE_SHA= GITHUB_BASE_REF= GITHUB_EVENT_NAME=push \
+    bash "$REPO_ROOT/scripts/check-pr-review.sh" "$repo"
+  [[ "$output" == *"AC-024-01-12: change-set clause not applicable on a 'push' event"* ]]
+  [[ "$output" != *"cannot resolve a base ref"* ]]
 }
 
 @test "unit: AC-024-01-12 passes a clean change set through an explicit GITHUB_BASE_SHA" {

@@ -141,6 +141,18 @@ telemetry recorded `usage: 0` for every live local call.
   unchanged), which gains a documented-change escape hatch: a change set that
   touches `agents/spec-*.md` is accepted only when a `docs/adr/*.md` change
   accompanies it.
+- 2026-10-22: Base resolution refined after CI showed the first form failing on
+  the `push`-event run of `Self CI`. `GITHUB_BASE_REF` is exported only for
+  `pull_request` events, and at `fetch-depth: 1` there is no `HEAD^` either, so
+  a push event has no base *by definition*. The clause is therefore reported
+  **not applicable** on a non-`pull_request` CI event, with the reason printed,
+  while a `pull_request` event with no resolvable base still **fails loudly**.
+  The distinction matters: skipping a clause that cannot apply to this event is
+  honest, whereas the pre-fix behaviour — an empty change set passing silently
+  on the very event that does have a base — was the vacuity this ADR exists to
+  remove. Both paths are pinned by hermetic tests that control
+  `GITHUB_EVENT_NAME` explicitly, because CI exports it and a test that does not
+  pin it would assert different things locally and in CI.
 - `AC-029-74` is deliberately **not** amended. It asserts the working tree
   equals `HEAD` for the two consumer files; that holds again as soon as this
   change is committed, so spec 029's delta contract survives intact and needs

@@ -370,7 +370,17 @@ change_base() {
 
 CHANGE_BASE="$(change_base || true)"
 if [ -z "$CHANGE_BASE" ]; then
-  fail "AC-024-01-12: cannot resolve a base ref for the change set — a check that cannot determine the change set must not report PASS (in CI export GITHUB_BASE_SHA or GITHUB_BASE_REF; locally the repo needs an origin/main remote ref)"
+  # A non-pull_request CI event (push, schedule, workflow_dispatch) has no base
+  # ref by definition, and at fetch-depth 1 there is no HEAD^ either — so the
+  # clause is genuinely not applicable to that run, and the pull_request run of
+  # the same workflow evaluates it for real. Skipping with a stated reason is
+  # honest here. Passing vacuously on a pull_request event is not, so that path
+  # still fails loudly.
+  if [ -n "${GITHUB_EVENT_NAME:-}" ] && [ "${GITHUB_EVENT_NAME}" != "pull_request" ]; then
+    pass "AC-024-01-12: change-set clause not applicable on a '${GITHUB_EVENT_NAME}' event (no base ref exists; the pull_request run evaluates it)"
+  else
+    fail "AC-024-01-12: cannot resolve a base ref for the change set — a check that cannot determine the change set must not report PASS (in CI export GITHUB_BASE_SHA or GITHUB_BASE_REF; locally the repo needs an origin/main remote ref)"
+  fi
 else
   # Diff base against the working tree (equal to HEAD on a clean CI checkout)
   # plus untracked paths, so an in-progress change set is evaluated honestly.
