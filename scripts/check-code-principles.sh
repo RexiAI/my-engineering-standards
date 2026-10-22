@@ -877,7 +877,16 @@ check_solid_srp() {
       esac
     fi
     if [ "$lines" -gt 400 ] || [ "$methods" -gt 15 ]; then
-      emit "$(classify "solid" "warn" "$f" "" "" "$lang")" "SRP: possible god file ($lang) — $f: ${lines} lines, ${methods} methods (split by responsibility)" "$f"
+      # ADR 0005: god-file is WARN by default because promoting it would turn
+      # existing consumer code red overnight. Consumers that have cleaned up
+      # opt into blocking enforcement with STRICT_GOD_FILE=1 (CI env or make).
+      # classify() would force "solid" back to warn (gate not in the blocking
+      # list), so the opt-in emits fail directly.
+      if [ "${STRICT_GOD_FILE:-0}" = "1" ]; then
+        emit "fail" "SRP: god file ($lang) — $f: ${lines} lines, ${methods} methods (split by responsibility — STRICT_GOD_FILE=1: blocking)" "$f"
+      else
+        emit "$(classify "solid" "warn" "$f" "" "" "$lang")" "SRP: possible god file ($lang) — $f: ${lines} lines, ${methods} methods (split by responsibility)" "$f"
+      fi
       found=true
     fi
   done
