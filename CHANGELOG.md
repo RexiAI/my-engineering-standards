@@ -1,3 +1,10 @@
+# [1.39.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.38.2...v1.39.0) (2026-10-22)
+
+
+### Features
+
+* **token-stats:** query opencode's session DB for real token and cost data ([#92](https://github.com/RexiAI/my-engineering-standards/issues/92)) ([fddc2ea](https://github.com/RexiAI/my-engineering-standards/commit/fddc2ea9f223723e600efcbc1a785b7fa2d2d737))
+
 ## [1.38.2](https://github.com/RexiAI/my-engineering-standards/compare/v1.38.1...v1.38.2) (2026-10-22)
 
 
