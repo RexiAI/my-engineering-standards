@@ -637,6 +637,60 @@ JSON
   printf '%s' "$output" | jq -e '.severity.usage == 90'
 }
 
+@test "wire: usage carried only at the response top level populates per-question usage (input/output shape)" {
+  # The local backend returns {"answers":{...},"usage":{"input_tokens":141,
+  # "output_tokens":74}} — top level, not per answer. Without the fallback in
+  # normalize_output every question's usage came out 0.
+  cat > "$FIX/wire_topusage_inout.json" <<'JSON'
+{"answers":{"classification":{"choice":"billing","confidence":0.9,
+"probabilities":{"billing":0.9,"infra":0.05,"flake":0.03,"other":0.02},
+"latency_ms":80}},
+"usage":{"input_tokens":141,"output_tokens":74}}
+JSON
+  seq_always 200 wire_topusage_inout
+  sf=$(make_state 'build failed at step 3')
+  invoke -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 0 "$status"
+  printf '%s' "$output" | jq -e '.classification.usage == 215'
+}
+
+@test "wire: top-level usage of the total_tokens shape populates per-question usage too" {
+  cat > "$FIX/wire_topusage_total.json" <<'JSON'
+{"answers":{"classification":{"choice":"billing","confidence":0.9,
+"probabilities":{"billing":0.9,"other":0.1}}},
+"usage":{"total_tokens":300}}
+JSON
+  seq_always 200 wire_topusage_total
+  sf=$(make_state 'build failed at step 3')
+  invoke -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 0 "$status"
+  printf '%s' "$output" | jq -e '.classification.usage == 300'
+}
+
+@test "wire: per-answer usage wins over the top-level usage; no top-level usage keeps hosted behavior" {
+  cat > "$FIX/wire_usage_precedence.json" <<'JSON'
+{"answers":{"classification":{"choice":"billing","confidence":0.9,
+"usage":{"total_tokens":40}}},
+"usage":{"input_tokens":141,"output_tokens":74}}
+JSON
+  seq_always 200 wire_usage_precedence
+  sf=$(make_state 'build failed at step 3')
+  invoke -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 0 "$status"
+  printf '%s' "$output" | jq -e '.classification.usage == 40'
+  # hosted shape with no usage anywhere stays 0 (AC-028-01 fixtures pin the
+  # present cases; this pins the absent case is untouched by the fallback)
+  cat > "$FIX/wire_no_usage.json" <<'JSON'
+{"answers":{"classification":{"choice":"billing","confidence":0.9,
+"probabilities":{"billing":0.9}}}}
+JSON
+  seq_always 200 wire_no_usage
+  sf=$(make_state 'build failed at step 3')
+  invoke -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 0 "$status"
+  printf '%s' "$output" | jq -e '.classification.usage == 0'
+}
+
 @test "wire: mixed choice+noul request — low choice confidence exits 10 with BOTH answers printed" {
   # Telemetry property holds under aliasing: finalize_response prints before
   # the gate, so the noul answer arrives alongside the sub-threshold choice.

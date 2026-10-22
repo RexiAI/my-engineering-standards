@@ -1,3 +1,39 @@
+## [1.39.2](https://github.com/RexiAI/my-engineering-standards/compare/v1.39.1...v1.39.2) (2026-10-22)
+
+
+### Bug Fixes
+
+* **judgment,gates:** close five defects in the fast-path and its guards (ADR 0009) ([#97](https://github.com/RexiAI/my-engineering-standards/issues/97)) ([3901406](https://github.com/RexiAI/my-engineering-standards/commit/390140623a5f3265fc82149bb40a78d2b8c1152f)), closes [#93](https://github.com/RexiAI/my-engineering-standards/issues/93) [#93](https://github.com/RexiAI/my-engineering-standards/issues/93) [#93](https://github.com/RexiAI/my-engineering-standards/issues/93)
+
+## [1.39.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.39.0...v1.39.1) (2026-10-22)
+
+
+### Bug Fixes
+
+* **judgment:** make the local backend fast-path reachable from ci-triage ([#94](https://github.com/RexiAI/my-engineering-standards/issues/94)) ([c660f49](https://github.com/RexiAI/my-engineering-standards/commit/c660f49b0aba613d641aaa85778e71667f780ee8))
+
+# [1.39.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.38.2...v1.39.0) (2026-10-22)
+
+
+### Features
+
+* **token-stats:** query opencode's session DB for real token and cost data ([#92](https://github.com/RexiAI/my-engineering-standards/issues/92)) ([fddc2ea](https://github.com/RexiAI/my-engineering-standards/commit/fddc2ea9f223723e600efcbc1a785b7fa2d2d737))
+
+## [1.38.2](https://github.com/RexiAI/my-engineering-standards/compare/v1.38.1...v1.38.2) (2026-10-22)
+
+
+### Bug Fixes
+
+* **media:** run bl via command interpreter on Windows in smoke-media ([#89](https://github.com/RexiAI/my-engineering-standards/issues/89)) ([7b6f841](https://github.com/RexiAI/my-engineering-standards/commit/7b6f841b64e5a66728399d716711849f3d74faeb))
+* remove duplicated typed-judgment stanza in model env example ([#90](https://github.com/RexiAI/my-engineering-standards/issues/90)) ([369f803](https://github.com/RexiAI/my-engineering-standards/commit/369f8037bee53c613a68d79831653914c93b8bbf))
+
+## [1.38.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.38.0...v1.38.1) (2026-10-19)
+
+
+### Bug Fixes
+
+* **ci:** wire GH_TOKEN into the daily-triage loop step ([#91](https://github.com/RexiAI/my-engineering-standards/issues/91)) ([3fd2872](https://github.com/RexiAI/my-engineering-standards/commit/3fd2872aad4cb3ef540e84398ae991c073e0eff1)), closes [#71](https://github.com/RexiAI/my-engineering-standards/issues/71) [#77](https://github.com/RexiAI/my-engineering-standards/issues/77) [#71](https://github.com/RexiAI/my-engineering-standards/issues/71)
+
 # [1.38.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.37.0...v1.38.0) (2026-10-17)
 
 

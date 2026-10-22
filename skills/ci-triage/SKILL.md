@@ -57,11 +57,15 @@ This fast-path is **opt-in and never authoritative**: a typed judgment is a
 probabilistic classification hint, not a gate. The Decision guide table above
 remains the source of the rubrics and the final word on routing.
 
-**Gate:** both `JUDGMENT_API_URL` and `JUDGMENT_API_KEY` must be set and
-non-empty in the environment. If either is unset or empty, **skip this section
-entirely** — the stock LLM classification procedure below runs unchanged and
-the run-log records no judgment fields at all (behavior identical to
-pre-integration).
+**Gate:** `JUDGMENT_API_URL` must be set and non-empty in the environment, and
+`JUDGMENT_API_KEY` must additionally be set and non-empty **unless**
+`JUDGMENT_BACKEND=local` — the local backend serves open and needs no key. That
+is the same rule `scripts/typed-judgment.sh` itself applies, so a consumer that
+demands a key in local mode is stricter than the script it calls and silently
+skips a working fast-path. If the requirement for the active backend is not met,
+**skip this section entirely** — the stock LLM classification procedure below
+runs unchanged and the run-log records no judgment fields at all (behavior
+identical to pre-integration).
 
 When configured, after gathering the `gh` evidence and before classifying by
 hand, build the state JSON from that evidence — exactly these fields:
@@ -74,11 +78,14 @@ hand, build the state JSON from that evidence — exactly these fields:
 
 Write it to a temp file and ask exactly one Choice question whose options are
 the four classes and whose criteria are the rubrics from the Decision guide
-table above:
+table above. `criteria` must be a JSON **object keyed by the option names**, not
+a string — that is the shape the judgment API's Choice question requires, and a
+string is rejected with HTTP 422, which the wrapper surfaces as exit 10
+(fallback), so the mistake is silent rather than loud:
 
 ```bash
 scripts/typed-judgment.sh --state-file "$STATE_JSON" \
-  --questions '{"classification":{"type":"choice","instructions":"Classify this failing CI run as exactly one of flake, regression, infra, config.","criteria":"flake: seen before, intermittent, or passed on retry with no code change; regression: a code change introduced the failure, deterministic on the failing commit; infra: runner OOM, registry down, secrets missing, or another environment failure; config: workflow syntax, wrong tool version, or a configuration error.","options":["flake","regression","infra","config"]}}'
+  --questions '{"classification":{"type":"choice","instructions":"Classify this failing CI run as exactly one of flake, regression, infra, config.","criteria":{"flake":"seen before, intermittent, or passed on retry with no code change","regression":"a code change introduced the failure, deterministic on the failing commit","infra":"runner OOM, registry down, secrets missing, or another environment failure","config":"workflow syntax, wrong tool version, or a configuration error"},"options":["flake","regression","infra","config"]}}'
 ```
 
 Then branch on the script's exit code:

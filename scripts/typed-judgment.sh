@@ -12,7 +12,17 @@
 #                        is read from stdin. A payload that parses as JSON is
 #                        embedded as a JSON value; anything else as a string.
 #   --questions <json>   Map of question id -> {type, instructions, criteria}.
-#                        Passed through verbatim in the request body.
+#                        Passed through verbatim in the request body, so the
+#                        CALLER owns the per-type shape contract:
+#                          type "choice" -> criteria is an OBJECT keyed by the
+#                                           option names; each value describes
+#                                           that option
+#                          type "score"  -> criteria is an ARRAY (1..255 items)
+#                          type "noul"   -> criteria is an OBJECT or null
+#                        A string criteria is rejected by the API with HTTP 422,
+#                        which this wrapper reports as exit 10 (fallback) — a
+#                        silent wrong shape, not a loud failure. Extra keys (e.g.
+#                        an "options" array) are accepted and ignored.
 #
 # Environment:
 #   JUDGMENT_BACKEND            'local' | 'hosted' (spec 029). Unset/empty ->
@@ -52,6 +62,9 @@
 #   {"answers": {"<question-id>": {<answer field>, "confidence": <0..1>?,
 #     "probabilities": {...}?, "usage": <tokens | {total_tokens} | {input,
 #     output}>?, "latency_ms": <ms>?}, ...}}
+#     When an answer carries no "usage" but the response does — top-level
+#     {"answers":{...},"usage":{input_tokens,output_tokens}}, the local
+#     backend's shape — that top-level value falls back into every question.
 #   <answer field> is per question type on the real wire — hosted and local
 #   both answer under "choice", "noul" (which carries NO confidence field —
 #   protocol-correct), or "score"; "answer" is the idealized shape. The
@@ -267,13 +280,18 @@ response_valid() {
 }
 
 normalize_output() { # $1 = client-measured elapsed ms (latency fallback)
+  # usage: per-answer value wins; when the response carries usage only at the
+  # top level ({"answers":{...},"usage":{input_tokens,output_tokens}} — the
+  # local backend's shape) that value falls back into every question; with
+  # neither, usage stays 0 (hosted shape without top-level usage is unchanged).
   jq -e --argjson q "$QUESTIONS" --argjson lat "$1" '
     (.answers // {}) as $a |
+    (.usage // null) as $top_usage |
     reduce ($q | keys[]) as $k ({}; .[$k] = {
       answer: ($a[$k].answer // $a[$k].choice // $a[$k].noul // $a[$k].score // null),
       confidence: ($a[$k].confidence // null),
       probabilities: ($a[$k].probabilities // {}),
-      usage: ($a[$k].usage // 0 |
+      usage: ($a[$k].usage // $top_usage // 0 |
         if type == "object" then (.total_tokens // ((.input_tokens // 0) + (.output_tokens // 0)))
         elif type == "number" then . else 0 end),
       latency_ms: ($a[$k].latency_ms // $lat)

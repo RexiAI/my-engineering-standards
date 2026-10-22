@@ -101,7 +101,7 @@ Mark deliberate shortcuts with `// ponytail:` comments naming the ceiling and up
 |----------|--------|-------------|
 | Single response | ≤4 lines (unless detail requested) | Caveman + self-discipline |
 | Tool output | Compressed if >2 KB | Headroom hooks |
-| Session ceiling | 50k tokens | Manual token audit (no stats command ships) |
+| Session ceiling | 50k tokens | `scripts/token-stats.sh` — reads opencode's own session DB (cost, five token buckets, per agent/model/month). No new telemetry is written; it queries what the harness already records |
 
 When approaching ceiling: compress last 5 outputs with headroom, check the session token readout, continue or rotate session.
 

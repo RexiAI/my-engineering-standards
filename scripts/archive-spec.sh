@@ -138,7 +138,17 @@ EMBEDDED_DOCS=" 00-informal.md 10-tasks.md 25-verification.md 30-report.md "
 } > "$ARCHIVE"
 
 # --- Cleanup ------------------------------------------------------------------
-git rm -r "$SPEC_DIR" >/dev/null
+# -f is deliberate and scoped to $SPEC_DIR only: the §Audit contract has the PR
+# Opener append the PR: line to 30-report.md *before* archiving, so the folder
+# is routinely dirty (local modifications, then staged changes) at the moment
+# this runs — plain `git rm -r` refused the normal stage-5b flow ("file has
+# local modifications", "changes staged in the index"). Forcing removal of
+# this folder is not a data-loss risk: every byte of it was just composed into
+# $ARCHIVE above (composed docs verbatim, evidence docs verbatim, scenario
+# headings preserved). Modifications anywhere else in the tree keep their
+# protection — git rm only ever touches its pathspec, so unrelated dirty
+# paths outside $SPEC_DIR are never clobbered by this command.
+git rm -r -f "$SPEC_DIR" >/dev/null
 git add "$ARCHIVE"
 
 echo "✔ Wrote $ARCHIVE"

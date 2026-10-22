@@ -13,6 +13,14 @@ let fails = 0;
 const ok = (name) => console.log(`[OK] ${name}`);
 const bad = (name, why) => { console.log(`[FAIL] ${name}: ${why}`); fails++; };
 
+// On POSIX `bl` is a real binary; on Windows it is an npm `.cmd` shim, which
+// Node cannot exec without a command interpreter (spawning it directly yields
+// ENOENT). Route through cmd.exe there so the check works on both platforms.
+const runBl = (argv) =>
+  process.platform === "win32"
+    ? spawnSync(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", "bl", ...argv], { encoding: "utf8", timeout: 30000 })
+    : spawnSync("bl", argv, { encoding: "utf8", timeout: 30000 });
+
 // 1. agent files: exist, have description + mode frontmatter, no pinned model
 for (const f of readdirSync(join(REPO, "agents")).filter((n) => n.startsWith("media-"))) {
   const txt = readFileSync(join(REPO, "agents", f), "utf8");
@@ -41,7 +49,7 @@ if (which.status !== 0) {
     ["asr", ["speech", "recognize", "--url", "https://example.invalid/a.wav", "--model", "qwen-audio-3.0-asr-flash", "--dry-run"]],
   ];
   for (const [name, argv] of cases) {
-    const r = spawnSync("bl", argv, { encoding: "utf8", timeout: 30000 });
+    const r = runBl(argv);
     r.status === 0 ? ok(`bl ${name} dry-run`) : bad(`bl ${name} dry-run`, (r.stderr || r.stdout || "").split("\n").slice(-1)[0]);
   }
 }

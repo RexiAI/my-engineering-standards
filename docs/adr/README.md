@@ -16,3 +16,4 @@ Proposed → Accepted → Deprecated → Superseded.
 | 0006 | [Extend the gate catalog to Python and Rust without adding gate names](0006-python-rust-gate-coverage.md)                                                            | Proposed |
 | 0007 | [Media agent family: global opencode agents driving the Bailian `bl` CLI, with a URL-chained pipeline and a separate realtime voice app](0007-media-agent-family.md) | Accepted |
 | 0008 | [Vercel deploy lane: a spec-deployer stage (5c), the 40-deploy.md gate artifact, and a split pipeline tail (5a/5b/5c/5d)](0008-vercel-deploy-lane.md) | Accepted |
+| 0009 | [Judgment consumer contract and AC-024-01-12 base-ref semantics](0009-judgment-consumer-contract-and-gate-base-ref.md) | Accepted |

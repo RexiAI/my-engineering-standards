@@ -108,7 +108,10 @@ case "${1:-.}" in
   --self-test) self_test ;;
   -h | --help) grep -E '^#( |$)' "$0" | sed 's/^# \{0,1\}//' ;;
   *)
-    root="${1%/}"
+    # bare call scans the repo root — ${1:-.} mirrors the case dispatch above
+    # (a bare ${1%/} dies under set -u with "unbound variable")
+    root="${1:-.}"
+    root="${root%/}"
     [ -d "$root" ] || { say "ERROR: no such root: $root"; exit 2; }
     if scan_root "$root"; then
       say "Agent model-agnosticism check: no model pins found."

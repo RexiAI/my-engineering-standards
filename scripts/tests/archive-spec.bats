@@ -96,3 +96,26 @@ seed_archive_repo() {
   [ -n "$b" ]
   [ "$a" -lt "$b" ]
 }
+
+@test "archive-spec: the 5b flow's dirty spec folder (PR line appended, staged edits) archives unaided" {
+  # docs/SPEC_PIPELINE.md §Audit contract: the PR Opener appends the PR: line
+  # to 30-report.md before archiving, so the folder is routinely dirty — first
+  # with local modifications, then with staged content — at the moment this
+  # script runs. Plain `git rm -r` refused that legitimate state (spec 031,
+  # PR #93); the force is scoped to $SPEC_DIR (ADR 0009 consumer-contract
+  # record) and the appended line must reach the composed archive.
+  seed_archive_repo
+  local repo="$TMPDIR_HELPER/repo"
+  local spec="$repo/specs/900-ev"
+  printf 'PR: https://github.com/example/example/pull/93\n' >> "$spec/30-report.md"
+  printf 'Verifier verdict: PASS\n' >> "$spec/25-verification.md"
+  git -C "$repo" add -- "$spec/25-verification.md"  # staged-differs-from-HEAD state
+  mkdir -p "$repo/docs"
+  printf 'untouched\n' > "$repo/docs/keep-me.md"    # unrelated path, must survive
+  run bash -c "cd '$repo' && bash '$REPO_ROOT/scripts/archive-spec.sh' 900-ev"
+  [ "$status" -eq 0 ]
+  [ ! -d "$spec" ]
+  [ ! -f "$spec/30-report.md" ]
+  grep -q '^PR: https://github.com/example/example/pull/93$' "$repo/docs/changes/900-ev.md"
+  [ -f "$repo/docs/keep-me.md" ]
+}
