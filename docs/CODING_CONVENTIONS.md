@@ -94,7 +94,7 @@ were its core):
 Enforcement today: god-file promotion is opt-in via `STRICT_GOD_FILE=1` in
 `scripts/check-code-principles.sh`; the two rules above are review-enforced
 pending mechanical checks. Promotion criteria and the rejected alternative
-(prescribing a web framework such as NestJS) are recorded in ADR 0005.
+(prescribing a web framework such as NestJS) are recorded in ADR 0012.
 
 ### Base rules
 

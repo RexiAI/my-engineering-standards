@@ -877,7 +877,7 @@ check_solid_srp() {
       esac
     fi
     if [ "$lines" -gt 400 ] || [ "$methods" -gt 15 ]; then
-      # ADR 0005: god-file is WARN by default because promoting it would turn
+      # ADR 0012: god-file is WARN by default because promoting it would turn
       # existing consumer code red overnight. Consumers that have cleaned up
       # opt into blocking enforcement with STRICT_GOD_FILE=1 (CI env or make).
       # classify() would force "solid" back to warn (gate not in the blocking

@@ -1,4 +1,4 @@
-# ADR 0005: Structural cleanliness rules and opt-in god-file enforcement
+# ADR 0012: Structural cleanliness rules and opt-in god-file enforcement
 
 ## Status
 
