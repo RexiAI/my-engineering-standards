@@ -6,11 +6,11 @@
 #   1. Every agent.*.model value in opencode.json is exactly an
 #      {env:SPEC_*_MODEL} reference with the mapped var name; any literal model
 #      id (any provider/model token) above the provider blocks fails,
-#      naming the offending agent. All 9 spec agents must be present.
+#      naming the offending agent. Every roster agent must be present.
 #   2. config/model.local.env and config/agent.local.env are not tracked by
 #      git (git ls-files) — a forced-added or previously-committed real file
 #      fails, naming the path.
-#   3. config/model.local.env.example exists and defines exactly the 9
+#   3. config/model.local.env.example exists and defines exactly the roster of
 #      SPEC_*_MODEL var names, and the set of vars referenced by opencode.json
 #      equals the set defined by the example. A reference with no example
 #      default, or an example var with no reference, fails naming the var.
@@ -79,7 +79,7 @@ validate_model_wiring() {
     value="$(printf '%s' "$line" | sed -nE 's/.*"model"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/p')"
     expected="$(model_env_var_for_agent "$agent")"
     if [ -z "$expected" ]; then
-      fail "$label: agent $agent is not one of the 9 configured agents"
+      fail "$label: agent $agent is not one of the configured roster agents"
     elif [ "$value" != "{env:$expected}" ]; then
       fail "$label: agent $agent: model value '$value' is not an {env:$expected} reference"
     fi
@@ -124,7 +124,7 @@ else
     fi
   done
   if [ "$example_vars" != "$expected_vars" ]; then
-    fail "config/model.local.env.example must define exactly the 9 SPEC_*_MODEL vars (expected: $(printf '%s ' $expected_vars))"
+    fail "config/model.local.env.example must define exactly the roster SPEC_*_MODEL vars (expected: $(printf '%s ' $expected_vars))"
   fi
 fi
 

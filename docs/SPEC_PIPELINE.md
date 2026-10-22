@@ -20,7 +20,9 @@ stage 0. You review once, after stage 1. Everything after that runs to a draft P
 | 3 | Refactorer | `spec-refactorer` | Nothing — runs to clean structure |
 | 4 | Verifier | `spec-verifier` | Nothing — independently re-checks stages 2-3 |
 | 5a | Mutation Runner | `spec-mutation-runner` | Nothing — runs to mutation-clean, only if Verifier passed |
-| 5b | PR Opener | `spec-pr-opener` | Nothing — commits, archives the spec, pushes, opens draft PR, only if Mutation Runner green |
+| 5b | PR Opener | `spec-pr-opener` | Nothing — commits, pushes, opens draft PR (no longer archives), only if Mutation Runner green |
+| 5c | Deploy Verifier | `spec-deployer` | Nothing — waits for the live Vercel preview deployment, verifies health check + E2E against it, writes `40-deploy.md`; frontend lanes only, otherwise a recorded skip |
+| 5d | Archiver | `spec-pr-opener` | Nothing — runs the archive as the genuinely final act, only if `40-deploy.md` carries a PASS verdict or a recorded skip |
 | — | Output | — | Review the draft PR |
 
 Two commands drive it: `/spec` runs stage 1 and stops. `/build` runs stages 2-5 and
@@ -56,6 +58,7 @@ specs/NNN-slug/                          ← PR branch only, gone on main
     AC-NNN-name.md      specifier: Given/When/Then scenarios, one file per task
   25-verification.md    verifier: independent re-check results, PASS/FAIL verdict
   30-report.md          architect: mutation score, complexity, gate results, remediation record
+  40-deploy.md          deploy verifier: deploy evidence — deploy URL, build status, health check status, E2E verdict (frontend lanes; a recorded skip reason otherwise)
 
 docs/changes/NNN-slug.md                 ← long-lived, on main, written by stage 5b via archive-spec.sh
 ```
@@ -80,6 +83,7 @@ enforces it mechanically at pipeline end (see §The gate below).
 | Verifier | `25-verification.md` | Per check: the exact command, its real output, its exit code, and a timestamp |
 | Mutation Runner | `30-report.md` | Mutation score (or skip reason), equivalent mutants, final test status |
 | PR Opener | `30-report.md` | PR URL and commit count, appended after the PR opens |
+| Deploy Verifier | `40-deploy.md` | Deploy URL, build status (pass/fail/skip), health check status, E2E verdict (pass/fail/skip), timestamp, phase-3 attempt count, verdict (PASS/FAIL/ESCALATED/SKIPPED) |
 
 The Coder and Refactorer deliberately leave no report artifact. Their claims
 become auditable not because they write them down, but because the Verifier
@@ -150,6 +154,17 @@ without `30-report.md` are skipped: their pipeline finishing is outside the
 job's control and must not fail CI. A finished-but-incomplete spec still
 fails the gate — the step never hands the script an unfinished folder.
 
+`--require-deploy` splits the deploy-artifact rule by stage (ADR 0010;
+implements the upgrade path spec 031's gate comment documented). Stage 5b (the
+PR Opener) runs the gate **without** the flag, pre-push: a *missing*
+`40-deploy.md` in a frontend repo is tolerated there, because stage 5c (the
+Deploy Verifier) can only write it after the PR opens — while a present-but-
+empty or malformed artifact still fails, preserving AC-031-19's guarantee.
+Stage 5d (the Archiver, same agent) runs the gate **with** `--require-deploy`
+as the pipeline's final gate, where a missing frontend `40-deploy.md` exits
+non-zero (AC-031-21) at the stage where it can actually be satisfied.
+Non-frontend behavior is flag-independent.
+
 ## Archive in the PR
 
 The `specs/NNN-slug/` folder is pipeline scratch. It belongs on the PR branch
@@ -161,10 +176,13 @@ the spec is reachable from `main` to anyone with read access.
 `scripts/archive-spec.sh NNN-slug` writes a single one-pager to
 `docs/changes/NNN-slug.md` containing the original ask, task list,
 acceptance-scenario IDs, verification verdict, and the mutation/complexity
-report, then `git rm -r specs/NNN-slug/`. **Stage 5b (PR Opener) runs this as
-its final act, inside the spec PR** — so the merge commit itself carries the
-archive: `main` lands with `docs/changes/NNN-slug.md` present and `specs/NNN-slug/`
-absent. Nothing runs after the merge; there is no post-merge cleanup step.
+report, then `git rm -r specs/NNN-slug/`. **Stage 5d (the Archiver) runs this as
+the pipeline's genuinely final act, inside the spec PR — after stage 5c's deploy
+verification** — so the merge commit itself carries the archive: `main` lands with
+`docs/changes/NNN-slug.md` present and `specs/NNN-slug/`
+absent. Other than the post-merge production verification lane
+(`§Production deploy verification (post-merge)`, spec 031), nothing runs after
+the merge; there is no post-merge cleanup step.
 
 Enforcement: `scripts/check-specs-archived.sh` (wired into the `validate` job of
 `.github/workflows/self-ci.yml`, no `continue-on-error`) fails any PR that would
@@ -173,14 +191,16 @@ merge a *finished* spec — one with a `30-report.md` — without its
 untracked local scratch under `specs/` is not policed.
 
 `archive-spec.sh` refuses to archive a spec that is not finished (no
-`30-report.md`), so stage 5b cannot run it early; for legacy specs merged before
+`30-report.md`), so stage 5d cannot run it early; for legacy specs merged before
 this flow existed, a human can still run it manually post-merge — the script
 stages both moves and prints the commit message to run. It does not commit or
-push — outside stage 5b, that stays with the human, like every other commit in
+push — outside stage 5d, that stays with the human, like every other commit in
 `AGENTS.md`.
 
 This is the only spec artifact that survives to `main`: a one-pager per
-merged feature, not seven files per feature. The acceptance scenarios survive
+merged feature, not seven files per feature.
+
+The acceptance scenarios survive
 in the test files as `AC-NNN-NN` IDs (the traceability check requires this
 anyway, `§Why no scenario mutation`); the verification verdict and mutation
 score survive in the one-pager; the original prose does not, because what the
@@ -218,23 +238,30 @@ aspirationally:
 
 1. **Every stage reported green.** Coder suite green; Refactorer structure
    clean; Verifier PASS (`25-verification.md`); Mutation Runner GREEN
-   (`30-report.md`).
+   (`30-report.md`); Deploy Verifier green or skipped (`40-deploy.md`).
 2. **`specs/NNN-slug/30-report.md` exists.** This is the *finished* signal —
    both `archive-spec.sh` (refuses to archive without it) and the enforcement
    gate (`check-specs-archived.sh`) key off it.
-3. **Stage 5b ran `scripts/archive-spec.sh` as its final act.** The PR carries
-   `docs/changes/NNN-slug.md` and no longer contains `specs/NNN-slug/`.
-4. **Draft PR open** on `spec/NNN-slug`, body linking `10-tasks.md` and
+3. **Draft PR open** on `spec/NNN-slug`, body linking `10-tasks.md` and
    `30-report.md`.
+4. **`40-deploy.md` present** with a verdict or a recorded skip reason — the
+   Deploy Verifier's artifact (stage 5c); frontend lanes carry a verdict,
+   non-frontend lanes carry the skip reason.
 5. **Gate green.** `scripts/check-specs-archived.sh` (self-ci `validate` job, no
    `continue-on-error`) passes — a finished spec can never merge without its
    archive.
+6. **Stage 5d (the Archiver) ran `scripts/archive-spec.sh` as the pipeline's
+   final act.** The PR carries `docs/changes/NNN-slug.md` and no longer contains
+   `specs/NNN-slug/`.
 
-The pipeline finishes at the moment stage 5b pushes the archive commit and
-opens the draft PR. Nothing runs after the merge; the merge commit itself lands
-`main` with the spec already archived. What happens after merge is out of
-scope for the pipeline: release tagging (Semantic Release) and human review of
-the diff.
+The pipeline finishes at the moment stage 5d (the Archiver) runs the archive as
+its final act and pushes the archive commit — after stage 5c's deploy
+verification, never before. The merge commit itself lands
+`main` with the spec already archived. After the merge, the production deploy
+verification lane runs against the live system for Vercel-linked frontend repos
+(`§Production deploy verification (post-merge)`); apart from that lane, what
+happens after merge — release tagging (Semantic Release) and human review of the
+diff — remains out of scope for the pipeline.
 
 ## Scenario format
 
@@ -330,6 +357,7 @@ listed conditions per the matrix, never by improvisation.
 | Out-of-scope finding | Record it (Verifier: `25-verification.md`); do not fix; propose a follow-up spec |
 | Acceptance criteria ambiguous | Resolve before delegating implementation — stop and ask one specific question |
 | Verifier verdict FAIL | STOP the pipeline; relay the report; do not run stage-5 agents; do not fix it yourself |
+| Deploy verification fails | Route per fix-routing rule; on ambiguous failure, STOP and escalate to human; never guess |
 | PR Opener precondition fails (branch not `spec/NNN-slug`, or `30-report.md` missing/not green) | STOP; commit nothing, push nothing |
 
 ## Commit and push carve-out
@@ -337,7 +365,11 @@ listed conditions per the matrix, never by improvisation.
 `AGENTS.md` says never commit or push without explicit instruction. The pipeline is
 a narrow, stated exception:
 
-- Pipeline agents may commit, push, and open a **draft** PR, but only:
+- Only the two tail stages that write to the branch may commit and push:
+  stage 5b (PR Opener) and stage 5d (Archiver) — the same `spec-pr-opener`
+  agent, acting twice. 5d runs under the same commit-and-push carve-out as 5b:
+  branch `spec/NNN-slug`, never `main`/`master`.
+- They may commit, push, and open a **draft** PR, but only:
   - on a branch named `spec/NNN-slug`, never `main`/`master`
   - one conventional commit per task from `10-tasks.md`
   - only after the Verifier reports PASS and the Architect reports every
@@ -349,7 +381,7 @@ a narrow, stated exception:
 
 ## Remediation budget
 
-Every gate-failure loop in the spec pipeline is bounded. The budget has two
+Every gate-failure loop in the spec pipeline is bounded. The budget has three
 phases, each with its own counter, and each capped at **max 3**. The exact
 phrasing `re-run until green is forbidden phrasing`: no gate is ever re-run
 "until green" — every re-run is a counted attempt under one of the two
@@ -366,6 +398,15 @@ re-runs only the failing gates, not the whole suite. The Phase 1 budget is
 is **max 3**, and its counter is independent of **Phase 1** — a Phase 1
 exhaustion does not consume Phase 2 budget or vice versa. This section states
 the policy; the loop's mechanics are spec 014's territory, not this document's.
+
+**Phase 3 — deploy-verification loop.** The live-system deploy checks stage 5c
+runs after the PR opened (spec 031). Its budget is **max 3** fix-and-redeploy
+rounds, and its counter is independent of **Phase 1** and **Phase 2** —
+exhaustion of one does not consume another's budget. The mechanics live in
+§Deploy verification loop (phase 3).
+
+Phase ordering is explicit: phase 3 runs only after the phase-2 post-PR
+CI loop is green — the two loops never race and phase 3 never starts early.
 
 Exhausting either budget stops the pipeline: the stop emits the failing gate
 IDs and the last evidence, and escalates to the human. This is the halt the
@@ -408,6 +449,73 @@ re-push re-triggers CI — and the Verifier re-checks. The loop runs at most 3
 fix-and-repush rounds (counter independent of Phase 1). On exhaustion the pipeline
 stops and escalates to the human with the failing check IDs and the last log evidence
 — never a silent green.
+
+## Deploy verification loop (phase 3)
+
+After stage 5b opens the draft PR (spec 031), stage 5c (`spec-deployer`)
+verifies the live system: it waits for the Vercel preview deployment the Git
+integration built for the PR head commit, runs a health check, then delegates
+E2E against the live preview URL, and records every round in
+`specs/NNN-slug/40-deploy.md`. Phase 3 is bounded: its budget is **max 3**
+fix-and-redeploy rounds and its counter is independent of **Phase 1** (pre-PR)
+and **Phase 2** (post-PR CI) — exhaustion of one does not consume another's
+budget.
+
+Ordering is explicit: Phase 3 runs only after the phase-2 CI loop is green; on a
+phase-2 FAIL verdict phase 3 does not start and the pipeline stops with the
+phase-2 failure evidence. The two loops never race.
+
+On the 3rd failed round `40-deploy.md` carries the marker line
+`Phase-3 budget exhausted` and `Verdict: ESCALATED`, the pipeline STOPs before
+stage 5d (the Archiver never runs for an exhausted spec —
+`check-specs-archived.sh` accepts that non-archival), relays the failing check
+IDs and the last log evidence from `40-deploy.md` verbatim, and escalates to the
+human.
+
+### Fix-routing (deterministic)
+
+- E2E test runner exits non-zero against the live preview URL → route to spec-coder (behavior). Deterministic: the test runner's exit code is unambiguous.
+- Vercel API returns a configuration-classified error (invalid vercel.json, wrong framework preset, env var missing from the Vercel project) → spec-deployer retries itself after the config repair. Deterministic: the Vercel error code classifies it.
+- Structural or complexity gate failure → route to spec-refactorer. Deterministic: the gate script's exit code is unambiguous.
+
+### Ambiguous cases — flagged open, escalated, never guessed
+
+- A Vercel build failure (`BUILD_FAILED`) where the build log does not contain a
+  clearly code-diagnostic or config-diagnostic pattern: STOP and escalate to the
+  human.
+- A health-check failure whose cause could be code or a missing runtime
+  environment variable: STOP and escalate to the human.
+
+Both cases stay open questions (spec 031 `10-tasks.md` §Open questions): the
+routing rule above is the deliberate Option B — immediate escalation, no log
+grepping heuristic invented. Upgrade path if a later spec adopts pattern-based
+routing: extend this section and its contract test together, never the routing
+silently.
+
+## Production deploy verification (post-merge)
+
+The pipeline's merge-to-`main` event gets one follow-up check (spec 031),
+rewriting the old "nothing runs after the merge" sentence: the post-merge
+workflow (`.github/workflows/ci-vercel-production-verify.yml`, shipped for
+child repos) verifies the production deployment Vercel's Git integration built
+for the merged commit. It queries the Vercel API for that deployment, runs a
+health check against the production URL, and records the result in the job log.
+
+Skip versus failure semantics — deterministic, `scripts/verify-production-deploy.sh`:
+
+- no production deployment exists for the commit → skip with the reason
+  `Production deployment not found for commit <sha>`, exit 0
+- no Vercel project linked to the repository → skip with the reason
+  `No Vercel project linked to this repository`, exit 0
+- Vercel Git integration not connected → skip with the reason
+  `Vercel Git integration not connected`, exit 0
+- missing or invalid `VERCEL_TOKEN` → recorded failure with the authentication
+  error, exit non-zero — this is a configuration defect, not a skip
+- health check non-2xx or transport failure → recorded failure, exit non-zero
+
+Everything else after the merge — release tagging (Semantic Release), human
+review — stays out of scope. This lane is independent of the GHCR container
+path: neither cancels the other.
 
 ## Conformance tiers
 

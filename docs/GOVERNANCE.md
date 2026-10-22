@@ -45,6 +45,7 @@ T3 prohibitions apply to all agents regardless of tier.
 | `spec-refactorer` | 3 | **T1** | read denies `specs/**`; `git push*` denied, other git allowed | prose says never commit/push — frontmatter would allow `git commit` |
 | `spec-mutation-runner` | 5a | **T1** | read denies `00-informal.md`; `git commit*`/`git push*` denied | none — edits tests/report, no git write |
 | `spec-pr-opener` | 5b | **T2** | read denies `00-informal.md`; `git push*` is `ask`; git commit allowed | none — the only push-capable agent |
+| `spec-deployer` | 5c | **T1** | read denies `00-informal.md`; edit gate-path denies + `*: ask`; bash denies `vercel deploy*`, `git commit*`, `git push*` | none — records `40-deploy.md` evidence, no git writes, no deployments created (ADR 0008) |
 | `spec-ux` | 1.5 | **T2 (frontmatter) / T1 (policy)** | read `*` allow; `git commit*` ask, `git push*` ask | prose says "Do not commit or push" — frontmatter permits push only on human confirmation |
 | `spec-pipeline` | orchestrator | **T1 (policy)** | no `permission` block at all — opencode primary defaults grant full access | policy (its instructions) forbids commit/push; frontmatter imposes no restriction |
 | `media-image` | media family | **T1** | bash allow `bl`/`ffprobe`, edit allow `out/**` only, `git push*`/`rm -rf *` deny, `*` ask | none — no git writes; confirm-before-spend gate in its prompt |

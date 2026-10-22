@@ -32,6 +32,7 @@ describes behaviour from a different major version is a defect.
 | NestJS | **`@nestjs/core` 12.1.3** | Node `>= 20`, ESM (`"type": "module"`) | [npm registry](https://registry.npmjs.org/@nestjs/core/latest) |
 | FastAPI | **0.143.1** | Python `>= 3.10` | [PyPI JSON API](https://pypi.org/pypi/fastapi/json) |
 | Rust | **1.99.0** (2026-10-01) | Edition **2024** | [Release announcement](https://blog.rust-lang.org/releases/latest/) · [releases.rs](https://releases.rs/) |
+| Vercel CLI | **64.5.0** (Apache-2.0 per the package manifest) | Node `>= 20` | [npm registry — vercel@64.5.0](https://registry.npmjs.org/vercel/64.5.0) |
 
 ### Support windows worth knowing
 
@@ -65,6 +66,7 @@ Short idiomatic code snippets are fine.
 | NestJS | MIT (`"license":"MIT"` in the registry manifest) | MIT |
 | FastAPI | MIT | MIT |
 | Rust | Dual MIT / Apache-2.0 | Books under CC-BY; see [doc.rust-lang.org](https://doc.rust-lang.org/) |
+| Vercel CLI | **Apache-2.0** (`"license":"Apache-2.0"` in the package manifest) | Not reproduced — links only |
 
 ---
 
@@ -291,6 +293,20 @@ Rust formatting/toolchain facts verified against `rust-lang` upstream:
 (`cargo build --locked`, `cargo test --locked`, `cargo fmt --all -- --check`).
 
 ---
+
+### Vercel CLI — `vercel.com/docs`
+
+Consumed by the spec 031 deploy lane (spec-deployer agent, `docs/DEPLOYMENT.md
+§Frontend: Vercel`). Pages actually read on 2026-10-19 (no unread links listed):
+
+- [registry.npmjs.org/vercel/64.5.0](https://registry.npmjs.org/vercel/64.5.0)
+  — package manifest, read in full: `license: "Apache-2.0"`,
+  `engines.node: ">= 20"`, command/bin metadata (`vc`, `vercel`).
+- [vercel.com/docs/cli](https://vercel.com/docs/cli) — Vercel CLI Overview
+  (retrieved 2026-10-07 per page front-matter): command inventory confirming
+  `inspect`, `logs`, `ls` (list), `env pull` / `env add`, `pull`, `domains`,
+  and the CI/CD auth pattern (`VERCEL_TOKEN` environment variable preferred
+  over `--token`, which leaks into process lists and logs).
 
 ## Findings that constrain our guides
 

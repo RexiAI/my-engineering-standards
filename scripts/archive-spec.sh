@@ -14,7 +14,9 @@
 # against (spec 029 phase-2 fix: the archive commit deleted the spike report
 # while 13 AC-029 tests still read its "^## …" anchors).
 #
-# Primary caller is the spec pipeline's stage 5b (PR Opener): the archive rides
+# Primary caller is the spec pipeline's stage 5d (Archiver — spec 031 moved the
+# archive off 5b so it is the genuinely final act, after deploy verification):
+# the archive rides
 # inside the spec PR, so the merge lands main with the spec already archived —
 # no post-merge step needed. Humans may also run it manually for legacy specs
 # already merged without an archive.
