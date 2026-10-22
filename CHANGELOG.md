@@ -1,3 +1,10 @@
+## [1.39.2](https://github.com/RexiAI/my-engineering-standards/compare/v1.39.1...v1.39.2) (2026-10-22)
+
+
+### Bug Fixes
+
+* **judgment,gates:** close five defects in the fast-path and its guards (ADR 0009) ([#97](https://github.com/RexiAI/my-engineering-standards/issues/97)) ([3901406](https://github.com/RexiAI/my-engineering-standards/commit/390140623a5f3265fc82149bb40a78d2b8c1152f)), closes [#93](https://github.com/RexiAI/my-engineering-standards/issues/93) [#93](https://github.com/RexiAI/my-engineering-standards/issues/93) [#93](https://github.com/RexiAI/my-engineering-standards/issues/93)
+
 ## [1.39.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.39.0...v1.39.1) (2026-10-22)
 
 
