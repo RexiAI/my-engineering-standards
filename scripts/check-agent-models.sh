@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Gate (ADR 0004): agent definitions must ship without a `model:` frontmatter key.
+# Gate (ADR 0011): agent definitions must ship without a `model:` frontmatter key.
 #
 # Model resolution belongs to the CONSUMER: `opencode.json`'s per-agent
 # `{env:SPEC_*_MODEL}` roster, or harness inheritance when nothing is configured.
 # A `model:` pin in an agent `.md` silently wins over the consumer's config
 # (`.opencode/agents/` loads after `opencode.json`), hard-coupling every run to
-# one vendor — see ADR 0003 for the shipped-agents side and ADR 0004 for this
+# one vendor — see ADR 0003 for the shipped-agents side and ADR 0011 for this
 # gate, which also covers consumer-side catalogs copied from ECC-style installs
 # (2026-10-15 incident: 27 pinned agents, `github-copilot/*` and `ollama/*`,
 # broke every run on a provider that does not serve those ids).
@@ -48,7 +48,7 @@ scan_root() {
       scanned=$((scanned + 1))
       pin="$(frontmatter "$file" | grep -E '^model:[[:space:]]*' || true)"
       if [ -n "$pin" ]; then
-        say "FAIL: ${file#$root/} pins ${pin} (ADR 0004: agent definitions carry no model key)"
+        say "FAIL: ${file#$root/} pins ${pin} (ADR 0011: agent definitions carry no model key)"
         violations=$((violations + 1))
       else
         say "PASS: ${file#$root/} (no model key)"
@@ -117,7 +117,7 @@ case "${1:-.}" in
       say "Agent model-agnosticism check: no model pins found."
       exit 0
     else
-      say "Agent model-agnosticism check: model pins found — remove them (ADR 0004)."
+      say "Agent model-agnosticism check: model pins found — remove them (ADR 0011)."
       exit 1
     fi
     ;;

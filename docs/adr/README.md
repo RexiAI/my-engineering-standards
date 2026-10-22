@@ -18,3 +18,5 @@ Proposed → Accepted → Deprecated → Superseded.
 | 0008 | [Vercel deploy lane: a spec-deployer stage (5c), the 40-deploy.md gate artifact, and a split pipeline tail (5a/5b/5c/5d)](0008-vercel-deploy-lane.md) | Accepted |
 | 0009 | [Judgment consumer contract and AC-024-01-12 base-ref semantics](0009-judgment-consumer-contract-and-gate-base-ref.md) | Accepted |
 | 0010 | [Stage-split deploy-artifact gate: --require-deploy for the stage-5d final run](0010-audit-trail-require-deploy-flag.md) | Accepted |
+| 0011 | [Mechanical gate for model-agnostic agent definitions](0011-agent-model-agnostic-gate.md) | Proposed |
+| 0012 | [Structural cleanliness rules and opt-in god-file enforcement](0012-structural-cleanliness-gates.md) | Proposed |

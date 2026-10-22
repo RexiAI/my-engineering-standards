@@ -659,7 +659,7 @@ a provider that does not serve those ids (`Model not found`), while unpinned
 agents ran fine. Strip `model:` lines from catalog copies; the resolution order
 is the consumer `opencode.json` `{env:SPEC_*_MODEL}` roster, then harness
 inheritance. `scripts/check-agent-models.sh` enforces the repo surface in
-self-ci (ADR 0004) and doubles as the audit tool for any catalog you install:
+self-ci (ADR 0011) and doubles as the audit tool for any catalog you install:
 `check-agent-models.sh <catalog-root>`.
 
 ## PR review model wiring
