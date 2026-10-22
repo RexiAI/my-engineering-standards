@@ -117,7 +117,12 @@ GATE_BASE="$(git -C "$GATE" rev-parse HEAD)"
 # artifacts; the verdict line under test is grepped from the output, so the
 # status is swallowed (|| true) under the file's set -e.
 gate_out() {
-  env GITHUB_BASE_SHA="${1:-}" GITHUB_BASE_REF= \
+  # GITHUB_EVENT_NAME is pinned because CI exports it into this selftest, and the
+  # gate's change-set clause is event-aware: a pull_request event with no
+  # resolvable base fails loudly, any other CI event reports the clause not
+  # applicable. Without the pin these cases assert different things locally and
+  # in CI. $2 overrides the event for the cases that test the skip path.
+  env GITHUB_BASE_SHA="${1:-}" GITHUB_BASE_REF= GITHUB_EVENT_NAME="${2:-pull_request}" \
     bash "$ROOT/scripts/check-pr-review.sh" "$GATE" 2>&1 || true
 }
 
@@ -155,6 +160,23 @@ case "$OUT" in
     bad "AC-024-01-12: unresolvable base still emitted the vacuous clean line" ;;
   *)
     ok "AC-024-01-12: no vacuous clean line when the base is unresolvable" ;;
+esac
+
+# (d) a non-pull_request CI event has no base ref by definition, and at
+# fetch-depth 1 there is no HEAD^ either, so the clause is not applicable to that
+# run — the pull_request run of the same workflow evaluates it for real.
+OUT="$(gate_out "" push)"
+case "$OUT" in
+  *"AC-024-01-12: change-set clause not applicable on a 'push' event"*)
+    ok "AC-024-01-12: non-pull_request CI event skips the clause with a stated reason" ;;
+  *)
+    bad "AC-024-01-12: non-pull_request CI event did not skip the clause" ;;
+esac
+case "$OUT" in
+  *"cannot resolve a base ref"*)
+    bad "AC-024-01-12: push event reported an unresolvable base instead of not-applicable" ;;
+  *)
+    ok "AC-024-01-12: push event does not report an unresolvable base" ;;
 esac
 
 echo ""
