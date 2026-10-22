@@ -1,3 +1,11 @@
+## [1.38.2](https://github.com/RexiAI/my-engineering-standards/compare/v1.38.1...v1.38.2) (2026-10-22)
+
+
+### Bug Fixes
+
+* **media:** run bl via command interpreter on Windows in smoke-media ([#89](https://github.com/RexiAI/my-engineering-standards/issues/89)) ([7b6f841](https://github.com/RexiAI/my-engineering-standards/commit/7b6f841b64e5a66728399d716711849f3d74faeb))
+* remove duplicated typed-judgment stanza in model env example ([#90](https://github.com/RexiAI/my-engineering-standards/issues/90)) ([369f803](https://github.com/RexiAI/my-engineering-standards/commit/369f8037bee53c613a68d79831653914c93b8bbf))
+
 ## [1.38.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.38.0...v1.38.1) (2026-10-19)
 
 
