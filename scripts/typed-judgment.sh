@@ -12,7 +12,17 @@
 #                        is read from stdin. A payload that parses as JSON is
 #                        embedded as a JSON value; anything else as a string.
 #   --questions <json>   Map of question id -> {type, instructions, criteria}.
-#                        Passed through verbatim in the request body.
+#                        Passed through verbatim in the request body, so the
+#                        CALLER owns the per-type shape contract:
+#                          type "choice" -> criteria is an OBJECT keyed by the
+#                                           option names; each value describes
+#                                           that option
+#                          type "score"  -> criteria is an ARRAY (1..255 items)
+#                          type "noul"   -> criteria is an OBJECT or null
+#                        A string criteria is rejected by the API with HTTP 422,
+#                        which this wrapper reports as exit 10 (fallback) — a
+#                        silent wrong shape, not a loud failure. Extra keys (e.g.
+#                        an "options" array) are accepted and ignored.
 #
 # Environment:
 #   JUDGMENT_BACKEND            'local' | 'hosted' (spec 029). Unset/empty ->
