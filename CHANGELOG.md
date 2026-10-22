@@ -1,3 +1,10 @@
+# [1.40.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.39.2...v1.40.0) (2026-10-22)
+
+
+### Features
+
+* **gates:** structural cleanliness rules + opt-in blocking god-file (ADR 0005) ([#86](https://github.com/RexiAI/my-engineering-standards/issues/86)) ([ba9c9d7](https://github.com/RexiAI/my-engineering-standards/commit/ba9c9d79d9697050fe17ceef6790332a342d9b22))
+
 ## [1.39.2](https://github.com/RexiAI/my-engineering-standards/compare/v1.39.1...v1.39.2) (2026-10-22)
 
 
