@@ -1,3 +1,10 @@
+# [1.41.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.40.0...v1.41.0) (2026-10-22)
+
+
+### Features
+
+* **deploy-lane:** spec-deployer stage 5c, 40-deploy.md artifact, split tail 5a/5b/5c/5d (spec 031) ([#93](https://github.com/RexiAI/my-engineering-standards/issues/93)) ([6e563d3](https://github.com/RexiAI/my-engineering-standards/commit/6e563d3c81590dff05001caa96faeec2744e04b0)), closes [#95](https://github.com/RexiAI/my-engineering-standards/issues/95) [#95](https://github.com/RexiAI/my-engineering-standards/issues/95) [#95](https://github.com/RexiAI/my-engineering-standards/issues/95) [#95](https://github.com/RexiAI/my-engineering-standards/issues/95) [#95](https://github.com/RexiAI/my-engineering-standards/issues/95)
+
 # [1.40.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.39.2...v1.40.0) (2026-10-22)
 
 
