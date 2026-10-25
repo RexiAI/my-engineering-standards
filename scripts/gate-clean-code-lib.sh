@@ -309,3 +309,141 @@ run_comments_gate() {
     cc_comments_finding "$rule" "$f" "$ln" "$end"
   done <<< "$CC_FINDINGS"
 }
+
+# ── Naming (Clean Code Ch.2: names that reveal intent) ───────────────────────
+# Five advisory heuristics. Advisory by contract: every record carries the
+# legacy severity `warn`, so no blocking set or env switch can promote it to
+# FAIL. classify() still applies -BaseRef scoping, so untouched files stay
+# unreported.
+
+# cc_naming_prog — the naming analyzer. Each record is TAB-separated
+# `file line rule name`.
+cc_naming_prog() {
+  cat <<'AWK'
+function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
+
+function iscommentline(t) {
+  return (substr(t, 1, 1) == "#" || substr(t, 1, 2) == "//" ||
+          substr(t, 1, 2) == "/*" || substr(t, 1, 1) == "*")
+}
+
+# The first `type name` declaration on the line (also catches `let x = ...`).
+function declared(t,   parts, cnt, i) {
+  gsub(/[;,(){}]/, " ", t)
+  cnt = split(t, parts, /[ \t]+/)
+  for (i = 1; i < cnt; i++) {
+    if (parts[i] ~ /^(int|long|short|byte|char|float|double|boolean|bool|var|let|const|auto|string|String)$/ &&
+        parts[i + 1] ~ /^[A-Za-z_$][A-Za-z0-9_$]*$/)
+      return parts[i + 1]
+  }
+  return ""
+}
+
+# Word-boundary test: `UserManager` and `Data` fire, `Managerial`/`Information` do not.
+function noiseword(name) {
+  return (name ~ /(^|[a-z0-9_])(Manager|Processor|Helper|Util|Data|Info)([A-Z0-9_]|$)/)
+}
+
+function encoded(name) {
+  return (name ~ /^(str|int|bool|flt|dbl|obj|arr|lst|num|ptr|b|i|n|sz|p)[A-Z]/)
+}
+
+function flagparam(name) {
+  return (name ~ /^(is|has|can|should|with)($|[A-Z_])/)
+}
+
+function paren_group(t,   p, i, n, depth, ch) {
+  p = index(t, "(")
+  if (p == 0) return ""
+  n = length(t); depth = 0
+  for (i = p; i <= n; i++) {
+    ch = substr(t, i, 1)
+    if (ch == "(") depth++
+    else if (ch == ")") { depth--; if (depth == 0) return substr(t, p + 1, i - p - 1) }
+  }
+  return ""
+}
+
+function countparams(inner,   depth, i, n, ch, c) {
+  inner = trim(inner)
+  if (inner == "") return 0
+  depth = 0; c = 1; n = length(inner)
+  for (i = 1; i <= n; i++) {
+    ch = substr(inner, i, 1)
+    if (ch == "(" || ch == "<" || ch == "[" || ch == "{") depth++
+    else if (ch == ")" || ch == ">" || ch == "]" || ch == "}") depth--
+    else if (ch == "," && depth == 0) c++
+  }
+  return c
+}
+
+function callname(t,   p, pre) {
+  p = index(t, "(")
+  if (p == 0) return "?"
+  pre = substr(t, 1, p - 1)
+  sub(/^.*[ \t]/, "", pre)
+  sub(/.*\./, "", pre)
+  return pre
+}
+
+function declshape(t,   p, i, n, depth, ch, q, rest) {
+  p = index(t, "(")
+  if (p == 0) return 0
+  if (t ~ /^[ \t]*(if|for|while|switch|catch|return|new|do|else|throw)([^A-Za-z0-9_]|$)/) return 0
+  n = length(t); depth = 0; q = 0
+  for (i = p; i <= n; i++) {
+    ch = substr(t, i, 1)
+    if (ch == "(") depth++
+    else if (ch == ")") { depth--; if (depth == 0) { q = i; break } }
+  }
+  if (q == 0) return 0
+  rest = trim(substr(t, q + 1))
+  return (rest == "" || rest ~ /^(\{|;|:|throws|->)/)
+}
+
+{
+  t = trim($0)
+  if (t == "") next
+  if (iscommentline(t)) next
+  nm = ""
+  if (match(t, /(^|[^A-Za-z0-9_])(class|interface|struct|enum|record|trait|type)[ \t]+[A-Za-z_$][A-Za-z0-9_$]*/)) {
+    n = split(substr(t, RSTART, RLENGTH), parts, /[ \t]+/)
+    nm = parts[n]
+    if (noiseword(nm)) printf "%s\t%d\t%s\t%s\n", FILENAME, FNR, "noise word in type name", nm
+  }
+  if (t !~ /(^|[^A-Za-z0-9_])for[ \t]*\(/) {
+    nm = declared(t)
+    if (nm != "") {
+      if (length(nm) == 1 && nm != "i" && nm != "j" && nm != "k" && nm != "_")
+        printf "%s\t%d\t%s\t%s\n", FILENAME, FNR, "single-character identifier", nm
+      else if (encoded(nm))
+        printf "%s\t%d\t%s\t%s\n", FILENAME, FNR, "encoded identifier", nm
+    }
+  }
+  if (match(t, /(^|[^A-Za-z0-9_$])boolean[ \t]+[A-Za-z_$][A-Za-z0-9_$]*/)) {
+    n = split(substr(t, RSTART, RLENGTH), parts, /[ \t]+/)
+    nm = parts[n]
+    if (flagparam(nm)) printf "%s\t%d\t%s\t%s\n", FILENAME, FNR, "boolean flag parameter", nm
+  } else if (match(t, /[A-Za-z_$][A-Za-z0-9_$]*[ \t]*:[ \t]*boolean([^A-Za-z0-9_]|$)/)) {
+    nm = substr(t, RSTART, RLENGTH)
+    sub(/[ \t]*:.*/, "", nm)
+    gsub(/^.*[^A-Za-z0-9_$]/, "", nm)
+    if (flagparam(nm)) printf "%s\t%d\t%s\t%s\n", FILENAME, FNR, "boolean flag parameter", nm
+  }
+  if (declshape(t) && countparams(paren_group(t)) >= 4)
+    printf "%s\t%d\t%s\t%s\n", FILENAME, FNR, "more than three parameters", callname(t)
+}
+AWK
+}
+
+# run_naming_gate <file>... — a run with no files is silent.
+run_naming_gate() {
+  [ "$#" -eq 0 ] && return 0
+  cc_analyze naming "$(cc_naming_prog)" "$@"
+  [ -z "$CC_FINDINGS" ] && { pass "Naming gate: no violations found"; return 0; }
+  local f ln rule name
+  while IFS=$'\t' read -r f ln rule name; do
+    [ -z "${f:-}" ] && continue
+    cc_emit naming warn "$f" "$ln" "$ln" "Naming: $rule ($name) ($f:$ln)"
+  done <<< "$CC_FINDINGS"
+}
