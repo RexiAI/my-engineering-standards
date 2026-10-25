@@ -447,3 +447,42 @@ run_naming_gate() {
     cc_emit naming warn "$f" "$ln" "$ln" "Naming: $rule ($name) ($f:$ln)"
   done <<< "$CC_FINDINGS"
 }
+
+# ── Null discipline (Clean Code Ch.7: don't return null, don't pass null) ────
+# Java/JS/TS only — Python and Rust nullability semantics differ. Always WARN.
+
+# cc_null_prog — the null-discipline analyzer. Each record is TAB-separated
+# `file line rule`.
+cc_null_prog() {
+  cat <<'AWK'
+{
+  t = $0
+  s = t
+  sub(/^[ \t]+/, "", s)
+  if (s ~ /^(\/\/|\/\*|\*|#)/) next
+  if (t ~ /(^|[^A-Za-z0-9_])return[ \t]+null([^A-Za-z0-9_]|$)/)
+    printf "%s\t%d\t%s\t%s\n", FILENAME, FNR, "return-null", ""
+  if (t ~ /([(,])[ \t]*null[ \t]*[,)]/)
+    printf "%s\t%d\t%s\t%s\n", FILENAME, FNR, "null-arg", ""
+}
+AWK
+}
+
+# cc_null_finding <rule> <file> <line> — route one record; both rules are WARN.
+cc_null_finding() {
+  case "$1" in
+    return-null) cc_emit null-discipline warn "$2" "$3" "$3" "Null-discipline: return null ($2:$3)" ;;
+    null-arg) cc_emit null-discipline warn "$2" "$3" "$3" "Null-discipline: null argument ($2:$3)" ;;
+  esac
+}
+
+run_null_discipline_gate() {
+  [ "$#" -eq 0 ] && return 0
+  cc_analyze null-discipline "$(cc_null_prog)" "$@"
+  [ -z "$CC_FINDINGS" ] && { pass "Null-discipline gate: no violations found"; return 0; }
+  local f ln rule
+  while IFS=$'\t' read -r f ln rule; do
+    [ -z "${f:-}" ] && continue
+    cc_null_finding "$rule" "$f" "$ln"
+  done <<< "$CC_FINDINGS"
+}
