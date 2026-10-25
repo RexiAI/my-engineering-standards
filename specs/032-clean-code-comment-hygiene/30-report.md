@@ -383,4 +383,6 @@ this report carries the mutation row (skip — `mvp` tier, with its evidence), t
 equivalent-mutants row (none), the complexity summary, the gate results, and the
 final test status. Stage 5a committed nothing, pushed nothing, and opened no PR.
 
-PR: (appended by stage 5b, `spec-pr-opener` — not written by this stage)
+PR: https://github.com/RexiAI/my-engineering-standards/pull/99 (draft, base `main`)
+Commits: 10 task/content commits on the pushed head at PR open (`git rev-list --count main..spec/032-clean-code-comment-hygiene` = 10); this report-recording commit is the 11th.
+Stage 5b archive: none — stage 5d (Archiver) runs `scripts/archive-spec.sh 032-clean-code-comment-hygiene` after stage 5c deploy verification, per `docs/SPEC_PIPELINE.md` §Archive in the PR.
