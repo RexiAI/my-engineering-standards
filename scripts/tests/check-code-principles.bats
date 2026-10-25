@@ -200,7 +200,8 @@ JAVA
   run --separate-stderr bash "$REPO_ROOT/scripts/check-code-principles.sh" "$TMPDIR_HELPER/empty"
   [ "$status" -eq 0 ]
   [[ "$output" == *"No source files found"* ]]
-  [[ "$output" == *"scanned for extensions: java, go, ts, tsx, js, jsx, py, rs"* ]]
+  # Spec 032 added `sh` to the enumeration (the comments gate scans shell).
+  [[ "$output" == *"scanned for extensions: java, go, ts, tsx, js, jsx, py, rs, sh"* ]]
   [[ "$output" == *"--require-language"* ]]
 }
 
