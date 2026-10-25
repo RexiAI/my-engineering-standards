@@ -1757,3 +1757,77 @@ Verdict: SKIPPED — Non-frontend repo — deploy verification not applicable
 
 Stage 5d (Archiver) may proceed: a recorded skip satisfies the deploy-artifact
 requirement for a non-frontend lane.
+
+---
+
+## Phase-2 CI verification (round 1)
+
+- Verifier: phase-2 post-PR CI check, round 1 of at most 3.
+- PR: https://github.com/RexiAI/my-engineering-standards/pull/99 (head `45c3084a6fb829cd8fb3068f5f478b18604d9aec` — the stage-5d archive commit).
+- Counter env for telemetry: `SPEC_LOOP_COUNT=2 SPEC_PHASE1_RETRIES=0 SPEC_PHASE2_RETRIES=0`.
+
+### Checks (queried live via `gh api repos/RexiAI/my-engineering-standards/commits/45c3084a6fb829cd8fb3068f5f478b18604d9aec/check-runs`, not inferred)
+
+| Check | Workflow / event | Conclusion | Run → check id | Terminal at (UTC) |
+|---|---|---|---|---|
+| Validate | Self CI / push (archive commit) | **success** | run `40212611191` → check `121226900450` | 2026-10-25T16:41:43Z |
+| Validate | Self CI / pull_request | **success** | run `40212614772` → check `121226909924` | 2026-10-25T16:41:05Z |
+| Review PR / Review PR | PR Review Agent / pull_request | **pending** (in_progress, non-terminal) | run `40212614867` → check `121226969338` | still running at 2026-10-25T18:03:55Z |
+
+Command and verbatim output:
+
+```
+command: gh api repos/RexiAI/my-engineering-standards/commits/45c3084a6fb829cd8fb3068f5f478b18604d9aec/check-runs --jq '.check_runs[] | {name, status, conclusion, id, started_at, completed_at}'
+exit: 0
+at: 2026-10-25T18:03:55Z
+
+{"completed_at":null,"conclusion":null,"id":121226969338,"name":"Review PR / Review PR","started_at":"2026-10-25T16:38:22Z","status":"in_progress"}
+{"completed_at":"2026-10-25T16:41:05Z","conclusion":"success","id":121226909924,"name":"Validate","started_at":"2026-10-25T16:38:07Z","status":"completed"}
+{"completed_at":"2026-10-25T16:41:43Z","conclusion":"success","id":121226900450,"name":"Validate","started_at":"2026-10-25T16:38:05Z","status":"completed"}
+```
+
+### Known prior state — resolved and confirmed
+
+Before the archive commit, `Validate` was red on **one** step only:
+`scripts/check-specs-archived.sh` ("Check finished specs are archived"), firing
+because `032-clean-code-comment-hygiene` had `30-report.md` (finished) but no
+`docs/changes/032-clean-code-comment-hygiene.md` (not yet archived) — the expected
+intermediate window between stage 5b (PR open) and stage 5d (archiver), as
+recorded in §Observed phase-2 state above.
+
+Both `Validate` runs now show that step green. The push run (`40212611191`, the
+archive commit itself) full step list, verbatim:
+
+```
+command: gh run view 40212611191 --repo RexiAI/my-engineering-standards --json status,conclusion,jobs --jq '.jobs[] | {name, status, conclusion, steps: [.steps[] | {name, conclusion}]}'
+exit: 0
+at: 2026-10-25T16:52:14Z
+
+{"conclusion":"success","name":"Validate","status":"completed","steps":[{"conclusion":"success","name":"Set up job"},{"conclusion":"success","name":"Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262"},{"conclusion":"success","name":"Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065"},{"conclusion":"success","name":"Install PyYAML"},{"conclusion":"success","name":"Check for CRLF in committed blobs"},{"conclusion":"success","name":"Check CI sweeper deliverables"},{"conclusion":"success","name":"Check agent definitions are model-agnostic"},{"conclusion":"success","name":"Check shell scripts parse (bash -n)"},{"conclusion":"success","name":"make validate-all"},{"conclusion":"success","name":"Check design-gate blame scoping (scratch repos)"},{"conclusion":"success","name":"Check gate list consistency"},{"conclusion":"success","name":"Check orchestration references"},{"conclusion":"success","name":"Check bats assertions are not vacuous"},{"conclusion":"success","name":"Check post-PR CI loop mechanics"},{"conclusion":"success","name":"Check skills specification"},{"conclusion":"success","name":"Check finished specs are archived"},{"conclusion":"success","name":"Check spec audit trails"},{"conclusion":"success","name":"make lint"},{"conclusion":"success","name":"Install pinned opencode binary and verify model env resolution"},{"conclusion":"success","name":"Check agent env guard and hardcoded secrets"},{"conclusion":"success","name":"Run loop files check"},{"conclusion":"success","name":"Check Daily Triage loop deliverables"},{"conclusion":"success","name":"Check PR Babysitter loop deliverables"},{"conclusion":"success","name":"Check PR review agent deliverables"},{"conclusion":"success","name":"Check security-hardening deliverables"},{"conclusion":"success","name":"Check remediation budget"},{"conclusion":"success","name":"Install shellcheck"},{"conclusion":"success","name":"shellcheck scripts and templates"},{"conclusion":"success","name":"Install bats-core"},{"conclusion":"success","name":"Run shell gate bats tests (spec 001 Track B)"},{"conclusion":"success","name":"Run gate selftests"},{"conclusion":"success","name":"Check scenario traceability (live tree)"},{"conclusion":"success","name":"Validate YAML syntax (.github, ci)"},{"conclusion":"success","name":"Post Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065"},{"conclusion":"success","name":"Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262"},{"conclusion":"success","name":"Complete job"}]}
+```
+
+Step "Check finished specs are archived" (`./scripts/check-specs-archived.sh`,
+`self-ci.yml:124-125`) is `success` in **both** runs (the pull_request run
+`40212614772` shows the identical 33-step list, all `success`). The previously-red
+step is green; no failure exists at this head.
+
+### Review PR / Review PR — pending, non-gating, not ruled on
+
+The `Review PR / Review PR` check is the **PR Review Agent** workflow
+(`.github/workflows/pr-review.yml` → `ci-pr-review.yml`), a separate, comment-only
+advisory review — not Self CI and not a phase-2 gate. It was still
+`in_progress` at the polling bound (started 2026-10-25T16:38:22Z, ~85 min
+elapsed, step "Review the PR with the pr-review agent" running; no review comment
+posted yet). Per `ci-pr-review.yml` it is "Review + suggest fixes only" and its
+own doc comment states the PR's required checks are unaffected by it; a
+`pending` state is neither a pass nor a fail and is recorded as such, with no
+verdict authority attached. The orchestrator may re-query it before merge.
+
+### Verdict
+
+**PASS** — phase-2 round 1. The Self CI workflow at head `45c3084` is green on
+both the push and pull_request events, every step `success`, and the single
+previously-red step (`check-specs-archived.sh` / "Check finished specs are
+archived") now passes. No failing check ID, no failing log to excerpt. The
+`Review PR / Review PR` check is non-gating and still pending (recorded, not
+ruled on).
