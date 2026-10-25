@@ -50,6 +50,13 @@ cc_emit() {
     "$msg" "$file" "$start"
 }
 
+# cc_comments_forced_blocking — 0 when the environment promotes the `comments`
+# gate into the blocking set (ADR 0011 rollout). Only the literal value `1`
+# promotes; `0`, `true` and the empty string all leave it warn-only.
+cc_comments_forced_blocking() {
+  [ "${STRICT_CLEAN_CODE:-}" = "1" ]
+}
+
 # ── Comment discovery ────────────────────────────────────────────────────────
 # The `comments` gate scans its own file set: the eight source extensions plus
 # `*.sh`, minus the prose/prompt trees. Every other gate keeps its own set
