@@ -87,14 +87,15 @@ else
   echo "  SKIP — canonical has no component-per-file"
 fi
 
-# Check 4: Count of gates — canonical should have 6
+# Check 4: Count of gates — canonical should have 9 (spec 032 added comments,
+# naming and null-discipline).
 GATE_COUNT=$(echo "$CANONICAL_CSV" | tr ',' '\n' | wc -l | tr -d ' ')
 echo ""
-echo "Check 4: gate count = $GATE_COUNT (expected 6)"
-if [ "$GATE_COUNT" -eq 6 ]; then
-  echo "  PASS — 6 gates"
+echo "Check 4: gate count = $GATE_COUNT (expected 9)"
+if [ "$GATE_COUNT" -eq 9 ]; then
+  echo "  PASS — 9 gates"
 else
-  echo "  WARN — gate count is $GATE_COUNT, expected 6 (may be intentional)"
+  echo "  WARN — gate count is $GATE_COUNT, expected 9 (may be intentional)"
 fi
 
 if [ "$FAIL" -ne 0 ]; then
