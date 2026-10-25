@@ -18,6 +18,14 @@
 #   AC-012-01-09  a missing --gates flag is reported loudly, not mis-run
 #   AC-012-01-10  selftest passes only when every fixture and control asserts correctly
 #
+# Also covers spec 032's three new gates (see the group sections near the end):
+#   AC-032-04-01..03 / AC-032-08-02,05  comments: commented-out code, WARN and FAIL
+#   AC-032-05-01..03                    comments: comment restates the next line
+#   AC-032-06-01..04                    comments: TODO/FIXME, dividers, attributions
+#   AC-032-07-01..05                    comments: every allowlist category
+#   AC-032-09-01..06                    naming: five advisory heuristics
+#   AC-032-10-01..04                    null-discipline: return null / null argument
+#
 # Invokes the checker as `bash "$CHECKER"` (robust regardless of the +x bit),
 # with SOURCE_DIR pointed at each fixture dir. Exits 0 only if every fixture
 # and control assertion passes; otherwise prints the failing fixture name, the
@@ -366,6 +374,524 @@ if grep -qF "$(printf '\033[0;31mFAIL')" "$TMP/clean-tree.out" || grep -qF "$(pr
   exit 1
 fi
 ok "AC-012-01-08 clean-tree: full run exits 0 with no FAIL or WARN lines"
+
+# ── Spec 032: clean-code comment hygiene and naming gates ────────────────────
+# Fixture groups for the three gates spec 032 adds. Each group asserts both
+# directions: the violating fixture reports the documented message at the
+# documented severity, and the near-miss/allowlisted control reports nothing.
+#
+#   comments-out-code   AC-032-04-01..03, AC-032-08-01..05
+#   comments-restate    AC-032-05-01..03
+#   comments-advisory   AC-032-06-01..04
+#   comments-allowlist  AC-032-07-01..05
+#   naming-heuristics   AC-032-09-01..06
+#   null-discipline     AC-032-10-01..04
+#
+# Every fixture below sits at line 6 or later in its file: lines 1-5 are never
+# scanned (the first-five-lines allowlist).
+
+cc_pad_slash() { printf '%s\n' '// pad one' '// pad two' '// pad three' '// pad four' '// pad five'; }
+cc_pad_hash() { printf '%s\n' '# pad one' '# pad two' '# pad three' '# pad four' '# pad five'; }
+
+# cc_out NAME GATES MODE — run the checker against $TMP/NAME; sets CC_RC.
+cc_out() {
+  local name="$1" gates="$2" mode="${3:-}"
+  if [ "$mode" = strict ]; then
+    if STRICT_CLEAN_CODE=1 bash "$CHECKER" --gates "$gates" "$TMP/$name" >"$TMP/$name.out" 2>"$TMP/$name.err"; then
+      CC_RC=0
+    else
+      CC_RC=$?
+    fi
+  else
+    if bash "$CHECKER" --gates "$gates" "$TMP/$name" >"$TMP/$name.out" 2>"$TMP/$name.err"; then
+      CC_RC=0
+    else
+      CC_RC=$?
+    fi
+  fi
+}
+
+# assert_cc_warn GROUP AC NAME GATES REGEX [MODE] — exit 0 and a WARN line.
+assert_cc_warn() {
+  local group="$1" acid="$2" name="$3" gates="$4" expected="$5" mode="${6:-}"
+  cc_out "$name" "$gates" "$mode"
+  if [ "$CC_RC" -ne 0 ]; then
+    bad "$group $acid $name: expected exit 0 (WARN), got $CC_RC"
+    show_out "$TMP/$name.out"
+    return 1
+  fi
+  if ! grep -qE "WARN.*${expected}" "$TMP/$name.out"; then
+    bad "$group $acid $name: expected a WARN line matching '$expected'"
+    show_out "$TMP/$name.out"
+    return 1
+  fi
+  ok "$group $acid $name: WARN matches '$expected' (exit 0)"
+}
+
+# assert_cc_fail GROUP AC NAME GATES REGEX [MODE] — exit 1 and a FAIL line.
+assert_cc_fail() {
+  local group="$1" acid="$2" name="$3" gates="$4" expected="$5" mode="${6:-}"
+  cc_out "$name" "$gates" "$mode"
+  if [ "$CC_RC" -ne 1 ]; then
+    bad "$group $acid $name: expected exit 1 (FAIL), got $CC_RC"
+    show_out "$TMP/$name.out"
+    return 1
+  fi
+  if ! grep -qE "FAIL.*${expected}" "$TMP/$name.out"; then
+    bad "$group $acid $name: expected a FAIL line matching '$expected'"
+    show_out "$TMP/$name.out"
+    return 1
+  fi
+  ok "$group $acid $name: FAIL matches '$expected' (exit 1)"
+}
+
+# assert_cc_clean GROUP AC NAME GATES REGEX [MODE] — exit 0 and no matching line.
+assert_cc_clean() {
+  local group="$1" acid="$2" name="$3" gates="$4" absent="$5" mode="${6:-}"
+  cc_out "$name" "$gates" "$mode"
+  if [ "$CC_RC" -ne 0 ]; then
+    bad "$group $acid $name: control expected exit 0, got $CC_RC"
+    show_out "$TMP/$name.out"
+    return 1
+  fi
+  if grep -qE "$absent" "$TMP/$name.out"; then
+    bad "$group $acid $name: control must NOT match '$absent'"
+    show_out "$TMP/$name.out"
+    return 1
+  fi
+  ok "$group $acid $name: control exits 0 with no '$absent'"
+}
+
+# ── comments-out-code (AC-032-04, AC-032-08) ────────────────────────────────
+mkdir -p "$TMP/cc-out-bad/src"
+{
+  cc_pad_slash
+  printf '%s\n' 'public class OutBad {'
+  printf '%s\n' '  void go() {'
+  printf '%s\n' '    int t = 1;'
+  printf '%s\n' '    // total = price * quantity;'
+  printf '%s\n' '    // printTotal(total);'
+  printf '%s\n' '    use(t);'
+  printf '%s\n' '  }'
+  printf '%s\n' '}'
+} > "$TMP/cc-out-bad/src/OutBad.java"
+mkdir -p "$TMP/cc-out-single/src"
+{
+  cc_pad_slash
+  printf '%s\n' 'public class OutSingle {'
+  printf '%s\n' '  void go() {'
+  printf '%s\n' '    int t = 1;'
+  printf '%s\n' '    // total = 1;'
+  printf '%s\n' '    use(t);'
+  printf '%s\n' '  }'
+  printf '%s\n' '}'
+} > "$TMP/cc-out-single/src/OutSingle.java"
+mkdir -p "$TMP/cc-out-prose/src"
+{
+  cc_pad_slash
+  printf '%s\n' 'public class OutProse {'
+  printf '%s\n' '  void go() {'
+  printf '%s\n' '    // The totals are kept in cents to avoid rounding drift.'
+  printf '%s\n' '    // See the billing note above for the historical reason.'
+  printf '%s\n' '    int cents = 0;'
+  printf '%s\n' '    use(cents);'
+  printf '%s\n' '  }'
+  printf '%s\n' '}'
+} > "$TMP/cc-out-prose/src/OutProse.java"
+mkdir -p "$TMP/cc-out-block/src"
+{
+  cc_pad_slash
+  printf '%s\n' 'public class OutBlock {'
+  printf '%s\n' '  void go() {'
+  printf '%s\n' '    /*'
+  printf '%s\n' '     * let x = 1;'
+  printf '%s\n' '     * return x;'
+  printf '%s\n' '     */'
+  printf '%s\n' '    int y = 0;'
+  printf '%s\n' '  }'
+  printf '%s\n' '}'
+} > "$TMP/cc-out-block/src/OutBlock.java"
+mkdir -p "$TMP/cc-out-shell/src"
+{
+  cc_pad_hash
+  printf '%s\n' '# echo "alpha";'
+  printf '%s\n' '# echo "beta";'
+  printf '%s\n' 'echo done'
+} > "$TMP/cc-out-shell/src/out.sh"
+mkdir -p "$TMP/cc-out-py/src"
+{
+  cc_pad_hash
+  printf '%s\n' '# total = price * quantity;'
+  printf '%s\n' '# printTotal(total);'
+  printf '%s\n' 'total = 0'
+} > "$TMP/cc-out-py/src/out.py"
+
+echo "== AC-032 comments-out-code =="
+assert_cc_warn comments-out-code AC-032-04-01 cc-out-bad comments 'Comments: commented-out code'
+assert_cc_fail comments-out-code AC-032-08-02 cc-out-bad comments 'Comments: commented-out code' strict
+assert_cc_clean comments-out-code AC-032-04-02 cc-out-single comments 'Comments:'
+assert_cc_clean comments-out-code AC-032-04-03 cc-out-prose comments 'Comments:'
+assert_cc_warn comments-out-code AC-032-04-03 cc-out-block comments 'Comments: commented-out code'
+assert_cc_warn comments-out-code AC-032-03-01 cc-out-shell comments 'Comments: commented-out code'
+# ADR 0006 D6: .py findings stay WARN even with the strict switch on.
+assert_cc_warn comments-out-code AC-032-08-05 cc-out-py comments 'Comments: commented-out code' strict
+
+# ── comments-restate (AC-032-05) ────────────────────────────────────────────
+mkdir -p "$TMP/cc-restate-bad/src"
+{
+  cc_pad_slash
+  printf '%s\n' 'public class RestateBad {'
+  printf '%s\n' '  int total() {'
+  printf '%s\n' '    // return total'
+  printf '%s\n' '    return total;'
+  printf '%s\n' '  }'
+  printf '%s\n' '}'
+} > "$TMP/cc-restate-bad/src/RestateBad.java"
+mkdir -p "$TMP/cc-restate-extra/src"
+{
+  cc_pad_slash
+  printf '%s\n' 'public class RestateExtra {'
+  printf '%s\n' '  void go() {'
+  printf '%s\n' '    // parse the config file'
+  printf '%s\n' '    const parsed = parseConfig(file);'
+  printf '%s\n' '    use(parsed);'
+  printf '%s\n' '  }'
+  printf '%s\n' '}'
+} > "$TMP/cc-restate-extra/src/RestateExtra.java"
+mkdir -p "$TMP/cc-restate-short/src"
+{
+  cc_pad_slash
+  printf '%s\n' 'public class RestateShort {'
+  printf '%s\n' '  int a() {'
+  printf '%s\n' '    // total'
+  printf '%s\n' '    return total;'
+  printf '%s\n' '  }'
+  printf '%s\n' '  int b() {'
+  printf '%s\n' '    // return total'
+  printf '%s\n' ''
+  printf '%s\n' '    return total;'
+  printf '%s\n' '  }'
+  printf '%s\n' '}'
+  printf '%s\n' '    // return total'
+} > "$TMP/cc-restate-short/src/RestateShort.java"
+
+echo "== AC-032 comments-restate =="
+assert_cc_warn comments-restate AC-032-05-01 cc-restate-bad comments 'Comments: comment restates the following line'
+assert_cc_clean comments-restate AC-032-05-02 cc-restate-extra comments 'Comments: comment restates the following line'
+assert_cc_clean comments-restate AC-032-05-03 cc-restate-short comments 'Comments: comment restates the following line'
+
+# ── comments-advisory (AC-032-06) ───────────────────────────────────────────
+mkdir -p "$TMP/cc-adv-todo/src"
+{
+  cc_pad_slash
+  printf '%s\n' '// TODO: handle retry'
+  printf '%s\n' 'int value = 0;'
+} > "$TMP/cc-adv-todo/src/Retry.java"
+mkdir -p "$TMP/cc-adv-fixme/src"
+{
+  cc_pad_hash
+  printf '%s\n' '# FIXME fix this before release'
+  printf '%s\n' 'echo done'
+} > "$TMP/cc-adv-fixme/src/cleanup.sh"
+mkdir -p "$TMP/cc-adv-refs/src"
+{
+  cc_pad_slash
+  printf '%s\n' '// TODO(#123): handle retry'
+  printf '%s\n' '// TODO 456'
+  printf '%s\n' '// FIXME https://example.com/i/7'
+} > "$TMP/cc-adv-refs/src/Refs.java"
+mkdir -p "$TMP/cc-adv-divider/src"
+{
+  cc_pad_slash
+  printf '%s\n' '// =========='
+} > "$TMP/cc-adv-divider/src/Divider.java"
+mkdir -p "$TMP/cc-adv-note/src"
+{
+  cc_pad_slash
+  printf '%s\n' '// -- note'
+} > "$TMP/cc-adv-note/src/Note.java"
+mkdir -p "$TMP/cc-adv-author/src"
+{
+  cc_pad_slash
+  printf '%s\n' '// @author Jane Doe'
+} > "$TMP/cc-adv-author/src/Author.java"
+mkdir -p "$TMP/cc-adv-created/src"
+{
+  cc_pad_slash
+  printf '%s\n' '// Created by Jane Doe'
+} > "$TMP/cc-adv-created/src/Created.java"
+
+echo "== AC-032 comments-advisory =="
+assert_cc_warn comments-advisory AC-032-06-01 cc-adv-todo comments 'Comments: TODO/FIXME without an issue reference'
+assert_cc_warn comments-advisory AC-032-06-01 cc-adv-fixme comments 'Comments: TODO/FIXME without an issue reference'
+assert_cc_clean comments-advisory AC-032-06-02 cc-adv-refs comments 'Comments: TODO/FIXME without an issue reference'
+assert_cc_warn comments-advisory AC-032-06-03 cc-adv-divider comments 'Comments: section-divider comment'
+assert_cc_clean comments-advisory AC-032-06-03 cc-adv-note comments 'Comments: (section-divider|attribution)'
+assert_cc_warn comments-advisory AC-032-06-03 cc-adv-author comments 'Comments: attribution comment'
+assert_cc_warn comments-advisory AC-032-06-03 cc-adv-created comments 'Comments: attribution comment'
+# Advisory rules never promote, even with the strict switch on.
+assert_cc_warn comments-advisory AC-032-06-04 cc-adv-todo comments 'Comments: TODO/FIXME without an issue reference' strict
+
+# ── comments-allowlist (AC-032-07) ──────────────────────────────────────────
+mkdir -p "$TMP/cc-allow-firstfive/src"
+cat > "$TMP/cc-allow-firstfive/src/head.sh" <<'SH'
+#!/bin/bash
+# ---------
+set -e
+# echo "alpha";
+# echo "beta";
+echo done
+SH
+mkdir -p "$TMP/cc-allow-directives/src"
+{
+  cc_pad_hash
+  printf '%s\n' '# shellcheck disable=SC2086'
+  printf '%s\n' '# shellcheck disable=SC2046'
+  printf '%s\n' 'echo done'
+} > "$TMP/cc-allow-directives/src/directives.sh"
+mkdir -p "$TMP/cc-allow-markers/src"
+{
+  cc_pad_hash
+  printf '%s\n' '# noqa: E501 value = compute();'
+  printf '%s\n' '# return value;'
+} > "$TMP/cc-allow-markers/src/noqa.sh"
+{
+  cc_pad_hash
+  printf '%s\n' '# type: ignore total = compute();'
+  printf '%s\n' '# return total;'
+} > "$TMP/cc-allow-markers/src/typeignore.sh"
+{
+  cc_pad_hash
+  printf '%s\n' '# pragma: no cover total = compute();'
+  printf '%s\n' '# return total;'
+} > "$TMP/cc-allow-markers/src/pragma.sh"
+{
+  cc_pad_hash
+  printf '%s\n' '# ponytail: total = 200;'
+  printf '%s\n' '# return total;'
+} > "$TMP/cc-allow-markers/src/ponytail.sh"
+{
+  cc_pad_hash
+  printf '%s\n' '# standards:allow-comment let total = 200;'
+  printf '%s\n' '# return total;'
+} > "$TMP/cc-allow-markers/src/standards.sh"
+{
+  cc_pad_hash
+  printf '%s\n' '# Licensed under MIT;'
+  printf '%s\n' '# return total;'
+} > "$TMP/cc-allow-markers/src/licence.sh"
+{
+  cc_pad_hash
+  printf '%s\n' '# https://example.com/let total = 5;'
+  printf '%s\n' '# return total;'
+} > "$TMP/cc-allow-markers/src/url.sh"
+{
+  cc_pad_hash
+  printf '%s\n' '# SPDX-License-Identifier: MIT'
+  printf '%s\n' '# Copyright 2026 Acme'
+} > "$TMP/cc-allow-markers/src/spdx.sh"
+# Per-line suppression: the directive line is skipped, the plain violation is not.
+mkdir -p "$TMP/cc-allow-mixed/src"
+{
+  cc_pad_hash
+  printf '%s\n' '# shellcheck disable=SC2086'
+  printf '%s\n' 'echo start'
+  printf '%s\n' '# echo "alpha";'
+  printf '%s\n' '# echo "beta";'
+} > "$TMP/cc-allow-mixed/src/mixed.sh"
+mkdir -p "$TMP/cc-allow-docblock/src"
+{
+  cc_pad_slash
+  printf '%s\n' '/**'
+  printf '%s\n' ' * let x = 1;'
+  printf '%s\n' ' * return x;'
+  printf '%s\n' ' */'
+  printf '%s\n' 'public void compute() { }'
+} > "$TMP/cc-allow-docblock/src/Public.java"
+{
+  cc_pad_slash
+  printf '%s\n' '/// let x = compute();'
+  printf '%s\n' '/// return x;'
+  printf '%s\n' 'pub fn compute() -> i32 { 1 }'
+} > "$TMP/cc-allow-docblock/src/doc.rs"
+{
+  cc_pad_slash
+  printf '%s\n' '// total := a + b;'
+  printf '%s\n' '// return total;'
+  printf '%s\n' 'func Add(a, b int) int { return a + b }'
+} > "$TMP/cc-allow-docblock/src/doc.go"
+mkdir -p "$TMP/cc-allow-docblock-ctl/src"
+{
+  cc_pad_slash
+  printf '%s\n' '/**'
+  printf '%s\n' ' * let x = 1;'
+  printf '%s\n' ' * return x;'
+  printf '%s\n' ' */'
+  printf '%s\n' 'private void compute() { }'
+} > "$TMP/cc-allow-docblock-ctl/src/Private.java"
+{
+  cc_pad_slash
+  printf '%s\n' '// let x = compute();'
+  printf '%s\n' '// return x;'
+  printf '%s\n' 'fn compute() -> i32 { 1 }'
+} > "$TMP/cc-allow-docblock-ctl/src/plain.rs"
+
+echo "== AC-032 comments-allowlist =="
+assert_cc_clean comments-allowlist AC-032-07-01 cc-allow-firstfive comments 'Comments:'
+assert_cc_clean comments-allowlist AC-032-07-02 cc-allow-directives comments 'Comments:'
+assert_cc_clean comments-allowlist AC-032-07-02 cc-allow-markers comments 'Comments:'
+assert_cc_warn comments-allowlist AC-032-07-03 cc-allow-mixed comments 'Comments: commented-out code'
+assert_cc_clean comments-allowlist AC-032-07-05 cc-allow-docblock comments 'Comments:'
+assert_cc_warn comments-allowlist AC-032-07-05 cc-allow-docblock-ctl comments 'Comments: commented-out code'
+
+# ── naming-heuristics (AC-032-09) ───────────────────────────────────────────
+mkdir -p "$TMP/cc-name-single/src"
+{
+  cc_pad_slash
+  printf '%s\n' 'public class Counters {'
+  printf '%s\n' '  void go() {'
+  printf '%s\n' '    int x = 1;'
+  printf '%s\n' '    use(x);'
+  printf '%s\n' '  }'
+  printf '%s\n' '}'
+} > "$TMP/cc-name-single/src/Counters.java"
+mkdir -p "$TMP/cc-name-single-ok/src"
+{
+  cc_pad_slash
+  printf '%s\n' 'public class Loops {'
+  printf '%s\n' '  void go() {'
+  printf '%s\n' '    int j = 2;'
+  printf '%s\n' '    for (int i = 0; i < 3; i++) { use(i); }'
+  printf '%s\n' '    for (int k = 0; k < 3; k++) { use(k); }'
+  printf '%s\n' '    use(j);'
+  printf '%s\n' '  }'
+  printf '%s\n' '}'
+} > "$TMP/cc-name-single-ok/src/Loops.java"
+mkdir -p "$TMP/cc-name-noise/src"
+{
+  cc_pad_slash
+  printf '%s\n' 'class UserManager {'
+  printf '%s\n' '}'
+  printf '%s\n' 'class Data {'
+  printf '%s\n' '}'
+  printf '%s\n' 'class Managerial {'
+  printf '%s\n' '}'
+  printf '%s\n' 'class Information {'
+  printf '%s\n' '}'
+} > "$TMP/cc-name-noise/src/Models.java"
+mkdir -p "$TMP/cc-name-encoded/src"
+{
+  cc_pad_slash
+  printf '%s\n' 'public class Names {'
+  printf '%s\n' '  void go() {'
+  printf '%s\n' '    String strName = "a";'
+  printf '%s\n' '    int iCount = 1;'
+  printf '%s\n' '    int index = 2;'
+  printf '%s\n' '    int counter = 3;'
+  printf '%s\n' '    use(strName + iCount + index + counter);'
+  printf '%s\n' '  }'
+  printf '%s\n' '}'
+} > "$TMP/cc-name-encoded/src/Names.java"
+mkdir -p "$TMP/cc-name-bool/src"
+{
+  cc_pad_slash
+  printf '%s\n' 'public class Flags {'
+  printf '%s\n' '  void save(boolean hasAccess) {'
+  printf '%s\n' '    use(hasAccess);'
+  printf '%s\n' '  }'
+  printf '%s\n' '  void load(boolean access) {'
+  printf '%s\n' '    use(access);'
+  printf '%s\n' '  }'
+  printf '%s\n' '}'
+} > "$TMP/cc-name-bool/src/Flags.java"
+{
+  cc_pad_slash
+  printf '%s\n' 'export function save(hasAccess: boolean): void {'
+  printf '%s\n' '  use(hasAccess);'
+  printf '%s\n' '}'
+} > "$TMP/cc-name-bool/src/flags.ts"
+mkdir -p "$TMP/cc-name-params/src"
+{
+  cc_pad_slash
+  printf '%s\n' 'public class Params {'
+  printf '%s\n' '  void three(int a, int b, int c) {'
+  printf '%s\n' '    use(a);'
+  printf '%s\n' '  }'
+  printf '%s\n' '}'
+} > "$TMP/cc-name-params/src/Params.java"
+mkdir -p "$TMP/cc-name-params-bad/src"
+{
+  cc_pad_slash
+  printf '%s\n' 'public class Params {'
+  printf '%s\n' '  void four(int a, int b, int c, int d) {'
+  printf '%s\n' '    use(a);'
+  printf '%s\n' '  }'
+  printf '%s\n' '}'
+} > "$TMP/cc-name-params-bad/src/Params.java"
+mkdir -p "$TMP/cc-name-shell/src"
+{
+  cc_pad_hash
+  printf '%s\n' 'x=1'
+  printf '%s\n' 'y=2'
+} > "$TMP/cc-name-shell/src/vars.sh"
+
+echo "== AC-032 naming-heuristics =="
+assert_cc_warn naming-heuristics AC-032-09-01 cc-name-single naming 'Naming: single-character identifier'
+assert_cc_clean naming-heuristics AC-032-09-01 cc-name-single-ok naming 'Naming: single-character identifier'
+assert_cc_warn naming-heuristics AC-032-09-02 cc-name-noise naming 'Naming: noise word in type name'
+assert_cc_clean naming-heuristics AC-032-09-02 cc-name-noise naming 'noise word in type name \((Managerial|Information)\)'
+assert_cc_warn naming-heuristics AC-032-09-03 cc-name-encoded naming 'Naming: encoded identifier'
+assert_cc_clean naming-heuristics AC-032-09-03 cc-name-encoded naming 'encoded identifier \(index\)'
+assert_cc_warn naming-heuristics AC-032-09-04 cc-name-bool naming 'Naming: boolean flag parameter'
+assert_cc_clean naming-heuristics AC-032-09-04 cc-name-bool naming 'boolean flag parameter \(access\)'
+assert_cc_warn naming-heuristics AC-032-09-05 cc-name-params-bad naming 'Naming: more than three parameters'
+assert_cc_clean naming-heuristics AC-032-09-05 cc-name-params naming 'Naming: more than three parameters'
+assert_cc_clean naming-heuristics AC-032-09-06 cc-name-shell naming 'Naming:'
+assert_cc_warn naming-heuristics AC-032-09-06 cc-name-single naming 'Naming: single-character identifier' strict
+
+# ── null-discipline (AC-032-10) ─────────────────────────────────────────────
+mkdir -p "$TMP/cc-null-return/src"
+{
+  cc_pad_slash
+  printf '%s\n' 'public class Finder {'
+  printf '%s\n' '  String find() { return null; }'
+  printf '%s\n' '}'
+} > "$TMP/cc-null-return/src/Finder.java"
+{
+  cc_pad_slash
+  printf '%s\n' 'export function f() { return null; }'
+} > "$TMP/cc-null-return/src/finder.ts"
+mkdir -p "$TMP/cc-null-arg/src"
+{
+  cc_pad_slash
+  printf '%s\n' 'public class Discipline {'
+  printf '%s\n' '  void go(Object x) {'
+  printf '%s\n' '    helper(null);'
+  printf '%s\n' '    helper(1, null);'
+  printf '%s\n' '    return x == null;'
+  printf '%s\n' '    Object s = null;'
+  printf '%s\n' '    return x == null ? this : null;'
+  printf '%s\n' '  }'
+  printf '%s\n' '}'
+} > "$TMP/cc-null-arg/src/Discipline.java"
+mkdir -p "$TMP/cc-null-langs/src"
+{
+  cc_pad_hash
+  printf '%s\n' 'def f():'
+  printf '%s\n' '    return None'
+  printf '%s\n' 'helper(None)'
+} > "$TMP/cc-null-langs/src/nulls.py"
+{
+  cc_pad_slash
+  printf '%s\n' 'fn f() -> Option<u8> { None }'
+} > "$TMP/cc-null-langs/src/nulls.rs"
+
+echo "== AC-032 null-discipline =="
+assert_cc_warn null-discipline AC-032-10-01 cc-null-return null-discipline 'Null-discipline: return null'
+assert_cc_warn null-discipline AC-032-10-02 cc-null-arg null-discipline 'Null-discipline: null argument'
+assert_cc_clean null-discipline AC-032-10-02 cc-null-arg null-discipline 'Null-discipline: return null'
+assert_cc_clean null-discipline AC-032-10-03 cc-null-langs null-discipline 'Null-discipline:'
+assert_cc_warn null-discipline AC-032-10-04 cc-null-return null-discipline 'Null-discipline: return null' strict
 
 echo ""
 if [ "$FAIL_COUNT" -gt 0 ]; then
