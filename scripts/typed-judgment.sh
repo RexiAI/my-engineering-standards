@@ -5,12 +5,22 @@
 #
 # Usage:
 #   scripts/typed-judgment.sh --questions <json>
-#       [--state-file <path>] [--dry-run]
+#       [--state-file <path>] [--max-state-bytes <N>] [--dry-run]
 #
 # Input:
 #   --state-file <path>  State payload source. Without it, the state payload
 #                        is read from stdin. A payload that parses as JSON is
 #                        embedded as a JSON value; anything else as a string.
+#   --max-state-bytes <N>  Payload cap in bytes for the serialized state
+#                        (flag wins over the env var below; default 12288 =
+#                        12 KB). A non-positive or non-numeric value is a
+#                        usage error (exit 2). When the state exceeds the cap
+#                        it is truncated deterministically to HEAD + MARKER +
+#                        TAIL (both ends preserved, MARKER names the omitted
+#                        byte count) and the truncated state is what the
+#                        request embeds. Truncation is a degradation, not a
+#                        fallback: the reason line below is emitted and the
+#                        call proceeds.
 #   --questions <json>   Map of question id -> {type, instructions, criteria}.
 #                        Passed through verbatim in the request body, so the
 #                        CALLER owns the per-type shape contract:
@@ -47,8 +57,24 @@
 #   JUDGMENT_BACKOFF_SECONDS    Retry delays, default "1 2". Setting it to
 #                               "0" (offline tests) removes the sleep.
 #   JUDGMENT_TIMEOUT_SECONDS    Per-attempt curl timeout, default 30.
+#   JUDGMENT_MAX_STATE_BYTES    Payload cap in bytes for the serialized state,
+#                               default 12288 (12 KB). --max-state-bytes wins.
+#                               The measured local-backend failure threshold
+#                               on 2026-10-26 was 20548 bytes for a
+#                               JSON-shaped state (and drifted lower after a
+#                               failing request); 12288 leaves a wide margin.
 #   JUDGMENT_DEBUG              Non-empty -> diagnostic lines on stderr.
 #                               State payloads in diagnostics are truncated.
+#
+# Fallback reason line (spec 034):
+#   On every exit-10 fallback the wrapper writes exactly one line to stderr:
+#     typed-judgment: reason=<unconfigured|unreachable|error>
+#   regardless of JUDGMENT_DEBUG. The reason line never carries the API key
+#   or state content. Truncation (which does NOT exit 10) writes:
+#     typed-judgment: reason=payload_overflow
+#     typed-judgment: truncated original_bytes=<N> cap_bytes=<cap>
+#   The second line lets consumers record truncated:true plus the original
+#   size in telemetry while the call still returns a usable answer (exit 0).
 #
 # Daily counter file:
 #   Path:   $JUDGMENT_CAP_DIR/judgment-cap-YYYY-MM-DD (default .cache/ under
@@ -92,11 +118,16 @@
 #        the answer aliases, or carrying a non-numeric confidence), or
 #        confidence below the threshold on an answer that carries one (the
 #        parsed answer is still printed on stdout so consumers can record
-#        telemetry). Consumers must preserve their stock procedure on 10.
+#        telemetry). Every exit 10 writes one `typed-judgment: reason=<...>`
+#        line to stderr: unconfigured (credentials), unreachable (transport/
+#        HTTP), error (cap, unparsable, low confidence). Consumers must
+#        preserve their stock procedure on 10.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+# shellcheck source=judgment-lib.sh
+source "$SCRIPT_DIR/judgment-lib.sh"
 
 MIN_CONFIDENCE_DEFAULT="0.6"
 RETRYABLE_STATUSES="401 422 429 529"
@@ -119,23 +150,55 @@ log_debug() {
   fi
 }
 
-need_value() { # $1 = argc, $2 = flag, $3 = noun completing "<flag> needs <noun>"
-  [ "$1" -ge 2 ] || usage_error "$2 needs $3"
+validate_positive_int() { # $1 = value, $2 = label
+  judgment_positive_int "$1" || usage_error "$2 must be a positive integer, got: '$1'"
+}
+
+resolve_max_state_bytes() {
+  if [ "$MAX_STATE_BYTES_SET" = true ]; then
+    validate_positive_int "$MAX_STATE_BYTES" "--max-state-bytes"
+  else
+    MAX_STATE_BYTES="${JUDGMENT_MAX_STATE_BYTES:-$JUDGMENT_CAP_DEFAULT_BYTES}"
+    validate_positive_int "$MAX_STATE_BYTES" "JUDGMENT_MAX_STATE_BYTES"
+  fi
 }
 
 parse_args() {
   STATE_FILE=""
   QUESTIONS=""
   DRY_RUN=false
+  MAX_STATE_BYTES=""
+  MAX_STATE_BYTES_SET=false
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --state-file) need_value "$#" "$1" "a path"; STATE_FILE="$2"; shift 2 ;;
-      --questions)  need_value "$#" "$1" "JSON";   QUESTIONS="$2"; shift 2 ;;
-      --dry-run)    DRY_RUN=true; shift ;;
+      --dry-run) DRY_RUN=true; shift ;;
+      --state-file|--questions|--max-state-bytes) assign_option "$@"; shift 2 ;;
       *) usage_error "unknown argument: $1" ;;
     esac
   done
+  resolve_max_state_bytes
   validate_questions
+}
+
+# assign_option <flag> <value> — every value-taking flag passes the same
+# "flag needs <noun>" presence check; storing it is a lookup. The caller shifts
+# the pair only after this returns, so a missing value exits 2 first.
+assign_option() {
+  [ "$#" -ge 2 ] || usage_error "$1 needs $(option_noun "$1")"
+  case "$1" in
+    --state-file) STATE_FILE="$2" ;;
+    --questions) QUESTIONS="$2" ;;
+    --max-state-bytes) MAX_STATE_BYTES="$2"; MAX_STATE_BYTES_SET=true ;;
+  esac
+}
+
+# option_noun <flag> — the noun each value-taking flag's usage message names.
+option_noun() {
+  case "$1" in
+    --state-file) printf '%s' 'a path' ;;
+    --questions) printf '%s' 'JSON' ;;
+    --max-state-bytes) printf '%s' 'a positive integer' ;;
+  esac
 }
 
 validate_questions() {
@@ -152,6 +215,60 @@ load_state() {
   fi
   [ -n "$STATE" ] || usage_error "empty state payload (use --state-file or pipe stdin)"
   log_debug "state excerpt: ${STATE:0:200}"
+}
+
+truncation_marker() { # $1 = omitted byte count
+  printf '...[truncated: %s bytes omitted]...' "$1"
+}
+
+# converge_omitted <total bytes> — the marker names the omitted byte count, and
+# the marker's own length feeds back into that count. A few iterations converge
+# deterministically. Echoes "<omitted> <marker-bytes>".
+converge_omitted() {
+  local omitted=$(( $1 - MAX_STATE_BYTES )) marker mlen new_omitted i
+  for i in 1 2 3 4; do
+    marker="$(truncation_marker "$omitted")"
+    mlen="$(judgment_byte_len "$marker")"
+    new_omitted=$(( $1 - (MAX_STATE_BYTES - mlen) ))
+    [ "$new_omitted" = "$omitted" ] && break
+    omitted="$new_omitted"
+  done
+  printf '%s %s\n' "$omitted" "$mlen"
+}
+
+# apply_truncation <state> <omitted> <marker-bytes> — HEAD + MARKER + TAIL,
+# never longer than the cap. Both slices are captured separately because each
+# one strips its own trailing newlines, exactly as the pre-refactor single-line
+# assignment did; emitting them as three printfs would keep those newlines.
+apply_truncation() {
+  local keep head_bytes tail_bytes head tail marker
+  if [ "$3" -ge "$MAX_STATE_BYTES" ]; then
+    # Degenerate cap: the marker alone does not fit. Keep a head slice only.
+    printf '%s' "$1" | head -c "$MAX_STATE_BYTES"
+    return 0
+  fi
+  keep=$(( MAX_STATE_BYTES - $3 ))
+  head_bytes=$(( keep / 2 ))
+  tail_bytes=$(( keep - head_bytes ))
+  head="$(printf '%s' "$1" | head -c "$head_bytes")"
+  tail="$(printf '%s' "$1" | tail -c "$tail_bytes")"
+  marker="$(truncation_marker "$2")"
+  printf '%s' "${head}${marker}${tail}"
+}
+
+# truncate_state — cap the serialized state deterministically before the
+# request is built (spec 034). HEAD + MARKER + TAIL preserves both ends and
+# names the omitted byte count; the result is never longer than the cap.
+# Emits the payload_overflow reason line and continues (not an exit-10
+# fallback: the truncated payload can still produce a usable answer).
+truncate_state() {
+  local total omitted mlen
+  total="$(judgment_byte_len "$STATE")"
+  [ "$total" -gt "$MAX_STATE_BYTES" ] || return 0
+  read -r omitted mlen <<< "$(converge_omitted "$total")"
+  STATE="$(apply_truncation "$STATE" "$omitted" "$mlen")"
+  judgment_emit_reason payload_overflow
+  printf 'typed-judgment: truncated original_bytes=%s cap_bytes=%s\n' "$total" "$MAX_STATE_BYTES" >&2
 }
 
 resolve_backend() {
@@ -236,11 +353,12 @@ api_attempt() {
   CURL_RC=0
   local -a auth=()
   [ -n "${JUDGMENT_API_KEY:-}" ] && auth=(-H "Authorization: Bearer ${JUDGMENT_API_KEY}")
+  # ${auth[@]+"${auth[@]}"}: bash 3.2 + `set -u` rejects an empty array expansion.
   HTTP_STATUS="$(curl -sS --max-time "${JUDGMENT_TIMEOUT_SECONDS:-30}" \
     -o "$RESP_FILE" -w '%{http_code}' \
     -X POST \
     -H 'Content-Type: application/json' \
-    "${auth[@]}" \
+    ${auth[@]+"${auth[@]}"} \
     --data-binary "@$REQ_FILE" \
     "$JUDGMENT_API_URL")" || CURL_RC=$?
   [ "$CURL_RC" -eq 0 ]
@@ -305,50 +423,65 @@ confidence_usable() { # $1 = normalized JSON — gates only answers that carry a
   jq -e --argjson min "$min" '[ .[].confidence | select(. != null) ] | all(. >= $min)' <<< "$1" >/dev/null 2>&1
 }
 
-fallback() { # $1 = reason — debug line then the documented exit 10
-  log_debug "$1 — fallback"
+fallback() { # $1 = reason word, $2 = human-readable detail (debug only)
+  log_debug "${2:-$1} — fallback"
+  judgment_emit_reason "$1"
   exit 10
 }
 
 check_callable() { # guards before any HTTP: credentials, model, daily cap
-  configured_credentials || fallback "not configured (JUDGMENT_API_URL/JUDGMENT_API_KEY)"
+  configured_credentials || fallback unconfigured "not configured (JUDGMENT_API_URL/JUDGMENT_API_KEY)"
   # hosted keeps spec 028's strict model requirement; local falls back to the
   # DEFAULT_LOCAL_MODEL alias (resolved in build_request) instead of erroring.
   if [ "$BACKEND" != "local" ]; then
     [ -n "${JUDGMENT_MODEL:-}" ] || usage_error "JUDGMENT_MODEL is required for a live call"
   fi
-  cap_reached && fallback "daily cap reached"
+  cap_reached && fallback error "daily cap reached"
   return 0
 }
 
 finalize_response() { # $1 = client-measured elapsed ms; prints answer, exits 0/10
-  response_valid || fallback "response unparsable or incomplete"
+  response_valid || fallback error "response unparsable or incomplete"
   local normalized
   normalized="$(normalize_output "$1")"
   printf '%s\n' "$normalized"
-  confidence_usable "$normalized" || fallback "confidence below threshold"
+  confidence_usable "$normalized" || fallback error "confidence below threshold"
   exit 0
+}
+
+# write_request_file — temp files for the request/response and the built body.
+# The EXIT trap is what removes them, so it is installed before anything can
+# fail on the way to a response.
+write_request_file() {
+  REQ_FILE="$(mktemp)"
+  RESP_FILE="$(mktemp)"
+  trap 'rm -f "$REQ_FILE" "$RESP_FILE"' EXIT
+  build_request > "$REQ_FILE"
+}
+
+# live_call — everything from the pre-HTTP guards to the final answer; exits
+# 0 (usable answer) or 10 (fallback).
+live_call() {
+  check_callable
+  local start_ms elapsed_ms
+  start_ms="$(date +%s%3N)"
+  call_api || fallback unreachable "API call failed (HTTP ${HTTP_STATUS:-none})"
+  cap_increment
+  elapsed_ms=$(( $(date +%s%3N) - start_ms ))
+  finalize_response "$elapsed_ms"
 }
 
 main() {
   resolve_backend
   parse_args "$@"
   load_state
-  REQ_FILE="$(mktemp)"
-  RESP_FILE="$(mktemp)"
-  trap 'rm -f "$REQ_FILE" "$RESP_FILE"' EXIT
-  build_request > "$REQ_FILE"
+  truncate_state
+  write_request_file
   if [ "$DRY_RUN" = true ]; then
     cat "$REQ_FILE"
     exit 0
   fi
-  check_callable
-  local start_ms elapsed_ms
-  start_ms="$(date +%s%3N)"
-  call_api || fallback "API call failed (HTTP ${HTTP_STATUS:-none})"
-  cap_increment
-  elapsed_ms=$(( $(date +%s%3N) - start_ms ))
-  finalize_response "$elapsed_ms"
+  live_call
 }
 
 main "$@"
