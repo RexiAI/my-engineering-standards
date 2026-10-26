@@ -871,3 +871,86 @@ pull_request (`Validate`, ID 121644641895) — report `success`. The
 failing check IDs to diagnose; nothing to fix. The pending `Review PR /
 Review PR` check is out of scope (separate non-blocking workflow) and remains
 `in_progress`; recorded, not a pass or fail.
+
+---
+
+### Re-confirmation: head `de065b4` (phase-2 record commit re-triggered CI)
+
+After round 1 PASSed at `b5efac9`, the phase-2 record itself was committed and
+pushed as `de065b4bacdfefb96a4f82affbdb2f0cecdf5217`
+(`docs(changes): record phase-2 CI verification for 035`), which re-triggered
+Self CI on the branch. This re-confirms the new head. **This head differs from
+the already-verified `b5efac9` only by that phase-2 record commit** — no
+production code, script, or test changed.
+
+### Per-check table (head `de065b4`)
+
+| Check | Workflow / event | Conclusion | Check-run ID |
+|---|---|---|---|
+| Validate | Self CI / push | success | 121648392722 |
+| Validate | Self CI / pull_request | success | 121648412927 |
+| Review PR / Review PR | PR Review Agent / pull_request | in_progress (pending) | 121649028121 |
+
+The `Review PR / Review PR` check is the spec-024 self-hosted review agent — a
+separate, non-blocking workflow (out of scope for the Self CI verification),
+recorded as pending, not a pass or fail.
+
+### Evidence: gh pr checks (bucket)
+
+```
+command: gh pr checks 104 --json name,state,bucket,workflow,link,event
+exit: 0
+at: 2026-10-26T15:10:17Z
+
+[
+  {"bucket":"pending","event":"pull_request","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/40344703292/job/121649028121","name":"Review PR / Review PR","state":"IN_PROGRESS","workflow":"PR Review Agent"},
+  {"bucket":"pass","event":"pull_request","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/40344703165/job/121648412927","name":"Validate","state":"SUCCESS","workflow":"Self CI"},
+  {"bucket":"pass","event":"push","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/40344697230/job/121648392722","name":"Validate","state":"SUCCESS","workflow":"Self CI"}
+]
+```
+
+### Evidence: check-runs via gh api (conclusions)
+
+```
+command: gh api repos/RexiAI/my-engineering-standards/commits/de065b4bacdfefb96a4f82affbdb2f0cecdf5217/check-runs --jq '.check_runs[] | {id, name, status, conclusion, started_at, completed_at}'
+exit: 0
+at: 2026-10-26T15:09:55Z
+
+{"completed_at":null,"conclusion":null,"id":121649028121,"name":"Review PR / Review PR","started_at":"2026-10-26T14:59:31Z","status":"in_progress"}
+{"completed_at":"2026-10-26T15:02:10Z","conclusion":"success","id":121648412927,"name":"Validate","started_at":"2026-10-26T14:58:27Z","status":"completed"}
+{"completed_at":"2026-10-26T15:03:11Z","conclusion":"success","id":121648392722,"name":"Validate","started_at":"2026-10-26T14:58:26Z","status":"completed"}
+```
+
+### Evidence: "Check finished specs are archived" step
+
+Both Self CI `Validate` jobs on head `de065b4` conclude `success`; the
+`Check finished specs are archived` step reports `success` in both (the step
+this phase-2 run verifies — it fails if a finished spec dir survives
+un-archived):
+
+```
+command: gh run view 40344697230 --json jobs --jq '.jobs[] | {name, conclusion, steps: [.steps[] | {name, conclusion}]}'   (push Self CI)
+exit: 0
+at: 2026-10-26T15:09:55Z
+
+{"conclusion":"success","name":"Check finished specs are archived"}
+```
+
+```
+command: gh run view 40344703165 --json jobs --jq '.jobs[] | {name, conclusion, steps: [.steps[] | {name, conclusion}]}'   (pull_request Self CI)
+exit: 0
+at: 2026-10-26T15:09:55Z
+
+{"conclusion":"success","name":"Check finished specs are archived"}
+```
+
+Every step in both `Validate` jobs concludes `success`; no step concluded
+`failure` or `cancelled` in either run.
+
+### Verdict: PASS (head `de065b4`)
+
+Both Self CI checks on head `de065b4` — push (`Validate`, ID 121648392722) and
+pull_request (`Validate`, ID 121648412927) — report `success`. No failing check
+IDs to diagnose; nothing to fix. The pending `Review PR / Review PR` check is out
+of scope (separate non-blocking workflow) and remains `in_progress`; recorded,
+not a pass or fail.
