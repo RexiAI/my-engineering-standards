@@ -1,0 +1,23 @@
+# E2E pipeline — child-repo caller for the shared reusable workflow.
+#
+# Written by ./.standards/scripts/bootstrap.sh --with-e2e (capability
+# `gate-e2e`). Point `compose-file` at this repo's E2E compose file and
+# `suite` at the command that runs the suite.
+name: E2E tests
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-e2e.yml@__STANDARDS_PIN__ # pinned; bump deliberately, never track a branch
+    with:
+      compose-file: docker-compose.e2e.yml
+      target-url: http://localhost
+    secrets:
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}

@@ -1,0 +1,22 @@
+# Weekly E2E smoke — child-repo caller for the shared reusable workflow.
+#
+# Written by ./.standards/scripts/bootstrap.sh --with-e2e (capability
+# `gate-e2e`). Set the E2E_TARGET_URL repository variable to the environment
+# the weekly smoke test should hit.
+name: Weekly E2E
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-e2e-weekly.yml@__STANDARDS_PIN__ # pinned; bump deliberately, never track a branch
+    with:
+      target-url: ${{ vars.E2E_TARGET_URL }}
+    secrets:
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}

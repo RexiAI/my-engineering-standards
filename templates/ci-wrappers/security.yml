@@ -1,0 +1,29 @@
+# Security scans — child-repo caller for the shared reusable workflow.
+#
+# Written by ./.standards/scripts/bootstrap.sh --with-security
+# (capability `gate-security`). The reusable workflow itself lives in the
+# standards repo; this file is the caller GitHub requires, so the child does
+# not have to wire the job by hand.
+name: Security scans
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Caller-side cap (docs/SECURITY.md §CI/CD Supply Chain): the callee declares
+# contents: read + security-events: write for CodeQL uploads.
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  security:
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-security.yml@__STANDARDS_PIN__ # pinned; bump deliberately, never track a branch
+    with:
+      codeql-enabled: true
+      trivy-enabled: true
+    secrets:
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
