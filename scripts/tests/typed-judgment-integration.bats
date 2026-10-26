@@ -135,12 +135,20 @@ md_tracked_excluding() {
   grep_file "$AGENT" '"ambiguous"' 'BLOCKED'
 }
 
-@test "AC-028-35: spec-ux maps exit 10 (low confidence) to BLOCKED" {
-  grep_file "$AGENT" 'exit 10' 'BLOCKED'
+@test "AC-028-35: spec-ux routes exit 10 (low confidence) to the stock applicability check" {
+  # Amended by spec 034 / ADR 0012: the authoritative contract is exit 10 =
+  # "no fast-path exists -> run the stock procedure". The pre-034 assertion
+  # (exit 10 -> BLOCKED) encoded the defect this spec fixes.
+  grep_file "$AGENT" 'exit 10' 'Applicability check'
+  local branch
+  branch="$(awk '/\*\*exit 10\*\*/{f=1} f{print; n++} n>=8{exit}' "$AGENT")"
+  [[ "$branch" != *BLOCKED* ]]
 }
 
-@test "AC-028-36: spec-ux maps exit 10 (any fallback reason) to BLOCKED" {
-  grep_file "$AGENT" 'fallback' 'BLOCKED'
+@test "AC-028-36: spec-ux records a fallback reason on exit 10 and never blocks" {
+  # Amended by spec 034 / ADR 0012: fallback telemetry carries the four-way
+  # reason word; exit 10 never halts the pipeline.
+  grep_file "$AGENT" 'fallback' '"reason"' 'unconfigured' 'unreachable'
 }
 
 @test "AC-028-37: spec-ux bash permission allow-list includes scripts/typed-judgment.sh" {
@@ -576,11 +584,18 @@ config_threshold_value() {
   fi
 }
 
-@test "AC-029-74: consumer files carry zero changes from spec 029" {
-  # 029 adds nothing to the consumer files: working tree must equal HEAD for
-  # them (028's own edits are already inside HEAD; this is the 029-only delta
-  # contract, re-checked by the Verifier against the PR diff).
-  [ -z "$(git -C "$REPO_ROOT" diff HEAD -- skills/ci-triage/SKILL.md agents/spec-ux.md)" ]
+@test "AC-029-74: consumer-file deltas are documented by the in-flight spec" {
+  # Spec 029 added nothing to the consumer files. A later documented spec may
+  # change them — spec 034 fixes the exit-10 contract and must edit both — so
+  # the invariant becomes the AC-024-01-12 documented-change rule: a non-empty
+  # working-tree delta is allowed only while its spec is in flight and its ADR
+  # is present. After the change is committed the diff is empty and this test
+  # passes unchanged.
+  local diff_out
+  diff_out="$(git -C "$REPO_ROOT" diff HEAD -- skills/ci-triage/SKILL.md agents/spec-ux.md || true)"
+  [ -z "$diff_out" ] && return 0
+  [ -d "$REPO_ROOT/specs/034-judgment-preflight-fail-open" ]
+  [ -f "$REPO_ROOT/docs/adr/0012-judgment-consumer-contract-fail-open-preflight.md" ]
 }
 
 @test "unit: judgment-local-up.sh exists, is executable, parameterized per spike report" {

@@ -42,14 +42,22 @@ unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_COMMON_DIR \
 # asserting a precondition they never enforced, which made a red local suite
 # normal and eroded its signal.
 #
-# Unset exactly these four and nothing else:
+# Unset the judgment-layer variables (credentials, backend, cap, preflight,
+# and local-backend run-state) so every test starts from the same hermetic
+# baseline; tests that need one set it explicitly on the invocation under test.
 #   - GITHUB_TOKEN / GH_TOKEN must stay. Unsetting them was observed to break
 #     AC-030-01-06 ("required body sections present").
 #   - OPENCODE_API_KEY and SPEC_*_MODEL must stay; check-model-env.sh verifies
 #     their resolution and AC-030-07-03 asserts it exits 0.
 # Tests that need a judgment variable set it explicitly on the invocation under
 # test, which is unaffected by this.
-unset JUDGMENT_API_KEY JUDGMENT_MODEL JUDGMENT_BACKEND JUDGMENT_API_URL
+unset JUDGMENT_API_KEY JUDGMENT_MODEL JUDGMENT_BACKEND JUDGMENT_API_URL \
+      JUDGMENT_CAP_DIR JUDGMENT_DAILY_CAP JUDGMENT_MAX_STATE_BYTES \
+      JUDGMENT_MIN_CONFIDENCE JUDGMENT_TIMEOUT_SECONDS JUDGMENT_BACKOFF_SECONDS \
+      JUDGMENT_DEBUG JUDGMENT_REQUIRED JUDGMENT_PREFLIGHT_TTL_SECONDS \
+      JUDGMENT_LOCAL_RUN_DIR JUDGMENT_LOCAL_PORT JUDGMENT_LOCAL_PROCESSES \
+      JUDGMENT_LOCAL_UP_CMD JUDGMENT_LOCAL_HEALTH_PATH JUDGMENT_LOCAL_API_PATH \
+      JUDGMENT_LOCAL_HEALTH_HOST JUDGMENT_LOCAL_TIMEOUT_SECONDS JUDGMENT_KEV_DIR
 
 # Resolve repo root from helper location (scripts/tests/test_helper.bash → repo root)
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
