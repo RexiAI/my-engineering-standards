@@ -784,3 +784,90 @@ No commit, no push, no PR; `PR:` is appended by stage 5b.
 
 PR: https://github.com/RexiAI/my-engineering-standards/pull/104
 commit-count: 2 (branch head `fefddff` when the draft PR opened; this record commit is 3 on the branch)
+
+## Post-PR CI verification (round 1 of 3)
+
+Round 1 of 3. Post-PR CI check for PR #104, head
+`b5efac9924847660e599f8fd6220f0921b8dcd7b` (branch
+`spec/035-child-project-standards-updater`). Scope per the task: wait for Self CI
+on `b5efac9` (push and pull_request). A third check — `Review PR / Review PR`
+(workflow `PR Review Agent`, the spec-024 self-hosted review agent) — is also
+present on the head SHA and remained `in_progress`; it is a separate,
+non-blocking workflow (per `.github/workflows/pr-review.yml`: "Secret-guarded …
+check state 'skipped', never 'failure', so the PR's required checks are
+unaffected") and is out of scope for the Self CI verification. Recorded as
+pending, not a pass or fail.
+
+### Per-check table
+
+| Check | Workflow / event | Conclusion | Check-run ID |
+|---|---|---|---|
+| Validate | Self CI / push | success | 121644599467 |
+| Validate | Self CI / pull_request | success | 121644641895 |
+| Review PR / Review PR | PR Review Agent / pull_request | in_progress (pending) | 121645260738 |
+
+### Evidence: gh pr checks (bucket)
+
+```
+command: gh pr checks 104 --json name,state,bucket,workflow,link,event
+exit: 0
+at: 2026-10-26T14:56:35Z
+
+[
+  {"bucket":"pending","event":"pull_request","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/40343636041/job/121645260738","name":"Review PR / Review PR","state":"IN_PROGRESS","workflow":"PR Review Agent"},
+  {"bucket":"pass","event":"pull_request","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/40343635998/job/121644641895","name":"Validate","state":"SUCCESS","workflow":"Self CI"},
+  {"bucket":"pass","event":"push","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/40343624275/job/121644599467","name":"Validate","state":"SUCCESS","workflow":"Self CI"}
+]
+```
+
+### Evidence: check-runs via gh api (conclusions)
+
+```
+command: gh api repos/RexiAI/my-engineering-standards/commits/b5efac9924847660e599f8fd6220f0921b8dcd7b/check-runs --jq '.check_runs[] | {id, name, status, conclusion, started_at, completed_at}'
+exit: 0
+at: 2026-10-26T14:56:35Z
+
+{"completed_at":null,"conclusion":null,"id":121645260738,"name":"Review PR / Review PR","started_at":"2026-10-26T14:52:58Z","status":"in_progress"}
+{"completed_at":"2026-10-26T14:56:13Z","conclusion":"success","id":121644641895,"name":"Validate","started_at":"2026-10-26T14:51:54Z","status":"completed"}
+{"completed_at":"2026-10-26T14:56:01Z","conclusion":"success","id":121644599467,"name":"Validate","started_at":"2026-10-26T14:51:50Z","status":"completed"}
+```
+
+### Evidence: "Check finished specs are archived" step
+
+The `Check finished specs are archived` step is the one this phase-2 run
+verifies (it fails if a finished spec dir survives un-archived). Both Self CI
+runs report it `conclusion: success`:
+
+```
+command: gh run view 40343624275 --json jobs --jq '.jobs[] | {name, conclusion, steps: [.steps[] | {name, conclusion}]}'
+exit: 0
+at: 2026-10-26T14:56:35Z
+
+(push Self CI — step of interest, verbatim:)
+{"conclusion":"success","name":"Check finished specs are archived"}
+```
+
+```
+command: gh run view 40343635998 --json jobs --jq '.jobs[] | {name, conclusion, steps: [.steps[] | {name, conclusion}]}'
+exit: 0
+at: 2026-10-26T14:56:35Z
+
+(pull_request Self CI — step of interest, verbatim:)
+{"conclusion":"success","name":"Check finished specs are archived"}
+```
+
+Both Self CI `Validate` jobs conclude `success`; every step (including
+`Check finished specs are archived`, `Check spec audit trails`,
+`make validate-all`, `Run shell gate bats tests`, `Check scenario traceability
+(live tree)`) reports `success`. No step concluded `failure` or `cancelled` in
+either run.
+
+### Verdict: PASS
+
+Both Self CI checks on head `b5efac9` — push (`Validate`, ID 121644599467) and
+pull_request (`Validate`, ID 121644641895) — report `success`. The
+`Check finished specs are archived` step passes in both (the spec dir
+`specs/035-child-project-standards-updater/` is archived to this file). No
+failing check IDs to diagnose; nothing to fix. The pending `Review PR /
+Review PR` check is out of scope (separate non-blocking workflow) and remains
+`in_progress`; recorded, not a pass or fail.
