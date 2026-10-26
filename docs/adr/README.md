@@ -22,3 +22,4 @@ Proposed → Accepted → Deprecated → Superseded.
 | 0012 | [Structural cleanliness rules and opt-in god-file enforcement](0012-structural-cleanliness-gates.md) | Proposed |
 | 0013 | [Clean Code comment hygiene and naming gates](0013-clean-code-comment-gates.md) | Proposed |
 | 0014 | [Judgment consumer contract: exit-10 = stock procedure, fail-open preflight, payload cap, four-way fallback reasons](0014-judgment-consumer-contract-fail-open-preflight.md) | Accepted |
+| 0015 | [Autopilot mode: choose-default-record-continue for unattended pipeline queue runs](0015-autopilot-mode.md) | Accepted |
