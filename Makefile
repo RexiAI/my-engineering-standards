@@ -1,4 +1,4 @@
-.PHONY: help validate validate-docs validate-refs validate-all lint format stats test test-scripts test-shell test-java test-go test-js mutation property-tests ci-fast ci ci-full sync-qwen judgment-up judgment-down install-media uninstall-media smoke-media
+.PHONY: help validate validate-docs validate-refs validate-all lint format stats test test-scripts test-shell test-java test-go test-js mutation property-tests ci-fast ci ci-full sync-qwen judgment-up judgment-down judgment-status install-media uninstall-media smoke-media
 
 DOCS := AGENTS.md README.md \
   docs/AGENTS_AND_SKILLS.md \
@@ -176,5 +176,8 @@ judgment-up:     # Start the local judgment backend and print JUDGMENT_* env lin
 
 judgment-down:   # Stop the local judgment backend started by judgment-up
 	@./scripts/judgment-local-up.sh down
+
+judgment-status: # Report local backend liveness and payload fitness (small + cap-sized probes)
+	@./scripts/judgment-status.sh
 
 
