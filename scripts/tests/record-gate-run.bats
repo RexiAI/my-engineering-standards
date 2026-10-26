@@ -43,3 +43,33 @@ teardown() { teardown_tmpdir; }
   [[ "$stderr" == *"must be one of pass|fail|block"* ]]
   [ ! -s "$RUNS" ]
 }
+
+@test "AC-035-28 — the optional autopilot fields are accepted and appended unchanged" {
+  run env GATE_RUNS_FILE="$RUNS" bash "$REPO_ROOT/scripts/record-gate-run.sh" -record \
+    '{"specSlug":"001-x","gatesFailed":[],"warnings":[],"durationSec":1.0,"outcome":"pass","autopilot":true,"autoDecisions":3,"stopReason":"phase-1 budget exhausted"}'
+  [ "$status" -eq 0 ]
+  [ "$(wc -l < "$RUNS" | tr -d ' ')" -eq 1 ]
+  grep -qF '"autopilot":true' "$RUNS"
+  grep -qF '"autoDecisions":3' "$RUNS"
+  grep -qF '"stopReason":"phase-1 budget exhausted"' "$RUNS"
+}
+
+@test "AC-035-29 — invalid autopilot field values are rejected, naming the field, appending nothing" {
+  run --separate-stderr env GATE_RUNS_FILE="$RUNS" bash "$REPO_ROOT/scripts/record-gate-run.sh" -record \
+    '{"specSlug":"001-x","gatesFailed":[],"warnings":[],"durationSec":1.0,"outcome":"pass","autopilot":"maybe"}'
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"autopilot"* ]]
+  [ ! -s "$RUNS" ]
+
+  run --separate-stderr env GATE_RUNS_FILE="$RUNS" bash "$REPO_ROOT/scripts/record-gate-run.sh" -record \
+    '{"specSlug":"001-x","gatesFailed":[],"warnings":[],"durationSec":1.0,"outcome":"pass","autoDecisions":"three"}'
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"autoDecisions"* ]]
+  [ ! -s "$RUNS" ]
+
+  run --separate-stderr env GATE_RUNS_FILE="$RUNS" bash "$REPO_ROOT/scripts/record-gate-run.sh" -record \
+    '{"specSlug":"001-x","gatesFailed":[],"warnings":[],"durationSec":1.0,"outcome":"pass","stopReason":""}'
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"stopReason"* ]]
+  [ ! -s "$RUNS" ]
+}

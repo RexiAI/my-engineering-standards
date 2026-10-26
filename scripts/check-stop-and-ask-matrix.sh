@@ -8,7 +8,7 @@
 # This script mechanically verifies spec 009:
 #
 #   AC-009-01  docs/SPEC_PIPELINE.md contains the `## Stop-and-Ask decision
-#              matrix` section: authoritative declaration, all 11 condition
+#              matrix` section: authoritative declaration, all 12 condition
 #              rows with deterministic actions, the dirty-tree STOP semantics,
 #              and no Confluence reference.
 #   AC-009-02  each of the 9 pipeline agents references the matrix section
@@ -20,6 +20,14 @@
 #   AC-009-04  this script exists, is executable, is read-only, and cites every
 #              AC-009-NN-NN scenario ID in its PASS/FAIL output so
 #              scripts/check-scenario-traceability.sh resolves each to a test.
+#
+# Spec 035 extends the gate with the autopilot contract:
+#   AC-035-30  docs/SPEC_PIPELINE.md contains the `## Autopilot mode` section
+#   AC-035-31  every one of the 12 matrix conditions has an autopilot
+#              disposition in that section (the row list is reconciled to 12,
+#              adding the `Deploy verification fails` row spec 031 introduced)
+#   AC-035-32  no pipeline agent carries an unconditional question instruction
+#              without referencing the `Autopilot mode` conversion
 #
 # Usage:
 #   scripts/check-stop-and-ask-matrix.sh [ROOT]
@@ -72,18 +80,32 @@ GATE_PATHS=(
   ".eslintrc.json"
 )
 
+# Unconditional question instructions an agent may carry (AC-035-32). `BLOCKED —`
+# is a literal uppercase marker: matched case-sensitively so prose like
+# "BLOCKed — from" does not trip the gate. The prose phrases match
+# case-insensitively.
+QUESTION_PHRASES=(
+  'BLOCKED —'
+  'ask the user'
+  'stop and ask'
+  'ask one specific question'
+  'ask one question'
+  'Ask for the absolute path'
+)
+
 VIOLATIONS=0
 fail() { echo -e "${RED}FAIL${NC} $*"; VIOLATIONS=$((VIOLATIONS + 1)); }
 pass() { echo -e "${GREEN}PASS${NC} $*"; }
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
-# extract_matrix_section <file> — print the body of the Stop-and-Ask section:
-# everything between the matrix heading and the next `## ` heading.
-extract_matrix_section() {
-  awk '
+# extract_section <file> <heading> — print the body of a `## ` section: every
+# line between <heading> and the next `## ` heading. Used for both the
+# Stop-and-Ask matrix and the `## Autopilot mode` section (spec 035).
+extract_section() {
+  awk -v heading="$2" '
     /^## / { if (sec) exit }
-    /^## Stop-and-Ask decision matrix$/ { sec=1; next }
+    $0 == heading { sec=1; next }
     sec { print }
   ' "$1"
 }
@@ -133,6 +155,82 @@ edit_effective_action() {
   printf 'ask'
 }
 
+# check_autopilot_section — AC-035-30: the `## Autopilot mode` section exists;
+# its body is captured in AUTOPILOT_SECTION for the disposition check.
+check_autopilot_section() {
+  if grep -qxF -- '## Autopilot mode' "$PIPELINE_DOC"; then
+    AUTOPILOT_SECTION="$(extract_section "$PIPELINE_DOC" '## Autopilot mode')"
+    pass "AC-035-30 — '## Autopilot mode' section present in docs/SPEC_PIPELINE.md"
+  else
+    fail "AC-035-30 — docs/SPEC_PIPELINE.md is missing the '## Autopilot mode' section"
+  fi
+}
+
+# autopilot_disposition <condition> — the autopilot disposition cell for
+# <condition>, empty when the row or the cell is missing.
+autopilot_disposition() {
+  local row
+  row="$(printf '%s\n' "$AUTOPILOT_SECTION" | grep -F -- "$1" | grep '^|' | head -1 || true)"
+  [ -n "$row" ] || return 0
+  printf '%s' "$row" | awk -F'|' 'NF >= 3 { gsub(/^[ \t]+|[ \t]+$/, "", $3); print $3 }'
+}
+
+# check_autopilot_dispositions — AC-035-31: every one of the 12 matrix
+# conditions has a non-empty autopilot disposition.
+check_autopilot_dispositions() {
+  local i cond disposition ok=1
+  for i in "${!ROW_CONDITIONS[@]}"; do
+    cond="${ROW_CONDITIONS[$i]}"
+    disposition="$(autopilot_disposition "$cond")"
+    if [ -z "$disposition" ] || [ "$disposition" = '---' ]; then
+      fail "AC-035-31 — no autopilot disposition for matrix condition [$cond]"
+      ok=0
+    fi
+  done
+  if [ "$ok" -eq 1 ]; then
+    pass "AC-035-31 — all 12 matrix conditions have an autopilot disposition"
+  else
+    fail "AC-035-31 — at least one of the 12 matrix conditions has no autopilot disposition"
+  fi
+}
+
+# first_question_phrase <file> — the first forbidden unconditional question
+# phrase the file uses, empty when it uses none.
+first_question_phrase() {
+  local candidate
+  for candidate in "${QUESTION_PHRASES[@]}"; do
+    if [ "$candidate" = 'BLOCKED —' ]; then
+      grep -qF -- "$candidate" "$1" || continue
+    else
+      grep -qiF -- "$candidate" "$1" || continue
+    fi
+    printf '%s' "$candidate"
+    return 0
+  done
+  return 0
+}
+
+# check_unconditional_questions — AC-035-32: no pipeline agent carries an
+# unconditional question instruction without referencing the autopilot
+# conversion.
+check_unconditional_questions() {
+  local f phrase ok=1
+  for f in "${AGENT_FILES[@]}"; do
+    [ -f "$AGENT_DIR/$f" ] || continue
+    phrase="$(first_question_phrase "$AGENT_DIR/$f")"
+    [ -n "$phrase" ] || continue
+    if ! grep -qF -- 'Autopilot mode' "$AGENT_DIR/$f"; then
+      fail "AC-035-32 — $f contains the unconditional question phrase [$phrase] with no 'Autopilot mode' conversion reference"
+      ok=0
+    fi
+  done
+  if [ "$ok" -eq 1 ]; then
+    pass "AC-035-32 — no pipeline agent carries an unconditional question instruction"
+  else
+    fail "AC-035-32 — at least one pipeline agent may still ask unconditionally in autopilot"
+  fi
+}
+
 # ── Check 1: matrix section in docs/SPEC_PIPELINE.md ─────────────────────────
 SECTION_OK=1
 if grep -q '^## Stop-and-Ask decision matrix$' "$PIPELINE_DOC"; then
@@ -142,7 +240,7 @@ else
   SECTION_OK=0
 fi
 
-SECTION=$(extract_matrix_section "$PIPELINE_DOC")
+SECTION=$(extract_section "$PIPELINE_DOC" '## Stop-and-Ask decision matrix')
 
 # AC-009-01-02 — the section declares the matrix authoritative.
 if [ "$SECTION_OK" -eq 1 ] \
@@ -153,7 +251,7 @@ else
   fail "AC-009-01-02 — section must state the matrix is authoritative and resolved per the matrix, never by improvisation"
 fi
 
-# AC-009-01-03 — all 11 rows present verbatim (condition text + deterministic
+# AC-009-01-03 — all 12 rows present verbatim (condition text + deterministic
 # action), per the matrix table in docs/SPEC_PIPELINE.md.
 ROW_CONDITIONS=(
   'Working tree dirty'
@@ -166,6 +264,7 @@ ROW_CONDITIONS=(
   'Out-of-scope finding'
   'Acceptance criteria ambiguous'
   'Verifier verdict FAIL'
+  'Deploy verification fails'
   'PR Opener precondition fails (branch not `spec/NNN-slug`, or `30-report.md` missing/not green)'
 )
 ROW_ACTIONS=(
@@ -179,6 +278,7 @@ ROW_ACTIONS=(
   'Record it (Verifier: `25-verification.md`); do not fix; propose a follow-up spec'
   'Resolve before delegating implementation — stop and ask one specific question'
   'STOP the pipeline; relay the report; do not run stage-5 agents; do not fix it yourself'
+  'Route per fix-routing rule; on ambiguous failure, STOP and escalate to human; never guess'
   'STOP; commit nothing, push nothing'
 )
 
@@ -194,9 +294,9 @@ for i in "${!ROW_CONDITIONS[@]}"; do
   fi
 done
 if [ "$ROWS_OK" -eq 1 ]; then
-  pass "AC-009-01-03 — all 11 conditions present with their deterministic actions"
+  pass "AC-009-01-03 — all 12 conditions present with their deterministic actions"
 else
-  fail "AC-009-01-03 — at least one of the 11 matrix rows is missing or altered"
+  fail "AC-009-01-03 — at least one of the 12 matrix rows is missing or altered"
 fi
 
 # AC-009-01-04 — no Confluence reference inside the matrix section.
@@ -321,7 +421,15 @@ fi
 
 echo ""
 
-# ── Check 4: the check script itself ─────────────────────────────────────────
+# ── Check 4: autopilot contract (spec 035) ───────────────────────────────────
+AUTOPILOT_SECTION=""
+check_autopilot_section
+check_autopilot_dispositions
+check_unconditional_questions
+
+echo ""
+
+# ── Check 5: the check script itself ─────────────────────────────────────────
 if [ -x "$SELF_SCRIPT" ]; then
   pass "AC-009-04-01 — scripts/check-stop-and-ask-matrix.sh exists and is executable"
 else

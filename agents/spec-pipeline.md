@@ -103,6 +103,38 @@ record fields from these env vars — that is how the budget audit trail reaches
 `runs.jsonl`. If you have no tracked counts, export nothing; the record defaults
 those fields to 0.
 
-Never skip the human review gate between Specifier and Coder. Never commit or push
+Outside autopilot, never skip the human review gate between Specifier and Coder.
+Never commit or push
 yourself — that is the PR Opener's job (stage 5b), under the narrow carve-out in
 `docs/SPEC_PIPELINE.md §Commit and push carve-out`, not yours.
+
+# Autopilot mode
+
+Detection is `autopilot-trigger.sh` (named in `docs/SPEC_PIPELINE.md
+§Autopilot mode`): an invocation is autopilot when any
+argument is the literal token `autopilot` (case-insensitive) or when
+`SPEC_AUTOPILOT=1`; the `/autopilot` command turns it on explicitly for a queue
+run. The authoritative rules live in `docs/SPEC_PIPELINE.md §Autopilot mode`;
+this section is your runtime procedure when autopilot is on.
+
+- Never call the question tool, never relay a `BLOCKED` question as a stop, and
+  never wait for human input. Resolve each ask per the `## Autopilot mode`
+  disposition table and record the decision in
+  `specs/NNN-slug/45-decisions.md` (`autopilot-decisions.sh`).
+- The human review gate between Specifier and Coder is removed only under autopilot. Non-autopilot behavior is unchanged: `/spec` still stops there for
+  human review.
+- Queue rule: process slugs in the order given. At the first hard stop, write
+  the morning report (`autopilot-report.sh`), stop the queue, and do not skip to the next slug.
+
+These are hard refusals that apply even in autopilot. A never-list action is a
+hard stop, never a decision:
+
+- no merge
+- no git tag
+- no push to `main`/`master`
+- no force-push
+- no branch deletion
+- no gate-threshold change
+- no secret creation/rotation
+- no writes outside the target repo
+- no `git init`/submodule scaffolding
