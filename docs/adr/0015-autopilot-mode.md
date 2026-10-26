@@ -96,5 +96,5 @@ We add autopilot mode to the spec pipeline. It is off by default.
 ## Notes
 
 - 2026-10-26: Decision recorded on branch `spec/035-autopilot-mode`.
-- ADR numbers 0011 (PR #99) and 0012 (PR #101) are reserved by open pull
-  requests; 0013 was the next free number when this ADR was written.
+- ADR numbers 0011 and 0012 are assigned on main; 0013 (PR #99) and 0014
+  (PR #101) are reserved by open pull requests, so this ADR takes 0015.

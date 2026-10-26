@@ -98,7 +98,7 @@ SDLC and find out any gap [without] asking. This is important for nights."
 
 ## Decisions taken under autopilot while writing this spec
 
-- ADR 0013 is required (pipeline-role change); 0011 is reserved by PR #99, 0012 by
+- ADR 0015 is required (pipeline-role change); 0011 is reserved by PR #99, 0012 by
   PR #101.
 - Decision artifact number is `45-decisions.md` so it never collides with the
   fixed 00/10/15/20/25/30/40 sequence.
@@ -282,16 +282,16 @@ Shell tests for every scenario above.
 - A repo-level static assertion test (AC-035-36) greps all 9 pipeline agents plus `spec-pipeline.md` and asserts none contains an unconditional question path: `scripts/check-stop-and-ask-matrix.sh` exits 0 against the real repo.
 - `make test-scripts` (bats) and `scripts/check-scenario-traceability.sh` both pass.
 
-## Task 13 — ADR 0013 (mandatory)
+## Task 13 — ADR 0015 (mandatory)
 
 **Verifies:** AC-035-37, AC-035-38
 
 This is a pipeline-role change; an ADR is required, not optional.
 
-- Write `docs/adr/0013-autopilot-mode.md` following `templates/ADR.md`: `## Status: Accepted`, plus `## Context`, `## Decision`, `### Alternatives Considered` (table), `## Consequences`, `## Compliance` (naming `check-stop-and-ask-matrix.sh` and `check-audit-trail.sh` as the enforcement), and `## Notes`.
+- Write `docs/adr/0015-autopilot-mode.md` following `templates/ADR.md`: `## Status: Accepted`, plus `## Context`, `## Decision`, `### Alternatives Considered` (table), `## Consequences`, `## Compliance` (naming `check-stop-and-ask-matrix.sh` and `check-audit-trail.sh` as the enforcement), and `## Notes`.
 - The decision states the trigger, the ask→decide conversion, that stops stay stops, the never-list, and the `45-decisions.md` + morning-report artifacts.
-- Add a row for ADR 0013 to the index table in `docs/adr/README.md` with a title and `Accepted` status.
-- Record in Notes: the reservation of 0011 (PR #99) and 0012 (PR #101) and that 0013 is the next free number.
+- Add a row for ADR 0015 to the index table in `docs/adr/README.md` with a title and `Accepted` status.
+- Record in Notes: the reservation of 0011 (PR #99) and 0012 (PR #101) and that 0015 is the next free number.
 
 ---
 
@@ -415,8 +415,8 @@ Checking bats assertions are not vacuous...
 PASS check-bats-assertions: 65 bats file(s), no vacuous assertions.
 Running bats tests (TAP)...
 1..529
-ok 167 AC-035-37 — ADR 0013 exists, follows the template, and records every required decision
-ok 168 AC-035-38 — ADR 0013 is indexed with a title and Accepted status
+ok 167 AC-035-37 — ADR 0015 exists, follows the template, and records every required decision
+ok 168 AC-035-38 — ADR 0015 is indexed with a title and Accepted status
 ok 169 AC-035-06 — /autopilot runs one slug unattended with autopilot on and no human gate
 ok 170 AC-035-07 — /autopilot with several slugs is an ordered queue of independent runs
 ok 171 AC-035-08 — /autopilot with no slugs prints usage and stops without guessing
@@ -622,7 +622,7 @@ production file maps to a task — `scripts/autopilot-trigger.sh` (Task 1),
 `scripts/autopilot-decisions.sh` (Task 6), `scripts/autopilot-report.sh` (Task 7),
 `scripts/autopilot-preflight.sh` (Task 8), `scripts/record-gate-run.sh` (Task 9),
 `scripts/check-stop-and-ask-matrix.sh` (Task 10), `scripts/check-audit-trail.sh`
-(Task 11), the bats suite (Task 12), `docs/adr/0013-autopilot-mode.md` +
+(Task 11), the bats suite (Task 12), `docs/adr/0015-autopilot-mode.md` +
 `docs/adr/README.md` (Task 13). Two changes deserve an explicit justification and are
 accounted for:
 
@@ -796,15 +796,15 @@ failure (`preflight: <reason>` to stderr, non-zero, later checks do not run).
 optional judgment backend is probed only against `http://127.0.0.1:1` (instant refusal).
 No test invokes live `gh`, and the suite passed in both full runs. AC-035-24..27 pass.
 
-### ADR 0013
+### ADR 0015
 
-`docs/adr/0013-autopilot-mode.md` exists and carries `## Title`, `## Status` (body
+`docs/adr/0015-autopilot-mode.md` exists and carries `## Title`, `## Status` (body
 `Accepted`), `## Context`, `## Decision`, `### Alternatives Considered` (table),
 `## Consequences`, `## Compliance` (naming `check-stop-and-ask-matrix.sh` and
 `check-audit-trail.sh`), and `## Notes`. `docs/adr/README.md` has the row
-`| 0013 | [Autopilot mode: choose-default-record-continue for unattended pipeline queue runs](0013-autopilot-mode.md) | Accepted |`.
+`| 0015 | [Autopilot mode: choose-default-record-continue for unattended pipeline queue runs](0015-autopilot-mode.md) | Accepted |`.
 It does not reuse 0011/0012: no `0011-*` or `0012-*` file exists, and the Notes record
-that 0011 (PR #99) and 0012 (PR #101) are reserved, with 0013 the next free number.
+that 0011 (PR #99) and 0012 (PR #101) are reserved, with 0015 the next free number.
 AC-035-37/38 pass.
 
 ---
