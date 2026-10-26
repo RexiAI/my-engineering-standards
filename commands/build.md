@@ -5,6 +5,17 @@ agent: spec-pipeline
 
 Run stages 2-5 of the spec pipeline (`docs/SPEC_PIPELINE.md`) for: `specs/$ARGUMENTS/`
 
+# Autopilot detection
+
+Before delegating, run `autopilot-trigger.sh $ARGUMENTS` (named in
+`docs/SPEC_PIPELINE.md §Autopilot mode`). When it prints
+`autopilot`, remove the literal token from the arguments and run stages 2-5 in
+autopilot (`docs/SPEC_PIPELINE.md §Autopilot mode`): `spec-coder`,
+`spec-refactorer`, `spec-verifier`, and the stage-5 agents resolve every ask per
+the autopilot disposition and never emit a `BLOCKED` question; they never wait for input.
+When it prints `normal`, behavior is unchanged. Detection is delegated to
+the script; do not re-implement the token match here.
+
 Confirm `specs/$ARGUMENTS/10-tasks.md` and `specs/$ARGUMENTS/20-acceptance/` exist.
 If not, tell the user to run `/spec $ARGUMENTS` first and stop.
 

@@ -81,3 +81,13 @@ the frontend missing-artifact rule by pipeline stage:
   (stacked on spec 031's lane, PR #93). The instruction carrier is
   `docs/SPEC_PIPELINE.md`, not `agents/spec-pr-opener.md`, to avoid colliding
   with the `check-pr-review.sh` base-ref fix landing on PR #95.
+- 2026-10-26: the deferred carrier update landed. `agents/spec-pr-opener.md`
+  now documents the two invocations explicitly — 5b runs
+  `check-audit-trail.sh <slug>` flagless, commits, pushes, opens the draft PR
+  and records the `PR:` line; 5d runs `check-audit-trail.sh --require-deploy
+  <slug>`, then `archive-spec.sh`, then `check-specs-archived.sh` pre-push,
+  then commits and pushes the archive. The doc had still described the pre-031
+  flow (archive at 5b), which contradicted this decision and would have deleted
+  the `specs/NNN-slug/` folder stage 5c writes `40-deploy.md` into. Both stages
+  are stated to act under the same commit-and-push carve-out
+  (`docs/SPEC_PIPELINE.md §Commit and push carve-out`).

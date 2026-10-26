@@ -586,16 +586,20 @@ config_threshold_value() {
 
 @test "AC-029-74: consumer-file deltas are documented by the in-flight spec" {
   # Spec 029 added nothing to the consumer files. A later documented spec may
-  # change them — spec 034 fixes the exit-10 contract and must edit both — so
-  # the invariant becomes the AC-024-01-12 documented-change rule: a non-empty
-  # working-tree delta is allowed only while its spec is in flight and its ADR
-  # is present. After the change is committed the diff is empty and this test
-  # passes unchanged.
+  # change them — spec 034 fixes the exit-10 contract, spec 035 adds the
+  # autopilot conversion — so the invariant is the AC-024-01-12 documented-change
+  # rule: a non-empty working-tree delta is allowed only while its spec is in
+  # flight and its ADR is present. After the change is committed the diff is
+  # empty and this test passes unchanged.
   local diff_out
   diff_out="$(git -C "$REPO_ROOT" diff HEAD -- skills/ci-triage/SKILL.md agents/spec-ux.md || true)"
   [ -z "$diff_out" ] && return 0
-  [ -d "$REPO_ROOT/specs/034-judgment-preflight-fail-open" ]
-  [ -f "$REPO_ROOT/docs/adr/0014-judgment-consumer-contract-fail-open-preflight.md" ]
+  if [ -d "$REPO_ROOT/specs/034-judgment-preflight-fail-open" ] &&
+     [ -f "$REPO_ROOT/docs/adr/0014-judgment-consumer-contract-fail-open-preflight.md" ]; then
+    return 0
+  fi
+  [ -d "$REPO_ROOT/specs/035-autopilot-mode" ]
+  [ -f "$REPO_ROOT/docs/adr/0015-autopilot-mode.md" ]
 }
 
 @test "unit: judgment-local-up.sh exists, is executable, parameterized per spike report" {

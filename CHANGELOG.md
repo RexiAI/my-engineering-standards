@@ -1,3 +1,15 @@
+# [1.45.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.44.0...v1.45.0) (2026-10-26)
+
+
+### Bug Fixes
+
+* clear pre-existing complexity FAIL, restore exec bit, correct README envrc path ([#103](https://github.com/RexiAI/my-engineering-standards/issues/103)) ([c03c0a4](https://github.com/RexiAI/my-engineering-standards/commit/c03c0a49848679106f9bf332bb995ba49660448e))
+
+
+### Features
+
+* autopilot mode for the spec pipeline (035) ([#102](https://github.com/RexiAI/my-engineering-standards/issues/102)) ([4d2dbfb](https://github.com/RexiAI/my-engineering-standards/commit/4d2dbfbd55c4eee0b1c99acbed654e9cf5458cc9))
+
 # [1.44.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.43.0...v1.44.0) (2026-10-26)
 
 

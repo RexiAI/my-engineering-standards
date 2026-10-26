@@ -17,7 +17,7 @@ One-time setup per machine:
 
 ```bash
 eval "$(direnv hook bash)"          # wire the hook once in your shell profile
-cp templates/.envrc.example .envrc  # per-machine copy, gitignored
+cp ./.standards/templates/.envrc.example .envrc  # per-machine copy, gitignored
 direnv allow                        # load it at the repo root
 ```
 

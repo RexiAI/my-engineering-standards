@@ -60,7 +60,7 @@ specs/NNN-slug/                          ← PR branch only, gone on main
   30-report.md          architect: mutation score, complexity, gate results, remediation record
   40-deploy.md          deploy verifier: deploy evidence — deploy URL, build status, health check status, E2E verdict (frontend lanes; a recorded skip reason otherwise)
 
-docs/changes/NNN-slug.md                 ← long-lived, on main, written by stage 5b via archive-spec.sh
+docs/changes/NNN-slug.md                 ← long-lived, on main, written by stage 5d via archive-spec.sh
 ```
 
 `NNN` is a zero-padded 3-digit sequence, e.g. `001-discount-system`.
@@ -359,6 +359,79 @@ listed conditions per the matrix, never by improvisation.
 | Verifier verdict FAIL | STOP the pipeline; relay the report; do not run stage-5 agents; do not fix it yourself |
 | Deploy verification fails | Route per fix-routing rule; on ambiguous failure, STOP and escalate to human; never guess |
 | PR Opener precondition fails (branch not `spec/NNN-slug`, or `30-report.md` missing/not green) | STOP; commit nothing, push nothing |
+
+## Autopilot mode
+
+Autopilot turns every "stop and ask" in this document into "choose the
+documented default, record it, continue". Stops stay stops and the never-list
+stays never. It is off by default; non-autopilot behavior is unchanged.
+
+**Trigger.** An invocation is autopilot when any single argument is the literal
+token `autopilot` (case-insensitive), or when `SPEC_AUTOPILOT=1` — the literal
+string `1` is the only truthy value. The `/autopilot` command turns it on
+explicitly for a queue run. Detection is delegated to
+`scripts/autopilot-trigger.sh`; commands and agents must not re-implement the
+match, and there is no `--autopilot` flag.
+
+**No questions.** In autopilot, no stage calls the question tool, emits
+`BLOCKED — <question>` as a stop, or waits for human input. Every ask row below
+becomes: choose the documented default, record it, continue.
+
+| Condition | Autopilot disposition |
+|---|---|
+| Working tree dirty | Continue only if every dirty path is inside the current spec folder, else STOP |
+| Repo not found after discovery (wrong directory, `.standards/` submodule missing) | Use the current working directory when it is a git work tree, else STOP |
+| Spec artifacts not found (`/build` without `10-tasks.md` / `20-acceptance/`) | If `00-informal.md` exists, run stage 1 and continue, else STOP |
+| Project type ambiguous (language stack / conformance tier undetectable) | Choose `mvp` and the detected language, record the decision, continue |
+| Version bump / git tag not requested | Never, unchanged — CI (Semantic Release) owns versioning |
+| A design gate blocks (complexity ≤6, `check-code-principles.sh` FAIL, mutation below threshold) | Fix the code, never the threshold, unchanged |
+| Design gate WARN (not FAIL) | Record it, unchanged |
+| Out-of-scope finding | Record it and propose a follow-up spec, unchanged |
+| Acceptance criteria ambiguous | Choose the most conservative reversible option, record it, continue |
+| Verifier verdict FAIL | Bounded 3-cycle remediation, then STOP |
+| Deploy verification fails | Bounded 3 attempts, then STOP |
+| PR Opener precondition fails (branch not `spec/NNN-slug`, or `30-report.md` missing/not green) | Create `spec/NNN-slug` from current HEAD if the branch is the only failure; never push `main`; STOP if the report is not green |
+
+### Hard stops
+
+These are the only stops autopilot keeps. Autopilot never converts a hard stop into a guess:
+
+1. dirty tree outside the current spec folder
+2. no repo / no `00-informal.md` / no way to establish requirements
+3. phase-1 or phase-2 budget exhausted
+4. deploy failure after 3 attempts
+5. `30-report.md` missing or not green at PR time
+6. any never-list action
+
+### Never-list
+
+These are refusals, not decisions — autopilot never resolves them by choosing:
+
+- no merge
+- no git tag
+- no push to `main`/`master`
+- no force-push
+- no branch deletion
+- no gate-threshold change
+- no secret creation/rotation
+- no writes outside the target repo
+- no `git init`/submodule scaffolding
+
+### Recording decisions
+
+Each resolved ask gets one entry in `specs/NNN-slug/45-decisions.md` with six
+labelled lines: `Condition:`, `Options:`, `Chosen:`, `Why:`, `Reversibility:`,
+and `At:` — an ISO-8601 UTC timestamp `YYYY-MM-DDTHH:MM:SSZ`. A run that
+resolves nothing writes the single line `No autopilot decisions were required`.
+`30-report.md` carries `Autopilot: true` and `Autopilot decisions: N`, where N
+is the entry count in `45-decisions.md`. `scripts/autopilot-decisions.sh` is the
+deterministic writer for both artifacts.
+
+A queue run writes a morning report — `docs/changes/autopilot-YYYY-MM-DD.md`
+when it opened at least one PR, `specs/autopilot-YYYY-MM-DD.md` when it opened
+none — with one status block per spec in queue order. `scripts/autopilot-report.sh`
+writes it deterministically, even when the queue stops at the first hard stop.
+At a hard stop the queue stops; it does not skip to the next slug.
 
 ## Commit and push carve-out
 

@@ -201,6 +201,15 @@ Do not touch `00-informal.md`, `10-tasks.md`, or `20-acceptance/`.
   tool" but does not specify web vs CLI), ask one question per the skill's Section 0.C
   discipline — exactly one, not a dump — then stop and wait. Do not guess.
 
+# Autopilot mode
+
+When autopilot is on (`docs/SPEC_PIPELINE.md §Autopilot mode`), the ask above is
+not a stop. Resolve the applicability call per the `## Autopilot mode` disposition
+table — choose the most conservative reversible option, record the decision in
+`specs/NNN-slug/45-decisions.md`, and continue. Never call the question tool and
+never wait for human input in autopilot; the human review gate is removed only by
+autopilot.
+
 # Output (end of turn)
 
 End your turn with one of:
