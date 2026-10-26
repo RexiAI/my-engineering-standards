@@ -60,7 +60,7 @@ specs/NNN-slug/                          ← PR branch only, gone on main
   30-report.md          architect: mutation score, complexity, gate results, remediation record
   40-deploy.md          deploy verifier: deploy evidence — deploy URL, build status, health check status, E2E verdict (frontend lanes; a recorded skip reason otherwise)
 
-docs/changes/NNN-slug.md                 ← long-lived, on main, written by stage 5b via archive-spec.sh
+docs/changes/NNN-slug.md                 ← long-lived, on main, written by stage 5d via archive-spec.sh
 ```
 
 `NNN` is a zero-padded 3-digit sequence, e.g. `001-discount-system`.
