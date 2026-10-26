@@ -601,7 +601,6 @@ config_threshold_value() {
   [ -d "$REPO_ROOT/specs/035-autopilot-mode" ]
   [ -f "$REPO_ROOT/docs/adr/0015-autopilot-mode.md" ]
 }
-}
 
 @test "unit: judgment-local-up.sh exists, is executable, parameterized per spike report" {
   [ -x "$UP_SCRIPT" ]
