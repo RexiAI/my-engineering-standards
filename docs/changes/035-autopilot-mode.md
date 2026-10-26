@@ -1133,3 +1133,25 @@ Verdict: SKIPPED — Non-frontend repo — deploy verification not applicable
 ## 45-decisions.md
 
 No autopilot decisions were required
+
+## Phase-2 CI verification (round 1)
+
+command: gh pr checks 102 --json name,state,bucket,workflow,link
+exit: 0
+at: 2026-10-26T08:44:42Z
+
+```
+[{"bucket":"pass","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/40294012592/job/121475556382","name":"Validate","state":"SUCCESS","workflow":"Self CI"}]
+```
+
+command: gh api repos/RexiAI/my-engineering-standards/commits/c8904000dec3fb0a8b42c5cd22db3e881491e6b5/check-runs --jq '.check_runs[]|"\(.name) \(.conclusion) \(.id)"'
+exit: 0
+at: 2026-10-26T08:44:42Z
+
+```
+Validate success 121475556382
+```
+
+Step "Check finished specs are archived": success. Run 40294012592 (push, c890400): success. Only a push-event run exists for this SHA; no pull_request-event run was listed.
+
+Verdict: PASS (round 1)
