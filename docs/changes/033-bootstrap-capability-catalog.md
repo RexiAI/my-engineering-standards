@@ -1485,3 +1485,64 @@ invocation exit 0 with this artifact present and non-empty.
   artifact satisfies it because the flag is non-frontend-behavior-independent.
 
 Verdict: SKIPPED — Non-frontend repo — deploy verification not applicable
+
+---
+
+## Phase-2 CI verification (round 1)
+
+Round 1 of 3. Post-PR CI check on head
+`2393d4348156fbd4bfe34c656e235fd2da705700` (branch
+`spec/033-bootstrap-capability-catalog`), PR #100.
+
+## Evidence: post-PR CI check-runs
+
+command: gh api repos/RexiAI/my-engineering-standards/commits/2393d4348156fbd4bfe34c656e235fd2da705700/check-runs --jq '.check_runs[] | "\(.id)\t\(.name)\t\(.status)\t\(.conclusion)"'
+exit: 0
+at: 2026-10-26T01:35:16Z
+
+121339867606	Review PR / Review PR	in_progress	null
+121339804058	Validate	completed	success
+121339789908	Validate	completed	success
+
+## Evidence: post-PR CI pr checks
+
+command: gh pr checks 100 --json name,state,bucket,workflow
+exit: 0
+at: 2026-10-26T01:35:16Z
+
+[{"bucket":"pending","name":"Review PR / Review PR","state":"IN_PROGRESS","workflow":"PR Review Agent"},{"bucket":"pass","name":"Validate","state":"SUCCESS","workflow":"Self CI"},{"bucket":"pass","name":"Validate","state":"SUCCESS","workflow":"Self CI"}]
+
+## Evidence: previously-red step "Check finished specs are archived"
+
+command: gh run view 40250057971 --json jobs --jq '.jobs[].steps[] | select(.name=="Check finished specs are archived") | "\(.name)\t\(.conclusion)"' && gh run view 40250062742 --json jobs --jq '.jobs[].steps[] | select(.name=="Check finished specs are archived") | "\(.name)\t\(.conclusion)"'
+exit: 0
+at: 2026-10-26T01:35:16Z
+
+(push run 40250057971)
+Check finished specs are archived	success
+(pull_request run 40250062742)
+Check finished specs are archived	success
+
+## Per-check table
+
+| Check ID | Name | Workflow | Status | Conclusion | Verdict |
+|---|---|---|---|---|---|
+| 121339789908 | Validate | Self CI (push) | completed | success | **PASS** |
+| 121339804058 | Validate | Self CI (pull_request) | completed | success | **PASS** |
+| 121339867606 | Review PR / Review PR | PR Review Agent | in_progress | null | **PENDING** (not a Self CI gate; separate non-blocking review agent) |
+
+Both Self CI runs (`push` 40250057971 and `pull_request` 40250062742) at head
+`2393d43` completed green. The previously-red step **"Check finished specs are
+archived"** now reports `success` on both runs — the archive commit resolved the
+stage-5d pre-archive failure recorded in `40-deploy.md` (head `2ddee56`).
+
+The third check, `Review PR / Review PR` (PR Review Agent workflow), remained
+`in_progress` on its LLM review step for the entire observation window and is
+not a Self CI gate. It is a separate non-blocking review agent and is reported
+here as pending, not as a pass or fail.
+
+## Verdict
+
+**PASS** — both Self CI runs green; the previously-red "Check finished specs are
+archived" step is now green on both push and pull_request. No failing check to
+route.
