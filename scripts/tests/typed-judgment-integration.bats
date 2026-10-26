@@ -136,7 +136,7 @@ md_tracked_excluding() {
 }
 
 @test "AC-028-35: spec-ux routes exit 10 (low confidence) to the stock applicability check" {
-  # Amended by spec 034 / ADR 0012: the authoritative contract is exit 10 =
+  # Amended by spec 034 / ADR 0014: the authoritative contract is exit 10 =
   # "no fast-path exists -> run the stock procedure". The pre-034 assertion
   # (exit 10 -> BLOCKED) encoded the defect this spec fixes.
   grep_file "$AGENT" 'exit 10' 'Applicability check'
@@ -146,7 +146,7 @@ md_tracked_excluding() {
 }
 
 @test "AC-028-36: spec-ux records a fallback reason on exit 10 and never blocks" {
-  # Amended by spec 034 / ADR 0012: fallback telemetry carries the four-way
+  # Amended by spec 034 / ADR 0014: fallback telemetry carries the four-way
   # reason word; exit 10 never halts the pipeline.
   grep_file "$AGENT" 'fallback' '"reason"' 'unconfigured' 'unreachable'
 }
@@ -595,7 +595,7 @@ config_threshold_value() {
   diff_out="$(git -C "$REPO_ROOT" diff HEAD -- skills/ci-triage/SKILL.md agents/spec-ux.md || true)"
   [ -z "$diff_out" ] && return 0
   [ -d "$REPO_ROOT/specs/034-judgment-preflight-fail-open" ]
-  [ -f "$REPO_ROOT/docs/adr/0012-judgment-consumer-contract-fail-open-preflight.md" ]
+  [ -f "$REPO_ROOT/docs/adr/0014-judgment-consumer-contract-fail-open-preflight.md" ]
 }
 
 @test "unit: judgment-local-up.sh exists, is executable, parameterized per spike report" {

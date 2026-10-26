@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # judgment-preflight.sh — bounded, fail-open fitness probe for the optional
 # local typed-judgment backend (spec 034; see docs/SPEC_PIPELINE.md
-# §Typed-judgment layer and ADR 0012).
+# §Typed-judgment layer and ADR 0014).
 #
 # Run as the first action of /spec and /build, before any delegation. It is
 # silent when the local backend is not configured (JUDGMENT_BACKEND != local,

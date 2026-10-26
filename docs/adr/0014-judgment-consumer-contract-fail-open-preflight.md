@@ -1,4 +1,4 @@
-# Judgment consumer contract: exit-10 = stock procedure, fail-open preflight, payload cap
+# ADR 0014: Judgment consumer contract: exit-10 = stock procedure, fail-open preflight, payload cap
 
 ## Title
 
@@ -89,7 +89,7 @@ from it, and the local backend introduced a third failure mode:
    → `BLOCKED`) now assert exit `10` → the stock applicability check. The
    spec 029 delta assertion AC-029-74 ("consumer files equal HEAD") is scoped
    to the documented-change rule: a non-empty working-tree delta is allowed
-   while this spec is in flight and ADR 0012 is present, and passes
+   while this spec is in flight and ADR 0014 is present, and passes
    unchanged once the change is committed.
 
 ### Alternatives Considered
@@ -142,8 +142,8 @@ from it, and the local backend introduced a third failure mode:
 
 ## Notes
 
-- 2026-10-26: Decision recorded. Numbered 0012 because 0011 is reserved by the
-  unmerged PR #99; it is the next free number for this change.
+- 2026-10-26: Decision recorded. Numbered 0014: 0011 and 0012 are taken on main and 0013 is reserved by the
+  unmerged PR #99.
 - 2026-10-26: Crash threshold measured live against the running local backend.
   JSON-shaped state: 12,288 bytes succeeded; 21,900 bytes failed in one run;
   a second bisect found 20,547 succeeding and 20,548 failing, with the

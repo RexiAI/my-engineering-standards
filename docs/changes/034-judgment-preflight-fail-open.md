@@ -82,7 +82,7 @@ halts the pipeline.
 
 Resolved by the owner's delegate on 2026-10-25. Override any at the human gate.
 
-- OQ-1 — **ADR 0012, not 0011.** `docs/adr/0011-clean-code-comment-gates.md`
+- OQ-1 — **ADR 0014 (renumbered from 0012, originally 0011).** `docs/adr/0011-clean-code-comment-gates.md`
   already exists on the in-flight `spec/032-clean-code-comment-hygiene` branch
   (PR #99). Reusing 0011 here would collide at merge. The two orphan ADR files
   (`0004-agent-model-agnostic-gate.md`, `0005-structural-cleanliness-gates.md`)
@@ -728,7 +728,7 @@ the backend is down; strictness is opt-in. Matches AC-034-12…16.
   state (exit 10 `reason=error`), which is correct — the fallback was the low
   confidence, not the truncation.
 - Crash-threshold claim (20,547 ok / 20,548 fail): **UNVERIFIED**. Recorded as a
-  live bisection in ADR 0012 §Notes and §Context, but not independently
+  live bisection in ADR 0014 §Notes and §Context, but not independently
   re-measurable by me: the wrapper now caps every payload at 12,288 bytes
   before the request, so the pre-cap crash cannot be reproduced through the
   wrapper, and sending a raw oversized request directly would risk the running
@@ -747,25 +747,25 @@ the backend is down; strictness is opt-in. Matches AC-034-12…16.
 - AC-029-74 before: `[ -z "$(git diff HEAD -- skills/ci-triage/SKILL.md
   agents/spec-ux.md)" ]` ("consumer files equal HEAD", a spec-029-only delta
   assertion). After: allows a non-empty delta only while spec 034 is in flight
-  AND ADR 0012 is present, else still fails. This re-scopes the assertion to the
-  documented-change rule (ADR 0012 Decision 6) — a legitimate, necessary
+  AND ADR 0014 is present, else still fails. This re-scopes the assertion to the
+  documented-change rule (ADR 0014 Decision 6) — a legitimate, necessary
   amendment, since spec 034 must edit both files and ADR 0009's AC-024-01-12
   requires the ADR. Not a weakening of coverage; it preserves the "undocumented
   consumer-file edits fail" guard. Minor note (flag, not FAIL): it hardcodes the
-  spec-034 / ADR-0012 escape hatch, so a future spec editing consumer files
+  spec-034 / ADR-0014 escape hatch, so a future spec editing consumer files
   must amend it again.
 
-### ADR 0012 / 0011 — PASS
+### ADR 0014 / 0011 — PASS
 
-- `docs/adr/0012-judgment-consumer-contract-fail-open-preflight.md` exists, is
+- `docs/adr/0014-judgment-consumer-contract-fail-open-preflight.md` exists, is
   `Accepted`, follows the `templates/ADR.md` heading set (Title/Status/Context/
   Decision/Consequences/Compliance/Notes, plus Alternatives Considered).
-- `docs/adr/README.md` index gains the `| 0012 | … | Accepted |` row.
+- `docs/adr/README.md` index gains the `| 0014 | … | Accepted |` row.
 - `scripts/check-pr-review.sh` AC-024-01-12 PASSes: "change set modifies
   agents/spec-*.md as a documented pipeline change — the same change set adds
   or modifies a docs/adr/*.md record". Governance requirement satisfied.
 - `docs/adr/0011*` does not exist; no 0011 index row. 0011 remains
-  reserved/untouched (ADR 0012 §Notes: "0011 is reserved by the unmerged PR
+  reserved/untouched (ADR 0014 §Notes: "0011 is reserved by the unmerged PR
   #99").
 - `scripts/check-governance.sh` exit 0.
 
@@ -785,7 +785,7 @@ for a hermetic baseline. Both `make test-scripts` runs passed offline.
 - `scripts/check-post-pr-ci-loop.sh` AC-014-04-09 was amended to allow exactly
   `scripts/judgment-preflight.sh` in the orchestrator (`agents/spec-pipeline.md`)
   while keeping the blanket `scripts/` ban for every other reference. This is
-  not a numbered task in `10-tasks.md`, but it is documented in ADR 0012 §Notes
+  not a numbered task in `10-tasks.md`, but it is documented in ADR 0014 §Notes
   and is a required consequence of Task 4's wiring (the orchestrator now runs
   the preflight). Verified: `scripts/check-post-pr-ci-loop.sh .` exits 0 with
   "no 'scripts/' in agents/spec-pipeline.md outside the allowed
@@ -814,7 +814,7 @@ set: `scripts/typed-judgment.sh`, `scripts/judgment-preflight.sh`,
 `scripts/judgment-status.sh` (new), `scripts/judgment-lib.sh` (new), `Makefile`,
 `agents/spec-pipeline.md`, `agents/spec-ux.md`, `skills/ci-triage/SKILL.md`,
 `config/model.local.env.example`, `docs/SPEC_PIPELINE.md`, `docs/adr/README.md`,
-`docs/adr/0012-judgment-consumer-contract-fail-open-preflight.md` (new),
+`docs/adr/0014-judgment-consumer-contract-fail-open-preflight.md` (new),
 `scripts/check-post-pr-ci-loop.sh`, `scripts/tests/*.bats`,
 `scripts/tests/test_helper.bash`. No Go/Java/JS/Python/Rust source is touched.
 
@@ -1001,7 +1001,7 @@ ok 524 unit: successful under-cap call writes no reason line at all
    change set. Proposed follow-up: a small lint/complexity cleanup spec for
    `skills/hallmark/site/examples/`.
 2. Verifier's flag (not a FAIL): `scripts/tests/typed-judgment*` assertion
-   AC-029-74 hardcodes the spec-034 / ADR-0012 escape hatch, so the next spec
+   AC-029-74 hardcodes the spec-034 / ADR-0014 escape hatch, so the next spec
    that edits consumer files must amend it again. Proposed follow-up: generalize
    the assertion to "documented change = ADR present in the same change set".
 3. Complexity-gate blind spot for `.sh` (see §Complexity summary). Proposed

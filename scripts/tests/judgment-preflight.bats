@@ -18,7 +18,7 @@ SPEC_UX="$REPO_ROOT/agents/spec-ux.md"
 CI_TRIAGE="$REPO_ROOT/skills/ci-triage/SKILL.md"
 PIPE_DOC="$REPO_ROOT/docs/SPEC_PIPELINE.md"
 ADR_INDEX="$REPO_ROOT/docs/adr/README.md"
-ADR_034="$REPO_ROOT/docs/adr/0012-judgment-consumer-contract-fail-open-preflight.md"
+ADR_034="$REPO_ROOT/docs/adr/0014-judgment-consumer-contract-fail-open-preflight.md"
 
 setup() {
   setup_tmpdir
@@ -324,7 +324,7 @@ pid_file() {
     'fail-open' 'judgment-preflight' \
     'max-state-bytes|payload cap' 'truncat' \
     'unconfigured' 'unreachable' 'payload_overflow' 'error'
-  grep -qE '\| 0012 \|.*0012-judgment-consumer-contract-fail-open-preflight\.md' "$ADR_INDEX"
+  grep -qE '\| 0014 \|.*0014-judgment-consumer-contract-fail-open-preflight\.md' "$ADR_INDEX"
 }
 
 # ── Task 10: static assertion + hermeticity ────────────────────────────────
