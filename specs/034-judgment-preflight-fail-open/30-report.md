@@ -244,3 +244,17 @@ status line below, which is the ordering the stage requires.
 - Nothing committed, pushed, or opened — that is stage 5b (the PR Opener).
   `PR:` line to be appended there.
 
+
+## PR
+
+PR: https://github.com/RexiAI/my-engineering-standards/pull/101
+commit-count: 11 (branch head `2411185` when the draft PR opened; this record
+commit is 12 on the branch)
+
+Opened as a **draft** against `main` by stage 5b. Per `docs/SPEC_PIPELINE.md`
+§Archive in the PR, the archive is **not** in this stage's scope — stage 5d
+(the Archiver, same agent) runs `scripts/archive-spec.sh 034-judgment-preflight-fail-open`
+as the pipeline's final act, after stage 5c's recorded deploy skip. Known
+red on this head until then: `scripts/check-specs-archived.sh` (finished spec,
+archive pending at 5d) and `specs/034-judgment-preflight-fail-open/40-deploy.md`
+(pending at 5c).
