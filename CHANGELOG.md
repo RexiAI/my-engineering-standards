@@ -1,3 +1,10 @@
+# [1.43.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.42.0...v1.43.0) (2026-10-26)
+
+
+### Features
+
+* **gates:** clean-code comment hygiene, naming and null-discipline gates (spec 032) ([#99](https://github.com/RexiAI/my-engineering-standards/issues/99)) ([33bb86d](https://github.com/RexiAI/my-engineering-standards/commit/33bb86d37d23a125e17d233454f4c2edbea6a191))
+
 # [1.42.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.41.0...v1.42.0) (2026-10-26)
 
 
