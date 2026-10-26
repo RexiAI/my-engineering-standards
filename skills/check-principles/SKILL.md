@@ -34,7 +34,7 @@ Run from the repo root (child repos use the submodule path):
 # Restrict which gates may emit FAIL (see severity table below)
 ./.standards/scripts/check-code-principles.sh --blocking complexity,property-tests,dry
 
-# Opt in to blocking comment hygiene (ADR 0011) — default is WARN
+# Opt in to blocking comment hygiene (ADR 0013) — default is WARN
 STRICT_CLEAN_CODE=1 ./.standards/scripts/check-code-principles.sh --gates comments
 ```
 
@@ -42,7 +42,7 @@ STRICT_CLEAN_CODE=1 ./.standards/scripts/check-code-principles.sh --gates commen
 
 The script runs nine gate categories: `complexity` (cyclomatic CC + KISS size
 findings), `dry`, `yagni`, `solid` (SRP/OCP/LSP/ISP/DIP as one unit),
-`component-per-file`, `property-tests`, and — since spec 032 / ADR 0011 —
+`component-per-file`, `property-tests`, and — since spec 032 / ADR 0013 —
 `comments`, `naming` and `null-discipline`. Only the gates in the **blocking
 set** may emit FAIL; every other gate is warn-only — a judgment call that never
 blocks, with or without `-BaseRef`.

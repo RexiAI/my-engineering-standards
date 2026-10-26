@@ -1,4 +1,4 @@
-# ADR 0011: Clean Code comment hygiene and naming gates
+# ADR 0013: Clean Code comment hygiene and naming gates
 
 ## Status
 

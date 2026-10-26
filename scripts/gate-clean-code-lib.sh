@@ -51,7 +51,7 @@ cc_emit() {
 }
 
 # cc_comments_forced_blocking — 0 when the environment promotes the `comments`
-# gate into the blocking set (ADR 0011 rollout). Only the literal value `1`
+# gate into the blocking set (ADR 0013 rollout). Only the literal value `1`
 # promotes; `0`, `true` and the empty string all leave it warn-only.
 cc_comments_forced_blocking() {
   [ "${STRICT_CLEAN_CODE:-}" = "1" ]

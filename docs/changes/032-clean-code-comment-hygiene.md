@@ -173,16 +173,16 @@ skipped or deferred: `scripts/check-gate-consistency.sh` and
 
 ---
 
-## Task 01 — ADR 0011 records the gate decision
+## Task 01 — ADR 0013 records the gate decision
 
-New file `docs/adr/0011-clean-code-comment-gates.md`; new row in
+New file `docs/adr/0013-clean-code-comment-gates.md`; new row in
 `docs/adr/README.md`. `docs/GOVERNANCE.md` §ADR Requirement makes this
 review-blocking for any gate-catalog change, so it lands first.
 
 **Acceptance criteria**
 
-- `docs/adr/0011-clean-code-comment-gates.md` exists, its first heading is
-  `# ADR 0011: <title>`, and its level-2 headings are `## Status`,
+- `docs/adr/0013-clean-code-comment-gates.md` exists, its first heading is
+  `# ADR 0013: <title>`, and its level-2 headings are `## Status`,
   `## Context`, `## Decision`, `## Consequences`, `## Compliance`, in that
   order, with `### Alternatives Considered` inside `## Decision` (the shape
   ADR 0005 and 0006 already use).
@@ -206,7 +206,7 @@ review-blocking for any gate-catalog change, so it lands first.
   `scripts/check-code-principles.selftest.sh`, and
   `scripts/check-gate-consistency.sh`.
 - `docs/adr/README.md` has a row beginning `| 0011 |` that links to
-  `0011-clean-code-comment-gates.md` and whose status cell is `Proposed` or
+  `0013-clean-code-comment-gates.md` and whose status cell is `Proposed` or
   `Accepted`; the link target exists.
 - `docs/GOVERNANCE.md` is not modified (its heading structure is asserted by
   `scripts/check-governance.sh`), and `scripts/check-governance.sh` still exits
@@ -515,7 +515,7 @@ red.
 - `docs/CODING_CONVENTIONS.md` §Design Principles gains a short
   "Comment hygiene and naming" block that names `comments`, `naming`,
   `null-discipline`, the WARN-first default, `STRICT_CLEAN_CODE=1`, and links
-  `docs/adr/0011-clean-code-comment-gates.md`. The existing
+  `docs/adr/0013-clean-code-comment-gates.md`. The existing
   "Comment the why, not the what" bullet is retained verbatim.
 - `skills/check-principles/SKILL.md` lists all nine gates (fixing the existing
   "five gate categories" staleness), documents the three new gates' severities
@@ -957,7 +957,7 @@ The single full-tree FAIL is the pre-existing `CC=10` at
 `skills/hallmark/site/examples/cobalt-01/script.js:7` — the same file that the
 complexity full-tree run flags, and one that is **not** in this diff. The 61
 WARNs are all advisory: 45 from the three new gates (all WARN by design — the
-WARN-first rollout of Task 08 / ADR 0011 — plus the pre-existing complexity,
+WARN-first rollout of Task 08 / ADR 0013 — plus the pre-existing complexity,
 DRY, YAGNI, and KISS WARNs in `ci/templates/`). None of the new gates emits a
 FAIL in the full-tree run, confirming Task 12 required-behaviour 4.
 
@@ -1074,10 +1074,10 @@ scoping. If shell complexity is ever to be gated, that is a follow-up spec
 
 ## Task 01 / Task 11 confirmations
 
-- **ADR 0011 listed in `docs/adr/README.md`**: row
-  `| 0011 | [Clean Code comment hygiene and naming gates](0011-clean-code-comment-gates.md) | Proposed |`
-  present; link target `docs/adr/0011-clean-code-comment-gates.md` exists. ADR
-  heading order confirmed: `# ADR 0011: …`, then `## Status` (`Proposed`),
+- **ADR 0013 listed in `docs/adr/README.md`**: row
+  `| 0011 | [Clean Code comment hygiene and naming gates](0013-clean-code-comment-gates.md) | Proposed |`
+  present; link target `docs/adr/0013-clean-code-comment-gates.md` exists. ADR
+  heading order confirmed: `# ADR 0013: …`, then `## Status` (`Proposed`),
   `## Context`, `## Decision` (with `### Alternatives Considered` inside),
   `## Consequences`, `## Compliance`.
 - **`.github/workflows/self-ci.yml` NOT modified**: `git diff main --
@@ -1210,7 +1210,7 @@ at: 2026-10-25T12:44:31Z
  M scripts/tests/check-code-principles-blame.sh
  M scripts/tests/check-code-principles.bats
  M skills/check-principles/SKILL.md
-?? docs/adr/0011-clean-code-comment-gates.md
+?? docs/adr/0013-clean-code-comment-gates.md
 ?? scripts/gate-analysis-lib.sh
 ?? scripts/gate-clean-code-lib.sh
 ?? scripts/tests/check-code-principles-clean-code.bats

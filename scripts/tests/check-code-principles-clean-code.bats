@@ -18,7 +18,7 @@ CHECKER="$REPO_ROOT/scripts/check-code-principles.sh"
 SELFTEST="$REPO_ROOT/scripts/check-code-principles.selftest.sh"
 BLAME="$REPO_ROOT/scripts/tests/check-code-principles-blame.sh"
 CONSISTENCY="$REPO_ROOT/scripts/check-gate-consistency.sh"
-ADR="$REPO_ROOT/docs/adr/0011-clean-code-comment-gates.md"
+ADR="$REPO_ROOT/docs/adr/0013-clean-code-comment-gates.md"
 ADR_INDEX="$REPO_ROOT/docs/adr/README.md"
 SKILL="$REPO_ROOT/skills/check-principles/SKILL.md"
 CONVENTIONS="$REPO_ROOT/docs/CODING_CONVENTIONS.md"
@@ -72,11 +72,11 @@ section_of() {
   ' "$1"
 }
 
-# ── Task 01 — ADR 0011 ───────────────────────────────────────────────────────
+# ── Task 01 — ADR 0013 ───────────────────────────────────────────────────────
 
 @test "AC-032-01-01: the ADR exists with the mandated section shape" {
   [ -f "$ADR" ]
-  head -1 "$ADR" | grep -qE '^# ADR 0011: .+'
+  head -1 "$ADR" | grep -qE '^# ADR 0013: .+'
   local heads first_five
   heads="$(grep -E '^## ' "$ADR")"
   first_five="$(printf '%s\n' "$heads" | head -5)"
@@ -140,9 +140,9 @@ section_of() {
 @test "AC-032-01-03: the ADR is indexed and governance still passes" {
   [ -f "$ADR_INDEX" ]
   local row
-  row="$(grep -E '^\| 0011 \|' "$ADR_INDEX" | head -1)"
+  row="$(grep -E '^\| 0013 \|' "$ADR_INDEX" | head -1)"
   [ -n "$row" ]
-  printf '%s' "$row" | grep -qF '0011-clean-code-comment-gates.md'
+  printf '%s' "$row" | grep -qF '0013-clean-code-comment-gates.md'
   [ -f "$ADR" ]
   printf '%s' "$row" | grep -qE '\| (Proposed|Accepted) \|[[:space:]]*$'
   grep -qxF '## Trust Tiers' "$REPO_ROOT/docs/GOVERNANCE.md"
@@ -1099,7 +1099,7 @@ PY
   printf '%s\n' "$design" | grep -qF 'null-discipline'
   printf '%s\n' "$design" | grep -qiF 'WARN by default'
   printf '%s\n' "$design" | grep -qF 'STRICT_CLEAN_CODE=1'
-  printf '%s\n' "$design" | grep -qF 'docs/adr/0011-clean-code-comment-gates.md'
+  printf '%s\n' "$design" | grep -qF 'docs/adr/0013-clean-code-comment-gates.md'
   grep -qF 'Comment the why, not the what' "$CONVENTIONS"
 }
 

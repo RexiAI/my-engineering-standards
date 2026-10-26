@@ -99,7 +99,7 @@ pending mechanical checks. Promotion criteria and the rejected alternative
 ### Comment hygiene and naming
 
 Three more gates in `scripts/check-code-principles.sh` cover Clean Code Ch.2,
-Ch.4 and Ch.7 (ADR 0011):
+Ch.4 and Ch.7 (ADR 0013):
 
 - **`comments`** — redundant-comment elimination, not a comment ban. Two
   blocking-class rules (commented-out code in two or more consecutive
@@ -125,7 +125,7 @@ through the normal blocking-set mechanism, so `-BaseRef` blame scoping still
 applies. `naming` and `null-discipline` are advisory-only and never emit FAIL,
 and `.py`/`.rs` findings stay WARN even under the switch (ADR 0006 D6).
 Rationale, the rejected blanket comment ban, and the rollout plan:
-[`docs/adr/0011-clean-code-comment-gates.md`](adr/0011-clean-code-comment-gates.md).
+[`docs/adr/0013-clean-code-comment-gates.md`](adr/0013-clean-code-comment-gates.md).
 
 ### Base rules
 
