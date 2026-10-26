@@ -94,11 +94,21 @@ Then branch on the script's exit code:
   the `class` field of the classification output (the three-part output rule
   still applies: evidence must back it — cite the same log evidence you
   gathered). Record in `loop-run-log.md`:
-  `{"judgment":"classification","answer":"<answer>","confidence":<0..1>,"latency_ms":<ms>,"tokens":<n>,"fallback":false,"judgment_fallback":false}`.
-- **exit 10** (fallback: not configured after all, cap exceeded, API error,
-  or confidence below `JUDGMENT_MIN_CONFIDENCE`) — run the existing LLM
-  classification procedure unchanged and record
-  `{"judgment":"classification","judgment_fallback":true}` in the run-log.
+  `{"judgment":"classification","answer":"<answer>","confidence":<0..1>,"latency_ms":<ms>,"tokens":<n>,"fallback":false,"judgment_fallback":false,"reason":null,"truncated":<false|true>,"original_bytes":<n or null>}`.
+  `truncated` is `true` when the wrapper emitted `reason=payload_overflow`
+  (the state exceeded the 12 KB cap and was deterministically truncated);
+  `original_bytes` then carries the value from its
+  `typed-judgment: truncated original_bytes=<n> cap_bytes=<cap>` stderr line.
+  A usable answer with `truncated:true` still records `fallback:false`.
+- **exit 10** (no fast-path exists: not configured after all, cap exceeded,
+  API error, unparsable response, or confidence below
+  `JUDGMENT_MIN_CONFIDENCE`) — run the existing LLM classification procedure
+  unchanged and record
+  `{"judgment":"classification","judgment_fallback":true,"reason":"<unconfigured|unreachable|payload_overflow|error>","truncated":<false|true>,"original_bytes":<n or null>}`
+  in the run-log. The `reason` is the word from the wrapper's
+  `typed-judgment: reason=<word>` stderr line. A transport or fallback failure
+  never maps to a block or an escalation by itself — only the deterministic
+  Decision guide does that.
 
 Never let a typed judgment change the flake rule, the infra/config
 "not a code defect" routing, the maker/checker split, or the escalation
