@@ -1,3 +1,10 @@
+# [1.44.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.43.0...v1.44.0) (2026-10-26)
+
+
+### Features
+
+* **spec 034:** judgment fail-open preflight, exit-10 consumer contract, 12 KB payload cap ([#101](https://github.com/RexiAI/my-engineering-standards/issues/101)) ([7bda8f9](https://github.com/RexiAI/my-engineering-standards/commit/7bda8f91a15cf75bdb47ee3109fd6d0c145b41f5))
+
 # [1.43.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.42.0...v1.43.0) (2026-10-26)
 
 
