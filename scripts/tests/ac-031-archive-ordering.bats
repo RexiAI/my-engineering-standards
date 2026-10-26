@@ -80,12 +80,33 @@ seed_finished_spec() {
   [[ "$output" == *"099-ex"* ]]
 }
 
-@test "unit — ESCALATED verdict alone qualifies; PASS-content 40-deploy.md alone does not" {
+@test "unit — the exception needs BOTH a line-start marker and Verdict: ESCALATED" {
+  # This assertion changed with the anchoring fix: the exception used to accept
+  # either signal anywhere in the file (OR, unanchored grep). It now requires
+  # the marker line AND the ESCALATED verdict line, each at line start — see
+  # check-specs-archived.sh §Spec 031 exception. A verdict alone is not enough,
+  # and prose that merely mentions either string never was.
   local repo="$TMPDIR_HELPER/repo"
   seed_finished_spec "$repo" "099-e2"
   printf 'Verdict: ESCALATED\n' > "$repo/specs/099-e2/40-deploy.md"
   git -C "$repo" add -A && git -C "$repo" commit -qm esc
   run bash -c "cd '$repo' && bash '$REPO_ROOT/scripts/check-specs-archived.sh'"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"099-e2 is finished"* ]]
+
+  local repo1="$TMPDIR_HELPER/repo1"
+  seed_finished_spec "$repo1" "099-m1"
+  printf 'Phase-3 budget exhausted\n' > "$repo1/specs/099-m1/40-deploy.md"
+  git -C "$repo1" add -A && git -C "$repo1" commit -qm marker-only
+  run bash -c "cd '$repo1' && bash '$REPO_ROOT/scripts/check-specs-archived.sh'"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"099-m1 is finished"* ]]
+
+  local repo3="$TMPDIR_HELPER/repo3"
+  seed_finished_spec "$repo3" "099-e3"
+  printf 'Phase-3 budget exhausted\n\nVerdict: ESCALATED\n' > "$repo3/specs/099-e3/40-deploy.md"
+  git -C "$repo3" add -A && git -C "$repo3" commit -qm both
+  run bash -c "cd '$repo3' && bash '$REPO_ROOT/scripts/check-specs-archived.sh'"
   [ "$status" -eq 0 ]
 
   local repo2="$TMPDIR_HELPER/repo2"
