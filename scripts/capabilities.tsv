@@ -1,0 +1,91 @@
+# scripts/capabilities.tsv — the single source of truth for every capability
+# bootstrap.sh can wire into a child repo (spec 033).
+#
+# One catalog: --list renders it, the interactive menu renders it (grouped by
+# the category column, in file order), --all iterates it, the flag parser
+# matches its `flag` column, and --dry-run prints its `files`/`init_ci`
+# columns. bootstrap.sh names no capability of its own — it only names the
+# ACTION VERBS a row may reference (see the `action` column below).
+#
+# Format — pipe-separated, 10 fields, comments (`#`) and blank lines ignored:
+#
+#   id|label|category|stack|flag|baseline|action|files|init_ci|conflicts
+#
+#   id          stable, greppable identifier (also the outcome-line subject)
+#   label       human-readable name (menu + --help)
+#   category    menu group / --list column 3
+#   stack       required stack: backend | frontend | ci | none
+#   flag        the non-interactive flag this capability answers to
+#               ("--flag value" for value-taking flags, bare "--flag" otherwise)
+#   baseline    yes = always selected (core wiring); no = opt-in
+#   action      bootstrap action verb(s), comma-separated:
+#                 pointer           real AGENTS.md pointer file, never a symlink
+#                 bridge            copy templates/opencode.json.bridge
+#                 envrc             .envrc + .gitignore + config/.gitignore
+#                 gitattributes     LF normalization
+#                 pr-template       .github/PULL_REQUEST_TEMPLATE.md
+#                 session-scripts   session hygiene scripts (chmod +x)
+#                 git-hook          .githooks/pre-commit (chmod +x + hooksPath)
+#                 opencode-wiring   .opencode/{agents,commands,skills} symlink or copy
+#                 copy-template     copy every files item (see syntax below)
+#                 merge-tsconfig    merge strict flags into tsconfig*.json
+#                 none              no local write; effect comes from init_ci
+#                 information       listed only, never selected by --all
+#   files       space-separated write plan. Item syntax:
+#                 DEST                      plan-only (written by init-ci.sh)
+#                 DEST:SRC                  copy SRC (relative to .standards/)
+#                 +DEST:SRC                 append SRC to DEST, guarded by a
+#                                           '# >>> standards:SRC' sentinel line
+#                 ...@STACK                 apply only when STACK is detected
+#                                           or selected
+#                 {ci}                      the selected CI platform's file
+#   init_ci     flags forwarded to init-ci.sh (aggregated into one invocation)
+#   conflicts   comma-separated capability ids this one cannot be combined with
+#
+# The first row whose category is "CI platform" and whose init_ci carries
+# --platform is the default platform when a selected capability needs a CI
+# file but no platform was chosen.
+#
+# Not carried as a "files written" row because nothing is written for it: the
+# okf reference (.standards/okf/) is consumed in place, and a root `okf`
+# symlink is actively removed by the core-wiring run (same dangling-link
+# hazard as AGENTS.md in submodule-less CI checkouts).
+# The spec pipeline's deploy verifier (agents/spec-deployer.md) ships inside
+# agent-spec-pipeline's .opencode/agents copy; media agents are listed as
+# information only (they need external provider credentials).
+
+core-agents-md|AGENTS.md standards pointer|Core wiring|none|--with-core|yes|pointer|AGENTS.md||
+core-opencode-json|opencode.json bridge|Core wiring|none|--with-core|yes|bridge|opencode.json||
+core-envrc|Per-machine direnv env|Core wiring|none|--with-core|yes|envrc|.envrc .gitignore config/.gitignore||
+core-gitattributes|Line-ending normalization|Core wiring|none|--with-core|yes|gitattributes|.gitattributes||
+core-pr-template|PR template|Core wiring|none|--with-core|yes|pr-template|.github/PULL_REQUEST_TEMPLATE.md||
+core-session-hygiene|Session hygiene scripts|Core wiring|none|--with-core|yes|session-scripts|session-start-check.sh:templates/session-start-check.sh session-end-check.sh:templates/session-end-check.sh||
+core-git-hook|guard-env pre-commit hook|Core wiring|none|--with-core|yes|git-hook|.githooks/pre-commit:templates/githooks-pre-commit||
+agent-spec-pipeline|Spec pipeline agents + commands|Agent pipeline|none|--with-spec-pipeline|yes|opencode-wiring|.opencode/agents .opencode/commands .opencode/skills||
+agent-pr-review|PR review agent|Agent pipeline|ci|--with-pr-review|no|none|{ci}|--with-pr-review|
+stack-java|Java (Maven)|Backend stacks|backend|--stack java|no|copy-template|checkstyle.xml:language-specific/java/checkstyle.xml spotbugs-include.xml:language-specific/java/spotbugs-include.xml pmd-rules.xml:language-specific/java/pmd-rules.xml +.gitignore:templates/.gitignore.java|--backend java|
+stack-go|Go|Backend stacks|backend|--stack go|no|copy-template|.golangci.yml:language-specific/go/golangci.yml Makefile:ci/templates/Makefile.go +.gitignore:templates/.gitignore.go|--backend go|
+stack-node|Node.js backend|Backend stacks|backend|--stack node|no|copy-template,merge-tsconfig|eslint.config.js:language-specific/javascript/eslint.config.js prettier.config.js:language-specific/javascript/prettier.config.js +.gitignore:templates/.gitignore.node|--backend node|
+stack-python|Python (FastAPI)|Backend stacks|backend|--stack python|no|none|.github/workflows/ci-python.yml|--backend python|
+stack-rust|Rust|Backend stacks|backend|--stack rust|no|none|.github/workflows/ci-rust.yml|--backend rust|
+frontend-nextjs|Next.js|Frontend/mobile stacks|frontend|--frontend nextjs|no|none|{ci}|--frontend nextjs|frontend-react,frontend-angular,frontend-ionic,frontend-react-native,frontend-static
+frontend-react|React (Vite)|Frontend/mobile stacks|frontend|--frontend react|no|none|{ci}|--frontend react|frontend-nextjs,frontend-angular,frontend-ionic,frontend-react-native,frontend-static
+frontend-angular|Angular|Frontend/mobile stacks|frontend|--frontend angular|no|none|{ci}|--frontend angular|frontend-nextjs,frontend-react,frontend-ionic,frontend-react-native,frontend-static
+frontend-ionic|Ionic (Angular wiring)|Frontend/mobile stacks|frontend|--frontend ionic|no|none|{ci}|--frontend ionic|frontend-nextjs,frontend-react,frontend-angular,frontend-react-native,frontend-static
+frontend-react-native|React Native (Expo)|Frontend/mobile stacks|frontend|--frontend react-native|no|none|{ci}|--frontend react-native|frontend-nextjs,frontend-react,frontend-angular,frontend-ionic,frontend-static
+frontend-static|Static HTML|Frontend/mobile stacks|frontend|--frontend static|no|none|{ci}|--frontend static|frontend-nextjs,frontend-react,frontend-angular,frontend-ionic,frontend-react-native
+ci-github|GitHub Actions|CI platform|none|--platform github|no|none|.github/workflows/ci.yml|--platform github|ci-gitlab
+ci-gitlab|GitLab CI|CI platform|none|--platform gitlab|no|none|.gitlab-ci.yml|--platform gitlab|ci-github
+release-automation|Semantic Release (default-branch publish)|CI platform|ci|--with-release|no|none|{ci}|--with-release|
+gate-saga|Saga/outbox gate templates|Quality gates|backend|--with-saga|no|none|{ci}|--with-saga|
+gate-contract|Pact contract tests|Quality gates|backend|--with-contract|no|copy-template|.github/workflows/contract.yml:templates/ci-wrappers/contract.yml pact-java.yml:ci/templates/pact-java.yml@java pact-go.yml:ci/templates/pact-go.yml@go pact-node.yml:ci/templates/pact-node.yml@node pact-python.yml:ci/templates/pact-python.yml@python pact-rust.yml:ci/templates/pact-rust.yml@rust||
+gate-mutation|Mutation testing|Quality gates|backend|--with-mutation|no|copy-template|pitest-profile.xml:ci/templates/pitest-profile.xml@java stryker.conf.json:ci/templates/stryker.conf.json@node stryker.react-native.conf.json:ci/templates/stryker.react-native.conf.json@react-native mutmut-pyproject.toml:ci/templates/mutmut-pyproject.toml@python .cargo/mutants.toml:ci/templates/mutants.toml@rust mutation.mk:ci/templates/mutation.mk@rust||
+gate-security|Security scans|Quality gates|none|--with-security|no|copy-template|.github/workflows/security.yml:templates/ci-wrappers/security.yml||
+gate-e2e|E2E pipeline|Quality gates|none|--with-e2e|no|copy-template|.github/workflows/e2e.yml:templates/ci-wrappers/e2e.yml .github/workflows/e2e-weekly.yml:templates/ci-wrappers/e2e-weekly.yml||
+gate-sweeper|CI sweeper loop|Quality gates|ci|--with-sweeper|no|copy-template|.github/workflows/sweeper.yml:.github/workflows/ci-sweeper.yml||
+deploy-kamal|Kamal (VPS)|Deploy|backend|--with-deploy kamal|no|none|{ci}|--deploy-tool kamal|deploy-dokku,deploy-ssh,deploy-vercel
+deploy-dokku|Dokku (VPS)|Deploy|backend|--with-deploy dokku|no|none|{ci}|--deploy-tool dokku|deploy-kamal,deploy-ssh,deploy-vercel
+deploy-ssh|SSH deploy|Deploy|backend|--with-deploy ssh|no|none|{ci}|--deploy-tool ssh|deploy-kamal,deploy-dokku,deploy-vercel
+deploy-vercel|Vercel production verification|Deploy|frontend|--with-deploy vercel|no|copy-template|.github/workflows/vercel-production-verify.yml:templates/ci-wrappers/vercel-production-verify.yml||deploy-kamal,deploy-dokku,deploy-ssh
+loop-foundation|Loop engineering bundle|Loop engineering|none|--with-loop|no|copy-template|templates/LOOP.md:templates/LOOP.md templates/STATE.md:templates/STATE.md templates/loop-run-log.md:templates/loop-run-log.md templates/loop-budget.md:templates/loop-budget.md templates/loop-constraints.md:templates/loop-constraints.md templates/gate.yaml:templates/gate.yaml||
+media-agents|Media agent family (informational)|Media agents|none|--with-media|no|information|~/.config/opencode/agents/media-*.md||

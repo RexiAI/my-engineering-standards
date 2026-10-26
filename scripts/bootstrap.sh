@@ -1,356 +1,311 @@
 #!/bin/bash
 set -euo pipefail
 
-# bootstrap.sh - One-time setup to bridge engineering standards into a child repo
-# Usage: Run from the root of the child repo: ./.standards/scripts/bootstrap.sh
-#        Add --copy-agents to copy spec-pipeline agents/commands as real files
-#        instead of symlinking, e.g. to set a per-agent model override without
-#        editing files inside the .standards/ submodule. You own the copies
-#        after this — re-run with --copy-agents again after a submodule update
-#        to pull in changes; this does not merge them for you.
+# bootstrap.sh — catalog-driven bootstrap for a child repo that consumes this
+# standards repo as a .standards/ submodule.
+#
+# Every capability this script can wire is one row in scripts/capabilities.tsv.
+# That catalog is the single source of truth: --list renders it, the interactive
+# menu renders it, --all iterates it, the flag parser matches its `flag` column,
+# and --dry-run prints its `files`/`init_ci` columns. This script names no
+# capability and no capability flag of its own — it names only the ACTION VERBS
+# a row may reference (act_<verb>, dispatched by name).
+#
+# This file is deliberately the thin shell: argument parsing, the interactive
+# menu loop, and dispatch. Everything else lives in sourced modules:
+#   bootstrap-catalog-lib.sh  capabilities.tsv loading + column queries
+#   bootstrap-detect-lib.sh   backend/frontend stack detection
+#   bootstrap-lib.sh          selection state + compatibility rules
+#   bootstrap-plan-lib.sh     --help/--list text, dry-run plan, init-ci arguments
+#   bootstrap-actions.sh      file-writing primitives, act_* verbs, execution
+#
+# Usage — run from the child repo root:
+#   ./.standards/scripts/bootstrap.sh                       # TTY: menu; non-TTY: core wiring + detected stacks
+#   ./.standards/scripts/bootstrap.sh --list
+#   ./.standards/scripts/bootstrap.sh --all --dry-run
+#   ./.standards/scripts/bootstrap.sh --stack java --with-saga --with-deploy kamal
+#   ./.standards/scripts/bootstrap.sh --copy-agents          # copies instead of symlinking agents/commands/skills
+#
+# Baseline (always-on) capabilities are the catalog's `baseline=yes` rows: core
+# wiring plus the spec-pipeline agent symlinks. --none selects exactly that set
+# and nothing else; a bare non-TTY run adds the detected stacks (today's
+# behavior) but never CI.
+#
+# Acceptance scenarios: specs/033-bootstrap-capability-catalog/20-acceptance/
+# covered by scripts/tests/bootstrap-capability-catalog.bats (AC-033-01..49).
 
-COPY_AGENTS=false
-for arg in "$@"; do
-    case "$arg" in
-        --copy-agents) COPY_AGENTS=true ;;
-    esac
-done
-
-REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 STANDARDS_DIR="$REPO_ROOT/.standards"
+CATALOG="$SCRIPT_DIR/capabilities.tsv"
 
-echo "=== Engineering Standards Bootstrap ==="
-echo "Repo root: $REPO_ROOT"
-echo ""
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/bootstrap-catalog-lib.sh"
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/bootstrap-detect-lib.sh"
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/bootstrap-lib.sh"
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/bootstrap-plan-lib.sh"
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/bootstrap-actions.sh"
 
-# Validate .standards/ exists
-if [ ! -d "$STANDARDS_DIR" ]; then
+# ── argument parsing ──────────────────────────
+# Mode flags toggle a variable and take no value; every other flag is matched
+# against the catalog's `flag` column only, so no capability flag is named here.
+MODE_FLAG_TABLE="--all:MODE_ALL --none:MODE_NONE --dry-run:DRY_RUN --copy-agents:COPY_AGENTS --list:DO_LIST --help:DO_HELP -h:DO_HELP"
+
+mode_flag_var() { # FLAG → the variable that flag toggles, or empty
+  local entry
+  for entry in $MODE_FLAG_TABLE; do
+    if [ "${entry%%:*}" = "$1" ]; then
+      printf '%s' "${entry#*:}"
+      return 0
+    fi
+  done
+  printf ''
+}
+
+is_mode_flag() { [ -n "$(mode_flag_var "$1")" ]; }
+
+set_mode_flag() { # FLAG — only called for a flag is_mode_flag accepted
+  local var
+  var=$(mode_flag_var "$1")
+  printf -v "$var" '%s' true
+}
+
+parse_args() {
+  local arg
+  while [ $# -gt 0 ]; do
+    arg="$1"
+    shift
+    if is_mode_flag "$arg"; then
+      set_mode_flag "$arg"
+    elif [ "${arg#-}" != "$arg" ]; then
+      parse_capability_flag "$arg" "$@" || shift
+    else
+      refuse_and_exit "unexpected argument: $arg"
+    fi
+  done
+}
+
+parse_capability_flag() { # FLAG [VALUE ...] → 1 when it consumed VALUE
+  local flag="$1"
+  shift
+  if flag_takes_value "$flag"; then
+    select_flag_with_value "$flag" "$@"
+    return 1
+  fi
+  select_flag_tokens "$flag" "unknown flag: $flag (see --help, or --list for the catalog)"
+  return 0
+}
+
+select_flag_with_value() { # FLAG [VALUE ...]
+  local flag="$1" val ids
+  if [ $# -lt 2 ]; then
+    refuse_and_exit "missing value for $flag (expected: $(flag_values "$flag"))"
+  fi
+  val="$2"
+  ids=$(flag_ids "$flag $val")
+  if [ -z "$ids" ]; then
+    refuse_and_exit "unknown value '$val' for $flag (expected: $(flag_values "$flag"))"
+  fi
+  select_ids "$ids"
+}
+
+select_flag_tokens() { # FLAG ERROR_MESSAGE
+  local ids
+  ids=$(flag_ids "$1")
+  if [ -z "$ids" ]; then
+    refuse_and_exit "$2"
+  fi
+  select_ids "$ids"
+}
+
+select_ids() { # newline-separated catalog ids
+  local token
+  for token in $1; do
+    explicit_select "$token"
+  done
+}
+
+# ── interactive menu ──────────────────────────
+MENU_IDS=()
+MENU_NUMS=0
+
+render_menu() {
+  local i cat="" num=0
+  MENU_IDS=()
+  print_menu_header
+  for i in "${!CAT_IDS[@]}"; do
+    if [ "${CAT_ACTIONS[$i]}" = "information" ]; then continue; fi
+    if [ "${CAT_CATS[$i]}" != "$cat" ]; then
+      cat="${CAT_CATS[$i]}"
+      print_menu_group "$cat"
+    fi
+    num=$((num + 1))
+    MENU_IDS[$num]="${CAT_IDS[$i]}"
+    print_menu_row "$i" "$num"
+  done
+  MENU_NUMS=$num
+  print_menu_footer
+}
+
+print_menu_header() {
+  echo ""
+  echo "=== Select capabilities ==="
+}
+
+print_menu_group() { printf '\n[%s]\n' "$1"; }
+
+print_menu_row() { # INDEX NUM
+  local mark="[ ]" det=""
+  if is_selected "${CAT_IDS[$1]}"; then mark="[x]"; fi
+  if is_detected_row "$1"; then det="  [detected]"; fi
+  printf '%s %2d) %-22s %s%s\n' "$mark" "$2" "${CAT_IDS[$1]}" "${CAT_LABELS[$1]}" "$det"
+}
+
+print_menu_footer() {
+  printf '\nInformational only (never selected by --all): %s\n' "$(information_ids)"
+  echo "Toggle: numbers separated by spaces; 'all'; 'none' (core wiring only — the --none flag)."
+}
+
+toggle_token() {
+  local tok="$1" id
+  case "$tok" in
+    ''|*[!0-9]*)
+      echo "  WARN: '$tok' is not a menu number"
+      return 0
+      ;;
+  esac
+  if [ "$tok" -lt 1 ] || [ "$tok" -gt "$MENU_NUMS" ]; then
+    echo "  WARN: no menu entry numbered $tok"
+    return 0
+  fi
+  id="${MENU_IDS[$tok]}"
+  if is_selected "$id"; then
+    deselect_id "$id"
+  else
+    select_id "$id"
+    note_ci_need "$id"
+  fi
+}
+
+print_selection() {
+  local i ids=""
+  for i in "${!CAT_IDS[@]}"; do
+    if is_selected "${CAT_IDS[$i]}"; then ids="$ids ${CAT_IDS[$i]}"; fi
+  done
+  printf 'Selected:%s\n' "$ids"
+}
+
+menu_select() {
+  render_menu
+  read_menu_lines
+  echo ""
+  print_selection
+}
+
+read_menu_lines() {
+  local line
+  while :; do
+    printf 'Selection (Enter accepts): '
+    IFS= read -r line || line=""
+    if [ -z "$line" ]; then return 0; fi
+    apply_menu_line "$line"
+    render_menu
+  done
+}
+
+apply_menu_line() { # LINE — one menu command line
+  local tok
+  case "$1" in
+    all)
+      MODE_ALL=true
+      DEPLOY_EXPLICIT=false
+      expand_all
+      ;;
+    none)
+      reselect_baseline
+      ;;
+    *)
+      for tok in $1; do
+        toggle_token "$tok"
+      done
+      ;;
+  esac
+}
+
+# ── summary ───────────────────────────────────
+# Printed by execute_all as its last act (dispatched from bootstrap-actions.sh).
+print_summary() {
+  echo ""
+  if [ -z "$INIT_CI_ARGS" ]; then
+    echo "CI/CD setup skipped (no CI platform selected)."
+    echo "To enable more capabilities: ./.standards/scripts/bootstrap.sh --all"
+  fi
+  echo ""
+  echo "=== Bootstrap complete ==="
+  echo "Next steps:"
+  echo "  1. Review and commit the new files: git status"
+  echo "  2. OpenCode auto-discovers AGENTS.md and loads instructions from .standards/"
+  echo "  3. Run the session hygiene check: ./session-start-check.sh"
+  if [ -d "$STANDARDS_DIR/ci/templates/java-feature" ]; then
+    echo "  4. TDD scaffolds available: ci/templates/{java,go,js}-feature (docs/TESTING_TDD_GUIDE.md)"
+  fi
+}
+
+# ── main ──────────────────────────────────────
+main() {
+  allow_menu_on_tty "$@"
+  load_catalog
+  parse_args "$@"
+  handle_info_flags
+  require_standards_dir
+  print_bootstrap_header
+  prepare_selection
+  if [ "$DRY_RUN" = true ]; then
+    print_plan
+    exit 0
+  fi
+  echo ""
+  execute_all
+}
+
+allow_menu_on_tty() { # "$@" of main — a flagless TTY run opens the menu
+  if [ $# -eq 0 ] && [ -t 0 ]; then
+    MENU_ALLOWED=true
+  fi
+}
+
+handle_info_flags() {
+  if [ "$DO_HELP" = true ]; then print_help; exit 0; fi
+  if [ "$DO_LIST" = true ]; then print_list; exit 0; fi
+}
+
+require_standards_dir() {
+  if [ ! -d "$STANDARDS_DIR" ]; then
     echo "ERROR: .standards/ not found."
-    echo "Run this first: git submodule add git@github.com:RexiAI/my-engineering-standards.git .standards"
+    echo "Run this first: git submodule add git@github.com:RexAI/my-engineering-standards.git .standards"
     exit 1
-fi
+  fi
+}
 
-# 1. AGENTS.md — a real pointer file, never a symlink. CI and hosting
-#    platforms (GitHub Actions, Vercel) check out WITHOUT initializing
-#    submodules; a dangling AGENTS.md symlink there crashes tools that stat
-#    the repo root — Next.js >= 15.5 reads AGENTS.md at build startup and dies
-#    with ENOENT on a broken link, before compiling anything. The pointer file
-#    keeps agents one hop from the full standards and has nothing to drift.
-if [ -L "$REPO_ROOT/AGENTS.md" ]; then
-    rm "$REPO_ROOT/AGENTS.md"
-    echo "[REPLACE] AGENTS.md symlink -> real pointer file"
-fi
-if [ ! -f "$REPO_ROOT/AGENTS.md" ]; then
-    cat > "$REPO_ROOT/AGENTS.md" << 'AGENTS_POINTER_EOF'
-# Engineering Standards (pointer)
+print_bootstrap_header() {
+  echo "=== Engineering Standards Bootstrap ==="
+  echo "Repo root: $REPO_ROOT"
+}
 
-This repo follows the shared engineering standards maintained in the
-`.standards/` git submodule. This file is a real file, not a symlink, on
-purpose: CI and hosting platforms check out without initializing submodules,
-and a dangling `AGENTS.md` symlink crashes builds that stat it (Next.js
->= 15.5 fails with ENOENT at startup).
+# Detection, selection, and the one init-ci.sh invocation's arguments — the
+# state every later step reads.
+prepare_selection() {
+  detect_backend
+  detect_frontend
+  report_detection
+  compute_selection
+  PRIMARY_BACKEND_VALUE=$(primary_backend)
+  mark_platform_refusals
+  INIT_CI_ARGS=$(collect_init_ci_args)
+}
 
-Run `git submodule update --init --recursive`, then read the full standards
-index at [.standards/AGENTS.md](.standards/AGENTS.md).
-AGENTS_POINTER_EOF
-    echo "[WRITE] AGENTS.md (pointer to .standards/AGENTS.md)"
-else
-    echo "[SKIP] AGENTS.md already exists (manual backup required to replace)"
-fi
-
-# 2. Copy opencode.json
-if [ ! -f "$REPO_ROOT/opencode.json" ]; then
-    cp "$STANDARDS_DIR/templates/opencode.json.bridge" "$REPO_ROOT/opencode.json"
-    echo "[COPY] opencode.json.bridge -> opencode.json"
-else
-    echo "[SKIP] opencode.json already exists"
-    # Children bootstrapped before the bridge template carried the agent block
-    # have an opencode.json with no SPEC_*_MODEL wiring — subagents would
-    # silently inherit the caller's model. Say so instead of skipping quietly.
-    if ! grep -q '{env:SPEC_PIPELINE_MODEL}' "$REPO_ROOT/opencode.json"; then
-        echo "[WARN] existing opencode.json lacks the agent.*.model {env:SPEC_*_MODEL} block — copy it from templates/opencode.json.bridge so pipeline stages resolve per-model"
-    fi
-fi
-
-# 3. OKF (Operational Knowledge Framework) — consumed in place at
-#    .standards/okf/ (opencode.json's instructions list points there).
-#    Deliberately NO root symlink: same dangling-link hazard as AGENTS.md —
-#    root-scanning build tools stat every repo-root entry and die with ENOENT
-#    on a broken link in submodule-less checkouts (GitHub Actions, Vercel).
-if [ -L "$REPO_ROOT/okf" ]; then
-    rm "$REPO_ROOT/okf"
-    echo "[REMOVE] okf symlink — reference .standards/okf/ directly"
-fi
-
-# 3b. Symlink (default) or copy (--copy-agents) spec pipeline agents + commands
-# (see docs/SPEC_PIPELINE.md)
-mkdir -p "$REPO_ROOT/.opencode"
-if [ "$COPY_AGENTS" = true ]; then
-    if [ -L "$REPO_ROOT/.opencode/agents" ]; then
-        echo "[SKIP] .opencode/agents is a symlink — remove it first if you want a real copy"
-    elif [ -e "$REPO_ROOT/.opencode/agents" ]; then
-        echo "[SKIP] .opencode/agents already exists as a real directory — not overwriting"
-    else
-        cp -r "$STANDARDS_DIR/agents" "$REPO_ROOT/.opencode/agents"
-        echo "[COPY] .standards/agents -> .opencode/agents (you own these now)"
-    fi
-    if [ -L "$REPO_ROOT/.opencode/commands" ]; then
-        echo "[SKIP] .opencode/commands is a symlink — remove it first if you want a real copy"
-    elif [ -e "$REPO_ROOT/.opencode/commands" ]; then
-        echo "[SKIP] .opencode/commands already exists as a real directory — not overwriting"
-    else
-        cp -r "$STANDARDS_DIR/commands" "$REPO_ROOT/.opencode/commands"
-        echo "[COPY] .standards/commands -> .opencode/commands (you own these now)"
-    fi
-else
-    if [ ! -e "$REPO_ROOT/.opencode/agents" ]; then
-        ln -sf ../.standards/agents "$REPO_ROOT/.opencode/agents"
-        echo "[SYMLINK] .standards/agents -> .opencode/agents"
-    else
-        echo "[SKIP] .opencode/agents already exists"
-    fi
-    if [ ! -e "$REPO_ROOT/.opencode/commands" ]; then
-        ln -sf ../.standards/commands "$REPO_ROOT/.opencode/commands"
-        echo "[SYMLINK] .standards/commands -> .opencode/commands"
-    else
-        echo "[SKIP] .opencode/commands already exists"
-    fi
-fi
-
-# 3c. Symlink (default) or copy (--copy-agents) skills/
-if [ "$COPY_AGENTS" = true ]; then
-    if [ -L "$REPO_ROOT/.opencode/skills" ]; then
-        echo "[SKIP] .opencode/skills is a symlink — remove it first if you want a real copy"
-    elif [ -e "$REPO_ROOT/.opencode/skills" ]; then
-        echo "[SKIP] .opencode/skills already exists as a real directory — not overwriting"
-    else
-        cp -r "$STANDARDS_DIR/skills" "$REPO_ROOT/.opencode/skills"
-        echo "[COPY] .standards/skills -> .opencode/skills (you own these now)"
-    fi
-else
-    if [ ! -e "$REPO_ROOT/.opencode/skills" ]; then
-        ln -sf ../.standards/skills "$REPO_ROOT/.opencode/skills"
-        echo "[SYMLINK] .standards/skills -> .opencode/skills"
-    else
-        echo "[SKIP] .opencode/skills already exists"
-    fi
-fi
-
-# 3d. Per-machine direnv .envrc (spec 025): write the child .envrc from the
-# committed template when absent; ensure the child's .gitignore covers it and
-# the per-machine env files. The .envrc is per-machine — never committed.
-if [ ! -f "$REPO_ROOT/.envrc" ]; then
-    cp "$STANDARDS_DIR/templates/.envrc.child" "$REPO_ROOT/.envrc"
-    echo "[COPY] templates/.envrc.child -> .envrc (per-machine, gitignored)"
-    echo "  Run 'direnv allow' at the repo root to load it."
-else
-    echo "[SKIP] .envrc already exists — not overwriting"
-fi
-touch "$REPO_ROOT/.gitignore"
-if ! grep -q '^\.envrc$' "$REPO_ROOT/.gitignore" 2>/dev/null; then
-    printf '\n# Per-machine direnv file (spec 025): never committed.\n.envrc\n' >> "$REPO_ROOT/.gitignore"
-    echo "[APPEND] .envrc -> .gitignore"
-fi
-mkdir -p "$REPO_ROOT/config"
-touch "$REPO_ROOT/config/.gitignore"
-for env_pat in model.local.env agent.local.env; do
-    if ! grep -qx "$env_pat" "$REPO_ROOT/config/.gitignore" 2>/dev/null; then
-        printf '%s\n' "$env_pat" >> "$REPO_ROOT/config/.gitignore"
-        echo "  [APPEND] $env_pat -> config/.gitignore"
-    fi
-done
-
-# 3e. Line-ending normalization. Machines with core.autocrlf=true otherwise
-# get CRLF working trees on fresh clones, which trips prettier --check
-# (endOfLine lf) and every line-ending-sensitive formatter gate in CI — the
-# same bug class this repo fixed for itself in v1.4.1.
-if [ ! -f "$REPO_ROOT/.gitattributes" ]; then
-    cat > "$REPO_ROOT/.gitattributes" << 'GITATTR_EOF'
-# Normalize line endings regardless of core.autocrlf: LF everywhere except
-# explicit Windows scripts.
-* text=auto eol=lf
-*.sh text eol=lf
-Makefile* text eol=lf
-*.bat text eol=crlf
-GITATTR_EOF
-    echo "[WRITE] .gitattributes (LF normalization)"
-else
-    echo "[SKIP] .gitattributes already exists"
-fi
-
-# 4. Copy PR template
-mkdir -p "$REPO_ROOT/.github"
-if [ ! -f "$REPO_ROOT/.github/PULL_REQUEST_TEMPLATE.md" ]; then
-    cp "$STANDARDS_DIR/templates/PULL_REQUEST_TEMPLATE.md" "$REPO_ROOT/.github/PULL_REQUEST_TEMPLATE.md"
-    echo "[COPY] PULL_REQUEST_TEMPLATE.md -> .github/"
-else
-    echo "[SKIP] PR template already exists"
-fi
-
-# 4. Detect project type and copy language-specific configs
-LANG_DETECTED=""
-if [ -f "$REPO_ROOT/pom.xml" ]; then
-    echo ""
-    echo "[JAVA] Detected Maven project"
-    LANG_DETECTED="java"
-    for f in checkstyle.xml spotbugs-include.xml pmd-rules.xml; do
-        if [ ! -f "$REPO_ROOT/$f" ]; then
-            cp "$STANDARDS_DIR/language-specific/java/$f" "$REPO_ROOT/$f"
-            echo "  [COPY] language-specific/java/$f -> $f"
-        fi
-    done
-    touch "$REPO_ROOT/.gitignore"
-    if ! grep -q "target/" "$REPO_ROOT/.gitignore" 2>/dev/null; then
-        cat "$STANDARDS_DIR/templates/.gitignore.java" >> "$REPO_ROOT/.gitignore"
-        echo "  [APPEND] .gitignore.java -> .gitignore"
-    fi
-
-elif ls "$REPO_ROOT"/*.go 2>/dev/null | head -1 > /dev/null 2>&1; then
-    echo ""
-    echo "[GO] Detected Go project"
-    LANG_DETECTED="go"
-    if [ ! -f "$REPO_ROOT/.golangci.yml" ]; then
-        cp "$STANDARDS_DIR/language-specific/go/golangci.yml" "$REPO_ROOT/.golangci.yml"
-        echo "  [COPY] language-specific/go/golangci.yml -> .golangci.yml"
-    fi
-    if [ ! -f "$REPO_ROOT/Makefile" ]; then
-        cp "$STANDARDS_DIR/ci/templates/Makefile.go" "$REPO_ROOT/Makefile"
-        echo "  [COPY] ci/templates/Makefile.go -> Makefile"
-    fi
-    if ! grep -q "bin/" "$REPO_ROOT/.gitignore" 2>/dev/null; then
-        cat "$STANDARDS_DIR/templates/.gitignore.go" >> "$REPO_ROOT/.gitignore"
-        echo "  [APPEND] .gitignore.go -> .gitignore"
-    fi
-
-elif [ -f "$REPO_ROOT/package.json" ]; then
-    echo ""
-    echo "[JS/TS] Detected Node.js project"
-    LANG_DETECTED="node"
-    # ESLint config
-    if [ ! -f "$REPO_ROOT/.eslintrc.js" ] && [ ! -f "$REPO_ROOT/.eslintrc.json" ] && [ ! -f "$REPO_ROOT/eslint.config.js" ]; then
-        cp "$STANDARDS_DIR/language-specific/javascript/eslint.config.js" "$REPO_ROOT/eslint.config.js"
-        echo "  [COPY] language-specific/javascript/eslint.config.js -> eslint.config.js"
-    fi
-    # Prettier config
-    if [ ! -f "$REPO_ROOT/.prettierrc.js" ] && [ ! -f "$REPO_ROOT/.prettierrc" ] && [ ! -f "$REPO_ROOT/prettier.config.js" ]; then
-        cp "$STANDARDS_DIR/language-specific/javascript/prettier.config.js" "$REPO_ROOT/prettier.config.js"
-        echo "  [COPY] language-specific/javascript/prettier.config.js -> prettier.config.js"
-    fi
-    # .gitignore
-    if ! grep -q "node_modules/" "$REPO_ROOT/.gitignore" 2>/dev/null; then
-        cat "$STANDARDS_DIR/templates/.gitignore.node" >> "$REPO_ROOT/.gitignore"
-        echo "  [APPEND] .gitignore.node -> .gitignore"
-    fi
-fi
-
-# 5. CI/CD initialization
-echo ""
-echo "--- CI/CD Setup ---"
-if [ ! -t 0 ]; then
-    echo "Non-interactive stdin — skipping CI/CD setup. Run later: ./.standards/scripts/init-ci.sh"
-else
-echo "Initialize CI/CD for this project?"
-select CI_CHOICE in "GitHub Actions" "GitLab CI" "Skip"; do
-    case $CI_CHOICE in
-        "GitHub Actions"|"GitLab CI")
-            if [ "$CI_CHOICE" = "GitHub Actions" ]; then
-                CI_PLATFORM="github"
-            else
-                CI_PLATFORM="gitlab"
-            fi
-            echo ""
-            echo "Running CI/CD generator..."
-            if [ -n "$LANG_DETECTED" ]; then
-                bash "$STANDARDS_DIR/scripts/init-ci.sh" \
-                    --platform "$CI_PLATFORM" \
-                    --backend "$LANG_DETECTED" \
-                    --registry "ghcr.io"
-            else
-                bash "$STANDARDS_DIR/scripts/init-ci.sh" \
-                    --platform "$CI_PLATFORM" \
-                    --registry "ghcr.io"
-            fi
-            break
-            ;;
-        "Skip")
-            echo "[SKIP] CI/CD setup skipped."
-            echo "  Run later: ./.standards/scripts/init-ci.sh"
-            break
-            ;;
-    esac
-done
-fi
-
-# 5b. TDD feature templates (spec 001 Track A) — reference ci/templates/*-feature
-# Scaffolds for polyglot TDD: ci/templates/java-feature, ci/templates/go-feature, ci/templates/js-feature
-# Child repos copy one via: cp -r .standards/ci/templates/go-feature ./my-feature
-# No hard-coded child path (/home/ etc.) — uses REPO_ROOT and STANDARDS_DIR only.
-if [ -d "$STANDARDS_DIR/ci/templates/java-feature" ]; then
-  echo "[INFO] TDD scaffolds available: ci/templates/java-feature, ci/templates/go-feature, ci/templates/js-feature"
-  echo "  See docs/TESTING_TDD_GUIDE.md §(a) for bootstrap snippet."
-fi
-
-# 6. Session hygiene scripts
-echo ""
-echo "--- Session Hygiene ---"
-echo ""
-for script in session-start-check.sh session-end-check.sh; do
-    if [ ! -f "$REPO_ROOT/$script" ]; then
-        cp "$STANDARDS_DIR/templates/$script" "$REPO_ROOT/$script"
-        chmod +x "$REPO_ROOT/$script"
-        echo "  [COPY] templates/$script -> $script"
-    else
-        echo "  [SKIP] $script already exists"
-    fi
-done
-
-# 7. Git hooks — wire the guard-env pre-commit (docs/GIT_WORKFLOW.md §Git Hooks)
-echo ""
-echo "--- Git Hooks ---"
-mkdir -p "$REPO_ROOT/.githooks"
-if [ ! -f "$REPO_ROOT/.githooks/pre-commit" ]; then
-    cp "$STANDARDS_DIR/templates/githooks-pre-commit" "$REPO_ROOT/.githooks/pre-commit"
-    chmod +x "$REPO_ROOT/.githooks/pre-commit"
-    echo "  [COPY] templates/githooks-pre-commit -> .githooks/pre-commit"
-else
-    echo "  [SKIP] .githooks/pre-commit already exists"
-fi
-if git -C "$REPO_ROOT" config core.hooksPath .githooks; then
-    echo "  [CONFIG] core.hooksPath = .githooks"
-else
-    echo "  [WARN] could not set core.hooksPath — run manually: git config core.hooksPath .githooks"
-fi
-
-# 8. TS strict flags — merge into child tsconfig*.json for Node projects. The
-# shared baseline (language-specific/javascript/tsconfig.base.json) is a
-# reference doc, not a copy; Vite/create-react-app scaffolds ship loose and
-# null-safety bugs stay invisible to `tsc -b` until strict is on.
-if [ "${LANG_DETECTED:-}" = "node" ]; then
-    for tsconf in "$REPO_ROOT"/tsconfig*.json; do
-        [ -e "$tsconf" ] || continue
-        node -e '
-            const fs = require("fs");
-            const p = process.argv[1];
-            let j;
-            try { j = JSON.parse(fs.readFileSync(p, "utf8")); }
-            catch { console.log("  [SKIP] " + p + " — not plain JSON (comments present); enable strict:true manually"); process.exit(0); }
-            const c = j.compilerOptions || {};
-            if (c.strict === true && c.noImplicitReturns === true) { process.exit(0); }
-            j.compilerOptions = Object.assign({}, c);
-            if (j.compilerOptions.strict !== true) j.compilerOptions.strict = true;
-            if (j.compilerOptions.noImplicitReturns !== true) j.compilerOptions.noImplicitReturns = true;
-            fs.writeFileSync(p, JSON.stringify(j, null, 2) + "\n");
-            console.log("  [MERGE] strict + noImplicitReturns -> " + p);
-        ' "$tsconf" || echo "  [WARN] merge failed for $tsconf — check manually"
-    done
-fi
-
-echo ""
-echo "=== Bootstrap complete ==="
-echo "Next steps:"
-echo "  1. Review and commit the new files:"
-echo "     git add .standards AGENTS.md opencode.json .gitattributes .github/ config/.gitignore Makefile"
-echo "  2. OpenCode will auto-discover AGENTS.md and load instructions from .standards/"
-echo "  3. Run session hygiene check: ./session-start-check.sh"
-echo "  4. Push and verify CI pipeline runs"
-echo "  5. Read OKF practices: open .standards/okf/ (context policy, RAG, rot detection)"
+main "$@"
