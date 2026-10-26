@@ -1,0 +1,26 @@
+# Contract tests (Pact) — child-repo caller for the shared reusable workflow.
+#
+# Written by ./.standards/scripts/bootstrap.sh --with-contract (capability
+# `gate-contract`). `language` is filled in from the detected/selected
+# backend; the per-language Pact reference snippets (pact-<lang>.yml) are
+# copied next to this file by the same capability.
+name: Contract tests (Pact)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-contract.yml@__STANDARDS_PIN__ # pinned; bump deliberately, never track a branch
+    with:
+      language: __BACKEND_LANGUAGE__
+    secrets:
+      PACT_BROKER_URL: ${{ secrets.PACT_BROKER_URL }}
+      PACT_BROKER_TOKEN: ${{ secrets.PACT_BROKER_TOKEN }}

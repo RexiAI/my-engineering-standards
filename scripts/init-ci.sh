@@ -11,8 +11,19 @@ set -euo pipefail
 #   Interactive:    ./.standards/scripts/init-ci.sh
 #   Pre-filled:     ./.standards/scripts/init-ci.sh \
 #                     --platform github \
-#                     --languages java,go \
+#                     --backend java,go,node,python,rust \
+#                     --frontend nextjs,react,angular,ionic,react-native,static \
 #                     --registry ghcr.io
+#
+# Acceptance scenario coverage (spec 033, docs/SPEC_PIPELINE.md §Scenario format):
+#   AC-033-31  usage line and invalid-flag error text updated together
+#   AC-033-32  --backend python accepted; emits the self-contained
+#              ci/templates/child-ci-python.yml as .github/workflows/ci-python.yml
+#              (no ci-python.yml reusable workflow exists yet — ADR 0006 D4)
+#   AC-033-33  --backend rust accepted; emits child-ci-rust.yml the same way
+#   AC-033-34  --frontend ionic accepted; wires the Angular workflow
+#              (ci-angular.yml on GitHub, ci/gitlab/frontend/ci-angular.yml on
+#              GitLab) until a dedicated Ionic workflow exists
 #
 # Acceptance scenario coverage (spec 022, docs/SPEC_PIPELINE.md §Scenario format):
 #   AC-022-01  docs/CI_CD.md §Release Process rationale — why the bootstrap does
@@ -111,7 +122,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     *)
       err "Unknown flag: $1"
-      echo "Usage: $0 [--platform github|gitlab|both] [--backend java,go,node] [--frontend nextjs,react,angular,react-native,static] [--registry ghcr.io] [--with-saga] [--with-deploy] [--deploy-tool kamal|dokku|ssh] [--with-release] [--with-pr-review]"
+      echo "Usage: $0 [--platform github|gitlab|both] [--backend java,go,node,python,rust] [--frontend nextjs,react,angular,ionic,react-native,static] [--registry ghcr.io] [--with-saga] [--with-deploy] [--deploy-tool kamal|dokku|ssh] [--with-release] [--with-pr-review]"
       exit 1
       ;;
   esac
@@ -333,6 +344,30 @@ _wants_npm_token() {
 collect_secrets
 
 # ── Step 4: Generate files ────────────────────
+# Caller-side permission cap (docs/SECURITY.md §CI/CD Supply Chain §Caller
+# workflows must grant what a reusable workflow declares). A called workflow can
+# never hold more GITHUB_TOKEN permissions than its CALLER grants; when the
+# callee declares more than the caller allows, GitHub fails the run at startup
+# ("The workflow is requesting 'packages: write', but is only allowed
+# 'packages: read'") — which is what happens under an org-default read-only
+# token when this block is omitted. Grant the union of what the callees wired
+# below declare:
+#   ci-<backend> / ci-<frontend>: contents: read, packages: write
+#   ci-deploy-*:                  contents: read, packages: read
+#   ci-release:                   contents: write, issues: write, pull-requests: write
+#   ci-pr-review:                 contents: read, pull-requests: write
+_caller_permissions() { # → CALLER_CONTENTS_PERM / CALLER_EXTRA_PERMS
+  CALLER_CONTENTS_PERM="read"
+  CALLER_EXTRA_PERMS=""
+  if [ "$WITH_RELEASE_FLAG" = "true" ]; then
+    CALLER_CONTENTS_PERM="write"
+    CALLER_EXTRA_PERMS="  issues: write
+  pull-requests: write"
+  elif [ "$WITH_PR_REVIEW_FLAG" = "true" ]; then
+    CALLER_EXTRA_PERMS="  pull-requests: write"
+  fi
+}
+
 generate_github_ci() {
   local target="$PROJECT_ROOT/.github/workflows/ci.yml"
   local registry="${REGISTRY_FLAG:-ghcr.io}"
@@ -340,27 +375,7 @@ generate_github_ci() {
 
   mkdir -p "$PROJECT_ROOT/.github/workflows"
 
-  # Caller-side permission cap (docs/SECURITY.md §CI/CD Supply Chain §Caller
-  # workflows must grant what a reusable workflow declares). A called workflow
-  # can never hold more GITHUB_TOKEN permissions than its CALLER grants; when
-  # the callee declares more than the caller allows, GitHub fails the run at
-  # startup ("The workflow is requesting 'packages: write', but is only
-  # allowed 'packages: read'") — which is what happens under an org-default
-  # read-only token when this block is omitted. Grant the union of what the
-  # callees wired below declare:
-  #   ci-<backend> / ci-<frontend>: contents: read, packages: write
-  #   ci-deploy-*:                  contents: read, packages: read
-  #   ci-release:                   contents: write, issues: write, pull-requests: write
-  #   ci-pr-review:                 contents: read, pull-requests: write
-  local contents_perm="read"
-  local extra_perms=""
-  if [ "$WITH_RELEASE_FLAG" = "true" ]; then
-    contents_perm="write"
-    extra_perms="  issues: write
-  pull-requests: write"
-  elif [ "$WITH_PR_REVIEW_FLAG" = "true" ]; then
-    extra_perms="  pull-requests: write"
-  fi
+  _caller_permissions
 
   cat > "$target" << EOF
 name: CI
@@ -373,11 +388,11 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: ${contents_perm}
+  contents: ${CALLER_CONTENTS_PERM}
   packages: write
 EOF
-  if [ -n "$extra_perms" ]; then
-    printf '%s\n' "$extra_perms" >> "$target"
+  if [ -n "$CALLER_EXTRA_PERMS" ]; then
+    printf '%s\n' "$CALLER_EXTRA_PERMS" >> "$target"
   fi
   printf '\njobs:\n' >> "$target"
 
@@ -386,15 +401,7 @@ EOF
   fi
 
   for lang in "${BACKEND[@]}"; do
-    cat >> "$target" << EOF
-  backend-ci-${lang}:
-    uses: RexiAI/my-engineering-standards/.github/workflows/ci-${lang}.yml@${STANDARDS_PIN} # pinned; bump deliberately, never track a branch
-    with:
-      docker-registry: $registry
-    secrets:
-      GHCR_TOKEN: \${{ secrets.GHCR_TOKEN }}
-      PACT_BROKER_URL: \${{ secrets.PACT_BROKER_URL }}
-EOF
+    _gh_backend_job "$target" "$registry" "$lang"
   done
 
   _gh_frontend_job "$target" "$registry"
@@ -415,6 +422,63 @@ EOF
   _gh_dependabot
   _gh_releaserc
   _copy_go_makefile
+}
+
+# One backend job per language. java/go/node call the shared reusable
+# workflow; python/rust have no reusable workflow yet (ADR 0006 D4 scopes them
+# to ci/templates/), so they get the self-contained template copied instead of
+# a delegator pointing at a workflow nobody ships (AC-033-32/33).
+_gh_backend_job() {
+  local target="$1" registry="$2" lang="$3"
+  if ! _backend_has_delegator "$lang"; then
+    _copy_selfcontained_backend "$lang"
+    return 0
+  fi
+
+  cat >> "$target" << EOF
+  backend-ci-${lang}:
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-${lang}.yml@${STANDARDS_PIN} # pinned; bump deliberately, never track a branch
+    with:
+      docker-registry: $registry
+    secrets:
+      GHCR_TOKEN: \${{ secrets.GHCR_TOKEN }}
+      PACT_BROKER_URL: \${{ secrets.PACT_BROKER_URL }}
+EOF
+}
+
+# False only for the languages whose reusable workflow does not exist yet.
+_backend_has_delegator() {
+  case "$1" in
+    python|rust) return 1 ;;
+  esac
+  return 0
+}
+
+_backend_child_template() {
+  case "$1" in
+    python) echo "child-ci-python.yml" ;;
+    rust)   echo "child-ci-rust.yml" ;;
+    *)      echo "" ;;
+  esac
+}
+
+# Copy the self-contained child CI template into .github/workflows/ci-<lang>.yml.
+# Never overwrites an existing file.
+_copy_selfcontained_backend() {
+  local lang="$1" tpl dest
+  tpl="$(_backend_child_template "$lang")"
+  if [ -z "$tpl" ]; then
+    warn "No CI template for backend '$lang' — nothing emitted"
+    return 0
+  fi
+  dest="$PROJECT_ROOT/.github/workflows/ci-${lang}.yml"
+  if [ -f "$dest" ]; then
+    info "Kept existing .github/workflows/ci-${lang}.yml"
+    return 0
+  fi
+  mkdir -p "$PROJECT_ROOT/.github/workflows"
+  cp "$STANDARDS_DIR/ci/templates/$tpl" "$dest"
+  ok "Generated: .github/workflows/ci-${lang}.yml (self-contained: ci/templates/$tpl)"
 }
 
 # Deploy job for production, appended only when --with-deploy is set.
@@ -495,12 +559,18 @@ EOF
 
 # Frontend job block: react-native swaps the docker-registry/GHCR pair for a
 # node-version/EXPO_TOKEN pair (EAS builds remotely, no registry push).
+# Ionic shares the Angular workflow until a dedicated ci-ionic.yml exists
+# (AC-033-34).
 _gh_frontend_job() {
   local target="$1"
   local registry="$2"
   [ -z "$FRONTEND" ] && return 0
 
-  local workflow="ci-${FRONTEND}.yml"
+  local workflow
+  case "$FRONTEND" in
+    ionic) workflow="ci-angular.yml" ;;
+    *)     workflow="ci-${FRONTEND}.yml" ;;
+  esac
   local with_block="      docker-registry: $registry"
   local secrets_block="       GHCR_TOKEN: \${{ secrets.GHCR_TOKEN }}"
   if [ "$FRONTEND" = "react-native" ]; then
@@ -524,6 +594,8 @@ _gh_deploy_needs() {
   local needs_list=""
   local lang
   for lang in "${BACKEND[@]}"; do
+    # Only languages that emit a backend-ci-<lang> job can be a dependency.
+    _backend_has_delegator "$lang" || continue
     if [ -n "$needs_list" ]; then
       needs_list="${needs_list}, backend-ci-${lang}"
     else
@@ -582,6 +654,15 @@ _has_node_backend() {
   return 1
 }
 
+# The GitLab pipeline stage list; --with-saga inserts the saga-gates stage.
+_gitlab_stages() { # SAGA_ENABLED → the stages block
+  if [ "$1" = "true" ]; then
+    printf 'stages:\n  - test\n  - lint\n  - saga-gates\n  - contract\n  - integration\n  - deploy\n  - docker'
+    return 0
+  fi
+  printf 'stages:\n  - test\n  - lint\n  - contract\n  - integration\n  - deploy\n  - docker'
+}
+
 generate_gitlab() {
   local target="$PROJECT_ROOT/.gitlab-ci.yml"
   local registry="${REGISTRY_FLAG:-ghcr.io}"
@@ -599,10 +680,17 @@ include:
 EOF
 
   for lang in "${BACKEND[@]}"; do
+    if ! _backend_has_delegator "$lang"; then
+      # No ci/gitlab/backend/ci-<lang>.yml template exists yet (ADR 0006 D4).
+      warn "No GitLab CI template for backend '$lang' — nothing emitted into .gitlab-ci.yml"
+      continue
+    fi
     echo "  - local: .standards/ci/gitlab/backend/ci-${lang}.yml" >> "$target"
   done
   if [ -n "$FRONTEND" ]; then
-    echo "  - local: .standards/ci/gitlab/frontend/ci-${FRONTEND}.yml" >> "$target"
+    # Ionic rides the Angular template until a dedicated Ionic one exists
+    # (AC-033-34) — same alias as the GitHub path.
+    echo "  - local: .standards/ci/gitlab/frontend/ci-$(_gitlab_frontend_wiring).yml" >> "$target"
   fi
   if [ "$WITH_RELEASE_FLAG" = "true" ]; then
     # GitLab symmetric (AC-022-03-06): include the shared release template;
@@ -610,24 +698,8 @@ EOF
     echo "  - local: .standards/ci/gitlab/shared/ci-release.yml" >> "$target"
   fi
 
-  # Add saga-gates stage when --with-saga
-  local stages_block="stages:
-  - test
-  - lint
-  - contract
-  - integration
-  - deploy
-  - docker"
-  if [ "$saga_enabled" = "true" ]; then
-    stages_block="stages:
-  - test
-  - lint
-  - saga-gates
-  - contract
-  - integration
-  - deploy
-  - docker"
-  fi
+  local stages_block
+  stages_block=$(_gitlab_stages "$saga_enabled")
 
   cat >> "$target" << EOF
 
@@ -687,6 +759,10 @@ _gl_backend_jobs() {
   local saga_enabled="$2"
   local lang
   for lang in "${BACKEND[@]}"; do
+    # No GitLab template exists for python/rust yet (ADR 0006 D4) — the include
+    # loop above already warned; emitting extends: .<lang>-unit would point at a
+    # job that does not exist.
+    _backend_has_delegator "$lang" || continue
     cat >> "$target" << EOF
 
 ${lang}-unit:
@@ -729,13 +805,26 @@ EOF
   done
 }
 
+# GitLab template/job namespace for the selected frontend. Ionic aliases to
+# Angular until a dedicated Ionic template ships (AC-033-34).
+_gitlab_frontend_wiring() {
+  case "$FRONTEND" in
+    ionic) echo "angular" ;;
+    *)     echo "$FRONTEND" ;;
+  esac
+}
+
 # Frontend jobs for GitLab. React Native shares the unit/lint/build jobs with
-# the web frontends (the extends names interpolate through FRONTEND) and only
-# swaps the tail job: typecheck+eas instead of docker. Emitted in the original
-# job order (unit, lint, typecheck, build, eas) to keep generated output stable.
+# the web frontends (the extends names interpolate through the frontend
+# namespace) and only swaps the tail job: typecheck+eas instead of docker.
+# Emitted in the original job order (unit, lint, typecheck, build, eas) to keep
+# generated output stable.
 _gl_frontend_job() {
   local target="$1"
   [ -z "$FRONTEND" ] && return 0
+
+  local fw
+  fw="$(_gitlab_frontend_wiring)"
 
   if [ "$FRONTEND" = "static" ]; then
     cat >> "$target" << EOF
@@ -754,11 +843,11 @@ EOF
   cat >> "$target" << EOF
 
 frontend-unit:
-  extends: .${FRONTEND}-unit
+  extends: .${fw}-unit
   stage: test
 
 frontend-lint:
-  extends: .${FRONTEND}-lint
+  extends: .${fw}-lint
   stage: lint
 EOF
 
@@ -774,7 +863,7 @@ EOF
   cat >> "$target" << EOF
 
 frontend-build:
-  extends: .${FRONTEND}-build
+  extends: .${fw}-build
   stage: deploy
 EOF
 
@@ -789,7 +878,7 @@ EOF
     cat >> "$target" << EOF
 
 frontend-docker:
-  extends: .${FRONTEND}-docker
+  extends: .${fw}-docker
   stage: docker
 EOF
   fi

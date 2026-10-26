@@ -1,0 +1,29 @@
+# Production deploy verification (Vercel) — child-repo caller for the shared
+# post-merge lane.
+#
+# Written by ./.standards/scripts/bootstrap.sh --with-deploy vercel
+# (capability `deploy-vercel`). The reusable workflow queries the Vercel API
+# for the production deployment the Git integration built for the merged
+# commit, health-checks the production URL, and records the result. Repos
+# without a linked Vercel project skip with a reason; a missing VERCEL_TOKEN
+# is a configuration defect and fails loudly (docs/DEPLOYMENT.md
+# §Frontend: Vercel).
+name: Production deploy verification (Vercel)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-production:
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-vercel-production-verify.yml@__STANDARDS_PIN__ # pinned; bump deliberately, never track a branch
+    with:
+      health-path: "/"
+    secrets:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
