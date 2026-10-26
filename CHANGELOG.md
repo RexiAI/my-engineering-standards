@@ -1,3 +1,10 @@
+# [1.42.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.41.0...v1.42.0) (2026-10-26)
+
+
+### Features
+
+* **bootstrap:** catalog-driven capability wiring + init-ci python/rust/ionic (spec 033) ([#100](https://github.com/RexiAI/my-engineering-standards/issues/100)) ([222eafe](https://github.com/RexiAI/my-engineering-standards/commit/222eafe247426b4d0243bd5f3b93d84348f64a97))
+
 # [1.41.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.40.0...v1.41.0) (2026-10-22)
 
 
