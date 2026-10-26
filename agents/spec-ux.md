@@ -38,9 +38,13 @@ applicability check below runs unchanged and your behavior is identical to the
 pre-integration agent (record no judgment telemetry).
 
 When configured, write the concatenation of the **full** content of
-`00-informal.md` and `10-tasks.md` (no truncation of the payload itself) to a
-temp state file and ask exactly one Choice question, before loading the design
-skill. The criteria field must be a JSON **object keyed by the option names**,
+`00-informal.md` and `10-tasks.md` to a temp state file and ask exactly one
+Choice question, before loading the design skill. The wrapper caps the
+serialized state at `JUDGMENT_MAX_STATE_BYTES` (default 12288 bytes = 12 KB)
+and truncates it deterministically — head + marker + tail, with the marker
+naming the omitted byte count — before sending. The truncated payload is what
+the API receives; the agent itself never claims the state is sent untruncated.
+The criteria field must be a JSON **object keyed by the option names**,
 not a string — that is the shape the judgment API's Choice question requires,
 and a string is rejected with HTTP 422, which the wrapper surfaces as exit 10
 (fallback), so the mistake is silent rather than loud. The options array is
@@ -60,13 +64,27 @@ faster; it never invents a new one:
 - exit 0, answer `"skip"` → emit the existing SKIPPED line verbatim
   (`SKIPPED — no frontend surface detected. …`) and end your turn.
 - exit 0, answer `"ambiguous"` → emit `BLOCKED — <one question>`; you
-  formulate that single question with your own judgment, as today.
-- **exit 10** (confidence below threshold, daily cap, API/network failure, or
-  any other fallback reason) → emit `BLOCKED — <one question>`; you formulate
-  the question as today. Do not fall through to a silent SKIPPED or run.
+  formulate that single question with your own judgment, as today. This is
+  the only fast-path outcome that blocks.
+
+The fast-path never invents or replaces an outcome; it only picks one faster.
+
+- **exit 10** (no fast-path exists: not configured after all, daily cap,
+  API/network failure, unparsable response, or confidence below the
+  threshold) → run the stock applicability check unchanged: the
+  `# Applicability check (first action, always)` section below. Record
+  `fallback:true` plus the wrapper-reported reason in telemetry. Do not fall
+  through to a silent SKIPPED or run, and do not halt the pipeline for a
+  transport/fallback failure.
 
 Record telemetry per call in your turn's run-log section, whatever the exit
-code: `{"judgment":"applicability","answer":<answer or null>,"confidence":<0..1 or null>,"latency_ms":<ms or null>,"tokens":<n or null>,"fallback":<false|true>}`.
+code: `{"judgment":"applicability","answer":<answer or null>,"confidence":<0..1 or null>,"latency_ms":<ms or null>,"tokens":<n or null>,"fallback":<false|true>,"reason":<"unconfigured"|"unreachable"|"payload_overflow"|"error"|null>,"truncated":<false|true>,"original_bytes":<n or null>}`.
+`reason` is one of the four fallback reasons on exit 10 and `null` otherwise.
+`truncated` is `true` when the wrapper emitted `reason=payload_overflow` (the
+state exceeded the cap and was truncated); `original_bytes` is the value from
+its `typed-judgment: truncated original_bytes=<n> cap_bytes=<cap>` stderr
+line, or `null` when no truncation occurred. A usable answer with
+`truncated:true` still records `fallback:false`.
 
 # Load the design skill
 

@@ -744,3 +744,207 @@ JSON
   printf '%s' "$output" | jq -e '.u.answer == 0'
   printf '%s' "$output" | jq -e '.severity.answer == 0'
 }
+
+# ── Spec 034: fallback-reason taxonomy + payload cap/truncation ──────────────
+# All tests stay offline: the same fake-curl transport above is the only
+# network path, and no test requires the live local backend (AC-034-33).
+
+# request_body <n> — the JSON body of the nth fake-transport request
+request_body() {
+  awk -v want="$1" '
+    /^--- request [0-9]+$/ { printing = ($3 == want); next }
+    printing { print }
+  ' "$BODIES"
+}
+
+# state_field <n> — the request's state as compact JSON (string or object)
+state_field() { request_body "$1" | jq -cS '.state'; }
+
+# state_text <n> — the request's state when it is a JSON string
+state_text() { request_body "$1" | jq -r '.state'; }
+
+byte_len() { printf '%s' "$1" | wc -c | tr -d '[:space:]'; }
+
+# repeat_char <n> — n copies of a single character (no newline)
+repeat_char() { head -c "$1" /dev/zero | tr '\0' "${2:-a}"; }
+
+# reason_lines <reason> — count of exact reason lines on stderr
+reason_lines() {
+  printf '%s\n' "$stderr" | grep -cE "^typed-judgment: reason=$1$" || true
+}
+
+@test "AC-034-01: unconfigured wrapper falls back with reason unconfigured" {
+  sf=$(make_state 'build failed at step 3')
+  invoke -u JUDGMENT_BACKEND -u JUDGMENT_API_URL -u JUDGMENT_API_KEY \
+    -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 10 "$status"
+  [ "$(reason_lines unconfigured)" -eq 1 ]
+  [ "$(attempts_count)" -eq 0 ]
+}
+
+@test "AC-034-02: unreachable backend falls back with reason unreachable" {
+  printf '7\t0\t%s/empty.json\n' "$FIX" > "$SEQUENCE"
+  sf=$(make_state 'build failed at step 3')
+  invoke -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 10 "$status"
+  [ "$(reason_lines unreachable)" -eq 1 ]
+  [ "$(attempts_count)" -eq 3 ]
+}
+
+@test "AC-034-03: daily cap exceeded falls back with reason error and no request" {
+  export JUDGMENT_DAILY_CAP=5
+  echo 5 > "$(counter_file)"
+  sf=$(make_state 'build failed at step 3')
+  invoke -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 10 "$status"
+  [ "$(reason_lines error)" -eq 1 ]
+  [ "$(attempts_count)" -eq 0 ]
+}
+
+@test "AC-034-04: below-threshold confidence falls back with reason error" {
+  seq_always 200 low
+  sf=$(make_state 'build failed at step 3')
+  invoke -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 10 "$status"
+  [ "$(reason_lines error)" -eq 1 ]
+}
+
+@test "AC-034-05: reason line never leaks the key or an untruncated state" {
+  export JUDGMENT_API_KEY="sk-secret-key-034"
+  export JUDGMENT_DEBUG=1
+  local tail_sentinel="LEAK-SENTINEL-DO-NOT-PRINT"
+  local state; state="$(repeat_char 20000)H$(repeat_char 300)b${tail_sentinel}"
+  printf '7\t0\t%s/empty.json\n' "$FIX" > "$SEQUENCE"
+  sf=$(make_state "$state")
+  invoke -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 10 "$status"
+  [[ "$output" != *"sk-secret-key-034"* ]]
+  [[ "$stderr" != *"sk-secret-key-034"* ]]
+  [[ "$output" != *"$state"* ]]
+  [[ "$stderr" != *"$state"* ]]
+  [[ "$output$stderr" != *"$tail_sentinel"* ]]
+}
+
+@test "AC-034-06: under-cap state is sent byte-identical with no overflow reason" {
+  local state; state="$(repeat_char 1000)"
+  sf=$(make_state "$state")
+  invoke -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 0 "$status"
+  [ "$(request_body 1 | jq -r '.state | type')" = "string" ]
+  [ "$(state_text 1)" = "$state" ]
+  [ "$(byte_len "$(state_text 1)")" -eq 1000 ]
+  [[ "$stderr" != *"payload_overflow"* ]]
+}
+
+@test "AC-034-07: over-cap state is truncated head + marker + tail, still sent, exit 0" {
+  local head_sentinel="HEAD-START" tail_sentinel="TAIL-END"
+  local state="${head_sentinel}$(repeat_char 20000)${tail_sentinel}"
+  sf=$(make_state "$state")
+  invoke -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 0 "$status"
+  local truncated; truncated="$(state_text 1)"
+  [ "$(byte_len "$truncated")" -le 12288 ]
+  [[ "$truncated" == "$head_sentinel"* ]]
+  [[ "$truncated" == *"$tail_sentinel" ]]
+  [[ "$truncated" == *"[truncated: "*" bytes omitted]"* ]]
+  [ "$(reason_lines payload_overflow)" -eq 1 ]
+  [ "$(attempts_count)" -eq 1 ]
+}
+
+@test "AC-034-08: truncation is deterministic across invocations" {
+  local state; state="$(repeat_char 20000)"
+  sf=$(make_state "$state")
+  invoke -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 0 "$status"
+  invoke -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 0 "$status"
+  [ "$(state_field 1)" = "$(state_field 2)" ]
+}
+
+@test "AC-034-09: cap defaults to 12288, honours the env var, and the flag wins" {
+  # default
+  local state; state="$(repeat_char 13000)"
+  sf=$(make_state "$state")
+  invoke -- --state-file "$sf" --questions "$Q" --dry-run
+  assert_exit_code 0 "$status"
+  [ "$(byte_len "$(printf '%s' "$output" | jq -r '.state')")" -eq 12288 ]
+
+  # env
+  invoke JUDGMENT_MAX_STATE_BYTES=2048 -- --state-file "$sf" --questions "$Q" --dry-run
+  assert_exit_code 0 "$status"
+  [ "$(byte_len "$(printf '%s' "$output" | jq -r '.state')")" -eq 2048 ]
+
+  # flag wins over env
+  invoke JUDGMENT_MAX_STATE_BYTES=2048 -- --state-file "$sf" --questions "$Q" \
+    --max-state-bytes 4096 --dry-run
+  assert_exit_code 0 "$status"
+  [ "$(byte_len "$(printf '%s' "$output" | jq -r '.state')")" -eq 4096 ]
+}
+
+@test "AC-034-10: --dry-run prints the truncated body, never the full state" {
+  local state; state="UNIQUE-HEAD$(repeat_char 20000)"
+  sf=$(make_state "$state")
+  invoke -- --state-file "$sf" --questions "$Q" --dry-run
+  assert_exit_code 0 "$status"
+  [[ "$output" == *"[truncated: "*" bytes omitted]"* ]]
+  [ "$(byte_len "$(printf '%s' "$output" | jq -r '.state')")" -le 12288 ]
+  [[ "$output" != *"$state"* ]]
+  [ "$(attempts_count)" -eq 0 ]
+}
+
+@test "AC-034-11: non-JSON string state over the cap is truncated as a string" {
+  local head_sentinel="STR-HEAD" tail_sentinel="STR-TAIL"
+  local state="${head_sentinel}$(repeat_char 20000)${tail_sentinel}"
+  sf=$(make_state "$state")
+  invoke -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 0 "$status"
+  [ "$(request_body 1 | jq -r '.state | type')" = "string" ]
+  local truncated; truncated="$(state_text 1)"
+  [ "$(byte_len "$truncated")" -le 12288 ]
+  [[ "$truncated" == "$head_sentinel"* ]]
+  [[ "$truncated" == *"$tail_sentinel" ]]
+  [[ "$truncated" == *"[truncated: "*" bytes omitted]"* ]]
+  [ "$(reason_lines payload_overflow)" -ge 1 ]
+}
+
+@test "unit: invalid --max-state-bytes values are usage errors (exit 2, no request)" {
+  sf=$(make_state 'build failed at step 3')
+  local bad
+  for bad in abc 0 -1 12.5 ""; do
+    invoke -- --state-file "$sf" --questions "$Q" --max-state-bytes "$bad"
+    assert_exit_code 2 "$status"
+    [ "$(attempts_count)" -eq 0 ]
+  done
+}
+
+@test "unit: invalid JUDGMENT_MAX_STATE_BYTES is a usage error (exit 2)" {
+  sf=$(make_state 'build failed at step 3')
+  invoke JUDGMENT_MAX_STATE_BYTES=abc -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 2 "$status"
+  [ "$(attempts_count)" -eq 0 ]
+}
+
+@test "unit: a cap smaller than the marker still never exceeds the cap" {
+  local state; state="$(repeat_char 500)"
+  sf=$(make_state "$state")
+  invoke -- --state-file "$sf" --questions "$Q" --max-state-bytes 10 --dry-run
+  assert_exit_code 0 "$status"
+  [ "$(byte_len "$(printf '%s' "$output" | jq -r '.state')")" -le 10 ]
+}
+
+@test "unit: state exactly at the cap is not truncated and emits no reason" {
+  local state; state="$(repeat_char 100)"
+  sf=$(make_state "$state")
+  invoke -- --state-file "$sf" --questions "$Q" --max-state-bytes 100
+  assert_exit_code 0 "$status"
+  [ "$(state_text 1)" = "$state" ]
+  [[ "$stderr" != *"reason="* ]]
+}
+
+@test "unit: successful under-cap call writes no reason line at all" {
+  seq_ok
+  sf=$(make_state 'build failed at step 3')
+  invoke -- --state-file "$sf" --questions "$Q"
+  assert_exit_code 0 "$status"
+  [ -z "$stderr" ]
+}

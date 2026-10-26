@@ -282,7 +282,14 @@ while IFS= read -r tok; do
   fi
 done < <(grep -hoP '`\Kspec-[a-z][a-z0-9-]*' "$BUILD" "$ORCH" 2>/dev/null | sort -u || true)
 absent AC-014-04-09 "$BUILD" 'scripts/'
-absent AC-014-04-09 "$ORCH" 'scripts/'
+# Spec 034 amendment: the orchestrator runs one script itself — the fail-open
+# judgment preflight, as its first action for both /spec and /build. The
+# original blanket ban stays for every other scripts/ reference.
+if grep -vE 'scripts/judgment-preflight\.sh' "$ORCH" | grep -qE 'scripts/'; then
+  fail "AC-014-04-09 — forbidden pattern 'scripts/' present in ${ORCH#"$ROOT"/} outside the allowed judgment-preflight invocation"
+else
+  pass "AC-014-04-09 — no 'scripts/' in ${ORCH#"$ROOT"/} outside the allowed judgment-preflight invocation (spec 034)"
+fi
 absent AC-014-04-09 "$BUILD" '\.github/workflows'
 absent AC-014-04-09 "$ORCH" '\.github/workflows'
 

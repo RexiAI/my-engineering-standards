@@ -565,6 +565,15 @@ not as literals in `opencode.json`.
 
 ### One-time setup (per machine)
 
+0. **Start the optional local judgment backend** (step 0; optional but
+   recommended where a GPU is available): `make judgment-up`. It serves the
+   opt-in typed-judgment fast-path described in §Typed-judgment layer; skip it
+   freely on machines without the backend, every consumer falls back to its
+   stock procedure. Token caveat, measured: judgment classification calls are
+   negligible next to this machine's ~95% cache-read token spend, so the local
+   backend is a reliability and cost-hygiene feature, not the main token
+   lever.
+
 1. **Install direnv and wire the hook once** so every shell loads the env
    automatically before opencode launches:
 
@@ -701,7 +710,11 @@ supports this as an **opt-in** fast-path — see ADR 0004.
   attempts with exponential backoff), a per-day call cap
   (`.cache/judgment-cap-YYYY-MM-DD`, gitignored), a confidence threshold
   (default `0.6`), and never prints the API key or an untruncated state
-  payload in diagnostics. `--dry-run` prints the request body offline.
+  payload in diagnostics. `--dry-run` prints the request body offline. The
+  contract the wrapper and its two probe consumers share — the reason-line
+  format, the bounded-probe call shape, the payload-cap default, and the
+  synthetic fitness question — lives in `scripts/judgment-lib.sh`, sourced by
+  all three scripts.
 - **Local backend option.** `JUDGMENT_BACKEND=local` activates a local compute
   backend (spec 029, ADR 0005): a judgment model you serve on your own
   machine instead of a hosted paid API. In local mode the API key is optional
@@ -716,10 +729,46 @@ supports this as an **opt-in** fast-path — see ADR 0004.
   judgment-up` / `make judgment-down` wire the same script.
 - **Exit-code contract.** `0` = usable answer (parsed, every question
   answered, every confidence at or above the threshold); `10` = fallback
-  (not configured, cap exceeded, transport/HTTP failure after retries,
-  unparsable response, or low confidence); `2` = usage error. Exit `10` is
-  the load-bearing case: consumers treat it exactly like "no fast-path
-  exists".
+  (no fast-path exists: not configured, cap exceeded, transport/HTTP failure
+  after retries, unparsable response, or low confidence); `2` = usage error.
+  Exit `10` is load-bearing and means exactly one thing: **no fast-path
+  exists → run the original (stock) procedure**. `BLOCKED` or halting is
+  never a valid consumer response to exit `10`; exit `10` never halts a
+  consumer. The only consumer outcome that halts is a genuine ambiguous
+  answer at exit `0`.
+- **Fallback reasons.** Every exit `10` writes one
+  `typed-judgment: reason=<word>` line to stderr, with `<word>` one of
+  `unconfigured` (credentials absent), `unreachable` (transport/HTTP failure
+  after retries), `payload_overflow` (the state was capped and truncated —
+  emitted while the call still proceeds, so a usable answer keeps exit `0`),
+  or `error` (daily cap, unparsable response, confidence below threshold).
+  The line is not debug-gated and never carries the key or state content.
+- **Fail-open preflight.** `scripts/judgment-preflight.sh` is a bounded
+  fitness probe run as the first action of `/spec` and `/build`. It is silent
+  when the local backend is not configured; when configured it makes one
+  Choice probe through `scripts/typed-judgment.sh` (timeout 5 s, no backoff,
+  confidence threshold 0 for the probe — it measures reachability and
+  inference, not the calibration of one synthetic question) and caches the
+  outcome in `${JUDGMENT_CAP_DIR:-.cache}/judgment-preflight`
+  for `JUDGMENT_PREFLIGHT_TTL_SECONDS` (default 300). A failed probe prints
+  one warning naming `make judgment-up` and `continuing without` the
+  fast-path, then exits `0`: it never blocks a stage by default.
+  `--require-judgment` or `JUDGMENT_REQUIRED=1` opts into a hard failure.
+- **Payload cap.** The wrapper caps the serialized state at
+  `--max-state-bytes` / `JUDGMENT_MAX_STATE_BYTES` (default 12 KB = 12,288
+  bytes; the flag wins). An over-cap state is truncated deterministically to
+  head + marker + tail, where the marker names the omitted byte count and
+  the result is at most the cap. Truncation is a degradation, not a
+  fallback: the truncated payload is sent, `payload_overflow` is recorded,
+  and a usable answer still exits `0`. This prevents the observed local
+  backend crash on oversized payloads (measured first failure at 20,548
+  bytes on 2026-10-26, drifting lower after a failing request — 12 KB keeps a
+  wide margin).
+- **Operator surface.** `make judgment-status` runs
+  `scripts/judgment-status.sh`, which reports liveness (the same PID-file
+  signal as `scripts/judgment-local-up.sh status`) and payload fitness (a
+  small probe plus a max-size probe at the cap). It exits `0` only when the
+  backend is running and both probes pass.
 - **Consumers must preserve their stock procedure.** Every consumer of the
   fast-path keeps its original LLM/manual procedure intact and runs it on
   any exit `10` — the typed judgment may only pick a path the consumer
