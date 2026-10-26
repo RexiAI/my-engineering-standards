@@ -1,3 +1,10 @@
+## [1.45.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.45.0...v1.45.1) (2026-10-26)
+
+
+### Bug Fixes
+
+* **ci:** stop masking test failures and unblock submodule tests in ci-node.yml; anchor the archive gate's exception ([#105](https://github.com/RexiAI/my-engineering-standards/issues/105)) ([a3fb047](https://github.com/RexiAI/my-engineering-standards/commit/a3fb0478de4cec04ffd8becffdad94904056bf07))
+
 # [1.45.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.44.0...v1.45.0) (2026-10-26)
 
 
