@@ -1,4 +1,4 @@
-# ADR 0004: Mechanical gate for model-agnostic agent definitions
+# ADR 0011: Mechanical gate for model-agnostic agent definitions
 
 ## Status
 

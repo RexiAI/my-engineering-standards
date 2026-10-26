@@ -54,7 +54,7 @@ jobs:
           ./scripts/check-ci-sweeper.sh
           ./scripts/check-ci-sweeper.sh --self-test
 
-      # Agent model-agnosticism gate (ADR 0004): shipped agent definitions must
+      # Agent model-agnosticism gate (ADR 0011): shipped agent definitions must
       # carry no `model:` frontmatter key — resolution belongs to the consumer's
       # opencode.json roster or harness inheritance. The --self-test run proves
       # the gate rejects a pinned fixture. Not continue-on-error: a pin
