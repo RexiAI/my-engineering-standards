@@ -27,6 +27,27 @@ verifies `$GITHUB_TOKEN` and `$GH_TOKEN` are non-empty before its commit/push
 step and reports + stops when either is missing — there is no env script to
 source.
 
+# Judgment preflight (first action, both modes)
+
+Before delegating to any stage — for **both** invocation modes, the `/spec`
+path and the `/build` path — run the bounded fitness probe as your first
+action, before any delegation:
+
+```bash
+scripts/judgment-preflight.sh
+```
+
+It probes the optional local typed-judgment backend and is fail-open by
+design:
+
+- An exit 0 — a healthy probe, or a warning that the backend is unavailable —
+  **never blocks** any stage. Continue with delegation exactly as described
+  below; the warning line already tells the operator to run `make judgment-up`,
+  and the pipeline proceeds, continuing without the typed-judgment fast-path.
+- The only non-zero exit is a hard failure under `--require-judgment` or
+  `JUDGMENT_REQUIRED=1`. Only then stop the run and relay the preflight output;
+  strictness is opt-in and never the default.
+
 You are invoked in one of two ways:
 
 - **`/spec <slug or path>`**: create/confirm `specs/NNN-slug/00-informal.md` exists,
