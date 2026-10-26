@@ -20,3 +20,4 @@ Proposed → Accepted → Deprecated → Superseded.
 | 0010 | [Stage-split deploy-artifact gate: --require-deploy for the stage-5d final run](0010-audit-trail-require-deploy-flag.md) | Accepted |
 | 0011 | [Mechanical gate for model-agnostic agent definitions](0011-agent-model-agnostic-gate.md) | Proposed |
 | 0012 | [Structural cleanliness rules and opt-in god-file enforcement](0012-structural-cleanliness-gates.md) | Proposed |
+| 0013 | [Clean Code comment hygiene and naming gates](0013-clean-code-comment-gates.md) | Proposed |

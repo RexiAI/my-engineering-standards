@@ -29,7 +29,9 @@
 #   AC-011-03-04  unknown gate name in override -> exit 2
 #   AC-011-03-05  property-tests presence gate is not blame-scoped
 #   AC-011-03-06  --warn-as-error promotes the new blame WARNs to failures
-#   AC-011-03-07  no naming or test-delta gates are added
+#   AC-011-03-07  inverted by spec 032: `naming` IS a gate now (advisory-only),
+#                 so --blocking naming runs and reports WARN; `test-delta` stays
+#                 the unknown-gate negative case
 #   AC-011-03-08  blocking set + severity mapping documented in the skill
 #
 # Usage:
@@ -419,14 +421,26 @@ else
   bad "AC-011-03-04 empty --blocking value -> exit 2 (rc=$RUN_RC, err=$(tr '\n' ' ' < "$ERR"))"
 fi
 
-echo "== AC-011-03-07 no naming / test-delta gates =="
+echo "== AC-011-03-07 naming is a gate again (spec 032 supersedes the assertion) =="
 
+# Spec 032 added `naming` (and `comments` / `null-discipline`) to the catalog,
+# superseding spec 011's "no naming gate" assertion. `naming` is advisory-only:
+# --blocking naming must be ACCEPTED and must still report its findings as WARN,
+# never FAIL. `test-delta` remains the unknown-gate negative case.
 run_check "$r1" --blocking naming,complexity
-if [ "$RUN_RC" -eq 2 ] && grep -q "unknown gate name in blocking set: 'naming'" "$ERR" \
-   && grep -q "complexity, dry, yagni, solid, component-per-file, property-tests" "$ERR"; then
-  ok "AC-011-03-07 'naming' is not a gate (unknown, exit 2); valid list names only real gates"
+if [ "$RUN_RC" -ne 2 ] && ! grep -q "unknown gate name" "$ERR" \
+   && grep -q "Naming:" "$OUT" && grep -qE "WARN.*Naming:" "$OUT" \
+   && ! grep -qE "FAIL.*Naming:" "$OUT"; then
+  ok "AC-011-03-07 'naming' is a gate (spec 032): --blocking naming,complexity runs, naming findings stay WARN"
 else
-  bad "AC-011-03-07 --blocking naming -> exit 2 naming the gate (rc=$RUN_RC, err=$(tr '\n' ' ' < "$ERR"))"
+  bad "AC-011-03-07 --blocking naming,complexity runs with naming WARN (rc=$RUN_RC, err=$(tr '\n' ' ' < "$ERR"), out=$(tr '\n' ' ' < "$OUT"))"
+fi
+
+run_check "$r1" --blocking bogus
+if [ "$RUN_RC" -eq 2 ] && grep -q "valid gates: complexity, dry, yagni, solid, component-per-file, property-tests, comments, naming, null-discipline" "$ERR"; then
+  ok "AC-011-03-04 valid-gate list in the blocking-set error names all nine gates"
+else
+  bad "AC-011-03-04 blocking-set error lists all nine gates (rc=$RUN_RC, err=$(tr '\n' ' ' < "$ERR"))"
 fi
 
 run_check "$r1" --blocking test-delta

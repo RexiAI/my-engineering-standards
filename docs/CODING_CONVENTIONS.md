@@ -96,6 +96,37 @@ Enforcement today: god-file promotion is opt-in via `STRICT_GOD_FILE=1` in
 pending mechanical checks. Promotion criteria and the rejected alternative
 (prescribing a web framework such as NestJS) are recorded in ADR 0012.
 
+### Comment hygiene and naming
+
+Three more gates in `scripts/check-code-principles.sh` cover Clean Code Ch.2,
+Ch.4 and Ch.7 (ADR 0013):
+
+- **`comments`** — redundant-comment elimination, not a comment ban. Two
+  blocking-class rules (commented-out code in two or more consecutive
+  code-shaped comment lines; a comment that restates the following line) and
+  three advisory rules (TODO/FIXME without an issue reference, section
+  dividers, attribution comments). Shebangs, `shellcheck`/`noqa`/`pragma`
+  directives, usage headers, licence markers, URLs, the first five lines of a
+  file, and doc blocks attached to public API are allowlisted — they are the
+  comment kinds Ch.4 endorses.
+- **`naming`** — five advisory heuristics: single-character identifiers
+  (other than `i`/`j`/`k`/`_`), noise words in type names
+  (`Manager`/`Processor`/`Helper`/`Util`/`Data`/`Info`), Hungarian/encoded
+  prefixes, boolean flag parameters that do not read as predicates, and
+  functions with more than three parameters.
+- **`null-discipline`** — Ch.7's "don't return null, don't pass null": a
+  `return null` or a `null` literal passed as a call argument is reported.
+  Comparisons, local assignments and ternary branches are not. Java/JS/TS only.
+
+**All three are WARN by default** — they cannot turn a tree red on day one.
+`STRICT_CLEAN_CODE=1` is the opt-in blocking switch that promotes the two
+blocking-class *comment* rules to FAIL; `--blocking comments` does the same
+through the normal blocking-set mechanism, so `-BaseRef` blame scoping still
+applies. `naming` and `null-discipline` are advisory-only and never emit FAIL,
+and `.py`/`.rs` findings stay WARN even under the switch (ADR 0006 D6).
+Rationale, the rejected blanket comment ban, and the rollout plan:
+[`docs/adr/0013-clean-code-comment-gates.md`](adr/0013-clean-code-comment-gates.md).
+
 ### Base rules
 
 - **Prefer composition over inheritance.** Use interfaces and delegation instead of abstract base classes. For tests, use plain `@BeforeEach` + helper methods instead of `AbstractBaseTestSuite` base classes.

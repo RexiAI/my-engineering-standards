@@ -45,6 +45,54 @@
 #                  fast-check; Python hypothesis and Rust proptest/quickcheck
 #                  during the ADR 0006 warn phase). See docs/TESTING.md
 #                  §Property Testing.
+#   Comments     — Clean Code Ch.4 redundant-comment elimination, not a comment
+#                  ban. Five rules; two are blocking-class, three are advisory:
+#                    blocking-class (WARN by default, FAIL under the strict
+#                    switch below):
+#                      · commented-out code — two or more consecutive
+#                        code-shaped comment lines
+#                      · comment restates the following line — the comment's
+#                        token set is a subset of the next physical code line
+#                    advisory (WARN in every mode, never FAIL):
+#                      · TODO/FIXME without an issue reference
+#                      · section-divider comment (`// ======`)
+#                      · attribution comment (`@author`, `created by`)
+#                  Allowlist — a comment line is skipped for every rule when it
+#                  is on one of the first five lines of the file; contains
+#                  `shellcheck`, `noqa`, `type: ignore`, `pragma`, `ponytail:`,
+#                  `standards:allow-`, `SPDX-License-Identifier`, `Copyright`,
+#                  `Licensed under`, `@license`, or a URL (`http://`,
+#                  `https://`); licence and copyright markers are therefore
+#                  permanently endorsed; sits in a `/** ... */` doc block
+#                  immediately followed by a `public`/`protected`/`export`
+#                  declaration; or sits in a `///` run or Go `//` run
+#                  immediately followed by a public-API declaration (`pub`,
+#                  `func <Upper>`, `type <Upper>`). Suppression is per line or
+#                  per doc block, never per file.
+#   Naming       — Clean Code Ch.2, five advisory heuristics (never FAIL): a
+#                  single-character identifier other than i/j/k/_, a noise word
+#                  (Manager/Processor/Helper/Util/Data/Info) in a type name, an
+#                  encoded (Hungarian) identifier prefix, a boolean flag
+#                  parameter whose name does not read as a predicate, and a
+#                  function with more than three parameters. Java/Go/JS/TS/
+#                  Python/Rust non-test code; not shell.
+#   Null discipline — Clean Code Ch.7 "Don't Return Null" / "Don't Pass Null":
+#                  `return null` and a `null` literal passed as a call argument
+#                  are reported. Comparisons, local assignments and ternary
+#                  branches are not. Always WARN. Java/JS/TS only — Python and
+#                  Rust nullability semantics differ.
+#
+# Rollout (spec 032, ADR 0011): the `comments` gate is WARN by default and joins
+# the blocking set only under STRICT_CLEAN_CODE=1 (only the literal value `1`
+# counts) or an explicit `--blocking comments`. `naming` and `null-discipline`
+# are advisory-only and never emit FAIL. Findings in .py/.rs files stay WARN
+# even under STRICT_CLEAN_CODE=1 (ADR 0006 D6 warn phase).
+#
+# Comment scanning covers the eight source extensions above plus `*.sh`; block-
+# comment syntax is only parsed for the C-family/Rust extensions, shell and
+# Python comments run from `#` to end of line. Paths under docs/, specs/,
+# agents/, templates/ and node_modules/ are excluded from comment scanning
+# (prose and agent prompts are not code).
 #
 # This is a heuristic gate, not a proof. It catches the common shapes the
 # principles forbid and points at exact file:line evidence; it does not parse
@@ -67,8 +115,9 @@
 # SOURCE_DIR defaults to the current directory. --tier overrides auto-detection
 # from the project's AGENTS_*.md "Conformance tier:" declaration (see
 # docs/CONFORMANCE_TIERS.md). --warn-as-error promotes every WARN to a failure.
-# --gates restricts the run to a comma-separated subset of the six gate
-# categories (complexity, dry, yagni, solid, component-per-file, property-tests) — the Verifier's
+# --gates restricts the run to a comma-separated subset of the nine gate
+# categories (complexity, dry, yagni, solid, component-per-file, property-tests,
+# comments, naming, null-discipline) — the Verifier's
 # scoped re-verification of a single failing category (AC-007-02, AC-007-03);
 # --json prints a single JSON object { "tier", "gates", "fails", "warns" }
 # carrying the same findings as the human output, for transcription into
@@ -92,12 +141,19 @@
 #
 # Blocking set (which gates may emit FAIL):
 #   Gate names: complexity (cyclomatic CC + KISS size findings), dry, yagni,
-#   solid (SRP/OCP/LSP/ISP/DIP as one unit), component-per-file, property-tests.
+#   solid (SRP/OCP/LSP/ISP/DIP as one unit), component-per-file, property-tests,
+#   comments, naming, null-discipline.
 #   Default blocking set: complexity,property-tests,component-per-file — the
 #   objective gates in this repo's terms (component-per-file is mvp-tier, cheap
 #   heuristic — BookingWidget 14-in-1 must not pass). A gate outside the
 #   blocking set is warn-only and never emits FAIL, with or without -BaseRef
 #   (DIP and YAGNI single-implementation findings therefore report as WARN).
+#   `comments` is warn-only by default and joins the blocking set either through
+#   an explicit --blocking/PRINCIPLES_BLOCKING_GATES entry or through
+#   STRICT_CLEAN_CODE=1 (spec 032, ADR 0011); only its two blocking-class rules
+#   are affected — the three advisory comment rules stay WARN in every mode.
+#   `naming` and `null-discipline` are advisory-only: they never emit FAIL, no
+#   matter what names the blocking set.
 #   Override with --blocking <comma-list> or the
 #   PRINCIPLES_BLOCKING_GATES environment variable (flag wins over env
 #   over default); an unknown gate name or an empty value exits 2.
@@ -133,6 +189,15 @@ set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/gate-report-lib.sh"
 # Shared 007 helpers (require_tools / finish_clean / guarded json_escape).
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/check-common.sh"
+# Per-gate analyzers (DRY / YAGNI / SOLID / component-per-file / property-tests):
+# the analysis lives in scripts/gate-analysis-lib.sh, so this script keeps
+# registration, classification and dispatch.
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/gate-analysis-lib.sh"
+# spec 032 clean-code gates (comments / naming / null-discipline). The analyzers,
+# their awk programs, the comment discovery set and the STRICT_CLEAN_CODE
+# promotion rule live there, so this script keeps registration, classification
+# and dispatch — see scripts/gate-clean-code-lib.sh.
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/gate-clean-code-lib.sh"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -145,6 +210,9 @@ WARN_AS_ERROR=false
 REPORT_PATH=""
 FAILS_LIST=()
 WARNS_LIST=()
+# Property-tests skip reason is said once per run, not once per language: the
+# reason is the tier, not the language.
+PROP_TESTS_SKIP_SAID=false
 
 # fail/pass/warn feed all three outputs: human stdout (unless --json), the
 # --json transcript (FAILS_JSON/WARNS_JSON, file/line triplets), and the
@@ -268,12 +336,13 @@ if [ "$REQUIRE_LANG_SET" = true ]; then
 fi
 
 # ── Blocking set (which gates may emit FAIL) ─────────────────────────────────
-# Gate names: complexity, dry, yagni, solid, component-per-file, property-tests. Default:
+# Gate names: complexity, dry, yagni, solid, component-per-file, property-tests,
+# comments, naming, null-discipline. Default:
 # complexity,property-tests,component-per-file (the objective gates). --blocking wins over the
 # PRINCIPLES_BLOCKING_GATES env var, which wins over the default.
 blocking_raw() { # blocking_raw — resolve --blocking / env var / default into a raw comma list
   if [ "$BLOCKING_ARG_SET" = true ]; then
-    [ -n "$BLOCKING_ARG" ] || { echo "Error: --blocking requires a comma-separated list of gates (complexity, dry, yagni, solid, component-per-file, property-tests)" >&2; exit 2; }
+    [ -n "$BLOCKING_ARG" ] || { echo "Error: --blocking requires a comma-separated list of gates (complexity, dry, yagni, solid, component-per-file, property-tests, comments, naming, null-discipline)" >&2; exit 2; }
     printf '%s' "$BLOCKING_ARG"
     return
   fi
@@ -286,7 +355,7 @@ blocking_raw() { # blocking_raw — resolve --blocking / env var / default into 
 
 valid_gate() { # valid_gate <name> — 0 if a known gate name
   case "$1" in
-    complexity|dry|yagni|solid|component-per-file|property-tests) return 0 ;;
+    complexity|dry|yagni|solid|component-per-file|property-tests|comments|naming|null-discipline) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -297,12 +366,12 @@ resolve_blocking_set() {
   BLOCKING_SET=""
   for g in $(printf '%s' "$raw" | tr ',' '\n' | sed '/^$/d'); do
     if ! valid_gate "$g"; then
-      echo "Error: unknown gate name in blocking set: '$g' (valid gates: complexity, dry, yagni, solid, component-per-file, property-tests)" >&2
+      echo "Error: unknown gate name in blocking set: '$g' (valid gates: complexity, dry, yagni, solid, component-per-file, property-tests, comments, naming, null-discipline)" >&2
       exit 2
     fi
     BLOCKING_SET="${BLOCKING_SET}${BLOCKING_SET:+ }$g"
   done
-  [ -n "$BLOCKING_SET" ] || { echo "Error: blocking set is empty — must name at least one of: complexity, dry, yagni, solid, component-per-file, property-tests" >&2; exit 2; }
+  [ -n "$BLOCKING_SET" ] || { echo "Error: blocking set is empty — must name at least one of: complexity, dry, yagni, solid, component-per-file, property-tests, comments, naming, null-discipline" >&2; exit 2; }
 }
 resolve_blocking_set
 
@@ -327,18 +396,18 @@ fi
 SELECTED_GATES=()
 if [ "$GATES_SET" = true ]; then
   if [ -z "$GATES" ]; then
-    echo "ERROR: --gates requires a comma-separated list of gate names (complexity, dry, yagni, solid, component-per-file, property-tests)" >&2
+    echo "ERROR: --gates requires a comma-separated list of gate names (complexity, dry, yagni, solid, component-per-file, property-tests, comments, naming, null-discipline)" >&2
     exit 2
   fi
   IFS=',' read -r -a gate_list <<< "$GATES"
   for g in "${gate_list[@]}"; do
     case "$g" in
-      complexity|dry|yagni|solid|component-per-file|property-tests) SELECTED_GATES+=("$g") ;;
-      *) echo "ERROR: unknown gate '$g' (valid: complexity, dry, yagni, solid, component-per-file, property-tests)" >&2; exit 2 ;;
+      complexity|dry|yagni|solid|component-per-file|property-tests|comments|naming|null-discipline) SELECTED_GATES+=("$g") ;;
+      *) echo "ERROR: unknown gate '$g' (valid: complexity, dry, yagni, solid, component-per-file, property-tests, comments, naming, null-discipline)" >&2; exit 2 ;;
     esac
   done
 else
-  SELECTED_GATES=(complexity dry yagni solid component-per-file property-tests)
+  SELECTED_GATES=(complexity dry yagni solid component-per-file property-tests comments naming null-discipline)
 fi
 
 contains_gate() { # contains_gate <name>
@@ -374,6 +443,18 @@ NODE_FILES=$(find "$SOURCE_DIR" $FIND_PRUNE -prune -o \( -name '*.ts' -o -name '
 PY_FILES=$(find "$SOURCE_DIR" $FIND_PRUNE -prune -o -name '*.py' -print 2>/dev/null || true)
 RS_FILES=$(find "$SOURCE_DIR" $FIND_PRUNE -prune -o -name '*.rs' -print 2>/dev/null || true)
 
+# Comment scanning (spec 032, Task 03) has its own discovery set: the eight
+# extensions above plus *.sh, and a path-segment exclusion for prose/prompt
+# trees (docs/, specs/, agents/, templates/, node_modules/). This set is used
+# ONLY by the three new gates — every existing gate keeps the file sets above
+# byte-for-byte, so a .sh file never reaches the complexity analyzer.
+SH_FILES=$(find "$SOURCE_DIR" $FIND_PRUNE -prune -o -name '*.sh' -print 2>/dev/null || true)
+
+# The comment gate's own file set: the six discovery lists above, minus the
+# prose/prompt trees (docs/, specs/, agents/, templates/, node_modules/). The
+# exclusion lives in the lib beside the gate that needs it.
+COMMENT_FILES=$(cc_comment_files "$SOURCE_DIR" $JAVA_FILES $GO_FILES $NODE_FILES $PY_FILES $RS_FILES $SH_FILES)
+
 # --require-language (ADR 0006 D5): the caller declared the language this repo
 # is written in — zero files of it is a failure (exit 1), not a silent pass.
 if [ "$REQUIRE_LANG_SET" = true ]; then
@@ -395,9 +476,11 @@ fi
 # ADR 0006 D5: enumerate exactly which extensions were scanned so a repo in an
 # uncovered language visibly reports that nothing matched, instead of implying
 # it was checked. Still exit 0 by default (Alternative A — hard-failing zero
-# files — breaks docs-only repos and uncovered languages).
-[ -z "$JAVA_FILES" ] && [ -z "$GO_FILES" ] && [ -z "$NODE_FILES" ] && [ -z "$PY_FILES" ] && [ -z "$RS_FILES" ] && {
-  finish_clean "No source files found under $SOURCE_DIR — scanned for extensions: java, go, ts, tsx, js, jsx, py, rs; none matched, so nothing was analysed. If this repo uses another language it is NOT covered by this gate; pass --require-language <lang> to fail instead of silently passing."
+# files — breaks docs-only repos and uncovered languages). Spec 032 adds `sh`
+# to the enumeration: a shell-only tree is scanned by the `comments` gate, so it
+# must not report "nothing was analysed".
+[ -z "$JAVA_FILES" ] && [ -z "$GO_FILES" ] && [ -z "$NODE_FILES" ] && [ -z "$PY_FILES" ] && [ -z "$RS_FILES" ] && [ -z "$SH_FILES" ] && {
+  finish_clean "No source files found under $SOURCE_DIR — scanned for extensions: java, go, ts, tsx, js, jsx, py, rs, sh; none matched, so nothing was analysed. If this repo uses another language it is NOT covered by this gate; pass --require-language <lang> to fail instead of silently passing."
 }
 
 say "Checking design principles in: $SOURCE_DIR (tier: $TIER)"
@@ -415,6 +498,15 @@ NONTEST_RS=$(echo "$RS_FILES" | grep -vE '/tests?/|(^|/)tests?\.rs$' || true)
 
 ALL_NONTEST="$NONTEST_JAVA $NONTEST_GO $NONTEST_NODE $NONTEST_PY $NONTEST_RS"
 ALL_NONTEST=$(echo "$ALL_NONTEST" | tr ' ' '\n' | sed '/^$/d' | sort -u)
+
+# ── Analyzers ────────────────────────────────────────────────────────────────
+# DRY / YAGNI / SOLID / component-per-file / property-tests: the analyzers and
+# their awk programs live in scripts/gate-analysis-lib.sh. The three clean-code
+# gates (comments / naming / null-discipline) live in
+# scripts/gate-clean-code-lib.sh, together with the comment discovery set. The
+# complexity/KISS analyzer stays here — it shares the LOC splitting and
+# reporting helpers with the run block. Only the dispatch of any of them stays
+# below.
 
 # ── Complexity + KISS analyzer (awk) ─────────────────────────────────────────
 # Computes cyclomatic complexity per method via brace-depth tracking, plus body
@@ -624,628 +716,57 @@ END { while (top>=0) end_py() }
 AWK
 )"
 
-# split_loc <file:line> — split an analyzer location into LOC_FILE / LOC_LINE.
-split_loc() {
-  LOC_FILE="${1%%:*}"
-  LOC_LINE="${1#*:}"
-  LOC_LINE="${LOC_LINE%%:*}"
+# report_complexity_finding <lang> <approx-note> <analyzer-line> — route one
+# `file:start:end:name:RULE=n` record through classify(), so -BaseRef blame
+# scoping applies. `CC=` is a defect (legacy FAIL); body length and parameter
+# count are review hints (legacy WARN).
+report_complexity_finding() {
+  local lang="$1" approx="$2" line="$3" f s e
+  [ -z "$line" ] && return 0
+  f=$(printf '%s' "$line" | cut -d: -f1)
+  s=$(printf '%s' "$line" | cut -d: -f2)
+  e=$(printf '%s' "$line" | cut -d: -f3)
+  case "$line" in
+    *CC=*) emit "$(classify "complexity" "fail" "$f" "$s" "$e" "$lang")" "Cyclomatic complexity >6 ($lang): $line$approx" "$f" "$s" ;;
+    *KISS_LINES=*) emit "$(classify "complexity" "warn" "$f" "$s" "$e" "$lang")" "Method body >20 lines ($lang): $line$approx" "$f" "$s" ;;
+    *KISS_PARAMS=*) emit "$(classify "complexity" "warn" "$f" "$s" "$e" "$lang")" "Method with >6 parameters ($lang): $line$approx" "$f" "$s" ;;
+  esac
 }
 
-# report_one_violation <lang> <line> — emit one analyzer line as FAIL/WARN.
-report_one_violation() {
-  local lang="$1" line="$2"
-  [ -z "$line" ] && return 0
-  LOC_FILE=""; LOC_LINE=""
-  if [[ "$line" == *:*:* ]]; then
-    split_loc "$line"
-  fi
-  case "$line" in
-    *CC=*) fail "Cyclomatic complexity >6 ($lang): $line" "$LOC_FILE" "$LOC_LINE" ;;
-    *KISS_LINES=*) warn "Method body >20 lines ($lang): $line" "$LOC_FILE" "$LOC_LINE" ;;
-    *KISS_PARAMS=*) warn "Method with >6 parameters ($lang): $line" "$LOC_FILE" "$LOC_LINE" ;;
+# complexity_analyzer <lang> — set CC_PROG to the analyzer program for <lang>
+# and CC_APPROX to the note its findings carry. Python needs the indent-based
+# program (no braces); Rust reuses the brace-based one and says why its count is
+# approximate.
+complexity_analyzer() {
+  CC_PROG="$complexity_awk"
+  CC_APPROX=""
+  case "$1" in
+    python)
+      CC_PROG="$complexity_awk_py"
+      CC_APPROX=" [approximate heuristic — comprehension/decorator forms can inflate the count; ADR 0006 warn phase]" ;;
+    rust)
+      CC_APPROX=" [approximate heuristic — match arms/generic bounds/closures can inflate the count; ADR 0006 warn phase]" ;;
   esac
 }
 
 run_complexity_kiss() {
-  local lang="$1"; shift
+  local lang="$1"
+  shift
   local files=("$@")
   [ "${#files[@]}" -eq 0 ] && return 0
-  local out rc prog="$complexity_awk" approx=""
-  case "$lang" in
-    python)
-      prog="$complexity_awk_py"
-      approx=" [approximate heuristic — comprehension/decorator forms can inflate the count; ADR 0006 warn phase]" ;;
-    rust)
-      approx=" [approximate heuristic — match arms/generic bounds/closures can inflate the count; ADR 0006 warn phase]" ;;
-  esac
+  complexity_analyzer "$lang"
+  local out rc=0 line
   # No `|| true` swallow: an awk/xargs failure means the check could not run —
   # that is a tooling failure (exit 2), never a silent PASS (AC-007-03-07).
-  out=$(printf '%s\n' "${files[@]}" | xargs awk -v LANG="$lang" "$prog" 2>&1) || rc=$?
-  if [ "${rc:-0}" -ne 0 ]; then
+  out=$(printf '%s\n' "${files[@]}" | xargs awk -v LANG="$lang" "$CC_PROG" 2>&1) || rc=$?
+  if [ "$rc" -ne 0 ]; then
     echo "ERROR: complexity/KISS analyzer failed to run (awk/xargs) — cannot complete the check" >&2
     exit 2
   fi
   [ -z "$out" ] && { pass "Complexity/KISS ($lang): no violations found"; return 0; }
-  local line f s e
   while IFS= read -r line; do
-    [ -z "$line" ] && continue
-    f=$(printf '%s' "$line" | cut -d: -f1)
-    s=$(printf '%s' "$line" | cut -d: -f2)
-    e=$(printf '%s' "$line" | cut -d: -f3)
-    case "$line" in
-      *CC=*) emit "$(classify "complexity" "fail" "$f" "$s" "$e" "$lang")" "Cyclomatic complexity >6 ($lang): $line$approx" "$f" "$s" ;;
-      *KISS_LINES=*) emit "$(classify "complexity" "warn" "$f" "$s" "$e" "$lang")" "Method body >20 lines ($lang): $line$approx" "$f" "$s" ;;
-      *KISS_PARAMS=*) emit "$(classify "complexity" "warn" "$f" "$s" "$e" "$lang")" "Method with >6 parameters ($lang): $line$approx" "$f" "$s" ;;
-    esac
+    report_complexity_finding "$lang" "$CC_APPROX" "$line"
   done <<< "$out"
-}
-
-# ── DRY: duplicate 4-line windows ────────────────────────────────────────────
-check_dry() {
-  local files="$1"
-  [ -z "$files" ] && return 0
-  local tmp; tmp=$(mktemp)
-  echo "$files" | while IFS= read -r f; do
-    [ -f "$f" ] || continue
-    awk -v file="$f" '
-      FNR==1 { n=0; delete buf }
-      { line=$0; sub(/\/\/.*/,"",line); sub(/\/\*.*\*\//,"",line)
-        gsub(/^[ \t]+|[ \t]+$/,"",line)
-        if (line=="") next
-        if (line ~ /^[\{\}]+$/) next
-        buf[n%4]=line
-        n++
-        if (n>=4) {
-          win=""
-          for (i=1;i<=4;i++) win = win (i>1?"\x1f":"") buf[(n-4+i)%4]
-          if (length(win)>=16 && win !~ /^(import|package|using|export (default )?(class|function|const|type|interface|abstract))\x1f/)
-            print win "\t" file ":" FNR-3
-        }
-      }' "$f"
-  done | sort | awk -F '\t' '
-    $1 != prev { if (count > 0 && count >= 2 && prevloc != "") print count "\t" prev "\t" prevloc; prev=$1; count=0; prevloc="" }
-    { count++; if (prevloc=="") prevloc=$2 }
-    END { if (count >= 2 && prevloc != "") print count "\t" prev "\t" prevloc }
-  ' | sort -rn | head -10 > "$tmp"
-  if [ -s "$tmp" ]; then
-    local dfile dline sev
-    while IFS=$'\t' read -r count win loc; do
-      dfile=$(printf '%s' "$loc" | sed -E 's/:[0-9]+$//')
-      dline=$(printf '%s' "$loc" | sed -nE 's/.*:([0-9]+)$/\1/p')
-      sev=$(classify "dry" "warn" "$dfile" "$dline" "$dline" "$(lang_of_file "$dfile")")
-      if [ "$sev" = none ]; then continue; fi
-      emit "$sev" "Possible duplication (${count}x identical 4-line block, first at $loc): ${win//$'\x1f'/ /}" "$dfile" "$dline"
-    done < "$tmp"
-  else
-    pass "DRY: no duplicate 4-line blocks detected"
-  fi
-  rm -f "$tmp"
-}
-
-# ── YAGNI: single-implementation interfaces + empty bodies ───────────────────
-check_yagni() {
-  local files="$1"; local lang="$2"
-  [ -z "$files" ] && return 0
-  local found=false
-  local name impls refs iface line
-  case "$lang" in
-    java)
-      for f in $files; do
-        [ -f "$f" ] || continue
-        local lniface ln iface
-        while IFS= read -r lniface; do
-          [ -z "$lniface" ] && continue
-          ln=${lniface%%:*}
-          iface=${lniface#*:}
-          name=$(echo "$iface" | grep -oE 'interface[ \t]+[A-Za-z0-9_]+' | awk '{print $2}')
-          [ -z "$name" ] && continue
-          impls=$(grep -rE "implements[^,{]*$name\b" $GREP_EXCLUDES "$SOURCE_DIR" --include="*.java" 2>/dev/null | wc -l | tr -d ' ' || true)
-          if [ "$impls" -eq 1 ]; then
-            emit "$(classify "yagni" "fail" "$f" "$ln" "$ln")" "YAGNI: interface $name has exactly one implementation (premature abstraction) — $f:$ln" "$f" "$ln"
-            found=true
-          fi
-        done < <(grep -nE '^\s*(public\s+)?interface[ \t]+' "$f" 2>/dev/null || true)
-        while IFS=: read -r ln _; do
-          emit "$(classify "yagni" "warn" "$f" "$ln" "$ln")" "Empty method body ($lang): $f:$ln" "$f" "$ln"
-          found=true
-        done < <(grep -nE '\{\s*\}' "$f" 2>/dev/null | grep -vE '//|test' || true)
-      done
-      ;;
-    go)
-      for f in $files; do
-        [ -f "$f" ] || continue
-        local lniface ln iface
-        while IFS= read -r lniface; do
-          [ -z "$lniface" ] && continue
-          ln=${lniface%%:*}
-          iface=${lniface#*:}
-          # Go declares the name BEFORE the keyword (`type X interface {`), unlike
-          # Java's `interface X`. Match the Go form and tolerate a non-match:
-          # bare `grep -o` returns 1 on no match, which aborts under pipefail.
-          name=$(echo "$iface" | grep -oE 'type[ \t]+[A-Za-z0-9_]+[ \t]+interface' | awk '{print $2}' || true)
-          [ -z "$name" ] && continue
-          refs=$(grep -rE "\b$name\b" $GREP_EXCLUDES "$SOURCE_DIR" --include="*.go" 2>/dev/null | grep -v "interface[ \t]*$name" | wc -l | tr -d ' ' || true)
-          if [ "$refs" -le 1 ]; then
-            emit "$(classify "yagni" "fail" "$f" "$ln" "$ln")" "YAGNI: Go interface $name is declared but barely referenced (premature abstraction) — $f:$ln" "$f" "$ln"
-            found=true
-          fi
-        done < <(grep -nE 'type[ \t]+[A-Za-z0-9_]+[ \t]+interface\b' "$f" 2>/dev/null || true)
-      done
-      ;;
-    node)
-      for f in $files; do
-        [ -f "$f" ] || continue
-        local lniface ln iface
-        while IFS= read -r lniface; do
-          [ -z "$lniface" ] && continue
-          ln=${lniface%%:*}
-          iface=${lniface#*:}
-          name=$(echo "$iface" | grep -oE 'interface[ \t]+[A-Za-z0-9_]+' | awk '{print $2}')
-          [ -z "$name" ] && continue
-          impls=$(grep -rE "implements[^,{]*$name\b" $GREP_EXCLUDES "$SOURCE_DIR" --include="*.ts" 2>/dev/null | wc -l | tr -d ' ' || true)
-          if [ "$impls" -eq 1 ]; then
-            emit "$(classify "yagni" "fail" "$f" "$ln" "$ln")" "YAGNI: interface $name has exactly one implementation (premature abstraction) — $f:$ln" "$f" "$ln"
-            found=true
-          fi
-        done < <(grep -nE '^\s*(export\s+)?interface[ \t]+' "$f" 2>/dev/null || true)
-      done
-      ;;
-    python)
-      # ABC/Protocol with exactly one concrete subclass = premature abstraction.
-      # Approximate: subclassing detected textually, no import resolution.
-      for f in $files; do
-        [ -f "$f" ] || continue
-        local lniface ln iface
-        while IFS= read -r lniface; do
-          [ -z "$lniface" ] && continue
-          ln=${lniface%%:*}
-          iface=${lniface#*:}
-          name=$(echo "$iface" | grep -oE 'class[ \t]+[A-Za-z0-9_]+' | awk '{print $2}' || true)
-          [ -z "$name" ] && continue
-          impls=$(grep -rE "class[ \t]+[A-Za-z0-9_]+[ \t]*\([^)]*\b$name\b" $GREP_EXCLUDES "$SOURCE_DIR" --include="*.py" 2>/dev/null | wc -l | tr -d ' ' || true)
-          if [ "$impls" -eq 1 ]; then
-            emit "$(classify "yagni" "fail" "$f" "$ln" "$ln" "$lang")" "YAGNI: Python ABC/Protocol $name has exactly one concrete subclass (premature abstraction) — $f:$ln" "$f" "$ln"
-            found=true
-          fi
-        done < <(grep -nE '^[ \t]*class[ \t]+[A-Za-z0-9_]+[ \t]*\([^)]*(ABC|Protocol)[^)]*\)' "$f" 2>/dev/null || true)
-        # Empty bodies: `pass` / `...` as the whole statement (approximate —
-        # `pass` in an except branch is legitimate, hence WARN-level review hint).
-        while IFS=: read -r ln _; do
-          emit "$(classify "yagni" "warn" "$f" "$ln" "$ln" "$lang")" "Empty body (pass/...) ($lang): $f:$ln" "$f" "$ln"
-          found=true
-        done < <(grep -nE '^[ \t]*(pass|\.\.\.)[ \t]*(#.*)?$' "$f" 2>/dev/null | grep -vE 'test' || true)
-      done
-      ;;
-    rust)
-      # Trait with exactly one `impl ... Trait for` = premature abstraction.
-      # Approximate: textual impl count, derive-macro and blanket impls counted
-      # as written.
-      for f in $files; do
-        [ -f "$f" ] || continue
-        local lniface ln iface
-        while IFS= read -r lniface; do
-          [ -z "$lniface" ] && continue
-          ln=${lniface%%:*}
-          iface=${lniface#*:}
-          name=$(echo "$iface" | grep -oE 'trait[ \t]+[A-Za-z0-9_]+' | awk '{print $2}' || true)
-          [ -z "$name" ] && continue
-          impls=$(grep -rE "impl(<[^{;]*>)?[^{;]*\b$name\b[ \t]*for\b" $GREP_EXCLUDES "$SOURCE_DIR" --include="*.rs" 2>/dev/null | wc -l | tr -d ' ' || true)
-          if [ "$impls" -eq 1 ]; then
-            emit "$(classify "yagni" "fail" "$f" "$ln" "$ln" "$lang")" "YAGNI: Rust trait $name has exactly one implementation (premature abstraction) — $f:$ln" "$f" "$ln"
-            found=true
-          fi
-        done < <(grep -nE '^[ \t]*(pub([ \t]*\([^)]*\))?[ \t]+)?trait[ \t]+[A-Za-z0-9_]+' "$f" 2>/dev/null || true)
-        while IFS=: read -r ln _; do
-          emit "$(classify "yagni" "warn" "$f" "$ln" "$ln" "$lang")" "Empty body or empty block ($lang): $f:$ln" "$f" "$ln"
-          found=true
-        done < <(grep -nE '\{\s*\}' "$f" 2>/dev/null | grep -vE '//|test' || true)
-      done
-      ;;
-  esac
-  $found || pass "YAGNI ($lang): no premature abstractions detected"
-}
-
-# ── SOLID ────────────────────────────────────────────────────────────────────
-check_solid_srp() {
-  local files="$1"; local lang="$2"
-  [ -z "$files" ] && return 0
-  local found=false
-  local f lines methods comp_count
-  for f in $files; do
-    [ -f "$f" ] || continue
-    lines=$(wc -l < "$f" | tr -d ' ')
-    methods=0
-    case "$lang" in
-      java) methods=$(grep -cE '^\s*(public|protected|private)\s+.*\(' "$f" 2>/dev/null | tr -d ' ') || methods=0 ;;
-      node) methods=$(grep -cE '^\s*(public|private|protected|async\s+)?[A-Za-z0-9_$]+\s*\([^)]*\)\s*\{' "$f" 2>/dev/null | tr -d ' ') || methods=0 ;;
-      python) methods=$(grep -cE '^[ \t]*(async[ \t]+)?def[ \t]+' "$f" 2>/dev/null | tr -d ' ') || methods=0 ;;
-      rust) methods=$(grep -cE '^[ \t]*(pub([ \t]*\([^)]*\))?[ \t]+)?((async|unsafe|const)[ \t]+)*fn[ \t]+' "$f" 2>/dev/null | tr -d ' ') || methods=0 ;;
-      *) methods=0 ;;
-    esac
-    # Tightened SRP for TSX/JSX: >300 lines OR >8 components (god-file via component count).
-    # BookingWidget 14-in-1 was 390 lines / 14 components and passed the old 400/15 gate.
-    if [ "$lang" = "node" ]; then
-      case "$f" in
-        *.tsx|*.jsx)
-          comp_count=$( (grep -E '^\s*(export\s+)?(default\s+)?(function\s+[A-Z]|const\s+[A-Z][A-Za-z0-9_]*\s*[:=][^;]*=>|const\s+[A-Z][A-Za-z0-9_]*\s*=\s*React\.(memo|forwardRef)|class\s+[A-Z])' "$f" 2>/dev/null || true) | wc -l | tr -d ' ') || comp_count=0
-          if [ "$lines" -gt 300 ] || [ "$comp_count" -gt 8 ] || [ "$lines" -gt 400 ] || [ "$methods" -gt 15 ]; then
-            emit "$(classify "solid" "warn" "$f" "" "" "$lang")" "SRP: possible god file ($lang) — $f: ${lines} lines, ${methods} methods, ${comp_count} components (TSX threshold: 300 lines / 8 components; general: 400 lines / 15 methods) — split by responsibility" "$f"
-            found=true
-          fi
-          continue
-          ;;
-      esac
-    fi
-    if [ "$lines" -gt 400 ] || [ "$methods" -gt 15 ]; then
-      # ADR 0012: god-file is WARN by default because promoting it would turn
-      # existing consumer code red overnight. Consumers that have cleaned up
-      # opt into blocking enforcement with STRICT_GOD_FILE=1 (CI env or make).
-      # classify() would force "solid" back to warn (gate not in the blocking
-      # list), so the opt-in emits fail directly.
-      if [ "${STRICT_GOD_FILE:-0}" = "1" ]; then
-        emit "fail" "SRP: god file ($lang) — $f: ${lines} lines, ${methods} methods (split by responsibility — STRICT_GOD_FILE=1: blocking)" "$f"
-      else
-        emit "$(classify "solid" "warn" "$f" "" "" "$lang")" "SRP: possible god file ($lang) — $f: ${lines} lines, ${methods} methods (split by responsibility)" "$f"
-      fi
-      found=true
-    fi
-  done
-  $found || pass "SOLID-SRP ($lang): no oversized files"
-}
-
-check_solid_ocp() {
-  local files="$1"; local lang="$2"
-  [ -z "$files" ] && return 0
-  local found=false
-  local res r eif ocpfile ocpline eifline
-  for f in $files; do
-    [ -f "$f" ] || continue
-    case "$lang" in
-      python)
-        # if/elif dispatch chain (approximate: statement-leading elif only)
-        eif=$(grep -cE '^[ \t]*elif' "$f" 2>/dev/null || true)
-        if [ "${eif:-0}" -ge 4 ]; then
-          eifline=$(grep -nE '^[ \t]*elif' "$f" 2>/dev/null | head -1 | cut -d: -f1)
-          emit "$(classify "solid" "warn" "$f" "$eifline" "$eifline" "$lang")" "OCP: ${eif}-branch if/elif chain ($lang) — $f (consider polymorphism or a dispatch dict)" "$f" "$eifline"
-          found=true
-        fi
-        ;;
-      rust)
-        # match with >=4 `=>` arms (approximate: arm counting is heuristic and
-        # nested matches attribute arms to the outer match)
-        res=$(awk '
-          /(^|[^A-Za-z0-9_])match([^A-Za-z0-9_]|$)/ { swnr=FNR; arms=0; insw=1 }
-          insw { arms += gsub(/=>/," ") }
-          insw && /^[ \t]*\}/ { if (arms>=4) printf "%s:%d:match with %d arms\n", FILENAME, swnr, arms; insw=0 }
-        ' "$f" 2>/dev/null || true)
-        while IFS= read -r r; do
-          [ -n "$r" ] || continue
-          ocpfile=$(printf '%s' "$r" | cut -d: -f1)
-          ocpline=$(printf '%s' "$r" | cut -d: -f2)
-          emit "$(classify "solid" "warn" "$ocpfile" "$ocpline" "$ocpline" "$lang")" "OCP: type-dispatch match should be polymorphic ($lang, approximate arm count) — $r" "$ocpfile" "$ocpline"
-          found=true
-        done <<< "$res"
-        ;;
-      *)
-        # switch with >=4 cases (word-boundary: matches `switch x {` Go form too)
-        res=$(awk '
-          /(^|[^A-Za-z0-9_])switch([^A-Za-z0-9_]|$)/ { swnr=FNR; cases=0; insw=1 }
-          insw && /case[ \t]+/ { cases++ }
-          insw && /^\s*\}/ { if (cases>=4) printf "%s:%d:switch with %d cases\n", FILENAME, swnr, cases; insw=0 }
-        ' "$f" 2>/dev/null || true)
-        while IFS= read -r r; do
-          [ -n "$r" ] || continue
-          ocpfile=$(printf '%s' "$r" | cut -d: -f1)
-          ocpline=$(printf '%s' "$r" | cut -d: -f2)
-          emit "$(classify "solid" "warn" "$ocpfile" "$ocpline" "$ocpline" "$lang")" "OCP: type-dispatch switch should be polymorphic ($lang) — $r" "$ocpfile" "$ocpline"
-          found=true
-        done <<< "$res"
-        eif=$(grep -cE '^\s*else[ \t]+if' "$f" 2>/dev/null || true)
-        if [ "${eif:-0}" -ge 4 ]; then
-          eifline=$(grep -nE '^\s*else[ \t]+if' "$f" 2>/dev/null | head -1 | cut -d: -f1)
-          emit "$(classify "solid" "warn" "$f" "$eifline" "$eifline" "$lang")" "OCP: ${eif}-branch if/else chain ($lang) — $f (consider polymorphism or a lookup)" "$f" "$eifline"
-          found=true
-        fi
-        ;;
-    esac
-  done
-  $found || pass "SOLID-OCP ($lang): no large type-dispatch chains"
-}
-
-check_solid_lsp() {
-  local files="$1"; local lang="$2"
-  [ -z "$files" ] && return 0
-  local pat label
-  case "$lang" in
-    java|node) pat='instanceof'; label='instanceof' ;;
-    python) pat='isinstance[ \t]*\('; label='isinstance' ;;
-    *) return 0 ;;  # go/rust: no idiomatic runtime type-test dispatch to count
-  esac
-  local found=false
-  local f c
-  for f in $files; do
-    [ -f "$f" ] || continue
-    c=$(grep -cE "$pat" "$f" 2>/dev/null || true)
-    if [ "$c" -ge 3 ]; then
-      emit "$(classify "solid" "warn" "$f" "" "" "$lang")" "LSP: ${c} ${label} checks in one file ($lang) — $f (suggests broken substitutability or type dispatch)" "$f"
-      found=true
-    fi
-  done
-  $found || pass "SOLID-LSP ($lang): no heavy ${label} dispatch"
-}
-
-check_solid_isp() {
-  local files="$1"; local lang="$2"
-  [ -z "$files" ] && return 0
-  local found=false
-  local res r ispfile ispline prog label
-  case "$lang" in
-    python)
-      # Protocol/ABC with >5 methods (approximate: ends at the next column-0
-      # statement, so nested classes are mis-attributed)
-      label="Protocol/ABC"
-      prog='
-        /^[ \t]*class[ \t]+[A-Za-z0-9_]+[ \t]*\(.*(ABC|Protocol)/ { iw=1; nr=FNR; methods=0; next }
-        iw && /^[^ \t#]/ { if (methods>5) printf "%s:%d:Protocol/ABC with %d methods\n", FILENAME, nr, methods; iw=0; next }
-        iw && /^[ \t]*(async[ \t]+)?def[ \t]/ { methods++ }
-      '
-      ;;
-    rust)
-      # trait with >5 required/provided fns (approximate: ends at the first
-      # column-indented closing brace)
-      label="trait"
-      prog='
-        /^[ \t]*(pub([ \t]*\([^)]*\))?[ \t]+)?trait[ \t]+[A-Za-z0-9_]+/ { iw=1; nr=FNR; methods=0; next }
-        iw && /^[ \t]*\}/ { if (methods>5) printf "%s:%d:trait with %d methods\n", FILENAME, nr, methods; iw=0; next }
-        iw && /(^|[^A-Za-z0-9_])fn[ \t]+[A-Za-z0-9_]/ { methods++ }
-      '
-      ;;
-    *)
-      label="interface"
-      prog='
-        /^[ \t]*(public[ \t]+)?interface[ \t]+[A-Za-z0-9_]+/ { iw=1; nr=FNR; methods=0; next }
-        iw && /^[ \t]*\}/ { if (methods>5) printf "%s:%d:interface with %d methods\n", FILENAME, nr, methods; iw=0; next }
-        iw && /\([^)]*\)[ \t]*(;|\{|$)/ { methods++ }
-      '
-      ;;
-  esac
-  for f in $files; do
-    [ -f "$f" ] || continue
-    res=$(awk "$prog" "$f" 2>/dev/null || true)
-    while IFS= read -r r; do
-      [ -n "$r" ] || continue
-      ispfile=$(printf '%s' "$r" | cut -d: -f1)
-      ispline=$(printf '%s' "$r" | cut -d: -f2)
-      emit "$(classify "solid" "warn" "$ispfile" "$ispline" "$ispline" "$lang")" "ISP: fat ${label} (>5 methods) — $r (split by role)" "$ispfile" "$ispline"
-      found=true
-    done <<< "$res"
-  done
-  $found || pass "SOLID-ISP ($lang): no fat interfaces"
-}
-
-check_solid_dip() {
-  local lang="$1"
-  local found=false
-  local f hit dln
-  case "$lang" in
-    java)
-      for f in $JAVA_FILES; do
-        case "$f" in
-          */domain/*|*/engine/*|*/core/*)
-            hit=$(grep -nE '^\s*import\s+.*\.(infrastructure|persistence|repository)\.' "$f" 2>/dev/null || true)
-            if [ -n "$hit" ]; then
-              dln=$(printf '%s\n' "$hit" | head -1 | cut -d: -f1)
-              emit "$(classify "solid" "fail" "$f" "$dln" "$dln" "$lang")" "DIP: domain/engine code imports infrastructure ($lang) — $f:$dln" "$f" "$dln"
-              found=true
-            fi
-            ;;
-        esac
-      done
-      ;;
-    go)
-      for f in $GO_FILES; do
-        case "$f" in
-          */domain/*|*/engine/*|*/core/*)
-            hit=$(grep -nE '^\s*"[^"]*/(store|infra|repository)[^"]*"' "$f" 2>/dev/null || true)
-            if [ -n "$hit" ]; then
-              dln=$(printf '%s\n' "$hit" | head -1 | cut -d: -f1)
-              emit "$(classify "solid" "fail" "$f" "$dln" "$dln" "$lang")" "DIP: domain/engine code imports store/infra/repository ($lang) — $f:$dln" "$f" "$dln"
-              found=true
-            fi
-            ;;
-        esac
-      done
-      ;;
-    node)
-      for f in $NODE_FILES; do
-        case "$f" in
-          */domain/*|*/engine/*|*/core/*|*/entities/*)
-            hit=$(grep -nE "from\s+['\"].*(/store|/infra|/repository|/repositories|/infrastructure)" "$f" 2>/dev/null || true)
-            if [ -n "$hit" ]; then
-              dln=$(printf '%s\n' "$hit" | head -1 | cut -d: -f1)
-              emit "$(classify "solid" "fail" "$f" "$dln" "$dln" "$lang")" "DIP: domain/engine code imports infrastructure ($lang) — $f:$dln" "$f" "$dln"
-              found=true
-            fi
-            ;;
-        esac
-      done
-      ;;
-    python)
-      for f in $PY_FILES; do
-        case "$f" in
-          */domain/*|*/engine/*|*/core/*)
-            hit=$(grep -nE '^[ \t]*(from|import)[ \t]+[A-Za-z0-9_.]*(infrastructure|persistence|repository)' "$f" 2>/dev/null || true)
-            if [ -n "$hit" ]; then
-              dln=$(printf '%s\n' "$hit" | head -1 | cut -d: -f1)
-              emit "$(classify "solid" "fail" "$f" "$dln" "$dln" "$lang")" "DIP: domain/engine code imports infrastructure ($lang) — $f:$dln" "$f" "$dln"
-              found=true
-            fi
-            ;;
-        esac
-      done
-      ;;
-    rust)
-      for f in $RS_FILES; do
-        case "$f" in
-          */domain/*|*/engine/*|*/core/*)
-            hit=$(grep -nE '^[ \t]*use[ \t]+[^;]*(infra|infrastructure|repository|store|persistence)' "$f" 2>/dev/null || true)
-            if [ -n "$hit" ]; then
-              dln=$(printf '%s\n' "$hit" | head -1 | cut -d: -f1)
-              emit "$(classify "solid" "fail" "$f" "$dln" "$dln" "$lang")" "DIP: domain/engine code imports store/infra/repository ($lang) — $f:$dln" "$f" "$dln"
-              found=true
-            fi
-            ;;
-        esac
-      done
-      ;;
-  esac
-  $found || pass "SOLID-DIP ($lang): no domain→infrastructure imports"
-}
-
-# ── Component-per-file (TSX/JSX, mvp tier) ──────────────────────────────────
-# One React component per file: TSX/JSX files must export ≤2 PascalCase components
-# (FAIL if >2, WARN if >1) and ≤4 total exported functions (FAIL). For .ts with
-# React (imports React) and api/*.ts, total exported functions are also checked.
-# Tightened god-file for TSX via this gate (blocking): >300 lines FAIL.
-# Keep existing behavior for Java/Go untouched — only NODE_FILES inspected.
-check_component_per_file() {
-  local files="$1"
-  [ -z "$files" ] && return 0
-  local found=false
-  local f comp exported_total lines all_comp
-  for f in $files; do
-    [ -f "$f" ] || continue
-    case "$f" in
-      *.tsx|*.jsx) ;;
-      *.ts|*.js)
-        # For plain .ts/.js: only check api/*.ts or files that import React
-        if [[ "$f" == *"/api/"* ]]; then
-          : # always check api files
-        elif grep -qiE 'from\s+["'\'']react["'\'']|import\s+.*react|from\s+["'\''].*react' "$f" 2>/dev/null; then
-          : # React TS file — check
-        else
-          continue
-        fi
-        ;;
-      *) continue ;;
-    esac
-    # Exported PascalCase components: export function Foo / export const Foo = ...=> / export default function Foo
-    comp=$( (grep -E '^\s*export\s+(default\s+)?function\s+[A-Z]|^\s*export\s+const\s+[A-Z][A-Za-z0-9_]*\s*[:=][^;]*=>|^\s*export\s+default\s+function(\s+[A-Z]|\s*\()' "$f" 2>/dev/null || true) | wc -l | tr -d ' ')
-    comp=${comp:-0}
-    # Total exported functions/callables (any case): export function / export const X = / export async function
-    exported_total=$( (grep -E '^\s*export\s+(default\s+)?(async\s+)?function\s+[A-Za-z]|^\s*export\s+(const|let|var)\s+[A-Za-z0-9_]+\s*=' "$f" 2>/dev/null || true) | wc -l | tr -d ' ')
-    exported_total=${exported_total:-0}
-    lines=$(wc -l < "$f" 2>/dev/null | tr -d ' ') || lines=0
-    # All components in file (for god-file threshold 8, not just exported)
-    all_comp=$( (grep -E '^\s*(export\s+)?(default\s+)?(function\s+[A-Z]|const\s+[A-Z][A-Za-z0-9_]*\s*[:=][^;]*=>|const\s+[A-Z][A-Za-z0-9_]*\s*=\s*React\.(memo|forwardRef)|class\s+[A-Z])' "$f" 2>/dev/null || true) | wc -l | tr -d ' ')
-    all_comp=${all_comp:-0}
-    # Gate: >2 exported components => FAIL, >1 => WARN
-    if [ "$comp" -gt 2 ]; then
-      emit "$(classify "component-per-file" "fail" "$f" "" "")" "Component-per-file: $f has $comp exported components (threshold: ≤2, ideal ≤1) — split into one component per file with barrel index.ts (BookingWidget 14-in-1 anti-pattern)" "$f"
-      found=true
-    elif [ "$comp" -gt 1 ]; then
-      emit "$(classify "component-per-file" "warn" "$f" "" "")" "Component-per-file: $f has $comp exported components (ideal ≤1) — consider one component per file" "$f"
-      found=true
-    fi
-    # Gate: >4 total exported functions in .tsx/.jsx (covers App.tsx 7 functions) and api/*.ts
-    if [[ "$f" == *.tsx || "$f" == *.jsx ]] && [ "$exported_total" -gt 4 ]; then
-      emit "$(classify "component-per-file" "fail" "$f" "" "")" "Component-per-file: $f exports $exported_total functions/components (threshold: ≤4) — split file" "$f"
-      found=true
-    elif [[ "$f" == *"/api/"* ]] && [ "$exported_total" -gt 4 ]; then
-      emit "$(classify "component-per-file" "fail" "$f" "" "")" "Component-per-file: $f (api) exports $exported_total functions (threshold: ≤4) — split file" "$f"
-      found=true
-    fi
-    # Tightened god-file via blocking gate: >300 lines or >8 components for TSX/JSX
-    if [[ "$f" == *.tsx || "$f" == *.jsx ]]; then
-      if [ "$lines" -gt 300 ]; then
-        emit "$(classify "component-per-file" "fail" "$f" "" "")" "Component-per-file: god file — $f: ${lines} lines (TSX threshold: 300) — split by responsibility" "$f"
-        found=true
-      elif [ "$all_comp" -gt 8 ]; then
-        emit "$(classify "component-per-file" "fail" "$f" "" "")" "Component-per-file: god file — $f: ${all_comp} components (TSX threshold: 8) — split by responsibility" "$f"
-        found=true
-      fi
-    fi
-  done
-  $found || pass "Component-per-file: no violations"
-}
-
-# ── Property tests (production tier and above) ───────────────────────────────
-PROP_TESTS_SKIP_SAID=false
-check_property_tests() {
-  case "$TIER" in
-    mvp)
-      # Once per run, not once per language — the skip reason is tier, not lang.
-      if [ "$PROP_TESTS_SKIP_SAID" = false ]; then
-        say "Property tests: skipped (project tier is $TIER — production+ required)"
-        PROP_TESTS_SKIP_SAID=true
-      fi
-      return 0 ;;
-  esac
-  local lang="$1"
-  local src
-  case "$lang" in
-    java)
-      src=$JAVA_FILES
-      if [ -n "$src" ]; then
-        if grep -rE '@Property\b|net\.jqwik' $GREP_EXCLUDES "$SOURCE_DIR" --include="*.java" >/dev/null 2>&1; then
-          pass "Property tests ($lang): jqwik/@Property in use"
-        else
-          fail "Property tests ($lang): no jqwik @Property tests found (required at $TIER tier)"
-        fi
-      fi
-      ;;
-    go)
-      src=$GO_FILES
-      if [ -n "$src" ]; then
-        if grep -rE 'testing/quick\b|quick\.Check\b' $GREP_EXCLUDES "$SOURCE_DIR" --include="*.go" >/dev/null 2>&1; then
-          pass "Property tests ($lang): testing/quick in use"
-        else
-          fail "Property tests ($lang): no testing/quick usage found (required at $TIER tier)"
-        fi
-      fi
-      ;;
-    node)
-      src=$NODE_FILES
-      if [ -n "$src" ]; then
-        if grep -rE 'fast-check\b|@fast-check' $GREP_EXCLUDES "$SOURCE_DIR" --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" >/dev/null 2>&1 \
-           || grep -qE 'fast-check' "$SOURCE_DIR/package.json" 2>/dev/null; then
-          pass "Property tests ($lang): fast-check in use"
-        else
-          fail "Property tests ($lang): no fast-check property tests found (required at $TIER tier)"
-        fi
-      fi
-      ;;
-    python)
-      # ADR 0006 D6 warn phase: absence is a WARN (never fail) for one release.
-      # Like the other languages, property-tests is a presence check and is
-      # never blame-scoped. Framework: hypothesis (de-facto Python standard;
-      # docs/TESTING.md does not yet name one for Python).
-      src=$PY_FILES
-      if [ -n "$src" ]; then
-        if grep -rE '\bhypothesis\b|@given\(' $GREP_EXCLUDES "$SOURCE_DIR" --include="*.py" >/dev/null 2>&1 \
-           || grep -qE 'hypothesis' "$SOURCE_DIR/pyproject.toml" 2>/dev/null \
-           || grep -qE '^hypothesis' "$SOURCE_DIR"/requirements*.txt 2>/dev/null; then
-          pass "Property tests ($lang): hypothesis in use"
-        else
-          warn "Property tests ($lang): no hypothesis property tests found (required at $TIER tier) — WARN only during the ADR 0006 D6 warn phase"
-        fi
-      fi
-      ;;
-    rust)
-      # ADR 0006 D6 warn phase: absence is a WARN (never fail) for one release.
-      # Framework: proptest (nominated by language-specific/rust/TESTING.md);
-      # quickcheck also accepted.
-      src=$RS_FILES
-      if [ -n "$src" ]; then
-        if grep -rE '\bproptest\b|\bquickcheck\b' $GREP_EXCLUDES "$SOURCE_DIR" --include="*.rs" >/dev/null 2>&1 \
-           || grep -qE '^(proptest|quickcheck)' "$SOURCE_DIR/Cargo.toml" 2>/dev/null; then
-          pass "Property tests ($lang): proptest/quickcheck in use"
-        else
-          warn "Property tests ($lang): no proptest/quickcheck property tests found (required at $TIER tier) — WARN only during the ADR 0006 D6 warn phase"
-        fi
-      fi
-      ;;
-  esac
 }
 
 # ── JSON report (-ReportPath, telemetry) ─────────────────────────────────────
@@ -1286,6 +807,12 @@ abs_of() { # abs_of <path> — normalize a (possibly relative) path to absolute
 is_blocking() { # is_blocking <gate> — 0 if the gate may emit FAIL
   local g
   for g in $BLOCKING_SET; do [ "$g" = "$1" ] && return 0; done
+  # ADR 0011 rollout: STRICT_CLEAN_CODE=1 is the opt-in that adds `comments`
+  # to the blocking set, so -BaseRef blame semantics still apply (pre-existing
+  # debt stays WARN; a diff-overlapping line FAILs). The env-value rule (only
+  # the literal `1` promotes) lives in gate-clean-code-lib.sh. `naming` and
+  # `null-discipline` are never promoted.
+  if [ "$1" = "comments" ] && cc_comments_forced_blocking; then return 0; fi
   return 1
 }
 
@@ -1299,19 +826,41 @@ file_fully_added() { # file_fully_added <absfile> — 0 if the diff added the wh
   grep -qxF "$1" "$BLAME_FULLY_ADDED" >/dev/null 2>&1
 }
 
+# range_contains <start> <end> <range> — 0 when <range> ("s-e") overlaps
+# [start, end]. Split out of ranges_overlap so the scan and the comparison each
+# read as one thing.
+range_contains() {
+  local s="${3%%-*}" e="${3#*-}"
+  [ "$2" -ge "$s" ] && [ "$1" -le "$e" ]
+}
+
+# ranges_hit <start> <end> <ranges> — 0 when any space-separated "s-e" in
+# <ranges> overlaps [start, end].
+ranges_hit() {
+  local r
+  for r in $3; do
+    range_contains "$1" "$2" "$r" && return 0
+  done
+  return 1
+}
+
 ranges_overlap() { # ranges_overlap <absfile> <start> <end> — 0 if any added range overlaps
   [ -f "$BLAME_RANGES" ] || return 1
-  local line ranges r s e
+  local line
   while IFS= read -r line; do
     [ -z "$line" ] && continue
-    ranges="${line#*$'\t'}"
-    for r in $ranges; do
-      s="${r%%-*}"
-      e="${r#*-}"
-      if [ "$3" -ge "$s" ] && [ "$2" -le "$e" ]; then return 0; fi
-    done
+    ranges_hit "$2" "$3" "${line#*$'\t'}" && return 0
   done < <(grep -F "$1"$'\t' "$BLAME_RANGES" 2>/dev/null || true)
   return 1
+}
+
+# blame_overlaps_diff <absfile> <start> <end> — 0 when the finding is
+# diff-introduced: its lines overlap an added line, or (for a file-level finding
+# with no line anchor) the file was touched at all.
+blame_overlaps_diff() {
+  file_fully_added "$1" && return 0
+  [ -n "$2" ] || return 0
+  ranges_overlap "$1" "$2" "$3"
 }
 
 classify_blame() { # classify_blame <gate> <file> <start> <end> [lang] → fail|warn|none under -BaseRef
@@ -1320,9 +869,7 @@ classify_blame() { # classify_blame <gate> <file> <start> <end> [lang] → fail|
   if ! file_touched "$af"; then echo none; return; fi
   if is_warn_only_lang "$lang"; then echo warn; return; fi  # ADR 0006 D6 warn phase
   if ! is_blocking "$gate"; then echo warn; return; fi
-  if file_fully_added "$af"; then echo fail; return; fi
-  if [ -z "$start" ]; then echo fail; return; fi  # file-level: touched ⇒ overlap
-  if ranges_overlap "$af" "$start" "$end"; then echo fail; return; fi
+  if blame_overlaps_diff "$af" "$start" "$end"; then echo fail; return; fi
   echo warn
 }
 
@@ -1384,8 +931,23 @@ parse_diff_hunks() { # parse_diff_hunks <diff> <repo_root> — fill BLAME_TOUCHE
   done <<< "$diffout"
 }
 
+# mark_untracked_added <repo_root> <repo-relative path>... — an untracked (and
+# not gitignored) audited file is entirely diff-introduced: it counts as both
+# touched and fully added.
+mark_untracked_added() {
+  local repo_root="$1"
+  shift
+  local untracked u
+  untracked=$(printf '%s\0' "$@" | xargs -0 git -C "$repo_root" ls-files --others --exclude-standard -- 2>/dev/null || true)
+  while IFS= read -r u; do
+    [ -z "$u" ] && continue
+    echo "$repo_root/$u" >> "$BLAME_TOUCHED"
+    echo "$repo_root/$u" >> "$BLAME_FULLY_ADDED"
+  done <<< "$untracked"
+}
+
 compute_diff() { # compute_diff <newline-separated audited files>
-  local files="$1" repo_root errf rel=() diffout u untracked
+  local files="$1" repo_root errf rel=() diffout
   repo_root=$(git rev-parse --show-toplevel 2>/dev/null) || {
     echo "Error: -BaseRef '$BASE_REF' — git rev-parse --show-toplevel failed; cannot compute the diff" >&2
     exit 2
@@ -1399,13 +961,7 @@ compute_diff() { # compute_diff <newline-separated audited files>
     exit 2
   fi
   parse_diff_hunks "$diffout" "$repo_root"
-  # Untracked (not gitignored) audited files are entirely diff-introduced.
-  untracked=$(printf '%s\0' "${rel[@]}" | xargs -0 git -C "$repo_root" ls-files --others --exclude-standard -- 2>/dev/null || true)
-  while IFS= read -r u; do
-    [ -z "$u" ] && continue
-    echo "$repo_root/$u" >> "$BLAME_TOUCHED"
-    echo "$repo_root/$u" >> "$BLAME_FULLY_ADDED"
-  done <<< "$untracked"
+  mark_untracked_added "$repo_root" "${rel[@]}"
   sort -u "$BLAME_TOUCHED" -o "$BLAME_TOUCHED"
   sort -u "$BLAME_RANGES" -o "$BLAME_RANGES"
   sort -u "$BLAME_FULLY_ADDED" -o "$BLAME_FULLY_ADDED"
@@ -1487,6 +1043,28 @@ if contains_gate property-tests; then
   say ""
 fi
 
+# The three spec-032 gates (analyzers in scripts/gate-clean-code-lib.sh).
+# `comments` scans its own discovery set (eight extensions + *.sh, prose/prompt
+# trees excluded); `naming` reuses the eight existing non-test sets (never
+# shell); `null-discipline` is Java/JS/TS only.
+if contains_gate comments; then
+  say "--- Comments ---"
+  run_comments_gate $COMMENT_FILES
+  say ""
+fi
+
+if contains_gate naming; then
+  say "--- Naming ---"
+  run_naming_gate $ALL_NONTEST
+  say ""
+fi
+
+if contains_gate null-discipline; then
+  say "--- Null discipline ---"
+  run_null_discipline_gate $NONTEST_JAVA $NONTEST_NODE
+  say ""
+fi
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 if [ "$WARN_AS_ERROR" = true ]; then
   TOTAL=$((FAILS + WARNS))
@@ -1497,7 +1075,7 @@ fi
 # Report the subset when --gates narrowed the run (AC-007-03-01); the default
 # full run keeps its prior summary text byte-for-byte.
 GATE_SUMMARY=""
-[ "${#SELECTED_GATES[@]}" -lt 6 ] && GATE_SUMMARY="(gates: $(IFS=,; echo "${SELECTED_GATES[*]}"))"
+[ "${#SELECTED_GATES[@]}" -lt 9 ] && GATE_SUMMARY="(gates: $(IFS=,; echo "${SELECTED_GATES[*]}"))"
 
 say "---------------------------------------------"
 emit_report
