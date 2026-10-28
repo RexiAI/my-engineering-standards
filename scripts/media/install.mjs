@@ -16,14 +16,30 @@
 // --uninstall removes the agents and the example. It never deletes a user's
 // backends.json: that file is machine configuration, not repo state.
 
-import { copyFileSync, mkdirSync, rmSync, existsSync } from "node:fs";
+import { copyFileSync, mkdirSync, rmSync, existsSync, lstatSync, readlinkSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, dirname } from "node:path";
+import { join, dirname, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const GLOBAL = process.env.OPENCODE_CONFIG_DIR || join(homedir(), ".config", "opencode");
 const uninstall = process.argv.includes("--uninstall");
+
+// ensureDir — mkdir -p that also survives the overlay layout: an opencode
+// config dir may contain symlinks (e.g. media -> ~/.config/opencode/media)
+// whose target does not exist yet. Plain recursive mkdir throws ENOENT on a
+// dangling symlink, so resolve the link and create the target first.
+function ensureDir(p, depth = 0) {
+  if (depth > 16) throw new Error(`symlink loop while creating ${p}`);
+  let st = null;
+  try { st = lstatSync(p); } catch { /* missing: create below */ }
+  if (st && st.isSymbolicLink()) {
+    let target = readlinkSync(p);
+    if (!isAbsolute(target)) target = join(dirname(p), target);
+    ensureDir(target, depth + 1);
+  }
+  mkdirSync(p, { recursive: true });
+}
 
 const AGENTS = ["media-image.md", "media-video.md", "media-voice.md", "media-producer.md"];
 const EXAMPLE = join(REPO, "scripts", "media", "backends.example.json");
@@ -37,7 +53,8 @@ if (uninstall) {
   process.exit(0);
 }
 
-mkdirSync(join(GLOBAL, "agents"), { recursive: true });
+ensureDir(GLOBAL);
+ensureDir(join(GLOBAL, "agents"));
 for (const a of AGENTS) {
   const src = join(REPO, "agents", a);
   if (!existsSync(src)) {
@@ -47,7 +64,7 @@ for (const a of AGENTS) {
   copyFileSync(src, join(GLOBAL, "agents", a));
 }
 
-mkdirSync(MEDIA_DIR, { recursive: true });
+ensureDir(MEDIA_DIR);
 if (!existsSync(EXAMPLE)) {
   console.error(`missing ${EXAMPLE} — run from a full clone of the standards repo`);
   process.exit(1);

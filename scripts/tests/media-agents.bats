@@ -86,6 +86,24 @@ teardown() { teardown_tmpdir; }
   [[ "$output" == *"[OK] backends.example.json parses"* ]]
 }
 
+@test "media-agents: install survives dangling symlinks in the config dir" {
+  if ! command -v node >/dev/null 2>&1; then skip "node not installed"; fi
+  local cfg="$TMPDIR_HELPER/cfg2"
+  local realmedia="$TMPDIR_HELPER/realmedia"
+  local realagents="$TMPDIR_HELPER/realagents"
+  mkdir -p "$cfg" "$realmedia" "$realagents"
+  ln -s "$realmedia" "$cfg/media"
+  ln -s "$realagents" "$cfg/agents"
+  rm -rf "$realmedia" "$realagents"   # both links now dangle
+
+  run env OPENCODE_CONFIG_DIR="$cfg" node "$REPO_ROOT/scripts/media/install.mjs"
+  [ "$status" -eq 0 ]
+  [ -d "$realmedia" ]
+  [ -d "$realagents" ]
+  [ -f "$cfg/media/backends.json" ]
+  [ -f "$cfg/agents/media-image.md" ]
+}
+
 @test "media-agents: install writes the tree, is idempotent, keeps user config, uninstall reverses" {
   if ! command -v node >/dev/null 2>&1; then skip "node not installed"; fi
   local cfg="$TMPDIR_HELPER/cfg"
