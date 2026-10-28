@@ -25,6 +25,16 @@ direnv allow                        # load it at the repo root
 
 Switching a model means editing the gitignored `config/model.local.env` and restarting OpenCode — no commit, no PR. See `docs/SPEC_PIPELINE.md` for details.
 
+## Media Agents (provider-agnostic)
+
+Four global opencode agents for image, video, and voice work, driven by a
+user-configured backend contract (`~/.config/opencode/media/backends.json`) —
+no provider, vendor CLI, or model id is assumed. Install with
+`make install-media` (or `scripts/bootstrap-windows.ps1` on a clean Windows
+machine), fill in the contract, then restart opencode. Contract, flows, and
+troubleshooting: `docs/MEDIA_AGENTS.md`; decision record:
+`docs/adr/0016-provider-agnostic-media-agents.md`.
+
 ## OKF — Operational Knowledge Framework
 
 [`okf/`](okf/index.md) documents how we work with AI: practices, decisions, and runbooks for managing context windows, choosing between RAG and context stuffing, detecting context rot, and setting up MCP servers.
