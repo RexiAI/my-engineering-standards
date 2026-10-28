@@ -25,6 +25,21 @@ DEFAULT_REPO_LIST="$STANDARDS_ROOT/repo-list.txt"
 DEFAULT_PARENT_DIR="$(cd "$STANDARDS_ROOT/.." && pwd)"
 
 SUBMODULE_PATH=".standards"
+# Children must follow the standards repo's default branch explicitly. A stale
+# child clone can carry an origin/HEAD that still names master, and plain
+# `submodule update --remote` would then check out an obsolete commit.
+STANDARDS_BRANCH="${STANDARDS_BRANCH:-}"
+if [ -z "$STANDARDS_BRANCH" ]; then
+    STANDARDS_BRANCH=$(git -C "$STANDARDS_ROOT" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)
+    STANDARDS_BRANCH="${STANDARDS_BRANCH#origin/}"
+fi
+if [ -z "$STANDARDS_BRANCH" ]; then
+    if git -C "$STANDARDS_ROOT" show-ref --verify --quiet refs/remotes/origin/main; then
+        STANDARDS_BRANCH="main"
+    else
+        STANDARDS_BRANCH="master"
+    fi
+fi
 BRANCH_NAME="chore/bump-engineering-standards"
 COMMIT_MESSAGE="chore: bump engineering standards submodule"
 
@@ -421,7 +436,7 @@ advance_child() {
     local repo="$1" current new
     resume_bump_branch "$repo" || return 0
     current=$(submodule_pointer "$repo")
-    if ! git -C "$repo" submodule update --remote "$SUBMODULE_PATH" >/dev/null 2>&1; then
+    if ! git -C "$repo" -c "submodule.$SUBMODULE_PATH.branch=$STANDARDS_BRANCH" submodule update --remote "$SUBMODULE_PATH" >/dev/null 2>&1; then
         fail_child "$repo" "git submodule update --remote failed"
         return 0
     fi
