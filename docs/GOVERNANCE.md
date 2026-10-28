@@ -48,10 +48,6 @@ T3 prohibitions apply to all agents regardless of tier.
 | `spec-deployer` | 5c | **T1** | read denies `00-informal.md`; edit gate-path denies + `*: ask`; bash denies `vercel deploy*`, `git commit*`, `git push*` | none — records `40-deploy.md` evidence, no git writes, no deployments created (ADR 0008) |
 | `spec-ux` | 1.5 | **T2 (frontmatter) / T1 (policy)** | read `*` allow; `git commit*` ask, `git push*` ask | prose says "Do not commit or push" — frontmatter permits push only on human confirmation |
 | `spec-pipeline` | orchestrator | **T1 (policy)** | no `permission` block at all — opencode primary defaults grant full access | policy (its instructions) forbids commit/push; frontmatter imposes no restriction |
-| `media-image` | media family | **T1** | bash allow `bl`/`ffprobe`, edit allow `out/**` only, `git push*`/`rm -rf *` deny, `*` ask | none — no git writes; confirm-before-spend gate in its prompt |
-| `media-video` | media family | **T1** | bash allow `bl`/`ffmpeg`/`ffprobe`, edit `out/**` only, `git push*`/`rm -rf *` deny, `*` ask | none — batch renders require explicit user approval |
-| `media-voice` | media family | **T1** | bash allow `bl`/`ffmpeg`/`ffplay`/`node`/`arecord`, edit `out/**` only, `git push*`/`rm -rf *` deny, `*` ask | none — launches the realtime app but never handles key literals |
-| `media-producer` | media-family orchestrator | **T1** | bash allow `bl`/`ffmpeg`/`ffprobe`, edit `out/**` only, `git push*`/`rm -rf *` deny, `*` ask, task allow | policy: storyboard human gate before first billable video render |
 
 No agent is mapped to T3: T3 is the universal prohibition, not an assignment.
 

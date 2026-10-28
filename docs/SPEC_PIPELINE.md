@@ -627,13 +627,14 @@ agent invoked it — no vendor coupling, works with any provider you already use
 Per-stage differentiation works through a **per-machine direnv mechanism** — no
 editing and committing `opencode.json` is involved. `opencode.json` (repo root)
 resolves every `agent.<name>.model` from an `{env:SPEC_*_MODEL}` reference, and
-the committed `config/model.local.env.example` carries the defaults. The
+the committed `config/model.local.env.example` carries placeholder defaults that
+you override per machine. The
 reasoning behind the default split (Specifier, UX Designer, Verifier, and
 Architect do the pipeline's highest-judgment work — detecting ambiguity,
 inferring design direction from a brief, adversarially checking prior stages'
 claims, and reasoning about surviving mutants — while Coder, Refactorer, and
 the orchestrator do more bounded, well-specified work; a weak Verifier is worse
-than none) is encoded as the committed defaults in `config/model.local.env.example`,
+than none) is encoded as placeholder defaults in `config/model.local.env.example`,
 not as literals in `opencode.json`.
 
 ### One-time setup (per machine)
@@ -668,7 +669,7 @@ not as literals in `opencode.json`.
 
    | Line | File | Role |
    |---|---|---|
-   | 1 | `config/model.local.env.example` | committed defaults for the 8 `SPEC_*_MODEL` vars |
+   | 1 | `config/model.local.env.example` | placeholder defaults for the 10 `SPEC_*_MODEL` vars |
    | 2 | `config/model.local.env` | gitignored per-machine override |
    | 3 | `config/agent.local.env` | gitignored per-machine credentials (`GITHUB_TOKEN`, `GH_TOKEN`) |
 
@@ -762,7 +763,7 @@ standalone PR-review agent gets its runtime model per repo instead:
 **PR review agent model**: `agents/pr-review.md` (the PR review agent,
 spec 024) ships without a `model:` key, same as every other agent. Its model
 resolves through `{env:SPEC_PR_REVIEW_MODEL}` in `opencode.json`, with the
-committed default in `config/model.local.env.example` and an optional
+placeholder default in `config/model.local.env.example` and an optional
 per-repo `PR_REVIEW_MODEL` override in the shared workflow. The agent's scope
 lock, permissions, secret handling, and cost bounds are documented in
 `docs/CI_CD.md §PR Review Agent`, the authoritative reference for wiring it

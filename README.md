@@ -13,6 +13,8 @@ git submodule add git@github.com:RexiAI/my-engineering-standards.git .standards
 
 The `spec-*` agents resolve their model from `{env:SPEC_*_MODEL}` references. Per-machine values arrive via the gitignored repo-root `.envrc` (direnv), which loads the committed `config/model.local.env.example` defaults, then the gitignored `config/model.local.env` override, then `config/agent.local.env` credentials — each via a `dotenv_if_exists` line (later lines win).
 
+The committed example carries placeholders only — no provider or model is assumed. Put real `<provider>/<model>` ids in `config/model.local.env` before running `/spec` or `/build`.
+
 One-time setup per machine:
 
 ```bash
@@ -22,27 +24,6 @@ direnv allow                        # load it at the repo root
 ```
 
 Switching a model means editing the gitignored `config/model.local.env` and restarting OpenCode — no commit, no PR. See `docs/SPEC_PIPELINE.md` for details.
-
-## Media Agents (Linux + Windows)
-
-Four global opencode agents for image, video, and voice generation via the
-Bailian `bl` CLI, plus a full-duplex realtime voice app and a zero-credit
-smoke suite. Install with `make install-media` (or `scripts/bootstrap-windows.ps1`
-on a clean Windows machine); restart opencode. Architecture, feature matrix
-(Token-Plan key gaps included), and troubleshooting: `docs/MEDIA_AGENTS.md`;
-decision record: `docs/adr/0007-media-agent-family.md`.
-
-## Qwen CLI Sync
-
-The spec pipeline's Token Plan models can also be used in the [Qwen Code CLI](https://github.com/anthropics/qwen-code). After cloning or pulling this repo, sync the models:
-
-```bash
-make sync-qwen   # one-way sync: opencode.json → ~/.qwen/settings.json
-```
-
-This adds all `bailian-token-plan-personal` provider models from `opencode.json` to your local Qwen CLI settings. The script is idempotent — re-running it replaces previous Token Plan entries with the current repo versions.
-
-**Note:** The Token Plan's OpenAI-compatible endpoint (`/compatible-mode/v1`) currently only serves `qwen3.8-max` and `qwen3.8-flash`. Other models (qwen3.7-max, glm-5.2, deepseek-v4-pro, etc.) require the Anthropic-compatible endpoint, which opencode uses but Qwen CLI does not support.
 
 ## OKF — Operational Knowledge Framework
 

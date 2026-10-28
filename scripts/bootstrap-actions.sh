@@ -384,7 +384,7 @@ report_init_ci_entries() {
 run_capability() { # run_capability INDEX
   local i="$1" id="${CAT_IDS[$1]}"
   if [ "${CAT_ACTIONS[$i]}" = "information" ]; then
-    refused "informational only — media agents need external provider credentials" "$id"
+    refused "informational only — no files are written for this capability" "$id"
     return 0
   fi
   ACT_APPLIED=0
