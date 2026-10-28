@@ -1,3 +1,10 @@
+# [1.46.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.45.1...v1.46.0) (2026-10-28)
+
+
+### Features
+
+* **spec 035:** child-project standards updater with PR progression ([#104](https://github.com/RexiAI/my-engineering-standards/issues/104)) ([6348482](https://github.com/RexiAI/my-engineering-standards/commit/6348482743017bd4295d57d6f937a9cab9616f77))
+
 ## [1.45.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.45.0...v1.45.1) (2026-10-26)
 
 
