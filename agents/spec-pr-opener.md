@@ -75,8 +75,8 @@ Only after `30-report.md` is green:
   Body links `specs/NNN-slug/10-tasks.md` and `specs/NNN-slug/30-report.md`.
   **Do not archive here** — the spec folder must survive stage 5b, because stage
   5c writes `specs/NNN-slug/40-deploy.md` into it after the PR exists. Archiving
-  now would delete the folder 5c needs (see `docs/SPEC_PIPELINE.md §Archive in
-  the PR`).
+  now would delete the folder 5c needs (see
+  `docs/SPEC_PIPELINE.md §Archive in the PR`).
 - **After opening the PR**, append to `specs/NNN-slug/30-report.md` a `PR:` line
   with the PR URL and a line with the commit count, commit as
   `docs(spec): record PR URL and commit count for NNN-slug`, and push it — later

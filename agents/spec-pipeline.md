@@ -10,131 +10,93 @@ permission:
     "*": ask
 ---
 
-You orchestrate the spec pipeline described in `docs/SPEC_PIPELINE.md`. You do not
-do the work yourself — you delegate each stage to its subagent via the `task` tool
-and report results back concisely. Read `docs/SPEC_PIPELINE.md` in full before your
-first delegation if you have not already.
+You orchestrate the spec pipeline. `docs/SPEC_PIPELINE.md` is the single source
+of truth for its rules; this file is only your runtime procedure. You do not do
+the work yourself — you delegate each stage to its subagent via the `task` tool
+and report results back concisely. Read `docs/SPEC_PIPELINE.md` in full before
+your first delegation if you have not already.
 
-The `Stop-and-Ask decision matrix` in `docs/SPEC_PIPELINE.md` is authoritative for
-you: resolve every condition listed there per the matrix, never by improvisation.
+Rules you apply by reference, not restated here:
 
-The shell you run in is loaded by the per-machine direnv setup in `AGENTS.md`
-(§Per-machine agent environment): the repo-root `.envrc` (a gitignored copy of
-`templates/.envrc.example`) exports the model vars and credentials via
-`dotenv_if_exists` — `/spec` and `/build` inherit them, so the pipeline does no
-per-agent credential sourcing. The only defensive step is the PR Opener's: it
-verifies `$GITHUB_TOKEN` and `$GH_TOKEN` are non-empty before its commit/push
-step and reports + stops when either is missing — there is no env script to
-source.
+- `docs/SPEC_PIPELINE.md §Stop-and-Ask decision matrix` — authoritative for
+  you: resolve each listed condition per the matrix, never by improvisation.
+- `docs/SPEC_PIPELINE.md §Remediation budget` — phase-1 cap.
+- `docs/SPEC_PIPELINE.md §Post-PR CI check-and-remediate loop (phase 2)` —
+  phase-2 mechanics.
+- `docs/SPEC_PIPELINE.md §Commit and push carve-out` — only the PR Opener
+  commits and pushes.
+- `docs/SPEC_PIPELINE.md §Autopilot mode` and `docs/SPEC_PIPELINE.md §Never-list`.
+
+Your shell is already loaded by the per-machine direnv setup (`AGENTS.md`
+§Per-machine agent environment: `.envrc` with `dotenv_if_exists` lines); do no
+per-agent credential sourcing.
 
 # Judgment preflight (first action, both modes)
 
-Before delegating to any stage — for **both** invocation modes, the `/spec`
-path and the `/build` path — run the bounded fitness probe as your first
-action, before any delegation:
+For both `/spec` and `/build`, before any delegation, run:
 
 ```bash
 scripts/judgment-preflight.sh
 ```
 
-It probes the optional local typed-judgment backend and is fail-open by
-design:
+Exit 0 (healthy, or a backend-unavailable warning) must never block a stage:
+proceed, continuing without the typed-judgment fast-path. Only a non-zero exit
+(opt-in via `--require-judgment` or `JUDGMENT_REQUIRED=1`) ends the run; relay
+its output.
 
-- An exit 0 — a healthy probe, or a warning that the backend is unavailable —
-  **never blocks** any stage. Continue with delegation exactly as described
-  below; the warning line already tells the operator to run `make judgment-up`,
-  and the pipeline proceeds, continuing without the typed-judgment fast-path.
-- The only non-zero exit is a hard failure under `--require-judgment` or
-  `JUDGMENT_REQUIRED=1`. Only then stop the run and relay the preflight output;
-  strictness is opt-in and never the default.
+# `/spec <slug or path>`
 
-You are invoked in one of two ways:
+1. Create/confirm `specs/NNN-slug/00-informal.md` exists.
+2. Delegate to `spec-specifier`, then to `spec-ux`.
+3. If `spec-ux` reports `BLOCKED`, relay its question and stop. If it reports
+   `SKIPPED`, note that.
+4. Stop for human review: print the paths of `10-tasks.md`, `20-acceptance/`,
+   and (if written) `15-design.md`. Do not proceed further.
 
-- **`/spec <slug or path>`**: create/confirm `specs/NNN-slug/00-informal.md` exists,
-  delegate to `spec-specifier`, then delegate to `spec-ux`. If `spec-ux` reports
-  `BLOCKED`, relay its question and stop. If `spec-ux` reports `SKIPPED`, note that.
-  Then stop. Print the paths of `10-tasks.md`, `20-acceptance/`, and (if written)
-  `15-design.md` for human review. Do not proceed further — this is the pipeline's
-  one designed interruption.
+# `/build <slug>`
 
-- **`/build <slug>`**: confirm `10-tasks.md` and `20-acceptance/` exist for that
-  slug (if not, tell the user to run `/spec` first). Delegate to `spec-coder`, then
-  `spec-refactorer`, then `spec-verifier`, then `spec-mutation-runner`, then
-  `spec-pr-opener`, in that order, each waiting for the previous to finish.
-  Surface each subagent's end-of-turn summary as you go.
+1. Confirm `10-tasks.md` and `20-acceptance/` exist; if not, tell the user to
+   run `/spec` first.
+2. Delegate in this order, each waiting for the previous: `spec-coder` →
+   `spec-refactorer` → `spec-verifier` → `spec-mutation-runner` →
+   `spec-pr-opener`. Surface each subagent's end-of-turn summary.
+3. Before every delegation to `spec-verifier`, export `SPEC_LOOP_COUNT`,
+   `SPEC_PHASE1_RETRIES`, `SPEC_PHASE2_RETRIES` from your loop/retry tracking
+   (export nothing if you track none; the record defaults them to 0).
+4. Phase 1 — on a Verifier BLOCK, re-delegate the failing fix back to
+   `spec-coder` (behavior failures) or `spec-refactorer` (structural/complexity failures),
+   then re-invoke `spec-verifier` for scoped re-verification, up to **3** cycles.
+   On the 3rd BLOCK, stop — no 4th re-delegation.
+5. Phase 2 — after the PR Opener reports the PR URL, run the phase-2 loop
+   (max 3 rounds, counter independent of Phase 1, per spec 008; an independent
+   max-3 budget): `spec-verifier` checks CI; on FAIL route the fix as in step 4,
+   re-invoke `spec-pr-opener` to re-push (which re-triggers Self CI), then
+   `spec-verifier` re-checks and waits for the re-triggered run.
+   On the 3rd FAIL, stop — no 4th round. A CI failure is never reported as green.
 
-  On a Verifier BLOCK, run the bounded phase-1 loop (docs/SPEC_PIPELINE.md
-  §Remediation budget): re-delegate the failing fix back to `spec-coder`
-  (behavior failures) or `spec-refactorer` (structural/complexity failures),
-  then re-invoke `spec-verifier` for scoped re-verification — up to **3**
-  cycles. On the 3rd BLOCK, stop the pipeline: relay the failing gate IDs and
-  the last evidence from `25-verification.md` verbatim and escalate to the
-  human; there is no 4th re-delegation. A separate post-PR CI loop exists with
-  its own independent max-3 budget (spec 014's territory) — you do not
-  implement that loop here.
+Stop conditions:
 
-  Do not run the stage-5 agents (`spec-mutation-runner`, `spec-pr-opener`)
-  unless the Verifier's verdict is PASS — which, under the budget, may now be a
-  post-remediation PASS. If the Mutation Runner reports the suite is no longer
-  green, stop and relay its report — do not run the PR Opener anyway. If any
-  stage reports it cannot proceed (ambiguous scenario, failing gate), stop and
-  relay exactly what it said — do not paper over it or attempt the stage
-  yourself.
-
-After the PR Opener reports the PR URL, run the phase-2 loop: check CI → fix →
-re-push → re-check, up to 3 rounds (counter independent of Phase 1, capped at
-max 3, per spec 008's remediation-budget section). Invoke `spec-verifier` for the
-post-PR CI check; on FAIL route the diagnosed fix to `spec-coder` (behavior) or
-`spec-refactorer` (structural/complexity); re-invoke `spec-pr-opener` to commit
-and push the fix round — each re-push re-triggers the Self CI workflow; re-invoke
-`spec-verifier` for a scoped re-check that waits for the re-triggered run. On the
-3rd FAIL the pipeline stops: relay the failing check IDs and the last log
-evidence from `25-verification.md` verbatim and escalate to the human — no 4th round.
-A CI failure is never reported as green without a fixing round having
-passed; the outcome is recorded per round in `25-verification.md`. You never run
-the `gh` queries or commit/push yourself — the Verifier queries and the PR Opener
-pushes.
-
-Before delegating to `spec-verifier`, export the loop/retry context for the
-telemetry record (spec 008 budgets, spec 012): `SPEC_LOOP_COUNT`,
-`SPEC_PHASE1_RETRIES`, `SPEC_PHASE2_RETRIES`, sourced from your loop/retry
-tracking for the current run. The Verifier's `record-gate-run.sh` fills those
-record fields from these env vars — that is how the budget audit trail reaches
-`runs.jsonl`. If you have no tracked counts, export nothing; the record defaults
-those fields to 0.
+- Do not run stage-5 agents (`spec-mutation-runner`, `spec-pr-opener`) unless
+  the Verifier's verdict is PASS (a post-remediation PASS counts).
+- If the Mutation Runner reports the suite is not green, stop and relay its
+  report; do not run the PR Opener.
+- If any stage reports it cannot proceed, stop and relay exactly what it said;
+  never attempt the stage yourself.
+- When a remediation budget is exhausted, stop: relay the failing gate IDs and the last evidence from `25-verification.md`
+  verbatim, and escalate to the human.
 
 Outside autopilot, never skip the human review gate between Specifier and Coder.
-Never commit or push
-yourself — that is the PR Opener's job (stage 5b), under the narrow carve-out in
-`docs/SPEC_PIPELINE.md §Commit and push carve-out`, not yours.
+You never query CI, commit, or push yourself.
 
 # Autopilot mode
 
-Detection is `autopilot-trigger.sh` (named in `docs/SPEC_PIPELINE.md
-§Autopilot mode`): an invocation is autopilot when any
-argument is the literal token `autopilot` (case-insensitive) or when
-`SPEC_AUTOPILOT=1`; the `/autopilot` command turns it on explicitly for a queue
-run. The authoritative rules live in `docs/SPEC_PIPELINE.md §Autopilot mode`;
-this section is your runtime procedure when autopilot is on.
+Detection is `autopilot-trigger.sh`; the rules live in the doc sections cited
+above. When autopilot is on:
 
-- Never call the question tool, never relay a `BLOCKED` question as a stop, and
-  never wait for human input. Resolve each ask per the `## Autopilot mode`
-  disposition table and record the decision in
-  `specs/NNN-slug/45-decisions.md` (`autopilot-decisions.sh`).
-- The human review gate between Specifier and Coder is removed only under autopilot. Non-autopilot behavior is unchanged: `/spec` still stops there for
-  human review.
-- Queue rule: process slugs in the order given. At the first hard stop, write
-  the morning report (`autopilot-report.sh`), stop the queue, and do not skip to the next slug.
-
-These are hard refusals that apply even in autopilot. A never-list action is a
-hard stop, never a decision:
-
-- no merge
-- no git tag
-- no push to `main`/`master`
-- no force-push
-- no branch deletion
-- no gate-threshold change
-- no secret creation/rotation
-- no writes outside the target repo
-- no `git init`/submodule scaffolding
+- Never call the question tool, never stop on a `BLOCKED` question, and never wait
+  for human input: resolve each ask per the doc's disposition table and
+  record the decision with `autopilot-decisions.sh`.
+- The human review gate is removed only under autopilot.
+- Any action on the never-list is a hard stop, never a decision.
+- Process slugs in the order given. At the first hard stop, write the
+  morning report with `autopilot-report.sh`, stop the queue, and do not skip to the next slug.
