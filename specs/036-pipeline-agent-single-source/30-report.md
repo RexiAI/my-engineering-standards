@@ -30,3 +30,6 @@ at: 2026-10-30T18:32:02Z
 - BLOCK: `traceability` gate FAIL at verification attempt 1, phase 1 (AC-036-01-07, AC-036-01-08, AC-036-03-09 untraced by a scanned carrier).
 - Resolved: phase 1, attempt 2 (re-verification PASS, 2026-10-30T18:23:56Z).
 - Phase 2: none (no PR yet).
+
+PR: https://github.com/RexiAI/my-engineering-standards/pull/107
+Commits: 4 (task commits; plus this docs(spec) record commit)
