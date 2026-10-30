@@ -24,7 +24,11 @@ teardown() { teardown_tmpdir; }
 }
 
 @test "AC-035-16 — the 9 never-list actions are hard refusals, never decisions" {
-  run cat "$AGENT"
+  # Spec 036: the never-list lives once in docs/SPEC_PIPELINE.md §Never-list;
+  # the orchestrator references it instead of restating it.
+  DOC="$REPO_ROOT/docs/SPEC_PIPELINE.md"
+  grep -qF 'docs/SPEC_PIPELINE.md §Never-list' "$AGENT"
+  run cat "$DOC"
   [[ "$output" == *"no merge"* ]]
   [[ "$output" == *"no git tag"* ]]
   [[ "$output" == *'no push to `main`/`master`'* ]]
@@ -34,7 +38,7 @@ teardown() { teardown_tmpdir; }
   [[ "$output" == *"no secret creation/rotation"* ]]
   [[ "$output" == *"no writes outside the target repo"* ]]
   [[ "$output" == *'no `git init`/submodule scaffolding'* ]]
-  [[ "$output" == *"hard stop"* ]]
+  grep -qF 'hard stop' "$AGENT"
   grep -qiF 'never a decision' "$AGENT"
 }
 

@@ -1,3 +1,10 @@
+# [1.47.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.46.0...v1.47.0) (2026-10-30)
+
+
+### Features
+
+* single source of truth for pipeline orchestrator rules (036) ([#107](https://github.com/RexiAI/my-engineering-standards/issues/107)) ([75d2780](https://github.com/RexiAI/my-engineering-standards/commit/75d2780d326edda836b95b80c46f2b909b75dbd8))
+
 # [1.46.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.45.1...v1.46.0) (2026-10-28)
 
 

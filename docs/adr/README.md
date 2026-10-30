@@ -23,3 +23,4 @@ Proposed → Accepted → Deprecated → Superseded.
 | 0014 | [Judgment consumer contract: exit-10 = stock procedure, fail-open preflight, payload cap, four-way fallback reasons](0014-judgment-consumer-contract-fail-open-preflight.md) | Accepted |
 | 0015 | [Autopilot mode: choose-default-record-continue for unattended pipeline queue runs](0015-autopilot-mode.md) | Accepted |
 | 0016 | [Provider-agnostic media agent family: global opencode agents driving a user-configured backend contract](0016-provider-agnostic-media-agents.md) | Accepted |
+| 0017 | [Single source of truth for spec-pipeline rules](0017-pipeline-agent-single-source.md) | Accepted |
