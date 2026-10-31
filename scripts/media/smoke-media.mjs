@@ -1,57 +1,80 @@
 #!/usr/bin/env node
 // smoke-media.mjs — no-cost structural smoke for the media agent family.
-// Validates agent files, voice-chat syntax, and bl command construction
-// (--dry-run only; consumes zero credits). Exit 0 = green.
+// Validates the agent files and the backend-contract example; never invokes a
+// backend and never touches the network. Exit 0 = green.
 
-import { spawnSync } from "node:child_process";
-import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
+// Assembled at runtime so this guard file itself carries no literal vendor
+// token (same construction precedent as check-no-hardcoded-secrets.sh).
+const VENDOR = new RegExp([
+  "ali" + "baba",
+  "ali" + "yun",
+  "dash" + "scope",
+  "bai" + "lian",
+  "qw" + "en",
+  "sk-" + "sp-",
+].join("|"), "i");
 let fails = 0;
 const ok = (name) => console.log(`[OK] ${name}`);
 const bad = (name, why) => { console.log(`[FAIL] ${name}: ${why}`); fails++; };
 
-// On POSIX `bl` is a real binary; on Windows it is an npm `.cmd` shim, which
-// Node cannot exec without a command interpreter (spawning it directly yields
-// ENOENT). Route through cmd.exe there so the check works on both platforms.
-const runBl = (argv) =>
-  process.platform === "win32"
-    ? spawnSync(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", "bl", ...argv], { encoding: "utf8", timeout: 30000 })
-    : spawnSync("bl", argv, { encoding: "utf8", timeout: 30000 });
+const AGENTS = ["media-image.md", "media-video.md", "media-voice.md", "media-producer.md"];
 
-// 1. agent files: exist, have description + mode frontmatter, no pinned model
-for (const f of readdirSync(join(REPO, "agents")).filter((n) => n.startsWith("media-"))) {
-  const txt = readFileSync(join(REPO, "agents", f), "utf8");
+// 1. agent files: exist, description + mode frontmatter, no pinned model, no
+//    vendor-specific command surface.
+for (const f of AGENTS) {
+  const p = join(REPO, "agents", f);
+  if (!existsSync(p)) { bad(f, "missing"); continue; }
+  const txt = readFileSync(p, "utf8");
   const fm = txt.split("---")[1] ?? "";
-  if (!/^description:/m.test(fm)) bad(f, "missing description in frontmatter");
-  else if (!/^mode:/m.test(fm)) bad(f, "missing mode in frontmatter");
-  else if (/^model:/m.test(fm)) bad(f, "model: pinned in frontmatter (governance: must not pin)");
-  else ok(`agent ${f}`);
+  if (!/^description:/m.test(fm)) { bad(f, "missing description in frontmatter"); continue; }
+  if (!/^mode:/m.test(fm)) { bad(f, "missing mode in frontmatter"); continue; }
+  if (/^model:/m.test(fm)) { bad(f, "model: pinned in frontmatter (governance: must not pin)"); continue; }
+  if (VENDOR.test(txt)) { bad(f, "vendor-specific token found"); continue; }
+  ok(`agent ${f}`);
 }
-for (const need of ["media-image.md", "media-video.md", "media-voice.md", "media-producer.md"])
-  if (!existsSync(join(REPO, "agents", need))) bad(need, "missing");
 
-// 2. voice-chat parses
-const chk = spawnSync(process.execPath, ["--check", join(REPO, "scripts", "media", "voice-chat", "voice-chat.mjs")], { encoding: "utf8" });
-chk.status === 0 ? ok("voice-chat.mjs parses") : bad("voice-chat.mjs", chk.stderr);
+// 2. agents point at the backend contract
+for (const f of AGENTS) {
+  const p = join(REPO, "agents", f);
+  if (!existsSync(p)) continue;
+  const txt = readFileSync(p, "utf8");
+  if (!txt.includes("backends.json")) { bad(f, "does not reference backends.json"); continue; }
+  ok(`backend contract referenced by ${f}`);
+}
 
-// 3. bl command construction (dry-run only) — skip cleanly if bl absent
-const which = spawnSync(process.platform === "win32" ? "where" : "which", ["bl"], { encoding: "utf8" });
-if (which.status !== 0) {
-  console.log("[SKIP] bl CLI not on PATH — install via bootstrap or `npm i -g bailian-cli`");
+// 3. example contract parses and covers every operation the agents use
+const example = join(REPO, "scripts", "media", "backends.example.json");
+if (!existsSync(example)) {
+  bad("backends.example.json", "missing");
 } else {
-  const cases = [
-    ["image", ["image", "generate", "--prompt", "smoke", "--dry-run"]],
-    ["video", ["video", "generate", "--prompt", "smoke", "--model", "happyhorse-1.1-t2v", "--dry-run"]],
-    ["tts", ["speech", "synthesize", "--text", "smoke", "--model", "qwen-audio-3.0-tts-plus", "--voice", "longanqian", "--dry-run"]],
-    ["asr", ["speech", "recognize", "--url", "https://example.invalid/a.wav", "--model", "qwen-audio-3.0-asr-flash", "--dry-run"]],
-  ];
-  for (const [name, argv] of cases) {
-    const r = runBl(argv);
-    r.status === 0 ? ok(`bl ${name} dry-run`) : bad(`bl ${name} dry-run`, (r.stderr || r.stdout || "").split("\n").slice(-1)[0]);
+  let cfg;
+  try { cfg = JSON.parse(readFileSync(example, "utf8")); }
+  catch (e) { bad("backends.example.json", `invalid JSON: ${e.message}`); cfg = null; }
+  if (cfg) {
+    if (VENDOR.test(JSON.stringify(cfg))) bad("backends.example.json", "vendor-specific token found");
+    else ok("backends.example.json parses");
+    const expected = { image: ["generate", "edit"], video: ["generate"], tts: ["command"], asr: ["command"] };
+    for (const [section, ops] of Object.entries(expected)) {
+      const got = cfg[section];
+      if (!got || typeof got !== "object") { bad(`backends.example.json ${section}`, "missing section"); continue; }
+      for (const op of ops) {
+        const argv = got[op];
+        if (!Array.isArray(argv) || argv.length === 0) bad(`backends.example.json ${section}.${op}`, "expected a non-empty argv array");
+        else ok(`contract ${section}.${op}`);
+      }
+    }
   }
+}
+
+// 4. no shipped provider/model ids in the family's files
+for (const p of [join(REPO, "docs", "MEDIA_AGENTS.md"), example]) {
+  if (!existsSync(p)) continue;
+  if (VENDOR.test(readFileSync(p, "utf8"))) bad(p.replace(REPO + "/", ""), "vendor-specific token found");
 }
 
 process.exit(fails ? 1 : 0);

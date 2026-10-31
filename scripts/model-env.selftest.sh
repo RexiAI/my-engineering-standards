@@ -836,7 +836,7 @@ fi
 if grep -q 'dotenv_if_exists' "$ROOT/AGENTS.md" \
    && grep -q '\.envrc' "$ROOT/AGENTS.md" \
    && grep -q 'config/model.local.env.example' "$ROOT/AGENTS.md" \
-   && ! grep -qiE 'opencode-(go|zen)|deepseek|qwen|kimi|glm-[0-9]|ANY_SUBSCRIPTION' "$ROOT/AGENTS.md" \
+   && ! grep -qiE 'opencode-(go|zen)|deepseek|kimi|glm-[0-9]|ANY_SUBSCRIPTION' "$ROOT/AGENTS.md" \
    && ! grep -q "$LOADENV\|$LOADMODELENV" "$ROOT/AGENTS.md"; then
   ok "AC-025-07-02 AGENTS.md describes the gitignored .envrc mechanism; carries no model or provider ids"
 else

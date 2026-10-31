@@ -31,7 +31,6 @@ s_030_07_02() { run_gate "AC-030-07-02" bash scripts/check-orchestration.sh; }
 #     0002/0003 and by check-model-env.sh itself — scanned only outside the
 #     provider region (same sed as check-model-env.sh).
 #   * CHANGELOG.md: historical release notes quoting retired pins.
-#   * scripts/sync-qwen-settings.sh: an API endpoint URL path, not a model id.
 #   * skills/hallmark/references/*.md: third-party design doc URLs.
 #   * specs/ and docs/changes/ path prefixes: the pipeline's own artifact
 #     prose, live and archived alike. Both lifecycle states quote these
@@ -52,7 +51,7 @@ s_030_07_02() { run_gate "AC-030-07-02" bash scripts/check-orchestration.sh; }
 t7_ids_clause() {
   local hits rest
   hits="$(git grep -niE "$ID_PATTERNS" -- . ':(exclude)opencode.json' 2>/dev/null || true)"
-  rest="$(printf '%s\n' "$hits" | grep -vE '^(CHANGELOG\.md|scripts/sync-qwen-settings\.sh|skills/hallmark/references/assets\.md|skills/hallmark/references/custom-craft\.md):|^specs/|^docs/changes/' | grep -v '^$' || true)"
+  rest="$(printf '%s\n' "$hits" | grep -vE '^(CHANGELOG\.md|skills/hallmark/references/assets\.md|skills/hallmark/references/custom-craft\.md):|^specs/|^docs/changes/' | grep -v '^$' || true)"
   if [ -z "$rest" ]; then
     pass "AC-030-07-03: tracked-tree scan clean outside the documented pre-existing allow-list"
   else

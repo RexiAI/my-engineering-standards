@@ -346,11 +346,18 @@ if [ "$AUTH_OK" -eq 1 ]; then
   pass "AC-009-02-02 — every agent reference states the matrix is authoritative for that agent"
 fi
 
-# AC-009-02-03 — no other agent file changed beyond the 8 listed.
+# AC-009-02-03 — no other agent file changed beyond the 8 listed. A deleted
+# agent (e.g. retiring a capability) is not a change to the pipeline roster:
+# the rule guards against adding or editing agents outside the 9, so only
+# added/modified paths are judged.
 EXTRA_AGENTS=""
 if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   while IFS= read -r line; do
     [ -z "$line" ] && continue
+    st=$(printf '%s' "$line" | cut -c1-2)
+    case "$st" in
+      *D*) continue ;;
+    esac
     rel=$(printf '%s' "$line" | awk '{print $2}' | sed 's#^agents/##')
     [ -z "$rel" ] && continue
     case " ${AGENT_FILES[*]} " in

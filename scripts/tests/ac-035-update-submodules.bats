@@ -17,6 +17,9 @@ setup() {
   export GIT_CONFIG_GLOBAL="$TMPDIR_HELPER/gitconfig"
   export GIT_CONFIG_NOSYSTEM=1
   export GH_STUB_STATE="$TMPDIR_HELPER/gh-state"
+  # Fixtures use main; never derive the branch from the host checkout (CI
+  # push-event checkouts have no origin/HEAD or origin/main).
+  export STANDARDS_BRANCH=main
   mkdir -p "$GH_STUB_STATE"
   git config --global user.email "test@example.com"
   git config --global user.name "Test"

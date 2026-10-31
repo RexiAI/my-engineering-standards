@@ -210,10 +210,17 @@ fi
 
 echo ""
 
-# AC-024-01-03 — Provider wiring stays config-side; no reviewer agent entry
+# AC-024-01-03 — Provider wiring stays config-side; no reviewer agent entry.
+# A committed provider block is optional: this repo assumes no provider, so a
+# missing block means the provider is per-machine and there is nothing to
+# check. When a block is present it must map the key by env reference.
 if [ -f "$OPENCODE_JSON" ]; then
   PROVIDER_SEC="$(sed -n '/"provider"/,$p' "$OPENCODE_JSON")"
-  str_contains AC-024-01-03 'opencode.json provider block' "$PROVIDER_SEC" '"OPENCODE_API_KEY"'
+  if [ -n "$PROVIDER_SEC" ]; then
+    str_contains AC-024-01-03 'opencode.json provider block' "$PROVIDER_SEC" '"OPENCODE_API_KEY"'
+  else
+    pass "AC-024-01-03: no committed provider block (per-machine provider config); provider wiring is not in the reviewer agent"
+  fi
   # The reviewer is a roster agent: its model must be an env reference.
   AGENT_ENTRY="$(grep -E '^[[:space:]]*"pr-review"' "$OPENCODE_JSON" || true)"
   if [ -n "$AGENT_ENTRY" ]; then

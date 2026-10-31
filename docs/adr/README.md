@@ -14,7 +14,6 @@ Proposed → Accepted → Deprecated → Superseded.
 | 0004 | [Typed-judgment layer: opt-in fast-path for probabilistic classification](0004-typed-judgment-layer.md)                                                              | Accepted |
 | 0005 | [Local judgment backend: an optional self-hosted compute backend for the typed-judgment layer](0005-local-judgment-backend.md)                                       | Accepted |
 | 0006 | [Extend the gate catalog to Python and Rust without adding gate names](0006-python-rust-gate-coverage.md)                                                            | Proposed |
-| 0007 | [Media agent family: global opencode agents driving the Bailian `bl` CLI, with a URL-chained pipeline and a separate realtime voice app](0007-media-agent-family.md) | Accepted |
 | 0008 | [Vercel deploy lane: a spec-deployer stage (5c), the 40-deploy.md gate artifact, and a split pipeline tail (5a/5b/5c/5d)](0008-vercel-deploy-lane.md) | Accepted |
 | 0009 | [Judgment consumer contract and AC-024-01-12 base-ref semantics](0009-judgment-consumer-contract-and-gate-base-ref.md) | Accepted |
 | 0010 | [Stage-split deploy-artifact gate: --require-deploy for the stage-5d final run](0010-audit-trail-require-deploy-flag.md) | Accepted |
@@ -23,4 +22,5 @@ Proposed → Accepted → Deprecated → Superseded.
 | 0013 | [Clean Code comment hygiene and naming gates](0013-clean-code-comment-gates.md) | Proposed |
 | 0014 | [Judgment consumer contract: exit-10 = stock procedure, fail-open preflight, payload cap, four-way fallback reasons](0014-judgment-consumer-contract-fail-open-preflight.md) | Accepted |
 | 0015 | [Autopilot mode: choose-default-record-continue for unattended pipeline queue runs](0015-autopilot-mode.md) | Accepted |
+| 0016 | [Provider-agnostic media agent family: global opencode agents driving a user-configured backend contract](0016-provider-agnostic-media-agents.md) | Accepted |
 | 0017 | [Single source of truth for spec-pipeline rules](0017-pipeline-agent-single-source.md) | Accepted |

@@ -52,7 +52,7 @@
 # hazard as AGENTS.md in submodule-less CI checkouts).
 # The spec pipeline's deploy verifier (agents/spec-deployer.md) ships inside
 # agent-spec-pipeline's .opencode/agents copy; media agents are listed as
-# information only (they need external provider credentials).
+# information only (provider-agnostic, user-configured backends).
 
 core-agents-md|AGENTS.md standards pointer|Core wiring|none|--with-core|yes|pointer|AGENTS.md||
 core-opencode-json|opencode.json bridge|Core wiring|none|--with-core|yes|bridge|opencode.json||
@@ -88,4 +88,4 @@ deploy-dokku|Dokku (VPS)|Deploy|backend|--with-deploy dokku|no|none|{ci}|--deplo
 deploy-ssh|SSH deploy|Deploy|backend|--with-deploy ssh|no|none|{ci}|--deploy-tool ssh|deploy-kamal,deploy-dokku,deploy-vercel
 deploy-vercel|Vercel production verification|Deploy|frontend|--with-deploy vercel|no|copy-template|.github/workflows/vercel-production-verify.yml:templates/ci-wrappers/vercel-production-verify.yml||deploy-kamal,deploy-dokku,deploy-ssh
 loop-foundation|Loop engineering bundle|Loop engineering|none|--with-loop|no|copy-template|templates/LOOP.md:templates/LOOP.md templates/STATE.md:templates/STATE.md templates/loop-run-log.md:templates/loop-run-log.md templates/loop-budget.md:templates/loop-budget.md templates/loop-constraints.md:templates/loop-constraints.md templates/gate.yaml:templates/gate.yaml||
-media-agents|Media agent family (informational)|Media agents|none|--with-media|no|information|~/.config/opencode/agents/media-*.md||
+media-agents|Media agent family (provider-agnostic, informational)|Media agents|none|--with-media|no|information|~/.config/opencode/agents/media-*.md||

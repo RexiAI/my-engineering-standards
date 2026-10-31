@@ -25,7 +25,7 @@ PY
 }
 
 @test "AC-031-07 — config/model.local.env.example carries the committed SPEC_DEPLOYER_MODEL default" {
-  grep -qx 'SPEC_DEPLOYER_MODEL=bailian-token-plan-personal/qwen3.8-flash' \
+  grep -qx 'SPEC_DEPLOYER_MODEL=your-provider/your-fast-model' \
     "$REPO_ROOT/config/model.local.env.example"
 }
 

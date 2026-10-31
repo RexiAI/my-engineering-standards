@@ -1,10 +1,13 @@
-# bootstrap-windows.ps1 — one-shot Windows setup for the media agent family
-# and opencode desktop. Run in PowerShell (no admin needed for user-scoped
-# installs; winget may prompt once for package agreements).
+# bootstrap-windows.ps1 — one-shot Windows setup for the provider-agnostic
+# media agent family and opencode desktop. Run in PowerShell (no admin needed
+# for user-scoped installs; winget may prompt once for package agreements).
 #
 #   powershell -ExecutionPolicy Bypass -File .\bootstrap-windows.ps1
 #
-# Idempotent: every step checks before installing.
+# Idempotent: every step checks before installing. No media provider is
+# installed or assumed — after this script, edit
+# %USERPROFILE%\.config\opencode\media\backends.json and fill in the commands
+# your machine provides.
 
 $ErrorActionPreference = "Stop"
 
@@ -36,31 +39,6 @@ Step "renew PATH for this session" {
               [System.Environment]::GetEnvironmentVariable("Path","User")
 }
 
-Step "Bailian CLI (bl)" {
-  npm list -g bailian-cli --depth=0 2>$null | Out-Null
-  if ($LASTEXITCODE -ne 0) { npm install -g bailian-cli }
-  bl --version
-}
-
-Step "Bailian skills" {
-  bl skill init
-}
-
-Step "Bailian login" {
-  $status = bl auth status 2>&1 | Out-String
-  if ($status -notmatch "API key") {
-    $key = Read-Host "Paste Bailian API key (Token-Plan sk-sp-... or standard sk-...)"
-    bl auth login --api-key $key
-    # Persist for opencode/voice-chat without putting it in any repo file:
-    [System.Environment]::SetEnvironmentVariable("OPENCODE_API_KEY", $key, "User")
-    if ($key -notmatch "^sk-sp-") {
-      [System.Environment]::SetEnvironmentVariable("BAILIAN_API_KEY", $key, "User")
-      [System.Environment]::SetEnvironmentVariable("DASHSCOPE_API_KEY", $key, "User")
-    }
-    Write-Host "Env vars set at user scope; restart your shell/opencode to pick them up."
-  } else { Write-Host "already authenticated" }
-}
-
 Step "Standards repo" {
   $repo = Join-Path $HOME "my-engineering-standards"
   if (-not (Test-Path $repo)) {
@@ -70,7 +48,8 @@ Step "Standards repo" {
 }
 
 Step "Verify" {
+  $repo = Join-Path $HOME "my-engineering-standards"
   node (Join-Path $repo "scripts\media\smoke-media.mjs")
   Write-Host "`nOpen opencode desktop, restart it if it was running. Agents: media-image, media-video, media-voice, media-producer." -ForegroundColor Green
-  Write-Host "Realtime voice (voice-chat.mjs) additionally needs a STANDARD DashScope sk- key — Token-Plan sk-sp- keys are rejected by the WebSocket endpoint."
+  Write-Host "Then edit $HOME\.config\opencode\media\backends.json — the media agents refuse to run until it names real commands."
 }
