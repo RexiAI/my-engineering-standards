@@ -468,6 +468,9 @@ live_call() {
   call_api || fallback unreachable "API call failed (HTTP ${HTTP_STATUS:-none})"
   cap_increment
   elapsed_ms=$(( $(date +%s%3N) - start_ms ))
+  # Wall-clock delta can go negative if the clock steps (NTP) mid-call; latency
+  # is never negative, so clamp.
+  (( elapsed_ms < 0 )) && elapsed_ms=0
   finalize_response "$elapsed_ms"
 }
 
