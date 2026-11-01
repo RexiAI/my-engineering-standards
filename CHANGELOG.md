@@ -1,3 +1,10 @@
+# [1.48.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.47.1...v1.48.0) (2026-11-01)
+
+
+### Features
+
+* media agents opt-in for child repos (040) ([#109](https://github.com/RexiAI/my-engineering-standards/issues/109)) ([9afdaef](https://github.com/RexiAI/my-engineering-standards/commit/9afdaef1d47eeb0710e7e4b883b78f86867ae91e)), closes [#106](https://github.com/RexiAI/my-engineering-standards/issues/106)
+
 ## [1.47.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.47.0...v1.47.1) (2026-11-01)
 
 
