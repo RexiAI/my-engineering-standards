@@ -81,6 +81,16 @@ CORS is a browser relaxation mechanism, not a security boundary (see the last bu
 - **Keep preflight responses minimal.** A preflight response allows only the methods the endpoint actually uses (no blanket `GET, POST, PUT, PATCH, DELETE, OPTIONS`) and only the headers the endpoint actually reads. A wildcard `Access-Control-Allow-Headers` is not combined with credentials; when credentials are allowed, list the headers explicitly. Keep `Access-Control-Expose-Headers` just as narrow, and `Access-Control-Max-Age` short enough that a policy change takes effect the same day.
 - **CORS is not access control.** CORS does not protect against non-browser clients: curl, a server-side script, or a native app ignores it completely. Authorization is enforced server-side on every request, independently of any CORS decision. A request CORS "blocked" still reached your server, and its side effects already happened.
 
+## Password Hashing
+
+Passwords are verified with a deliberately slow, memory-hard password-hashing function. Nothing else.
+
+- **Algorithm.** `Argon2id` is preferred; `bcrypt` is the accepted alternative where Argon2id is unavailable. A password is never stored in plaintext and never encrypted reversibly — "we can decrypt it for support" is not an exception.
+- **Forbidden.** Fast general-purpose hashes are unacceptable for password storage: `MD5`, `SHA-1`, and `SHA-256` — plain, salted, iterated, or "with a pepper" — are all rejected for this use. They are designed to be fast, which is exactly the property an offline attacker wants, and a home-grown construction built from them inherits the same problem.
+- **Minimum parameters.** bcrypt: a `cost` (work factor) of at least `12`, raised as hardware improves. Argon2id: at least `19 MiB` of memory, at least 2 `iterations`, and `parallelism` of at least 1 — the OWASP baseline; tune upward, never down. Store the algorithm and its parameters alongside the hash so verification knows what produced it.
+- **Verification is constant-time.** Compare through the library's `constant-time` verify function (`argon2_verify`, `bcrypt.compare`, or the platform equivalent), never with `==` / `===`, and never with an early-return byte loop. Never re-hash the candidate with application code and compare digests yourself.
+- **Rehash on login.** When a stored hash's algorithm or parameters are below the current baseline, `rehash` it during the next successful login — after the candidate is verified, never before — and do it transparently: the session stays valid and the user is not asked to log in again. A failed upgrade must not fail the login.
+
 ## Upstream Error Responses Must Not Reach the Client
 
 A third-party API's raw error response is not automatically safe to forward. Provider APIs (payment processors, LLM providers, any upstream service authenticated with a credential of yours) can include partial key material, account identifiers, or internal details in their error bodies — a 401 from an upstream provider might echo back a masked or partial version of the credential you sent it. This is a distinct leak path from log redaction (docs/OBSERVABILITY.md's "mask secrets in logs" rule): the risk here is forwarding the error body itself to *your own client's browser/app*, not writing it to your own logs.
