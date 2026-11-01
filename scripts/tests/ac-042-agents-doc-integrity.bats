@@ -22,8 +22,10 @@ bullets_of() {
 
 @test "AC-042-07-02: no doubled-extension reference remains" {
   local files hits
+  # docs/changes/** holds archived spec records, which quote the defect by design
+  # (the same reason specs/** is excluded). Live docs under docs/ stay in scope.
   files="$(cd "$REPO_ROOT" && git ls-files -- AGENTS.md README.md docs language-specific templates skills commands \
-    | grep -E '\.md$')"
+    | grep -E '\.md$' | grep -v '^docs/changes/')"
   [ -n "$files" ]
   hits="$(cd "$REPO_ROOT" && printf '%s\n' "$files" | while IFS= read -r f; do
     grep -lF -- 'docs/CI_CD.md.md' "$f" || true
