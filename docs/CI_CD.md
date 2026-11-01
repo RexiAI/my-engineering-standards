@@ -279,10 +279,16 @@ git submodule add git@github.com:RexiAI/my-engineering-standards.git .standards
 # 2. Run bootstrap (detects language, copies configs, prompts for CI)
 ./.standards/scripts/bootstrap.sh
 
-# 3. Review, commit, push
+# 3. Branch, then commit — never straight to main
+git checkout -b chore/add-engineering-standards
 git add .
 git commit -m "chore: add engineering standards submodule"
-git push
+
+# 4. Push the branch with an explicit upstream
+git push -u origin chore/add-engineering-standards
+
+# 5. Open the pull request (all changes reach main via PR)
+gh pr create --fill
 ```
 
 ### CI Only (already bootstrapped)
