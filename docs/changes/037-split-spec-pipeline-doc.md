@@ -953,3 +953,6 @@ markdown, and CI templates for child repos.
 - Timestamp: 2026-11-01T13:42:15Z
 
 Verdict: SKIPPED — Non-frontend repo — deploy verification not applicable
+
+PR: https://github.com/RexiAI/my-engineering-standards/pull/110
+Commits: 10 (on spec/037-split-spec-pipeline-doc, including this record commit)
