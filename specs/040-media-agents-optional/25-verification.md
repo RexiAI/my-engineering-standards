@@ -395,3 +395,155 @@ actually loads the agents and that a default child loads none.
 - Attempt 1, phase 1. No BLOCK, no FAIL, so no remediation round was consumed.
 - `SPEC_LOOP_COUNT=1`, `SPEC_PHASE1_RETRIES=0`, `SPEC_PHASE2_RETRIES=0`.
 - Phase-1 budget after this run: 0 of 3 used.
+
+---
+
+# Phase 2 — Post-PR CI check
+
+- **Round:** 1 (first post-PR CI check)
+- **PR:** #109 — https://github.com/RexiAI/my-engineering-standards/pull/109
+- **Head SHA checked:** `351b72f2910f7043c809a1559207b8656d664c6b` (unchanged across the
+  round — the PR did not move during the check)
+- **Workflow(s) observed:** `Self CI`, `PR Review Agent`
+- **Polling:** all three check runs were already terminal (`bucket: fail`) at first
+  query; no `pending` check was observed and none had to be waited on.
+
+## Evidence: PR check query
+
+command: gh pr checks 109 --json name,state,bucket,workflow,link
+exit: 0
+at: 2026-11-01T13:37:16Z
+
+```
+[{"bucket":"fail","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/41311726533/job/124863392546","name":"Review PR / Review PR","state":"FAILURE","workflow":"PR Review Agent"},{"bucket":"fail","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/41311726500/job/124863331920","name":"Validate","state":"FAILURE","workflow":"Self CI"},{"bucket":"fail","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/41311720252/job/124863313323","name":"Validate","state":"FAILURE","workflow":"Self CI"}]
+```
+
+## Evidence: failing check IDs
+
+command: gh api repos/RexiAI/my-engineering-standards/commits/351b72f2910f7043c809a1559207b8656d664c6b/check-runs --jq '.check_runs[] | select(.conclusion=="failure") | {name,id}'
+exit: 0
+at: 2026-11-01T13:37:17Z
+
+```
+{"id":124863392546,"name":"Review PR / Review PR"}
+{"id":124863331920,"name":"Validate"}
+{"id":124863313323,"name":"Validate"}
+```
+
+| # | Check | Bucket | Job ID | Run | Classification |
+|---|---|---|---|---|---|
+| 1 | `Review PR / Review PR` | `fail` | 124863392546 | 41311726533 | **Environmental** — ignored in verdict |
+| 2 | `Validate` (Self CI) | `fail` | 124863331920 | 41311726500 (pull_request) | **Structural** — pipeline sequencing |
+| 3 | `Validate` (Self CI) | `fail` | 124863313323 | 41311720252 (push, same SHA) | same failure, duplicated by the `push` trigger |
+
+Runs 2 and 3 are the same SHA on two triggers (`pull_request` + `push`), so they are
+one failure counted twice, not two independent findings.
+
+## Evidence: Self CI failing step log
+
+command: gh run view 41311726500 --log-failed
+exit: 0
+at: 2026-11-01T13:37:05Z
+
+```
+Validate	Check finished specs are archived	2026-11-01T13:32:43.1211632Z ^[[36;1m./scripts/check-specs-archived.sh^[[0m
+Validate	Check finished specs are archived	2026-11-01T13:32:43.1445272Z ^[[31m  [FAIL] 040-media-agents-optional is finished (has 30-report.md) but not archived — missing docs/changes/040-media-agents-optional.md^[[0m
+Validate	Check finished specs are archived	2026-11-01T13:32:43.1446855Z          Run: scripts/archive-spec.sh 040-media-agents-optional (stage 5d does this automatically)
+Validate	Check finished specs are archived	2026-11-01T13:32:43.1447753Z ^[[31m1 finished spec(s) not archived!^[[0m
+Validate	Check finished specs are archived	2026-11-01T13:32:43.1463170Z ##[error]Process completed with exit code 1.
+```
+
+## Evidence: local reproduction of the failing gate
+
+command: ./scripts/check-specs-archived.sh
+exit: 1
+at: 2026-11-01T13:37:00Z
+
+```
+  [FAIL] 040-media-agents-optional is finished (has 30-report.md) but not archived — missing docs/changes/040-media-agents-optional.md
+         Run: scripts/archive-spec.sh 040-media-agents-optional (stage 5d does this automatically)
+1 finished spec(s) not archived!
+```
+
+Deterministic, not a CI flake: the same gate exits 1 against the PR head checked out
+locally at `/tmp/opencode/spec-040-ci-verify` (`git log -1` = `351b72f`).
+
+## Failing steps vs. passing steps (Self CI, job `Validate`)
+
+17 steps succeeded, 1 failed, **17 skipped**:
+
+```
+success	Check for CRLF in committed blobs
+success	Check CI sweeper deliverables
+success	Check agent definitions are model-agnostic
+success	Check shell scripts parse (bash -n)
+success	make validate-all
+success	Check design-gate blame scoping (scratch repos)
+success	Check gate list consistency
+success	Check orchestration references
+success	Check bats assertions are not vacuous
+success	Check post-PR CI loop mechanics
+success	Check skills specification
+failure	Check finished specs are archived
+skipped	Check spec audit trails
+skipped	make lint
+skipped	Install pinned opencode binary and verify model env resolution
+skipped	Check agent env guard and hardcoded secrets
+skipped	Run loop files check
+skipped	Check Daily Triage loop deliverables
+skipped	Check PR Babysitter loop deliverables
+skipped	Check PR review agent deliverables
+skipped	Check security-hardening deliverables
+skipped	Check remediation budget
+skipped	Install shellcheck
+skipped	shellcheck scripts and templates
+skipped	Install bats-core
+skipped	Run shell gate bats tests (spec 001 Track B)
+skipped	Run gate selftests
+skipped	Check scenario traceability (live tree)
+skipped	Validate YAML syntax (.github, ci)
+```
+
+**This matters for the verdict:** the archive gate is early in the workflow, so the
+19 steps after it never executed. The 754-test shell track, shellcheck, the gate
+selftests, and `check-scenario-traceability.sh` (live tree) have **not** been
+validated by CI at this SHA. The attempt-1 `25-verification.md` above ran them
+locally and they were green, but CI itself carries no signal for them until the
+archive lands and the job runs past step 12.
+
+## Diagnosis
+
+Root cause: `specs/040-media-agents-optional/30-report.md` is committed, which makes
+the spec "finished" to `scripts/check-specs-archived.sh`, but
+`docs/changes/040-media-agents-optional.md` does not exist on the branch. Stage 5d
+(the Archiver, `scripts/archive-spec.sh`) has not run yet. The gate's spec-031
+deferral exception does **not** apply: it requires the pair
+`Phase-3 budget exhausted` + `Verdict: ESCALATED` at line start in `40-deploy.md`, and
+`40-deploy.md` records `Verdict: SKIPPED` (non-frontend repo, phase-3 attempt count
+0 of 3). A `SKIPPED` verdict is the *precondition* for stage 5d running the archive —
+it does not excuse skipping it.
+
+## Behavior vs. structural classification
+
+| Finding | Class | Detail |
+|---|---|---|
+| Missing `docs/changes/040-media-agents-optional.md` | **Structural** (pipeline sequencing) | Stage 5d archive not yet executed. No product behavior is wrong, no scenario is contradicted, no test asserts the wrong thing. The fix is `scripts/archive-spec.sh 040-media-agents-optional` + commit — an Archiver action, not Coder/Refactorer work. |
+| `Review PR / Review PR` | **Environmental** | Repo-wide, per the orchestrator's standing note and confirmed in this run's log: `AI_APICallError: Upstream request failed: Invalid credential`, plus the workflow's own `::warning::Review skipped — billing/quota error from model provider (exit ${review_rc}). Not a code defect.` Unrelated to this PR; the step still exits 1. Excluded from the verdict. |
+
+**No behavioral finding in this round.** Nothing observed here contradicts a
+scenario's Given/When/Then or points at the media-agents opt-in implementation.
+
+## Verdict — round 1
+
+**FAIL** — one non-excluded required check (`Self CI` / `Validate`) is red with a
+real, locally reproduced exit 1.
+
+- Failing check ID: **124863331920** (`Validate`, `pull_request`, run 41311726500);
+  duplicate **124863313323** (`Validate`, `push`, run 41311720252).
+- Excluded from the verdict: **124863392546** (`Review PR / Review PR`) —
+  environmental, invalid `OPENCODE_API_KEY`.
+- Route: stage 5d Archiver runs the archive, then this check is re-triggered as a
+  **scoped re-check** of check ID 124863331920 only (round 2).
+- Phase-2 budget after this round: 1 of 3 used.
+
+`SPEC_LOOP_COUNT=1`, `SPEC_PHASE1_RETRIES=0`, `SPEC_PHASE2_RETRIES=0`.
