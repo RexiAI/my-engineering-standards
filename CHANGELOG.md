@@ -1,3 +1,10 @@
+## [1.50.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.50.0...v1.50.1) (2026-11-01)
+
+
+### Bug Fixes
+
+* **ci:** skip the PR review cleanly when the model is unavailable ([#113](https://github.com/RexiAI/my-engineering-standards/issues/113)) ([07235bd](https://github.com/RexiAI/my-engineering-standards/commit/07235bd358a9ce48f6b5bdfd7645a0c9ac9795c2))
+
 # [1.50.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.49.0...v1.50.0) (2026-11-01)
 
 
