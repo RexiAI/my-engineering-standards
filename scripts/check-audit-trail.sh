@@ -1,7 +1,7 @@
 #!/bin/bash
 # check-audit-trail.sh — Verify a spec folder carries the audit-trail evidence the
 # pipeline contract requires, and that 25-verification.md records real evidence for
-# every one of the five contract checks (docs/SPEC_PIPELINE.md §Audit contract).
+# every one of the five contract checks (docs/spec-pipeline/audit-contract.md §Audit contract).
 #
 # The script doubles as its own test carrier (spec 015's acceptance tests): the
 # --selftest mode builds temp spec-folder fixtures and asserts the exit code of
@@ -62,7 +62,7 @@
 #   2 — missing <slug> argument (usage error)
 #
 # Standards reference:
-#   docs/SPEC_PIPELINE.md §Audit contract
+#   docs/spec-pipeline/audit-contract.md §Audit contract
 set -euo pipefail
 
 RED='\033[0;31m'
@@ -84,7 +84,7 @@ Usage:
   scripts/check-audit-trail.sh --selftest
 
 Verify a spec folder carries the audit-trail evidence required by
-docs/SPEC_PIPELINE.md §Audit contract: 10-tasks.md, 20-acceptance/ with a
+docs/spec-pipeline/audit-contract.md §Audit contract: 10-tasks.md, 20-acceptance/ with a
 scenario heading, 25-verification.md, 30-report.md (and non-empty 15-design.md
 when present), plus per-check evidence blocks in 25-verification.md. --selftest
 exercises every negative case against temp fixtures.
@@ -93,7 +93,7 @@ exercises every negative case against temp fixtures.
 missing 40-deploy.md fails (AC-031-21). Without it — the stage-5b pre-push run
 — that absence is tolerated because stage 5c cannot have written the artifact
 yet; a present-but-empty or malformed 40-deploy.md fails either way. See
-docs/SPEC_PIPELINE.md §The gate and ADR 0010.
+docs/spec-pipeline/audit-contract.md §The gate and ADR 0010.
 EOF
 }
 

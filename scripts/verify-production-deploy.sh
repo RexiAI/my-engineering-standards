@@ -5,10 +5,10 @@
 # integration for the merged commit exists and answers a health check, then
 # records the result on stdout (the CI log is the record — ponytail ceiling:
 # no artifact file is written; upgrade path: a --report flag writing the
-# evidence-block format of docs/SPEC_PIPELINE.md §Audit contract).
+# evidence-block format of docs/spec-pipeline/audit-contract.md §Audit contract).
 #
-# Verdict semantics (docs/SPEC_PIPELINE.md §Production deploy verification
-# (post-merge)):
+# Verdict semantics (docs/spec-pipeline/post-pr-loops.md
+# §Production deploy verification (post-merge)):
 #   - production deployment not found for the commit -> SKIP, exit 0
 #   - no Vercel project linked to the repository     -> SKIP, exit 0
 #   - Vercel Git integration not connected           -> SKIP, exit 0

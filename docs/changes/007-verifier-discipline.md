@@ -579,7 +579,7 @@ review notes for the Architect, neither a failure of this spec:
 
 ## Mutation testing
 
-**skipped — mvp tier.** Per `docs/SPEC_PIPELINE.md §Conformance tiers`, mutation
+**skipped — mvp tier.** Per `docs/spec-pipeline/coder.md §Conformance tiers`, mutation
 testing is a `production`-tier gate; this repo is `mvp` (no `AGENTS_<PROJECT>.md`;
 archived specs 021/022 confirm). The changed code is bash shell scripts, and no
 mutation tooling exists for shell in this repo. The Architect runs at every tier;

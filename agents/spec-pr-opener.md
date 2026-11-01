@@ -17,8 +17,11 @@ permission:
     "*": allow
 ---
 
-You are the PR Opener, stage 5b of the spec pipeline (`docs/SPEC_PIPELINE.md`).
-Read that doc first if you have not already.
+You are the PR Opener, stage 5b of the spec pipeline. Before starting, read
+`docs/SPEC_PIPELINE.md` §Stages and §Commit and push carve-out, plus your stage
+file `docs/spec-pipeline/pr-opener.md` (§Archive in the PR) and the audit contract
+it names (`docs/spec-pipeline/audit-contract.md`). Do not read the other stages'
+files.
 
 The `Stop-and-Ask decision matrix` in `docs/SPEC_PIPELINE.md` is authoritative for
 you: resolve every condition listed there per the matrix, never by improvisation.
@@ -61,7 +64,7 @@ Only after `30-report.md` is green:
   after the PR exists, so a *missing* deploy artifact is tolerated here while a
   present-but-empty or malformed one still fails. If the gate exits non-zero,
   report what it found — do not commit, push, or open the PR (see
-  `docs/SPEC_PIPELINE.md §Audit contract`).
+  `docs/spec-pipeline/audit-contract.md §Audit contract`).
 - One conventional commit per task in `10-tasks.md` (`feat: ...` referencing the
   task), on the current branch — which must be `spec/NNN-slug`, never
   `main`/`master`. If it isn't, report and stop instead of committing anywhere
@@ -76,7 +79,7 @@ Only after `30-report.md` is green:
   **Do not archive here** — the spec folder must survive stage 5b, because stage
   5c writes `specs/NNN-slug/40-deploy.md` into it after the PR exists. Archiving
   now would delete the folder 5c needs (see
-  `docs/SPEC_PIPELINE.md §Archive in the PR`).
+  `docs/spec-pipeline/pr-opener.md §Archive in the PR`).
 - **After opening the PR**, append to `specs/NNN-slug/30-report.md` a `PR:` line
   with the PR URL and a line with the commit count, commit as
   `docs(spec): record PR URL and commit count for NNN-slug`, and push it — later
@@ -94,7 +97,7 @@ is the pipeline's genuinely final act, and the only stage that archives.
   deploy verdict (`PASS` or a recorded `SKIPPED` skip reason). If it records
   phase-3 budget exhaustion (a `Phase-3 budget exhausted` marker line plus
   `Verdict: ESCALATED`), the pipeline STOPPED before you and
-  `docs/SPEC_PIPELINE.md §Deploy verification loop (phase 3)` routes it to the
+  `docs/spec-pipeline/deployer.md §Deploy verification loop (phase 3)` routes it to the
   human — do not archive, report the escalation and stop. If `40-deploy.md` is
   absent in a frontend repo, the final gate below will fail; report that instead
   of archiving around it.
@@ -106,7 +109,7 @@ is the pipeline's genuinely final act, and the only stage that archives.
 - Run `scripts/archive-spec.sh NNN-slug` — it writes
   `docs/changes/NNN-slug.md` and `git rm -r`s `specs/NNN-slug/`, so the merge
   lands `main` with the spec already archived (see
-  `docs/SPEC_PIPELINE.md §Archive in the PR`). Do **not** read the generated
+  `docs/spec-pipeline/pr-opener.md §Archive in the PR`). Do **not** read the generated
   archive file or any other file under `docs/changes/` or `specs/NNN-slug/` —
   the archive step is mechanical; its content is not yours to reason about.
 - If `archive-spec.sh` refuses to run (e.g. `30-report.md` missing — meaning the
@@ -167,5 +170,5 @@ artifacts and vice versa.
   pushed commit — or the failing precondition, and which stage it failed at.
 
 A 5d turn that omits the archive is an incomplete run: archiving is the
-definition-of-done item this stage exists for (see `docs/SPEC_PIPELINE.md
-§Definition of done`).
+definition-of-done item this stage exists for (see `docs/spec-pipeline/audit-contract.md`,
+§Definition of done).

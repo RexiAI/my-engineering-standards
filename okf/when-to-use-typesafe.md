@@ -36,7 +36,7 @@ do it, it is deterministic code and must stay that way.
 The repo's mechanism is deliberately small and provider-agnostic:
 `scripts/typed-judgment.sh` (curl+jq wrapper, env-var config, `--dry-run`
 for offline testing) with a hard exit-code contract — `0` usable, `10`
-fallback, `2` usage error. See `docs/SPEC_PIPELINE.md §Typed-judgment layer`
+fallback, `2` usage error. See `docs/spec-pipeline/typed-judgment.md §Typed-judgment layer`
 and ADR 0004 for the contract, the confidence threshold (default 0.6), the
 daily cap, and the rule that a judgment never overrides a deterministic gate.
 

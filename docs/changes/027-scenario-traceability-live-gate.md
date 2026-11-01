@@ -17,7 +17,7 @@ none caused by spec 026. Root-caused during this follow-up (correcting the
 up" — check 2 ("every AC-NNN-NN reference resolves to a real scenario
 heading") is fundamentally incompatible with running unscoped against a
 repo that has ever archived a spec, because archiving *deletes* the
-scenario headings by design (`docs/SPEC_PIPELINE.md §Archive in the PR`)
+scenario headings by design (`docs/spec-pipeline/pr-opener.md §Archive in the PR`)
 while every merged spec's deliverables-gate script (`check-ci-sweeper.sh`'s
 `AC-017-*` self-citations, `check-pr-review.sh`'s `AC-024-*`, etc.)
 permanently and correctly keeps citing those same IDs forever. Wiring the

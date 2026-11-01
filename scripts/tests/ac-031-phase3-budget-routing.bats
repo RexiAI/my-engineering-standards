@@ -55,7 +55,7 @@ teardown() { teardown_tmpdir; }
   [[ "$flat" == *"BUILD_FAILED"* ]]
   [[ "$flat" == *"clearly code-diagnostic or config-diagnostic pattern"* ]]
   [[ "$flat" == *"escalate to the human"* ]]
-  ! grep -qF 'parses the Vercel build log with grep patterns' "$DOC"
+  ! pipeline_cat | grep -qF 'parses the Vercel build log with grep patterns'
 }
 
 @test "AC-031-34 — Stop-and-Ask matrix has the deploy row with the fix-routing action" {

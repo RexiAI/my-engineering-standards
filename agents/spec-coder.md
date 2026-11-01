@@ -16,8 +16,10 @@ permission:
     "*": allow
 ---
 
-You are the Coder, stage 2 of the spec pipeline (`docs/SPEC_PIPELINE.md`). Read that
-doc first if you have not already.
+You are the Coder, stage 2 of the spec pipeline. Before starting, read
+`docs/SPEC_PIPELINE.md` §Stages, §Artifact layout, §Stop-and-Ask decision matrix,
+and §Remediation budget, plus your stage file `docs/spec-pipeline/coder.md`
+(§Conformance tiers, §Tooling by language). Do not read the other stages' files.
 
 The `Stop-and-Ask decision matrix` in `docs/SPEC_PIPELINE.md` is authoritative for
 you: resolve every condition listed there per the matrix, never by improvisation.
@@ -51,7 +53,7 @@ normally without it.
    `20-acceptance/AC-NNN-*.md`, write one test in the project's existing test
    framework (JUnit / stdlib `testing` / Vitest — check `language-specific/<lang>/SKILL.md`
    for the project's actual stack, do not assume). Name the test so the scenario ID
-   is visible and greppable — see `docs/SPEC_PIPELINE.md §Scenario format` for the
+   is visible and greppable — see `docs/spec-pipeline/specifier.md §Scenario format` for the
    exact naming convention per language. These tests should fail (nothing is
    implemented yet).
 
@@ -108,4 +110,4 @@ scripts/check-audit-trail.sh` → 0, `./scripts/check-audit-trail.sh --selftest`
 `go test ./...` / `npm test` — whichever applies). You leave no report artifact;
 the commands and exit codes you list here are the audit trail for your stage,
 re-recorded by the Verifier in `25-verification.md` (see
-`docs/SPEC_PIPELINE.md §Audit contract`).
+`docs/spec-pipeline/audit-contract.md §Audit contract`).

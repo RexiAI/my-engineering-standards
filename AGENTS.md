@@ -86,7 +86,7 @@ Every guide is distilled from official upstream documentation at a pinned versio
 - Read `docs/SCHEMA_EVOLUTION.md` before designing data models or APIs.
 - Read `docs/CONTRACT_TESTING.md` before writing service integration tests.
 - Read `skills/e2e-testing/SKILL.md` before writing or running E2E tests in a TS/Node or RN child repo — agentic E2E is the standard for that stack (docs/TESTING.md §Agentic E2E).
-- Read `docs/SPEC_PIPELINE.md` before running `/spec` or `/build`, or before writing an informal spec under `specs/`.
+- Read `docs/SPEC_PIPELINE.md` (the index; its §Stage files table maps each stage to its own file) before running `/spec` or `/build`, or before writing an informal spec under `specs/`.
 - Read `docs/LOOP_ENGINEERING.md` before designing or running a loop (an automated agent cycle with durable state).
 - Read `docs/AGENTS_AND_SKILLS.md` before creating or modifying any agent in `agents/` or skill in `skills/`/`language-specific/`.
 - Read `docs/GOVERNANCE.md` before changing pipeline roles, the gate catalog, or billing constraints — trust tiers, model-assignment discipline, and the ADR requirement live there.
@@ -110,8 +110,8 @@ commit, no PR**.
 `scripts/check-model-env.sh` enforces structurally that `opencode.json` keeps no
 literal model id and neither real env file is ever tracked; self-ci additionally
 downloads a pinned opencode binary and runs `scripts/model-env.runtime-check.sh`
-to verify the resolution behavior. See `docs/SPEC_PIPELINE.md §Model
-configuration` for the full mechanism and precedence.
+to verify the resolution behavior. See `docs/spec-pipeline/model-config.md §Model configuration` for the full
+mechanism and precedence.
 
 **Plugin triggers**: `rate_limit`, `quota_exceeded`, `5xx`, `timeout`, `overloaded`. Cooldown: 5 min; retry original after 15 min; max depth: 3.
 

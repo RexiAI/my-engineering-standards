@@ -610,7 +610,7 @@ $ ./scripts/check-code-principles.sh -BaseRef HEAD | head -2
 Checking design principles in: . (tier: mvp)
 ```
 
-Resolution per `docs/SPEC_PIPELINE.md §Conformance tiers` and the Stop-and-Ask row
+Resolution per `docs/spec-pipeline/coder.md §Conformance tiers` and the Stop-and-Ask row
 "Project type ambiguous (… conformance tier undetectable) → defer to the harness
 default (`mvp` tier)": **tier = `mvp`**.
 
@@ -618,7 +618,7 @@ default (`mvp` tier)": **tier = `mvp`**.
 
 ## Evidence: mutation score
 
-command: (none — recorded skip; mutation testing is a `production`-tier gate per docs/SPEC_PIPELINE.md §Conformance tiers)
+command: (none — recorded skip; mutation testing is a `production`-tier gate per docs/spec-pipeline/coder.md §Conformance tiers)
 exit: 0
 at: 2026-10-26T13:53:38Z
 
@@ -639,7 +639,7 @@ shows every AC-035-01…AC-035-26 scenario traced to a test.
 
 **None.** Mutation testing was not run at `mvp` tier, so no survivor list exists to
 classify. This is not a claim that the suite is mutation-clean — it is a claim that
-the mutation gate does not apply to this tier (`docs/SPEC_PIPELINE.md §Conformance
+the mutation gate does not apply to this tier (`docs/spec-pipeline/coder.md §Conformance
 tiers`, Architect row: `mvp` = skip).
 
 ---

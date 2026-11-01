@@ -70,7 +70,7 @@ the frontend missing-artifact rule by pipeline stage:
   `scripts/tests/ac-031-non-frontend-skip.bats` exercise both modes against
   hermetic fixtures; `scripts/check-audit-trail.sh --selftest` keeps the
   negative-case corpus green.
-- `docs/SPEC_PIPELINE.md §The gate` states which stage passes the flag; the
+- `docs/spec-pipeline/audit-contract.md §The gate` states which stage passes the flag; the
   pipeline agents are required to read that section.
 - The PR Opener's pre-push gate run and self-ci remain flagless; any future
   5d wiring must use `--require-deploy` (review checklist).

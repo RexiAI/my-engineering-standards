@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # judgment-status.sh — operator surface for the optional local judgment
-# backend (spec 034; see docs/SPEC_PIPELINE.md §Typed-judgment layer and
+# backend (spec 034; see docs/spec-pipeline/typed-judgment.md §Typed-judgment layer and
 # ADR 0014). `make judgment-status` wires this script.
 #
 # Reports liveness AND payload fitness — a backend can be alive on

@@ -611,7 +611,7 @@ none attributable to spec 018.
 
 **Skipped — `mvp` tier.**
 
-Per `docs/SPEC_PIPELINE.md §Conformance tiers`, mutation testing is a
+Per `docs/spec-pipeline/coder.md §Conformance tiers`, mutation testing is a
 `production`-tier gate. This repo is `mvp` tier (no `AGENTS_*.md` at repo root),
 so mutation testing is skipped at this stage. The changed deliverables are a bash
 check script (`scripts/check-pr-babysitter.sh`), skill markdown, STATE.md, and

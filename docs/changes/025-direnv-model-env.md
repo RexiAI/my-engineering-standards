@@ -356,7 +356,7 @@ flow so a developer can reproduce it without reading scripts, and governance
 requires the ADR record the decision.
 
 Acceptance criteria:
-- `docs/SPEC_PIPELINE.md §Model configuration` documents: one-time setup
+- `docs/spec-pipeline/model-config.md §Model configuration` documents: one-time setup
   (install direnv, wire the hook once, `direnv allow`), the parent `.envrc`
   copied from `templates/.envrc.example` with its three `dotenv_if_exists`
   lines (committed example → per-machine override → credentials), the child
@@ -458,7 +458,7 @@ Scenarios: `20-acceptance/AC-025-07-docs-adr.md`
 ## AC-025-06-08 — Runtime check case 2: file override wins; a var no file defines keeps its pre-exported value
 ## AC-025-06-09 — Runtime check case 3: nothing loaded → all empty
 ## AC-025-06-10 — Direnv-requiring cases skip cleanly when direnv is absent
-## AC-025-07-01 — SPEC_PIPELINE.md §Model configuration documents the dotenv flow
+## AC-025-07-01 — docs/spec-pipeline/model-config.md §Model configuration documents the dotenv flow
 ## AC-025-07-02 — AGENTS.md describes the gitignored `.envrc` mechanism
 
 > Amendment (post-spec, ADR 0002): originally asserted the AGENTS.md
@@ -599,7 +599,7 @@ PASS AC-025-06-07 cited by the runtime check
 PASS AC-025-06-08 cited by the runtime check
 PASS AC-025-06-09 cited by the runtime check
 == AC-025-07 docs + ADR ==
-PASS AC-025-07-01 SPEC_PIPELINE.md §Model configuration documents setup, parent/child flow, precedence, safety, boundary, enforcement
+PASS AC-025-07-01 docs/spec-pipeline/model-config.md §Model configuration documents setup, parent/child flow, precedence, safety, boundary, enforcement
 PASS AC-025-07-02 AGENTS.md describes the gitignored .envrc mechanism; model-table values unchanged
 PASS AC-025-07-03 README.md §Model Configuration describes copy template, direnv allow, edit, restart
 PASS AC-025-07-04 ADR 0001: status Accepted, dotenv decision, rejected alternatives (shell-profile, loader design), compliance
@@ -824,7 +824,7 @@ Determination: mutation testing is a `production`-tier rule (`docs/CONFORMANCE_T
 ## Mutation testing
 
 mutation: skipped — `mvp` tier
-command: (none — mutation testing is a `production`-tier gate per docs/SPEC_PIPELINE.md §Conformance tiers; this project declares `mvp`, so the mutation test is skipped by policy, not run)
+command: (none — mutation testing is a `production`-tier gate per docs/spec-pipeline/coder.md §Conformance tiers; this project declares `mvp`, so the mutation test is skipped by policy, not run)
 at: 2026-08-19T14:57:36Z
 
 ## Equivalent mutants

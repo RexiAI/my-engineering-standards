@@ -18,12 +18,12 @@ teardown() { teardown_tmpdir; }
 @test "check-post-pr-ci-loop: an empty tree cannot be checked and exits 2" {
   run --separate-stderr bash "$REPO_ROOT/scripts/check-post-pr-ci-loop.sh" "$TMPDIR_HELPER"
   [ "$status" -eq 2 ]
-  [[ "$output$stderr" == *"docs/SPEC_PIPELINE.md"* ]]
+  [[ "$output$stderr" == *"docs/spec-pipeline/post-pr-loops.md"* ]]
 }
 
-@test "check-post-pr-ci-loop: a tree with a gutted SPEC_PIPELINE.md exits non-zero with FAIL lines" {
-  mkdir -p "$TMPDIR_HELPER/docs"
-  printf '# Spec pipeline\n\nnothing here\n' > "$TMPDIR_HELPER/docs/SPEC_PIPELINE.md"
+@test "check-post-pr-ci-loop: a tree with a gutted post-pr-loops.md exits non-zero with FAIL lines" {
+  mkdir -p "$TMPDIR_HELPER/docs/spec-pipeline"
+  printf '# Spec pipeline\n\nnothing here\n' > "$TMPDIR_HELPER/docs/spec-pipeline/post-pr-loops.md"
   run bash "$REPO_ROOT/scripts/check-post-pr-ci-loop.sh" "$TMPDIR_HELPER"
   [ "$status" -ne 0 ]
   [[ "$output" == *"FAIL"* ]]

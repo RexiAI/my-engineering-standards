@@ -1,3 +1,17 @@
+## [1.50.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.50.0...v1.50.1) (2026-11-01)
+
+
+### Bug Fixes
+
+* **ci:** skip the PR review cleanly when the model is unavailable ([#113](https://github.com/RexiAI/my-engineering-standards/issues/113)) ([07235bd](https://github.com/RexiAI/my-engineering-standards/commit/07235bd358a9ce48f6b5bdfd7645a0c9ac9795c2))
+
+# [1.50.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.49.0...v1.50.0) (2026-11-01)
+
+
+### Features
+
+* **spec 037:** split SPEC_PIPELINE into an index plus per-stage docs ([#110](https://github.com/RexiAI/my-engineering-standards/issues/110)) ([acc4bf1](https://github.com/RexiAI/my-engineering-standards/commit/acc4bf148a87de85f699b8d938099a53d87e84da))
+
 # [1.49.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.48.0...v1.49.0) (2026-11-01)
 
 
@@ -548,7 +562,7 @@
 ### Added
 
 - **`agents/spec-verifier.md`** — new stage 4 of the spec pipeline, between Refactorer and Architect. Independent QA: re-runs the real test suite, real linter/complexity gate, and `scripts/check-scenario-traceability.sh` itself rather than trusting Coder/Refactorer's self-reported "green," and spot-checks that at least two acceptance tests' assertions actually match their scenario. Writes only `specs/NNN-slug/25-verification.md`; fixes nothing, never commits or pushes (`git commit*`/`git push*` denied in its permissions). Architect now requires the Verifier's PASS verdict before running mutation testing or any commit.
-- **`opencode.json`** — this repo's own agent model pins (opus-5 for Specifier/Verifier/Architect, sonnet-5 for Coder/Refactorer/Pipeline). Not shipped to consumers; a worked example of the override pattern documented in `docs/SPEC_PIPELINE.md §Model configuration`.
+- **`opencode.json`** — this repo's own agent model pins (opus-5 for Specifier/Verifier/Architect, sonnet-5 for Coder/Refactorer/Pipeline). Not shipped to consumers; a worked example of the override pattern documented in `docs/spec-pipeline/model-config.md §Model configuration`.
 - **`scripts/bootstrap.sh --copy-agents`**, **`templates/Makefile.bridge`'s `COPY_AGENTS=1 make init-ai`** — copies `agents/`/`commands/` as real, editable files instead of symlinking, for consumers who want to customize an agent's prompt/permissions (not just its model via `opencode.json`). Refuses to clobber an existing symlink or real directory; verified idempotent and correctly branching in a real sandbox run (both flag and no-flag paths, fresh and re-run).
 
 ### Changed

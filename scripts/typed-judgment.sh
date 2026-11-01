@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # typed-judgment.sh — curl+jq wrapper that sends a state payload plus typed
 # questions to a judgment API and prints normalized per-question answers
-# (spec 028; see docs/SPEC_PIPELINE.md §Typed-judgment layer, ADR 0004).
+# (spec 028; see docs/spec-pipeline/typed-judgment.md §Typed-judgment layer, ADR 0004).
 #
 # Usage:
 #   scripts/typed-judgment.sh --questions <json>

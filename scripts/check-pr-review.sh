@@ -70,7 +70,7 @@
 #
 # Standards reference:
 #   docs/CI_CD.md §PR Review Agent
-#   docs/SPEC_PIPELINE.md §PR review model wiring
+#   docs/spec-pipeline/model-config.md §PR review model wiring
 #   specs/024-pr-review-agent/20-acceptance/ (AC-024-01-01 … AC-024-05-05)
 set -euo pipefail
 
@@ -93,6 +93,7 @@ INIT_CI="$ROOT_DIR/scripts/init-ci.sh"
 SELF_CI="$ROOT_DIR/.github/workflows/self-ci.yml"
 CI_CD="$ROOT_DIR/docs/CI_CD.md"
 SPEC_PIPE="$ROOT_DIR/docs/SPEC_PIPELINE.md"
+MODEL_CFG="$ROOT_DIR/docs/spec-pipeline/model-config.md"
 
 # verify_grep <AC-ID> <file> <label> <pattern>...
 #   Every <pattern> must appear (fixed-string match) in <file>.
@@ -758,21 +759,21 @@ fi
 
 echo ""
 
-# AC-024-05-04 — SPEC_PIPELINE.md cross-references the section
-if [ -f "$SPEC_PIPE" ]; then
-  WIRE_SEC="$(awk '$0=="## PR review model wiring"{f=1;next} /^## /{if(f)exit} f' "$SPEC_PIPE")"
-  str_contains AC-024-05-04 'docs/SPEC_PIPELINE.md PR review model wiring section' "$WIRE_SEC" 'PR_REVIEW_MODEL'
-  str_contains AC-024-05-04 'docs/SPEC_PIPELINE.md PR review model wiring section' "$WIRE_SEC" '{env:SPEC_PR_REVIEW_MODEL}'
-  str_contains AC-024-05-04 'docs/SPEC_PIPELINE.md PR review model wiring section' "$WIRE_SEC" 'OPENCODE_API_KEY'
-  str_contains AC-024-05-04 'docs/SPEC_PIPELINE.md PR review model wiring section' "$WIRE_SEC" 'CI_CD.md §PR Review Agent'
+# AC-024-05-04 — the model-config stage doc carries the section
+if [ -f "$MODEL_CFG" ]; then
+  WIRE_SEC="$(awk '$0=="## PR review model wiring"{f=1;next} /^## /{if(f)exit} f' "$MODEL_CFG")"
+  str_contains AC-024-05-04 'docs/spec-pipeline/model-config.md PR review model wiring section' "$WIRE_SEC" 'PR_REVIEW_MODEL'
+  str_contains AC-024-05-04 'docs/spec-pipeline/model-config.md PR review model wiring section' "$WIRE_SEC" '{env:SPEC_PR_REVIEW_MODEL}'
+  str_contains AC-024-05-04 'docs/spec-pipeline/model-config.md PR review model wiring section' "$WIRE_SEC" 'OPENCODE_API_KEY'
+  str_contains AC-024-05-04 'docs/spec-pipeline/model-config.md PR review model wiring section' "$WIRE_SEC" 'CI_CD.md §PR Review Agent'
 else
-  fail "AC-024-05-04: docs/SPEC_PIPELINE.md is missing"
+  fail "AC-024-05-04: docs/spec-pipeline/model-config.md is missing"
 fi
 
 echo ""
 
 # AC-024-05-05 — No literal key value in the docs
-for doc in "$CI_CD" "$SPEC_PIPE"; do
+for doc in "$CI_CD" "$SPEC_PIPE" "$MODEL_CFG"; do
   if [ -f "$doc" ]; then
     if grep -qE "$KEY_SHAPE" "$doc"; then
       fail "AC-024-05-05: key-shaped value found in ${doc#"$ROOT_DIR"/}"

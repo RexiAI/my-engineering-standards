@@ -23,7 +23,7 @@ fail at launch; pin the version in the repo's engines field and CI image.
 
 The actor model and the judge model are read from **environment variables**;
 the config never hardcodes a model or provider id (a tracked file naming a
-model is a standard violation — see the repo's `docs/SPEC_PIPELINE.md §Model
+model is a standard violation — see the repo's `docs/spec-pipeline/model-config.md §Model
 configuration` indirection for the same principle):
 
 ```bash

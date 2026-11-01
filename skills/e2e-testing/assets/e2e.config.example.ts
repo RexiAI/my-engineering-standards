@@ -27,8 +27,8 @@ export default {
   tests: "tests/**/*.e2e.ts",
 
   // Models come from the environment; naming a provider or model id here is
-  // a standards violation (same indirection rule as docs/SPEC_PIPELINE.md
-  // §Model configuration).
+  // a standards violation (same indirection rule as
+  // docs/spec-pipeline/model-config.md §Model configuration).
   models: {
     agent: agentModel,
     judge: judgeModel,
