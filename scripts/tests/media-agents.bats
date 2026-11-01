@@ -3,6 +3,8 @@
 # agent family (ADR 0016). No AC prefix: the archived spec scenarios described
 # the retired vendor-specific implementation, so these assert the contract
 # that ships now. Zero credits and zero network: nothing here invokes a backend.
+# Sources live in agents-optional/ (ADR 0018 — the family is opt-in and stays
+# out of the default agents/ set every child repo links).
 
 load test_helper
 bats_require_minimum_version 1.5.0
@@ -17,45 +19,51 @@ teardown() { teardown_tmpdir; }
 
 @test "media-agents: every agent file exists" {
   for f in "${MEDIA_AGENTS[@]}"; do
-    [ -f "$REPO_ROOT/agents/$f" ]
+    [ -f "$REPO_ROOT/agents-optional/$f" ]
   done
+}
+
+@test "media-agents: the default agent set carries no media agent (ADR 0018)" {
+  run bash -c 'find "$1/agents" -maxdepth 1 -name "media-*.md" -print' _ "$REPO_ROOT"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
 }
 
 @test "media-agents: description and mode frontmatter, no pinned model" {
   for f in "${MEDIA_AGENTS[@]}"; do
-    run grep -c '^description: ' "$REPO_ROOT/agents/$f"
+    run grep -c '^description: ' "$REPO_ROOT/agents-optional/$f"
     [ "$status" -eq 0 ]
     [ "${lines[0]}" -eq 1 ]
-    run grep -c '^mode: ' "$REPO_ROOT/agents/$f"
+    run grep -c '^mode: ' "$REPO_ROOT/agents-optional/$f"
     [ "$status" -eq 0 ]
     [ "${lines[0]}" -eq 1 ]
-    run grep -c '^model: ' "$REPO_ROOT/agents/$f"
+    run grep -c '^model: ' "$REPO_ROOT/agents-optional/$f"
     [ "${lines[0]}" -eq 0 ]
   done
 }
 
 @test "media-agents: deny git push and rm -rf in the permission block" {
   for f in "${MEDIA_AGENTS[@]}"; do
-    run grep -qF -- '"git push*": deny' "$REPO_ROOT/agents/$f"
+    run grep -qF -- '"git push*": deny' "$REPO_ROOT/agents-optional/$f"
     [ "$status" -eq 0 ]
-    run grep -qF -- '"rm -rf *": deny' "$REPO_ROOT/agents/$f"
+    run grep -qF -- '"rm -rf *": deny' "$REPO_ROOT/agents-optional/$f"
     [ "$status" -eq 0 ]
   done
 }
 
 @test "media-agents: each agent references the backend contract" {
   for f in "${MEDIA_AGENTS[@]}"; do
-    run grep -qF 'backends.json' "$REPO_ROOT/agents/$f"
+    run grep -qF 'backends.json' "$REPO_ROOT/agents-optional/$f"
     [ "$status" -eq 0 ]
   done
 }
 
 @test "media-agents: no vendor-specific token in agents, docs, or contract example" {
   run grep -riE "$VENDOR_RE" \
-    "$REPO_ROOT/agents/media-image.md" \
-    "$REPO_ROOT/agents/media-video.md" \
-    "$REPO_ROOT/agents/media-voice.md" \
-    "$REPO_ROOT/agents/media-producer.md" \
+    "$REPO_ROOT/agents-optional/media-image.md" \
+    "$REPO_ROOT/agents-optional/media-video.md" \
+    "$REPO_ROOT/agents-optional/media-voice.md" \
+    "$REPO_ROOT/agents-optional/media-producer.md" \
     "$REPO_ROOT/docs/MEDIA_AGENTS.md" \
     "$REPO_ROOT/scripts/media/backends.example.json" \
     "$REPO_ROOT/scripts/media/install.mjs" \
