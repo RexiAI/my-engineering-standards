@@ -62,6 +62,16 @@ Any outbound request whose destination comes from a user or from an upstream res
 - **Do not follow redirects automatically.** An allowlisted URL can redirect to a refused one. Either disable automatic redirect following, or re-validate every redirect hop against the allowlist and the refused ranges before following it, and cap the hop count.
 - Apply the same rule to webhook delivery, image/PDF fetchers, link previews, and any "fetch this URL for me" endpoint. The rule belongs in one shared outbound-request helper, not copy-pasted per caller.
 
+## CSRF (Cross-Site Request Forgery)
+
+CSRF is the browser being tricked into attaching your user's session cookie to a request the user never made. It exists only where the credential is ambient — attached by the browser automatically.
+
+- **Cookie-authenticated state-changing requests need a CSRF token.** Any POST/PUT/PATCH/DELETE that mutates state and is authenticated by a cookie must carry a CSRF token the attacker's page cannot read (synchronizer token or double-submit, bound to the session). A state-changing request authenticated by a cookie without a valid token is rejected with `403`, before the handler runs. Safe methods such as `GET` and `HEAD` never mutate state — an endpoint that changes data on `GET` cannot be CSRF-protected and must be redesigned.
+- **Session cookies carry a SameSite policy.** Set session cookies `SameSite=Lax` or `SameSite=Strict`. `SameSite=None` turns that protection off, so it is allowed only for a cookie that genuinely must cross-site, is not the session cookie, and always carries the `Secure` attribute. Session cookies also carry `Secure` and `HttpOnly`.
+- **Validate `Origin`, fall back to `Referer`.** A state-changing request whose `Origin` header does not match an allowlist of your own origins is rejected. When no `Origin` header is present, validate `Referer` against the same allowlist; if neither header is present, reject. Compare as an exact origin, never a substring or suffix match.
+- **Bearer-token APIs need no CSRF token.** A header-borne bearer token, sent in `Authorization: Bearer <token>`, is not CSRF-susceptible: it is attached by the caller's code rather than by the browser, so a cross-site form post cannot carry it: a pure bearer API does not need a CSRF token. Keep it that way — never store the bearer token in a cookie (that makes it ambient and re-introduces CSRF), and never accept the same token from either a cookie or a header on the same endpoint.
+- Framework CSRF middleware counts only if it is enabled for the endpoint. A globally disabled filter is not protection.
+
 ## Upstream Error Responses Must Not Reach the Client
 
 A third-party API's raw error response is not automatically safe to forward. Provider APIs (payment processors, LLM providers, any upstream service authenticated with a credential of yours) can include partial key material, account identifiers, or internal details in their error bodies — a 401 from an upstream provider might echo back a masked or partial version of the credential you sent it. This is a distinct leak path from log redaction (docs/OBSERVABILITY.md's "mask secrets in logs" rule): the risk here is forwarding the error body itself to *your own client's browser/app*, not writing it to your own logs.
