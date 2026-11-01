@@ -1,26 +1,77 @@
 # Media Agents
 
-Machine-level media production for opencode (Linux + Windows): four global
-agents that drive a **user-configured backend contract**. This repo ships no
-provider, no vendor CLI, and no model ids — you point the agents at whatever
-image, video, TTS, and ASR commands your machine has. Architecture decision:
-`docs/adr/0016-provider-agnostic-media-agents.md`; trust tiers and
+Machine-level media production for opencode (Linux + Windows): four agents that
+drive a **user-configured backend contract**. This repo ships no provider, no
+vendor CLI, and no model ids — you point the agents at whatever image, video,
+TTS, and ASR commands your machine has. Architecture decisions:
+`docs/adr/0016-provider-agnostic-media-agents.md` (the contract) and
+`docs/adr/0018-media-agents-opt-in.md` (placement and opt-in); trust tiers and
 model-assignment rules: `docs/GOVERNANCE.md`.
+
+The family is **not loaded by default in child repos**: the files live in
+`agents-optional/`, outside the `agents/` tree a child's `.opencode/agents`
+wiring links. See §Opt-in below for the two ways to load them.
 
 ## Components
 
-| Component        | Path                            | Role                                                                     |
-| ---------------- | ------------------------------- | ------------------------------------------------------------------------ |
-| `media-image`    | `agents/media-image.md`         | text→image, image edit/merge                                             |
-| `media-video`    | `agents/media-video.md`         | t2v / i2v / first+last-frame / edit, ffmpeg assembly                     |
-| `media-voice`    | `agents/media-voice.md`         | TTS, ASR, turn-based voice chat                                          |
-| `media-producer` | `agents/media-producer.md`      | storyboard-gated end-to-end video pipeline; delegates to the three above |
-| installer        | `scripts/media/install.mjs`     | copies agents + the backend example into the opencode global dir         |
-| smoke            | `scripts/media/smoke-media.mjs` | structure + contract validation, zero network, zero spend                |
-| contract example | `scripts/media/backends.example.json` | the argv shape every agent reads                                   |
+| Component        | Path                                | Role                                                                     |
+| ---------------- | ----------------------------------- | ------------------------------------------------------------------------ |
+| `media-image`    | `agents-optional/media-image.md`    | text→image, image edit/merge                                             |
+| `media-video`    | `agents-optional/media-video.md`    | t2v / i2v / first+last-frame / edit, ffmpeg assembly                     |
+| `media-voice`    | `agents-optional/media-voice.md`    | TTS, ASR, turn-based voice chat                                          |
+| `media-producer` | `agents-optional/media-producer.md` | storyboard-gated end-to-end video pipeline; delegates to the three above |
+| installer        | `scripts/media/install.mjs`         | copies agents + the backend example into the opencode global dir         |
+| smoke            | `scripts/media/smoke-media.mjs`     | structure + contract validation, zero network, zero spend                |
+| contract example | `scripts/media/backends.example.json` | the argv shape every agent reads                                       |
 
 Agents inherit your primary opencode model and never pin one in frontmatter
 (governance rule, see `docs/GOVERNANCE.md §Model-Assignment Discipline`).
+
+## Opt-in
+
+The family loads in exactly two ways, both explicit. Nothing is placed under a
+child's `.opencode/` — that path is a symlink to the whole standards agent
+tree, so the per-repo opt-in names the files instead.
+
+A flagless run and `--none` leave the family out; `--all` selects it like any
+other non-baseline capability, so a child bootstrapped with `--all` does carry
+the four entries below.
+
+The directory sits outside the orchestration gate on purpose:
+`scripts/check-orchestration.sh` scans `agents/` and `commands/`, and resolves
+the references it finds against **this** repo's tree. Files in `agents-optional/`
+are instead reached from a child's `opencode.json` through
+`.standards/agents-optional/…`, whose paths resolve inside the submodule — so
+scanning them here would judge them against the wrong root.
+
+**Global (machine-wide).** `make install-media` copies the four agents from
+`agents-optional/` into `~/.config/opencode/agents/`, where they load in every
+opencode session on this machine. This is the right choice when media work is a
+machine capability you use from several repos. `make uninstall-media` removes
+them again.
+
+**Per repo.** `./.standards/scripts/bootstrap.sh --with-media` (or `--all`)
+writes four `agent` entries into the child's own `opencode.json`, each pointing
+at the standards submodule:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "agent": {
+    "media-image": { "prompt": "{file:.standards/agents-optional/media-image.md}" },
+    "media-video": { "prompt": "{file:.standards/agents-optional/media-video.md}" },
+    "media-voice": { "prompt": "{file:.standards/agents-optional/media-voice.md}" },
+    "media-producer": { "prompt": "{file:.standards/agents-optional/media-producer.md}" }
+  }
+}
+```
+
+Only those four keys are added: your existing `agent` entries, model pins, and
+every other key are preserved, a re-run is a no-op, and an `opencode.json` that
+is not plain JSON (comments) is left untouched with a WARN naming the manual
+step. Removing the four keys (or `make uninstall-media` for the global install)
+opts that repo back out. Either way the backend contract itself still has to
+exist — the agents stop and name a missing section rather than guessing.
 
 ## Backend contract
 
@@ -112,4 +163,8 @@ desktop separately if winget does not offer it.
 
 `scripts/tests/media-agents.bats` (in `make test`) checks frontmatter shape,
 no pinned models, no vendor-specific tokens, the contract example, installer
-idempotency, and smoke exit. `make smoke-media` runs the structural smoke.
+idempotency, and smoke exit — all against `agents-optional/`.
+`scripts/tests/ac-040-media-agents-optional.bats` covers the opt-in boundary:
+the family is absent from the default agent set and from a child bootstrapped
+without the flag, and `--with-media` writes (and re-runs over) the four
+`opencode.json` entries. `make smoke-media` runs the structural smoke.

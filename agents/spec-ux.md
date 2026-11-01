@@ -116,6 +116,44 @@ Then end your turn. Do not write `15-design.md`.
 If the spec has **a mixed surface** (frontend + backend), apply the skill only to the
 frontend tasks. Note which tasks are out of scope at the top of `15-design.md`.
 
+# Design laws (Laws of UX) — required, not decorative
+
+Taste and usability are different failure modes. The `design-taste-frontend`
+skill covers taste; the Laws of UX (lawsofux.com) cover usability. Every
+frontend task must be checked against them (ADR 0019).
+
+**The rule that makes this enforcement rather than ritual:** every law you cite
+must carry a concrete consequence for the implementation **and** a way for a
+reviewer to verify it. A law named without both is a defect in your artifact —
+drop it or make it checkable. Do not dump the catalogue; cite what actually
+governs a decision.
+
+**Core set — apply to every frontend task unless it has no such surface:**
+
+| Law | The consequence you must produce |
+|---|---|
+| Fitts's Law | Target size and distance: minimum touch target (44×44 CSS px), primary action size and placement, spacing between adjacent destructive and safe actions |
+| Hick's Law | Number of simultaneous choices: what is shown at first paint, what moves behind progressive disclosure |
+| Miller's Law | Chunking: how many items per group, why that grouping and not another |
+| Jakob's Law | Convention: which familiar pattern this copies, and — if it does not — what pays the learning cost |
+| Doherty Threshold | Feedback: what responds, within what budget, before the user loses flow (<400 ms target; skeletons/optimistic states where a round-trip exceeds it) |
+| Tesler's Law | Irreducible complexity: which part the system absorbs, and where the remainder is exposed rather than hidden |
+| Gestalt (Proximity, Common Region, Prägnanz) | Grouping and hierarchy: what the layout makes read as one unit, and how |
+
+**Apply where the task genuinely invokes them:** Von Restorff (one distinct
+element, not five competing accents), Serial Position (what sits first and last
+in a list or flow), Peak-End (the final state of a multi-step flow), Zeigarnik
+and Goal-Gradient (progress affordances), Parkinson's and Flow (pacing, no
+gratuitous interruption), Aesthetic-Usability (never as an excuse for a
+usability defect), Choice Overload, Pareto, Occam.
+
+**Deliberate violation is allowed, silence is not.** If a task knowingly departs
+from a core law, state the reason and the compensating control (e.g. novel
+navigation, plus an onboarding affordance carrying the learning cost).
+
+**State the exclusions.** For each frontend task, note which laws you judged
+inapplicable, so a considered exclusion is distinguishable from an omission.
+
 # When the spec HAS a frontend surface
 
 Run the full `design-taste-frontend` skill workflow:
@@ -136,6 +174,7 @@ Run the full `design-taste-frontend` skill workflow:
    - Typography and color tokens
    - Motion spec (GSAP / Motion, or static) consistent with the dial values
    - Accessibility notes (contrast, reduced-motion, dark mode)
+   - Design-law consequences (core set above; each with a verifiable check)
    - Anti-patterns to avoid (from Sections 4, 9 — specific to this task, not a full
      dump of the skill)
 
@@ -144,7 +183,13 @@ Run the full `design-taste-frontend` skill workflow:
 
 6. **Pre-flight checklist** (Section 14 of the skill) — run it mentally against your
    own output. If any box would fail in the implementation, call it out explicitly as a
-   "Watch" item the Coder must handle.
+   "Watch" item the Coder must handle. Then run the laws check below; an artifact that
+   fails it is not ready.
+
+7. **Design-laws check** — reject your own output if any cited law lacks a concrete
+   consequence and a verification method, if a core-set law is neither applied nor
+   explicitly excluded with a reason, or if a deliberate violation is stated without a
+   compensating control. Fix the artifact before writing it, not after review.
 
 # Output: `specs/NNN-slug/15-design.md`
 
@@ -172,6 +217,22 @@ Write exactly one file. Structure:
 - Theme: <light / dark / auto>
 - Icon library: <phosphor / hugeicons / tabler / radix>
 
+## Design Laws
+
+Required (ADR 0019). One row per law, per task where the application differs.
+A law without a consequence and a verification method does not belong here.
+
+| Task | Law | Applies to | Concrete consequence | How a reviewer checks it |
+|---|---|---|---|---|
+| N | Fitts's | primary CTA | 44×44 min target, 16px min gap from destructive action | measure in the built UI |
+| N | Doherty | form submit | optimistic state + spinner within 400 ms | throttle network, observe |
+
+**Deliberate violations** (reason + compensating control):
+- <law> — <why departed> — <what pays the cost>
+
+**Judged inapplicable for this spec** (so omissions are visible):
+- <law> — <why not applicable>
+
 ## Per-Task Directives
 
 ### Task N: <task title from 10-tasks.md>
@@ -197,6 +258,10 @@ Do not touch `00-informal.md`, `10-tasks.md`, or `20-acceptance/`.
 - Write only `specs/NNN-slug/15-design.md` and nothing else.
 - Do not commit or push. The pipeline orchestrator reads your output and stops for
   human review.
+- **Design laws (ADR 0019):** every cited law needs a concrete consequence and a
+  verification method; every core-set law must be applied or explicitly excluded
+  with a reason; a deliberate violation needs a reason and a compensating control.
+  A law citation used as decoration is an artifact defect, not a preference.
 - If the brief is genuinely ambiguous on the frontend surface (e.g. spec says "build a
   tool" but does not specify web vs CLI), ask one question per the skill's Section 0.C
   discipline — exactly one, not a dump — then stop and wait. Do not guess.

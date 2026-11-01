@@ -1,3 +1,24 @@
+# [1.49.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.48.0...v1.49.0) (2026-11-01)
+
+
+### Features
+
+* **spec-ux:** enforce Laws of UX as checkable consequences ([#111](https://github.com/RexiAI/my-engineering-standards/issues/111)) ([569f68b](https://github.com/RexiAI/my-engineering-standards/commit/569f68b38eb9086af34363c46f93633bd02a8bba))
+
+# [1.48.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.47.1...v1.48.0) (2026-11-01)
+
+
+### Features
+
+* media agents opt-in for child repos (040) ([#109](https://github.com/RexiAI/my-engineering-standards/issues/109)) ([9afdaef](https://github.com/RexiAI/my-engineering-standards/commit/9afdaef1d47eeb0710e7e4b883b78f86867ae91e)), closes [#106](https://github.com/RexiAI/my-engineering-standards/issues/106)
+
+## [1.47.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.47.0...v1.47.1) (2026-11-01)
+
+
+### Bug Fixes
+
+* **scripts:** avoid a SIGPIPE race in scenario traceability lookups ([#108](https://github.com/RexiAI/my-engineering-standards/issues/108)) ([ecbf44e](https://github.com/RexiAI/my-engineering-standards/commit/ecbf44e9bdefbdb59800fb32a8446959b3bb6dad))
+
 # [1.47.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.46.0...v1.47.0) (2026-10-30)
 
 
