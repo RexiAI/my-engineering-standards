@@ -167,8 +167,15 @@ jobs:
             "${prompt}" 2>&1) && review_rc=0 || review_rc=$?
 
           if [ "$review_rc" -ne 0 ]; then
-            if echo "$review_output" | sed 's/\x1b\[[0-9;]*m//g' | grep -qiE 'spending limit|quota exceeded|billing|rate.limit|429|402|insufficient balance'; then
-              echo "::warning::Review skipped — billing/quota error from model provider (exit ${review_rc}). Not a code defect."
+            # Provider-side failures are not code defects: a billing issue, a
+            # rate limit, or a model that the provider has withdrawn. The last
+            # case is real — PR_REVIEW_MODEL was pinned to a model that was
+            # later withdrawn, and the resulting hard failure blocked a PR on a
+            # required check for a comment-only advisory review. The guard's
+            # contract is "skip with a warning, never fail the PR on provider
+            # availability".
+            if echo "$review_output" | sed 's/\x1b\[[0-9;]*m//g' | grep -qiE 'spending limit|quota exceeded|billing|rate.limit|429|402|insufficient balance|model unavailable|model not found|unknown model|no such model|stream error'; then
+              echo "::warning::Review skipped — model provider unavailable or over quota (exit ${review_rc}). Not a code defect."
               exit 0
             fi
             echo "$review_output"
