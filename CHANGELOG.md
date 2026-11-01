@@ -1,3 +1,10 @@
+# [1.50.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.49.0...v1.50.0) (2026-11-01)
+
+
+### Features
+
+* **spec 037:** split SPEC_PIPELINE into an index plus per-stage docs ([#110](https://github.com/RexiAI/my-engineering-standards/issues/110)) ([acc4bf1](https://github.com/RexiAI/my-engineering-standards/commit/acc4bf148a87de85f699b8d938099a53d87e84da))
+
 # [1.49.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.48.0...v1.49.0) (2026-11-01)
 
 
