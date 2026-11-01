@@ -556,7 +556,7 @@ repos. The token travels as an environment variable, never as a `--token` flag
 **Two lanes, neither cancels the other.** The GHCR container path
 (`.github/workflows/ci-nextjs.yml` and siblings) keeps building and pushing
 images exactly as before. The Vercel lane adds: (1) stage 5c deploy
-verification against the live preview URL (`docs/SPEC_PIPELINE.md §Deploy
+verification against the live preview URL (`docs/spec-pipeline/deployer.md §Deploy
 verification loop (phase 3)`) and (2) a post-merge production check —
 `.github/workflows/ci-vercel-production-verify.yml` running
 `scripts/verify-production-deploy.sh`, which queries the Vercel API for the

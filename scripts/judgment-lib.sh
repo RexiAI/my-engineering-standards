@@ -17,7 +17,7 @@
 # Sourcing: callers source it right after their SCRIPT_DIR/REPO_ROOT block, e.g.
 #   source "$SCRIPT_DIR/judgment-lib.sh"
 
-# Payload cap default in bytes (docs/SPEC_PIPELINE.md §Typed-judgment layer).
+# Payload cap default in bytes (docs/spec-pipeline/typed-judgment.md §Typed-judgment layer).
 # The fitness probes measure the backend AT this cap, so they must agree with
 # the wrapper on the number instead of restating it.
 JUDGMENT_CAP_DEFAULT_BYTES=12288

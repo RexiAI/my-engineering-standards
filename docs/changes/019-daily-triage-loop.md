@@ -808,7 +808,7 @@ The binary's provider registry for `opencode-go` reads **`OPENCODE_API_KEY`**; t
    targets the wrong string (the negative-fixture mechanism itself works; the asserted string
    is wrong).
 
-This is exactly the failure class the Verifier exists to catch (SPEC_PIPELINE.md §Why a
+This is exactly the failure class the Verifier exists to catch (docs/spec-pipeline/rationale.md §Why a
 separate Verifier stage: "config files that looked correct on read but failed the moment they
 were actually executed"). The fix (Coder/Refactorer, not Verifier): rename the documented
 secret/env var to `OPENCODE_API_KEY` in `daily-triage.yml` (comment, guard, run-step env) and
@@ -1106,7 +1106,7 @@ identical pre-existing `ci/templates/*` FAILs/WARNs, zero on 019 files).
 
 Skipped — `mvp` tier.
 
-(Per `docs/SPEC_PIPELINE.md §Conformance tiers`, mutation testing is a
+(Per `docs/spec-pipeline/coder.md §Conformance tiers`, mutation testing is a
 `production`-tier gate and is skipped at `mvp`; this repo has no `AGENTS_*.md`, and the
 changed deliverables are bash + markdown + YAML with no mutation tooling in this repo.)
 

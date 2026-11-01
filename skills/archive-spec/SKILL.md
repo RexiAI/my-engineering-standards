@@ -53,7 +53,7 @@ final act, so the archive rides inside the spec PR and the merge lands `main`
 with the spec already archived. The enforcement gate
 `scripts/check-specs-archived.sh` (self-ci `validate` job, no `continue-on-error`)
 fails any PR that would merge a finished spec without its archive — see
-`docs/SPEC_PIPELINE.md §Archive in the PR` and `§Definition of done`.
+`docs/spec-pipeline/pr-opener.md §Archive in the PR` and `§Definition of done`.
 
 # Why the script does not commit
 

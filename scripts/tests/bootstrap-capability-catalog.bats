@@ -4,7 +4,7 @@
 #
 # One test per scenario in specs/033-bootstrap-capability-catalog/20-acceptance/.
 # The ID in each test name is what scripts/check-scenario-traceability.sh greps
-# for (docs/SPEC_PIPELINE.md §Scenario format).
+# for (docs/spec-pipeline/specifier.md §Scenario format).
 #
 # Fixture model: make_child_repo builds a hermetic child repo that consumes the
 # standards tree the way a real child does — <child>/.standards/ holds symlinks

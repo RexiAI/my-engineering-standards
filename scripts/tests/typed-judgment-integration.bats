@@ -18,7 +18,8 @@ MODEL_EX="$REPO_ROOT/config/model.local.env.example"
 AGENT_EX="$REPO_ROOT/config/agent.local.env.example"
 ADR="$REPO_ROOT/docs/adr/0004-typed-judgment-layer.md"
 ADR_README="$REPO_ROOT/docs/adr/README.md"
-PIPE="$REPO_ROOT/docs/SPEC_PIPELINE.md"
+# spec 037: the typed-judgment layer moved out of the index into its own file.
+PIPE="$REPO_ROOT/docs/spec-pipeline/typed-judgment.md"
 LOOP="$REPO_ROOT/docs/LOOP_ENGINEERING.md"
 OKF_DOC="$REPO_ROOT/okf/when-to-use-typesafe.md"
 
@@ -594,6 +595,17 @@ config_threshold_value() {
   local diff_out
   diff_out="$(git -C "$REPO_ROOT" diff HEAD -- skills/ci-triage/SKILL.md agents/spec-ux.md || true)"
   [ -z "$diff_out" ] && return 0
+  # Spec 037 rewrites the shared reading instructions in agents/spec-ux.md, so
+  # the documented-change rule is checked generally: an in-flight spec folder
+  # that names the changed surface (agents/, skills/ci-triage) is its review
+  # surface.
+  local d
+  for d in "$REPO_ROOT"/specs/[0-9][0-9][0-9]-*/; do
+    [ -d "$d" ] || continue
+    if grep -rqF -e 'agents/' -e 'skills/ci-triage/SKILL.md' "$d" 2>/dev/null; then
+      return 0
+    fi
+  done
   if [ -d "$REPO_ROOT/specs/034-judgment-preflight-fail-open" ] &&
      [ -f "$REPO_ROOT/docs/adr/0014-judgment-consumer-contract-fail-open-preflight.md" ]; then
     return 0

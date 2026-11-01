@@ -573,7 +573,7 @@ else
 fi
 
 # 04-02 / 04-03: no emit flag / loader-name matches across the live surface
-live_surfaces=(scripts templates agents .github config README.md AGENTS.md docs/SPEC_PIPELINE.md)
+live_surfaces=(scripts templates agents .github config README.md AGENTS.md docs/SPEC_PIPELINE.md docs/spec-pipeline)
 if grep -rn "$EMIT" "${live_surfaces[@]}" 2>/dev/null | grep -v '^Binary' | grep -q .; then
   bad "AC-025-04-02 no emit flag in live surfaces: $(grep -rn "$EMIT" "${live_surfaces[@]}" 2>/dev/null | head -1)"
 else
@@ -767,12 +767,12 @@ if [ "$FAIL_COUNT" -eq 0 ]; then
 fi
 
 # 06-06: docs + self-ci wiring
-pipe="$ROOT/docs/SPEC_PIPELINE.md"
+pipe="$ROOT/docs/spec-pipeline/model-config.md"
 if grep -q 'dotenv_if_exists' "$pipe" && grep -q 'templates/.envrc.example' "$pipe" \
    && grep -q 'direnv allow' "$pipe" && ! grep -q "$LOADENV\|$LOADMODELENV" "$pipe"; then
-  ok "AC-025-06-06 AC-025-07-01 SPEC_PIPELINE.md documents the dotenv flow with no loader reference"
+  ok "AC-025-06-06 AC-025-07-01 model-config.md documents the dotenv flow with no loader reference"
 else
-  bad "AC-025-06-06 AC-025-07-01 SPEC_PIPELINE.md documents the dotenv flow with no loader reference"
+  bad "AC-025-06-06 AC-025-07-01 model-config.md documents the dotenv flow with no loader reference"
 fi
 if grep -q 'dotenv_if_exists' "$ROOT/AGENTS.md" && grep -q '.envrc' "$ROOT/AGENTS.md" \
    && ! grep -q "$LOADENV\|$LOADMODELENV" "$ROOT/AGENTS.md"; then
@@ -813,7 +813,7 @@ done
 
 echo "== AC-025-07 docs + ADR =="
 
-# 07-01: SPEC_PIPELINE.md §Model configuration documents the full flow
+# 07-01: docs/spec-pipeline/model-config.md §Model configuration documents the full flow
 if grep -q 'direnv hook bash' "$pipe" \
    && grep -q 'direnv allow' "$pipe" \
    && grep -q 'templates/.envrc.example' "$pipe" \
@@ -826,9 +826,9 @@ if grep -q 'direnv hook bash' "$pipe" \
    && grep -q 'runtime-check' "$pipe" \
    && grep -q 'restart' "$pipe" \
    && ! grep -q "$LOADENV\|$LOADMODELENV\|$EMIT" "$pipe"; then
-  ok "AC-025-07-01 SPEC_PIPELINE.md §Model configuration documents setup, parent/child flow, precedence, safety, boundary, enforcement"
+  ok "AC-025-07-01 docs/spec-pipeline/model-config.md §Model configuration documents setup, parent/child flow, precedence, safety, boundary, enforcement"
 else
-  bad "AC-025-07-01 SPEC_PIPELINE.md §Model configuration documents the full dotenv flow"
+  bad "AC-025-07-01 docs/spec-pipeline/model-config.md §Model configuration documents the full dotenv flow"
 fi
 
 # 07-02: AGENTS.md documents the dotenv flow and carries NO model or provider

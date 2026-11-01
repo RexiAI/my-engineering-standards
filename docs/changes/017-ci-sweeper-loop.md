@@ -607,7 +607,7 @@ negative fixture fails closed.
 
 **skipped — mvp tier.** This repo conforms at `mvp` (no `AGENTS_*.md`;
 `check-code-principles.sh` auto-detects `tier: mvp`). Per
-`docs/SPEC_PIPELINE.md §Conformance tiers`, mutation testing is a `production`-tier
+`docs/spec-pipeline/coder.md §Conformance tiers`, mutation testing is a `production`-tier
 gate and does not run at `mvp`. The changed code is bash + skill markdown + workflow
 YAML; no mutation tooling for shell exists in this repo.
 

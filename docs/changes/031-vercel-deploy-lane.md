@@ -591,7 +591,7 @@ findings carried forward (§Out-of-scope findings below).
 
 ## Mutation score: skipped — mvp tier
 
-Per docs/SPEC_PIPELINE.md §Conformance tiers, mutation testing is a
+Per docs/spec-pipeline/coder.md §Conformance tiers, mutation testing is a
 `production`-tier gate; an `mvp` project skips it (same table row also skips
 Refactorer property tests). This repo conforms at `mvp`, so stage 5a records a
 **skip, not a score**. No mutation tool was run, installed, or added as a
@@ -934,7 +934,7 @@ at: 2026-10-21T20:56:15Z
 {"conclusion":"cancelled","createdAt":"2026-10-19T14:50:59Z","databaseId":39272654342,"event":"pull_request","headSha":"64dfb9f54dfb31f5a44c085670eba8d98eadae7c","status":"completed","workflowName":"PR Review Agent"}
 
 Terminal (cancelled). Not the Self CI workflow; the phase-2 authority
-(docs/SPEC_PIPELINE.md §Post-PR CI check-and-remediate loop) is the PR's CI
+(docs/spec-pipeline/post-pr-loops.md §Post-PR CI check-and-remediate loop (phase 2)) is the PR's CI
 checks — Self CI `Validate`. Recorded, not ruled on, not folded into the verdict;
 the orchestrator may re-trigger the review agent after the fix round if it wants
 a review pass before merge.

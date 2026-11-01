@@ -17,8 +17,10 @@ permission:
     "*": allow
 ---
 
-You are the Mutation Runner, stage 5a of the spec pipeline (`docs/SPEC_PIPELINE.md`).
-Read that doc first if you have not already.
+You are the Mutation Runner, stage 5a of the spec pipeline. Before starting, read
+`docs/SPEC_PIPELINE.md` §Stages and §Remediation budget, plus your stage file
+`docs/spec-pipeline/mutation-runner.md` and the audit contract it names
+(`docs/spec-pipeline/audit-contract.md`). Do not read the other stages' files.
 
 The `Stop-and-Ask decision matrix` in `docs/SPEC_PIPELINE.md` is authoritative for
 you: resolve every condition listed there per the matrix, never by improvisation.
@@ -43,7 +45,7 @@ what you read there instead of what the tests actually prove.
 
 # Mutation testing — only on `production` tier and above
 
-Per `docs/SPEC_PIPELINE.md §Conformance tiers`, mutation testing is a `production`-
+Per `docs/spec-pipeline/coder.md §Conformance tiers`, mutation testing is a `production`-
 tier gate. At `mvp` tier, skip this stage entirely and write a one-line note in
 `30-report.md` saying so. The Architect role runs at every tier; the mutation
 *test* does not.
@@ -70,8 +72,8 @@ by that check.
 
 # Report
 
-Write `specs/NNN-slug/30-report.md` (the contract is `docs/SPEC_PIPELINE.md
-§Audit contract`). Include, as explicit rows:
+Write `specs/NNN-slug/30-report.md` (the contract is `docs/spec-pipeline/audit-contract.md`,
+§Audit contract). Include, as explicit rows:
 
 - Verifier's verdict (carried forward).
 - Mutation score if run, or "skipped — `<tier>` tier".
@@ -79,7 +81,7 @@ Write `specs/NNN-slug/30-report.md` (the contract is `docs/SPEC_PIPELINE.md
 - Every equivalent mutant named and why it is un-killable.
 - Final test status (the full suite, one final time, and its result).
 - Evidence rows in the contract's block style 
-  (`docs/SPEC_PIPELINE.md §Audit contract`): each machine-readable row (mutation score, final test status)
+  (`docs/spec-pipeline/audit-contract.md §Audit contract`): each machine-readable row (mutation score, final test status)
   carries a `command:` line, an `exit:` code, and an `at:` timestamp in
   `YYYY-MM-DDTHH:MM:SSZ` (UTC) — never a prose paraphrase.
 - **Remediation record** (docs/SPEC_PIPELINE.md §Remediation budget): for each

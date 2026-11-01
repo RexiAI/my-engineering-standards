@@ -348,7 +348,7 @@ PASS — attempt 2, phase 1 (`25-verification.md`, "Verdict (attempt 2): PASS �
 
 ## Mutation score
 
-skipped — `mvp` tier (tier per `25-verification.md` design-principles gate JSON: `"tier": "mvp"`). Mutation testing is a `production`-tier gate per `docs/SPEC_PIPELINE.md §Conformance tiers`. No mutation tool run; no mutation-kill tests written.
+skipped — `mvp` tier (tier per `25-verification.md` design-principles gate JSON: `"tier": "mvp"`). Mutation testing is a `production`-tier gate per `docs/spec-pipeline/coder.md §Conformance tiers`. No mutation tool run; no mutation-kill tests written.
 
 ## Complexity summary (carried from Refactorer/Verifier)
 

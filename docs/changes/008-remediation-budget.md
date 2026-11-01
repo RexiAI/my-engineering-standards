@@ -533,7 +533,7 @@ match; diff fully accounted for; mvp tier substantiated (no `AGENTS_*.md`).
 
 ## Mutation score
 
-**skipped — `mvp` tier.** Per `docs/SPEC_PIPELINE.md §Conformance tiers`, mutation
+**skipped — `mvp` tier.** Per `docs/spec-pipeline/coder.md §Conformance tiers`, mutation
 testing is a `production`-tier gate; at `mvp` it is skipped. The changed code is
 shell scripts plus markdown prompts/docs — no mutation tooling for shell exists in
 this repo, and no Java/Go/TS/JS files were touched. No mutation run was attempted.

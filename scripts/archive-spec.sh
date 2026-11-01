@@ -37,7 +37,7 @@
 #   1 — missing inputs, spec not finished, or write failed
 #
 # Standards reference:
-#   docs/SPEC_PIPELINE.md §Archive in the PR
+#   docs/spec-pipeline/pr-opener.md §Archive in the PR
 #   docs/SPEC_PIPELINE.md §Commit and push carve-out
 set -euo pipefail
 

@@ -642,7 +642,7 @@ not attributable to 014.
 
 **Skipped — `mvp` tier.**
 
-Per `docs/SPEC_PIPELINE.md §Conformance tiers`, mutation testing is a
+Per `docs/spec-pipeline/coder.md §Conformance tiers`, mutation testing is a
 `production`-tier gate; `mvp` runs the 4-stage pipeline (Specifier, Coder,
 Refactorer, Verifier). No mutation tooling attempted. (Also, the changed code
 is a bash check script + markdown prompts/docs + workflow YAML; this repo has

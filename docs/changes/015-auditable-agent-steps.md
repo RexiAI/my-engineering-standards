@@ -236,7 +236,7 @@ fails the gate. Verified behaviorally correct in pass 2 against the real tree
 (exit 0), a scratch finished-but-incomplete spec (exit 1), a complete spec
 (exit 0), and a mix with an in-flight sibling (silent skip). But the fix was
 incomplete: three texts still described the old mechanism (10-tasks.md Task 4
-criteria, AC-015-16 Then-clause, docs/SPEC_PIPELINE.md §The gate) — recorded as
+criteria, AC-015-16 Then-clause, docs/spec-pipeline/audit-contract.md §The gate) — recorded as
 the pass-2 FAIL.
 
 ## 0.2 Fix 2 — three texts amended to the finished-signal convention (this pass)
@@ -471,7 +471,7 @@ AC-015-14 — verifier report without per-check evidence exits non-zero: all thr
 negative cases re-exercised via selftest (missing at: timestamp; lacking raw
 output; no evidence block at all → all exit 1). CONFIRMED.
 
-AC-015-01/02/03 — contract text in docs/SPEC_PIPELINE.md §Audit contract: stage→
+AC-015-01/02/03 — contract text in docs/spec-pipeline/audit-contract.md §Audit contract: stage→
 artifact table naming all six stages and four artifacts; five runnable Verifier
 checks; machine-readable rule (ISO-8601 UTC, raw output or exit code, never
 prose); uniform evidence-block format with worked example. CONFIRMED (unchanged;
@@ -520,7 +520,7 @@ Both prior defects are fixed and re-verified with real executions this pass:
 2. **Contract-text staleness (pass 2) — FIXED.** All three texts now describe the
    finished-signal convention and agree with the step on every point: iterate
    finished specs only, skip in-flight silently, exit 0 when none, finished-but-
-   incomplete still fails. `10-tasks.md` Task 4, AC-015-16, and docs/SPEC_PIPELINE.md
+   incomplete still fails. `10-tasks.md` Task 4, AC-015-16, and docs/spec-pipeline/audit-contract.md
    §The gate are mutually consistent with `.github/workflows/self-ci.yml`.
 
 `scripts/check-audit-trail.sh` unchanged throughout (untracked, mtime predates
@@ -560,7 +560,7 @@ command: repo conformance tier determination (no AGENTS_<PROJECT>.md at root; ga
 exit: 0
 at: 2026-08-15T18:49:53Z
 
-Mutation testing is a production-tier gate (docs/SPEC_PIPELINE.md §Conformance
+Mutation testing is a production-tier gate (docs/spec-pipeline/coder.md §Conformance
 tiers). This repo conforms at mvp tier, so the gate is skipped. The changed code
 is a bash check script + markdown prompts/docs + workflow YAML; no mutation
 tooling exists for shell in this repo.

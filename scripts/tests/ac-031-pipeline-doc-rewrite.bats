@@ -41,7 +41,7 @@ teardown() { teardown_tmpdir; }
   [[ "$output" == *"Stage 5d"* ]]
   [[ "$output" == *"archive-spec.sh"* ]]
   # the old "Stage 5b ran ... archive" item is gone
-  ! grep -q 'Stage 5b ran `scripts/archive-spec.sh`' "$DOC"
+  ! pipeline_cat | grep -q 'Stage 5b ran `scripts/archive-spec.sh`'
 }
 
 @test "AC-031-14 — commit-and-push carve-out names stage 5d explicitly alongside 5b" {
@@ -52,9 +52,9 @@ teardown() { teardown_tmpdir; }
 }
 
 @test "AC-031-15 — pipeline-finishes sentence names 5d (the Archiver) as the final act, not 5b" {
-  ! grep -qF 'The pipeline finishes at the moment stage 5b pushes the archive commit' "$DOC"
+  ! pipeline_cat | grep -qF 'The pipeline finishes at the moment stage 5b pushes the archive commit'
   # sentence may wrap across physical lines — flatten the paragraph first
-  sentence="$(tr '\n' ' ' < "$DOC" | grep -oE 'The pipeline finishes at the moment[^.]*\.' | head -1)"
+  sentence="$(pipeline_cat | tr '\n' ' ' | grep -oE 'The pipeline finishes at the moment[^.]*\.' | head -1)"
   [[ "$sentence" == *"5d"* ]]
   [[ "$sentence" == *"Archiver"* ]]
   [[ "$sentence" == *"final act"* ]]
@@ -62,10 +62,10 @@ teardown() { teardown_tmpdir; }
 }
 
 @test "AC-031-16 — phase ordering: phase-3 deploy verification runs only after phase-2 CI is green, never racing" {
-  run grep -iF 'phase-3' "$DOC"
+  run pipeline_cat
   [ "$status" -eq 0 ]
   # an explicit statement that phase 3 starts only after phase 2 is green
-  grep -qiE 'phase[ -]3[^.]*only after[^.]*phase[ -]2' "$DOC"
+  pipeline_cat | grep -qiE 'phase[ -]3[^.]*only after[^.]*phase[ -]2'
   grep -qF 'no longer archives' "$DOC"   # 5b row states the archive moved (belt for the table edit)
 }
 

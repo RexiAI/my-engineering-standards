@@ -22,7 +22,7 @@ and caused repeated doc/gate conflicts when machines differ.
 ## Decision
 
 1. General docs (`AGENTS.md`, `docs/GOVERNANCE.md`, the general part of
-   `docs/SPEC_PIPELINE.md §Model configuration`) carry **no** concrete model or
+   `docs/spec-pipeline/model-config.md §Model configuration`) carry **no** concrete model or
    provider ids. They describe the mechanism and point at
    `config/model.local.env.example` for defaults.
 2. `AC-025-07-02` is inverted: it now asserts AGENTS.md documents the dotenv

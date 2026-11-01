@@ -24,7 +24,7 @@
 #   1 — at least one finished spec lacks its docs/changes/NNN-slug.md archive
 #
 # Standards reference:
-#   docs/SPEC_PIPELINE.md §Archive in the PR
+#   docs/spec-pipeline/pr-opener.md §Archive in the PR
 set -euo pipefail
 
 fail() { echo -e "\033[31m$*\033[0m"; }

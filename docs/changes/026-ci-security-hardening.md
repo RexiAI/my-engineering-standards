@@ -110,7 +110,7 @@ incident writeups, and OWASP GenAI Top 10 2025)
 
 Source: `specs/026-ci-security-hardening/00-informal.md`. This is an
 infrastructure/CI hardening spec, not application code — there is no
-project test suite to extend. Per `docs/SPEC_PIPELINE.md §Audit contract`,
+project test suite to extend. Per `docs/spec-pipeline/audit-contract.md §Audit contract`,
 each finding below is fixed directly in the affected workflow/script/agent
 file, and its acceptance scenario is traced the same way this repo already
 traces its other workflow specs (017 CI Sweeper, 019 Daily Triage, 024 PR
@@ -271,7 +271,7 @@ informal-spec language required an assumption call.
 
 Verifier stage. Re-runs every claim in the tasks/fixes above; records the
 exact command, exit code, and raw output for each of the five contract
-checks (`docs/SPEC_PIPELINE.md §Audit contract`). This is an
+checks (`docs/spec-pipeline/audit-contract.md §Audit contract`). This is an
 infrastructure/CI spec (no application test suite) — "full test suite" is
 interpreted as the full battery of this repo's own self-ci gate scripts,
 run directly rather than through CI, against the actual PR branch.
@@ -309,7 +309,7 @@ ID by other specs' `*.selftest.sh` negative-case fixtures (e.g.
 Confirmed via `git worktree` diff against `upstream/main` HEAD
 (`21046d96796467f8238d6d613ce3a552bf3fced0`): that check exits 0 there only
 because `specs/` does not exist on `main` (specs are archived and deleted at
-merge, `docs/SPEC_PIPELINE.md §Archive in the PR`) — so
+merge, `docs/spec-pipeline/pr-opener.md §Archive in the PR`) — so
 `scripts/check-scenario-traceability.sh`'s check 2 short-circuits via
 `finish_clean` before it ever runs, and has apparently never executed
 against this repo's own live tree with a populated `specs/` folder in CI

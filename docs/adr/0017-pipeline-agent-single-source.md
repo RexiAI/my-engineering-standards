@@ -20,7 +20,7 @@ with the normative doc.
 - `docs/SPEC_PIPELINE.md` is the normative source for pipeline rules.
 - `agents/spec-pipeline.md` is a runtime procedure (preflight, stage order,
   stop conditions, telemetry exports) and cites doc rules by section reference
-  (`docs/SPEC_PIPELINE.md §<Heading>`).
+  (`docs/SPEC_PIPELINE.md §<Heading>` or `docs/spec-pipeline/<stage>.md §<Heading>`).
 - `scripts/check-agent-doc-duplication.sh` fails when any `agents/*.md` line
   (normalized, >= 8 words, outside code fences and headings) duplicates a doc
   line, or when a section reference does not resolve to a `##`/`###` heading.

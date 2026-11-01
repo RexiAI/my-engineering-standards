@@ -372,7 +372,7 @@ Review hints for the Architect (WARNs recorded, not stops): the 17 design-princi
 
 ## Mutation score
 
-**skipped — mvp tier.** Per `docs/SPEC_PIPELINE.md §Conformance tiers`, mutation testing is a `production`-tier gate and is skipped at `mvp`. Additionally, the changed code is a shell check script (`scripts/check-stop-and-ask-matrix.sh`) plus markdown docs/agent prompts — no mutation tooling for shell exists in this repo, and none applies to markdown. No mutation tooling attempted.
+**skipped — mvp tier.** Per `docs/spec-pipeline/coder.md §Conformance tiers`, mutation testing is a `production`-tier gate and is skipped at `mvp`. Additionally, the changed code is a shell check script (`scripts/check-stop-and-ask-matrix.sh`) plus markdown docs/agent prompts — no mutation tooling for shell exists in this repo, and none applies to markdown. No mutation tooling attempted.
 
 ## Complexity summary (carried from the Refactorer, re-confirmed by the Verifier)
 

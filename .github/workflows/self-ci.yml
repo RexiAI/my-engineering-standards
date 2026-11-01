@@ -108,7 +108,7 @@ jobs:
       - name: Check bats assertions are not vacuous
         run: ./scripts/check-bats-assertions.sh
 
-      # Phase-2 loop mechanics gate (docs/SPEC_PIPELINE.md §Post-PR CI
+      # Phase-2 loop mechanics gate (docs/spec-pipeline/post-pr-loops.md §Post-PR CI
       # check-and-remediate loop (phase 2), spec 014): grep-assert the post-PR
       # CI check is wired into the pipeline prompts/docs. No continue-on-error.
       - name: Check post-PR CI loop mechanics
@@ -117,14 +117,14 @@ jobs:
       - name: Check skills specification
         run: ./scripts/check-skills.sh
 
-      # Finished-spec gate (docs/SPEC_PIPELINE.md §Archive in the PR): a spec
+      # Finished-spec gate (docs/spec-pipeline/pr-opener.md §Archive in the PR): a spec
       # with a 30-report.md must be archived (docs/changes/NNN-slug.md) inside
       # its PR. No continue-on-error: a finished spec that would land scratch
       # on main fails the job.
       - name: Check finished specs are archived
         run: ./scripts/check-specs-archived.sh
 
-      # Audit-trail gate (docs/SPEC_PIPELINE.md §Audit contract): only *finished*
+      # Audit-trail gate (docs/spec-pipeline/audit-contract.md §Audit contract): only *finished*
       # spec folders — those carrying a 30-report.md, the pipeline's finished
       # signal (same convention as the check-specs-archived.sh step above) —
       # must be complete (10-tasks.md, 20-acceptance/, 25-verification.md,
@@ -156,7 +156,7 @@ jobs:
       - name: make lint
         run: make lint
 
-      # Model-config gate (docs/SPEC_PIPELINE.md §Model configuration): the
+      # Model-config gate (docs/spec-pipeline/model-config.md §Model configuration): the
       # hermetic check + selftest need no binary; the runtime check proves real
       # {env:SPEC_*_MODEL} resolution with the pinned opencode release. No
       # continue-on-error: a loader/gate/wiring regression fails the job.

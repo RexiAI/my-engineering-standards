@@ -15,7 +15,7 @@ set -euo pipefail
 #                     --frontend nextjs,react,angular,ionic,react-native,static \
 #                     --registry ghcr.io
 #
-# Acceptance scenario coverage (spec 033, docs/SPEC_PIPELINE.md §Scenario format):
+# Acceptance scenario coverage (spec 033, docs/spec-pipeline/specifier.md §Scenario format):
 #   AC-033-31  usage line and invalid-flag error text updated together
 #   AC-033-32  --backend python accepted; emits the self-contained
 #              ci/templates/child-ci-python.yml as .github/workflows/ci-python.yml
@@ -25,7 +25,7 @@ set -euo pipefail
 #              (ci-angular.yml on GitHub, ci/gitlab/frontend/ci-angular.yml on
 #              GitLab) until a dedicated Ionic workflow exists
 #
-# Acceptance scenario coverage (spec 022, docs/SPEC_PIPELINE.md §Scenario format):
+# Acceptance scenario coverage (spec 022, docs/spec-pipeline/specifier.md §Scenario format):
 #   AC-022-01  docs/CI_CD.md §Release Process rationale — why the bootstrap does
 #              not auto-wire release (credentials repo-owned, release as an
 #              authority, opt-in cadence, parent-vs-child asymmetry)

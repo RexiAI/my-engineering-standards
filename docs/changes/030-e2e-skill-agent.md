@@ -751,7 +751,7 @@ new hits.
 Judgment: **faithful.** (1) The provider carve-out is not a test invention —
 it is the repo's own authoritative semantics: check-model-env.sh (which this
 same scenario requires to exit 0) defines a literal id as anything *outside*
-the provider block, and docs/SPEC_PIPELINE.md §PR review model wiring declares
+the provider block, and docs/spec-pipeline/model-config.md §PR review model wiring declares
 provider blocks operator config (ADR 0002/0003). Scanning opencode.json's
 provider region would contradict the scenario's own first clause. (2) The
 allow-list divergence from the scenario's literal carve-out list is forced:
@@ -1043,11 +1043,11 @@ Architect (stage 5a) may proceed.
 
 Per docs/SPEC_PIPELINE.md §Stop-and-Ask decision matrix ("Project type ambiguous / conformance tier undetectable → defer to the harness default (`mvp` tier)") and docs/CONFORMANCE_TIERS.md (tier not declared → project conforms to the `mvp` floor), the repo's tier is `mvp`.
 
-Per docs/SPEC_PIPELINE.md §Conformance tiers, the Architect's mutation-testing stage runs only at `production` and above. At `mvp`, it is skipped.
+Per docs/spec-pipeline/coder.md §Conformance tiers, the Architect's mutation-testing stage runs only at `production` and above. At `mvp`, it is skipped.
 
 ## Mutation testing
 
-Not run. `mvp` tier does not require mutation testing (docs/SPEC_PIPELINE.md §Conformance tiers; `make mutation` else-branch). Skip reason recorded as the mutation-score row above.
+Not run. `mvp` tier does not require mutation testing (docs/spec-pipeline/coder.md §Conformance tiers; `make mutation` else-branch). Skip reason recorded as the mutation-score row above.
 
 ## Final test status
 
@@ -1128,7 +1128,7 @@ Commit count: 6
 # Post-PR CI check (phase 2) — round 1 of max 3
 
 Date: 2026-10-14. Verifier run: **attempt 2, phase 2, round 1** (phase-2 counter
-independent of phase 1 per docs/SPEC_PIPELINE.md §Post-PR CI check-and-remediate
+independent of phase 1 per docs/spec-pipeline/post-pr-loops.md §Post-PR CI check-and-remediate
 loop; phase 1 closed at attempt 1 PASS with zero BLOCKs). PR #78 (draft),
 https://github.com/RexiAI/my-engineering-standards/pull/78, branch
 `spec/030-e2e-skill-agent`, head `7cad7ff2693ebd03dd5aa626ee50ed17137b0e7f`.
@@ -1442,7 +1442,7 @@ Fix verification: `892cece` is exactly round 1's recommended **option A** —
 the `t7_ids_clause` filter in `tests/AC-030-07.sh` extended with
 `|^specs/|^docs/changes/` path prefixes (directory prefixes carry no
 trailing-`:` anchor, as round 1 specified) plus the lifecycle-equivalence
-rationale comment citing SPEC_PIPELINE.md §Archive in the PR and the 028
+rationale comment citing docs/spec-pipeline/pr-opener.md §Archive in the PR and the 028
 phase-2 round-1 precedent (E3). No other file changed.
 
 ## Round-2 verdict: **PASS** — phase-2 CI loop closes
@@ -1546,7 +1546,7 @@ at: 2026-10-14T16:19:36Z
 ```
 
 (Plus 13 comment lines recording the lifecycle-equivalence rationale — both
-lifecycle states quote the patterns as their job; SPEC_PIPELINE.md §Archive in
+lifecycle states quote the patterns as their job; docs/spec-pipeline/pr-opener.md §Archive in
 the PR treats `specs/*/` and `docs/changes/*.md` as the same content in two
 states; directory prefixes carry no trailing-`:` anchor. Stat: 1 file,
 +14 −1.)
