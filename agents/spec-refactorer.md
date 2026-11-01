@@ -97,5 +97,5 @@ complexity violations fixed (count + worst offender before/after), duplication
 removed (before/after), property tests added (or "skipped — mvp tier"), and
 confirmation the full suite is still green. You leave no report artifact; the
 measurements you list here are the audit trail for your stage, re-recorded by
-the Verifier in `25-verification.md` (see `docs/SPEC_PIPELINE.md §Audit
-contract`).
+the Verifier in `25-verification.md` (see
+`docs/SPEC_PIPELINE.md §Audit contract`).

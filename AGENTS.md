@@ -66,16 +66,17 @@ Every guide is distilled from official upstream documentation at a pinned versio
 
 ## Model Configuration
 
-This repo's spec pipeline agents are configured to use models via `opencode.json` `{env:SPEC_*_MODEL}` references. Concrete default model ids are defined only in `config/model.local.env.example`; per-machine overrides live in the gitignored `config/model.local.env`. Docs intentionally carry no model or provider ids — switch models by editing your local override, never tracked files.
+This repo's spec pipeline agents are configured to use models via `opencode.json` `{env:SPEC_*_MODEL}` references. `config/model.local.env.example` ships placeholder values only — no provider or model is assumed. Real model ids live in the gitignored `config/model.local.env`; the pipeline does not run until you set them there. Docs intentionally carry no model or provider ids — switch models by editing your local override, never tracked files.
 
 Per-machine values arrive via the gitignored repo-root `.envrc` (direnv). It
-loads the committed `config/model.local.env.example` defaults, then the
+loads the committed `config/model.local.env.example` placeholders, then the
 gitignored `config/model.local.env` override, then the gitignored
 `config/agent.local.env` credentials — each via a `dotenv_if_exists` line
 (later lines win; a dotenv line clobbers any pre-existing value). One-time
 setup per machine: copy `templates/.envrc.example` to `.envrc`, run
-`direnv allow`, and (only to override a default) copy
-`config/model.local.env.example` to `config/model.local.env`. Switching a
+`direnv allow`, and (to make the pipeline runnable) copy
+`config/model.local.env.example` to `config/model.local.env` and fill in real
+model ids. Switching a
 model means editing `config/model.local.env` and restarting opencode — **no
 commit, no PR**.
 `scripts/check-model-env.sh` enforces structurally that `opencode.json` keeps no

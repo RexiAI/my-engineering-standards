@@ -66,7 +66,7 @@ by name —
   recipe `scripts/judgment-local-up.sh` ships (spike winner, Kev-4B on an
   RTX 5060 Ti 16GB).
 - **CLM** (`github.com/Contrastive-LM/CLM`, Apache-2.0): bi-encoder decision
-  model (Qwen3-8B encoder + a hot-swappable projection head). Two processes
+  model (8B encoder + a hot-swappable projection head). Two processes
   (a vLLM pooling encoder on :8090 and `clm-serve` on :8700); responses carry
   `billing_units` and an `X-CLM-Latency-Ms` header instead of a body latency.
 

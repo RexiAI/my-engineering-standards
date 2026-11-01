@@ -78,8 +78,8 @@ Write `specs/NNN-slug/30-report.md` (the contract is `docs/SPEC_PIPELINE.md
 - Complexity summary carried from the Refactorer.
 - Every equivalent mutant named and why it is un-killable.
 - Final test status (the full suite, one final time, and its result).
-- Evidence rows in the contract's block style (`docs/SPEC_PIPELINE.md §Audit
-  contract`): each machine-readable row (mutation score, final test status)
+- Evidence rows in the contract's block style 
+  (`docs/SPEC_PIPELINE.md §Audit contract`): each machine-readable row (mutation score, final test status)
   carries a `command:` line, an `exit:` code, and an `at:` timestamp in
   `YYYY-MM-DDTHH:MM:SSZ` (UTC) — never a prose paraphrase.
 - **Remediation record** (docs/SPEC_PIPELINE.md §Remediation budget): for each

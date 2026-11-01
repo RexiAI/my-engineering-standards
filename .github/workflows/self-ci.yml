@@ -254,6 +254,7 @@ jobs:
           bash scripts/check-code-principles.selftest.sh
           bash scripts/check-scenario-traceability.selftest.sh
           bash scripts/tests/gate-telemetry.selftest.sh
+          bash scripts/check-agent-doc-duplication.selftest.sh
 
       # Live scenario-traceability check (spec 027, AC-027-02): the selftest
       # above only proves the checker's logic against hermetic fixtures — it

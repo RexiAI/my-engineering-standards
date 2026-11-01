@@ -48,13 +48,41 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+      # Consumer repos carry this standards repo as a `.standards/` submodule,
+      # and many tests shell out to `.standards/scripts/*.sh`. actions/checkout's
+      # own `submodules:` option cannot be used here: consumers register the
+      # submodule with an SSH URL (git@github.com:…), which needs a deploy key
+      # the runner does not have. Rewriting the scp-style URL to an HTTPS URL
+      # carrying `github.token` lets `git submodule update` authenticate instead.
+      # `contents: read` (workflow-level) already covers that token. Consumers
+      # with no `.gitmodules` skip the step entirely.
+      - name: Checkout submodules
+        if: ${{ hashFiles('.gitmodules') != '' }}
+        run: |
+          git config --global url."https://x-access-token:${{ github.token }}@github.com/".insteadOf "git@github.com:"
+          git submodule update --init --recursive
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ inputs.node-version-file == '' && inputs.node-version || '' }}
           node-version-file: ${{ inputs.node-version-file }}
           cache: npm
       - run: npm ci
-      - run: npm test -- --passWithNoTests 2>/dev/null || npm run test:unit --if-present || npm test
+      # Deterministic selection, no `||` fallback chain: a failing suite must
+      # fail the job. The previous chain (`npm test … 2>/dev/null || npm run
+      # test:unit --if-present || npm test`) reported green with failing tests —
+      # the first branch's stderr was discarded, and the second exits 0 when the
+      # script does not exist. Exactly one script runs; if neither is defined,
+      # that is a configuration error, not a skip.
+      - name: Unit tests
+        run: |
+          if [ "$(npm pkg get scripts.test)" != "{}" ]; then
+            npm test -- --passWithNoTests
+          elif [ "$(npm pkg get scripts.test:unit)" != "{}" ]; then
+            npm run test:unit
+          else
+            echo "::error::No test script defined (expected scripts.test or scripts.test:unit)"
+            exit 1
+          fi
 
   lint:
     name: Lint & Format
@@ -77,13 +105,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+      # Same submodule init as unit-test (see the comment there): pact suites
+      # and their provider-verification helpers live beside the consumer tests
+      # and shell out to the `.standards/` scripts.
+      - name: Checkout submodules
+        if: ${{ hashFiles('.gitmodules') != '' }}
+        run: |
+          git config --global url."https://x-access-token:${{ github.token }}@github.com/".insteadOf "git@github.com:"
+          git submodule update --init --recursive
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ inputs.node-version-file == '' && inputs.node-version || '' }}
           node-version-file: ${{ inputs.node-version-file }}
           cache: npm
       - run: npm ci
-      - run: npx jest test/pact --ci --forceExit 2>/dev/null || npm run test:pact --if-present || echo "No contract tests configured"
+      # Explicit existence check, no `|| … || echo` chain: the previous form
+      # swallowed a genuine pact failure behind "No contract tests configured"
+      # (the `echo` branch always exits 0). Only a repo with *no* pact script
+      # and *no* pact suite/config skips; a suite that exists and fails, fails.
+      - name: Contract tests (optional stage — skipped only when no pact suite exists)
+        run: |
+          if [ "$(npm pkg get scripts.test:pact)" != "{}" ]; then
+            npm run test:pact
+          elif [ -d test/pact ] || compgen -G 'pact.config.*' > /dev/null; then
+            npx jest test/pact --ci --forceExit
+          else
+            echo "No contract tests configured (no scripts.test:pact, no test/pact suite, no pact.config.*) — skipping"
+          fi
         env:
           PACT_BROKER_URL: ${{ secrets.PACT_BROKER_URL }}
 
@@ -94,13 +142,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+      # Same submodule init as unit-test (see the comment there).
+      - name: Checkout submodules
+        if: ${{ hashFiles('.gitmodules') != '' }}
+        run: |
+          git config --global url."https://x-access-token:${{ github.token }}@github.com/".insteadOf "git@github.com:"
+          git submodule update --init --recursive
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ inputs.node-version-file == '' && inputs.node-version || '' }}
           node-version-file: ${{ inputs.node-version-file }}
           cache: npm
       - run: npm ci
-      - run: npm run test:integration --if-present
+      # `--if-present` is a legitimate optional-stage skip here (most consumers
+      # have no integration suite), but the step is named so the skip is visible
+      # in the job log instead of looking like a test run that passed.
+      - name: Integration tests (optional stage — skipped when no test:integration script)
+        run: npm run test:integration --if-present
 
   deploy:
     name: Publish Package

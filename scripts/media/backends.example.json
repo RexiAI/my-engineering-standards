@@ -1,0 +1,28 @@
+{
+  "_readme": "Media backend contract. The installer copies this file to ~/.config/opencode/media/backends.json when no config exists yet. Edit that copy (never this template) and replace every <angle-bracket> token with a real command and flag your machine provides. Each operation is an argv array; the media agents substitute the named placeholders and execute it through their permission layer. No provider is assumed by this repo.",
+  "_placeholders": [
+    "{prompt}", "{image}", "{image_2}", "{image_3}", "{last_frame}",
+    "{video}", "{out}", "{size}", "{count}", "{model}", "{text}",
+    "{voice}", "{audio}", "{language}", "{duration}", "{resolution}", "{task_id}"
+  ],
+  "image": {
+    "generate": ["<your-image-cli>", "generate", "--prompt", "{prompt}", "--out", "{out}"],
+    "edit": ["<your-image-cli>", "edit", "--image", "{image}", "--prompt", "{prompt}", "--out", "{out}"],
+    "describe": ["<your-image-cli>", "describe", "--image", "{image}", "--prompt", "describe this image"],
+    "notes": "Optional: document whether this backend accepts local paths or requires a URL for {image}."
+  },
+  "video": {
+    "generate": ["<your-video-cli>", "generate", "--prompt", "{prompt}", "--out", "{out}"],
+    "status": ["<your-video-cli>", "task", "get", "{task_id}"],
+    "edit": ["<your-video-cli>", "edit", "--video", "{video}", "--prompt", "{prompt}", "--out", "{out}"],
+    "notes": "Optional: add {image} / {last_frame} / {duration} / {resolution} entries your backend supports. Omit \"status\" only when generate blocks until the file exists."
+  },
+  "tts": {
+    "command": ["<your-tts-cli>", "--text", "{text}", "--voice", "{voice}", "--out", "{out}"],
+    "notes": "Optional: document how the user lists available voices."
+  },
+  "asr": {
+    "command": ["<your-asr-cli>", "--audio", "{audio}"],
+    "notes": "Optional: document supported formats, duration limits, and whether local paths or URLs are accepted."
+  }
+}

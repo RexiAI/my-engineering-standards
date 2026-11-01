@@ -37,6 +37,12 @@
 #               Without the flag the absence is tolerated: stage 5b runs this
 #               gate pre-push, before stage 5c can write the artifact.
 #
+# Spec 035 extends the folder contract with the autopilot decision artifact:
+#   AC-035-33 — `Autopilot: true` in 30-report.md without a non-empty
+#               45-decisions.md FAILs the folder
+#   AC-035-34 — `Autopilot: true` with a non-empty 45-decisions.md passes
+#   AC-035-35 — without the marker, 45-decisions.md is optional either way
+#
 # Evidence-block contract (AC-015-04): for each of the five runnable Verifier
 # checks — scenario traceability, full test suite, complexity gate,
 # design-principles gate, scenario-to-behavior spot check — 25-verification.md
@@ -133,6 +139,27 @@ check_design_if_present() { # check_design_if_present <specs_dir> <slug>
     else
       fail "$slug: 15-design.md is present but empty (AC-015-13)"
     fi
+  fi
+}
+
+# check_autopilot_decisions <specs_dir> <slug> — spec 035 Task 11: a report that
+# says `Autopilot: true` must be accompanied by a non-empty 45-decisions.md;
+# without the marker the artifact is optional and never affects the verdict.
+check_autopilot_decisions() {
+  local specs_dir="$1" slug="$2"
+  local report="$specs_dir/$slug/30-report.md"
+  local decisions="$specs_dir/$slug/45-decisions.md"
+  [ -f "$report" ] || return 0
+  if grep -qE '^Autopilot:[[:space:]]*true$' "$report"; then
+    if [ ! -f "$decisions" ] || [ ! -s "$decisions" ]; then
+      fail "$slug: 30-report.md says 'Autopilot: true' but 45-decisions.md is missing or empty (AC-035-33)"
+    else
+      pass "$slug: 45-decisions.md present and non-empty for an autopilot run (AC-035-34)"
+    fi
+  elif [ -f "$decisions" ]; then
+    pass "$slug: 45-decisions.md present; optional without an 'Autopilot: true' marker (AC-035-35)"
+  else
+    pass "$slug: 45-decisions.md optional without an 'Autopilot: true' marker (AC-035-35)"
   fi
 }
 
@@ -274,6 +301,7 @@ check_folder() { # check_folder <slug> <specs_dir> — returns 0/1
   check_nonempty_file "$specs_dir" "$slug" "30-report.md" "AC-015-12"
   check_design_if_present "$specs_dir" "$slug"
   check_deploy_artifact "$specs_dir" "$slug"
+  check_autopilot_decisions "$specs_dir" "$slug"
   if [ -s "$folder/25-verification.md" ]; then
     check_verifier_evidence "$specs_dir" "$slug"
   fi
@@ -446,6 +474,31 @@ selftest() {
   ' "$base/complete/25-verification.md" > "$base/missing-block/25-verification.md"
   expect_run 1 "AC-015-14 — a contract check with no evidence block exits non-zero" \
     "$base" "missing-block"
+
+  # spec 035: the 45-decisions.md contract.
+  cp -r "$base/complete" "$base/autopilot-no-decisions"
+  printf 'Autopilot: true\nAutopilot decisions: 0\n' >> "$base/autopilot-no-decisions/30-report.md"
+  expect_run 1 "AC-035-33 — 'Autopilot: true' without 45-decisions.md exits non-zero" \
+    "$base" "autopilot-no-decisions"
+
+  cp -r "$base/complete" "$base/autopilot-empty-decisions"
+  printf 'Autopilot: true\nAutopilot decisions: 0\n' >> "$base/autopilot-empty-decisions/30-report.md"
+  : > "$base/autopilot-empty-decisions/45-decisions.md"
+  expect_run 1 "AC-035-33 — 'Autopilot: true' with an empty 45-decisions.md exits non-zero" \
+    "$base" "autopilot-empty-decisions"
+
+  cp -r "$base/complete" "$base/autopilot-with-decisions"
+  printf 'Autopilot: true\nAutopilot decisions: 1\n' >> "$base/autopilot-with-decisions/30-report.md"
+  printf 'No autopilot decisions were required\n' > "$base/autopilot-with-decisions/45-decisions.md"
+  expect_run 0 "AC-035-34 — 'Autopilot: true' with a non-empty 45-decisions.md exits 0" \
+    "$base" "autopilot-with-decisions"
+
+  cp -r "$base/complete" "$base/autopilot-optional"
+  printf 'No autopilot decisions were required\n' > "$base/autopilot-optional/45-decisions.md"
+  expect_run 0 "AC-035-35 — 45-decisions.md is optional without the marker (present)" \
+    "$base" "autopilot-optional"
+  expect_run 0 "AC-035-35 — 45-decisions.md is optional without the marker (absent)" \
+    "$base" "complete"
 
   echo ""
   if [ "$SELFTEST_FAILURES" -eq 0 ]; then

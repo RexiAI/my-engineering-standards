@@ -1,3 +1,50 @@
+# [1.48.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.47.1...v1.48.0) (2026-11-01)
+
+
+### Features
+
+* media agents opt-in for child repos (040) ([#109](https://github.com/RexiAI/my-engineering-standards/issues/109)) ([9afdaef](https://github.com/RexiAI/my-engineering-standards/commit/9afdaef1d47eeb0710e7e4b883b78f86867ae91e)), closes [#106](https://github.com/RexiAI/my-engineering-standards/issues/106)
+
+## [1.47.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.47.0...v1.47.1) (2026-11-01)
+
+
+### Bug Fixes
+
+* **scripts:** avoid a SIGPIPE race in scenario traceability lookups ([#108](https://github.com/RexiAI/my-engineering-standards/issues/108)) ([ecbf44e](https://github.com/RexiAI/my-engineering-standards/commit/ecbf44e9bdefbdb59800fb32a8446959b3bb6dad))
+
+# [1.47.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.46.0...v1.47.0) (2026-10-30)
+
+
+### Features
+
+* single source of truth for pipeline orchestrator rules (036) ([#107](https://github.com/RexiAI/my-engineering-standards/issues/107)) ([75d2780](https://github.com/RexiAI/my-engineering-standards/commit/75d2780d326edda836b95b80c46f2b909b75dbd8))
+
+# [1.46.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.45.1...v1.46.0) (2026-10-28)
+
+
+### Features
+
+* **spec 035:** child-project standards updater with PR progression ([#104](https://github.com/RexiAI/my-engineering-standards/issues/104)) ([6348482](https://github.com/RexiAI/my-engineering-standards/commit/6348482743017bd4295d57d6f937a9cab9616f77))
+
+## [1.45.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.45.0...v1.45.1) (2026-10-26)
+
+
+### Bug Fixes
+
+* **ci:** stop masking test failures and unblock submodule tests in ci-node.yml; anchor the archive gate's exception ([#105](https://github.com/RexiAI/my-engineering-standards/issues/105)) ([a3fb047](https://github.com/RexiAI/my-engineering-standards/commit/a3fb0478de4cec04ffd8becffdad94904056bf07))
+
+# [1.45.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.44.0...v1.45.0) (2026-10-26)
+
+
+### Bug Fixes
+
+* clear pre-existing complexity FAIL, restore exec bit, correct README envrc path ([#103](https://github.com/RexiAI/my-engineering-standards/issues/103)) ([c03c0a4](https://github.com/RexiAI/my-engineering-standards/commit/c03c0a49848679106f9bf332bb995ba49660448e))
+
+
+### Features
+
+* autopilot mode for the spec pipeline (035) ([#102](https://github.com/RexiAI/my-engineering-standards/issues/102)) ([4d2dbfb](https://github.com/RexiAI/my-engineering-standards/commit/4d2dbfbd55c4eee0b1c99acbed654e9cf5458cc9))
+
 # [1.44.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.43.0...v1.44.0) (2026-10-26)
 
 

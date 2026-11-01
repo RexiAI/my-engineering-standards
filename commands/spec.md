@@ -11,5 +11,16 @@ next sequence number, choose a short slug from the content, create
 `specs/NNN-slug/00-informal.md` with that content verbatim, then proceed.
 
 Delegate to the `spec-specifier` subagent. When it finishes, print the paths to
-`10-tasks.md` and `20-acceptance/`, and any open questions it raised. Then stop —
-do not run `/build` automatically. The human reviews these files before continuing.
+`10-tasks.md` and `20-acceptance/`, and any open questions it raised. When it
+prints `normal`, stop — do not run `/build` automatically. The human reviews these
+files before continuing.
+
+# Autopilot detection
+
+Before treating `$ARGUMENTS` as a slug, path, or informal-spec content, run
+`scripts/autopilot-trigger.sh $ARGUMENTS`. When it prints `autopilot`, remove the
+literal token from `$ARGUMENTS` and continue: do not stop after stage 1 for human
+review — continue the whole pipeline exactly as `/build` does, with autopilot on
+(`docs/SPEC_PIPELINE.md §Autopilot mode`). When it prints `normal`, behavior is
+unchanged and the human review gate stays. Detection is delegated to the script;
+do not re-implement the token match here.

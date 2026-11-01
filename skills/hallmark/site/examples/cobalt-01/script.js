@@ -9,20 +9,25 @@
 
   var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  /* ─── Nav scroll-frost ─── */
-  var nav = document.getElementById('nav');
-  if (nav) {
+  function setupNavFrost() {
+    var nav = document.getElementById('nav');
+    if (!nav) return;
     var ticking = false;
-    function onScroll() { nav.classList.toggle('is-scrolled', window.scrollY > 16); ticking = false; }
+    function onScroll() {
+      nav.classList.toggle('is-scrolled', window.scrollY > 16);
+      ticking = false;
+    }
     window.addEventListener('scroll', function () {
-      if (!ticking) { requestAnimationFrame(onScroll); ticking = true; }
+      if (ticking) return;
+      requestAnimationFrame(onScroll);
+      ticking = true;
     }, { passive: true });
     onScroll();
   }
 
-  /* ─── Copy install command ─── */
-  var copyBtn = document.querySelector('.strip__copy');
-  if (copyBtn && navigator.clipboard) {
+  function setupCopy() {
+    var copyBtn = document.querySelector('.strip__copy');
+    if (!copyBtn || !navigator.clipboard) return;
     copyBtn.addEventListener('click', function () {
       navigator.clipboard.writeText('npm i @distil/sdk').then(function () {
         copyBtn.textContent = 'Copied';
@@ -35,58 +40,71 @@
     });
   }
 
-  /* ─── Reduced motion / no IO: reveal everything, fill the typed line ─── */
-  function fillTyped() {
+  function revealAll() {
+    document.querySelectorAll('.reveal').forEach(function (el) {
+      el.classList.add('is-inview');
+    });
     var typed = document.querySelector('.type');
     if (typed && typed.dataset.type) typed.textContent = typed.dataset.type;
   }
 
-  if (reduced || !('IntersectionObserver' in window)) {
-    document.querySelectorAll('.reveal').forEach(function (el) { el.classList.add('is-inview'); });
-    fillTyped();
-    return;
+  function observeSections() {
+    var sections = document.querySelectorAll('main > section, .foot');
+    var io = new IntersectionObserver(function (entries, obs) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        entry.target.querySelectorAll('.reveal').forEach(function (el) {
+          el.classList.add('is-inview');
+        });
+        obs.unobserve(entry.target);
+      });
+    }, { rootMargin: '0px 0px -10% 0px', threshold: 0.08 });
+    sections.forEach(function (s) {
+      if (s.querySelector('.reveal')) io.observe(s);
+    });
   }
 
-  /* ─── Section-grouped reveals ─── */
-  var sections = document.querySelectorAll('main > section, .foot');
-  var io = new IntersectionObserver(function (entries, obs) {
-    entries.forEach(function (entry) {
-      if (!entry.isIntersecting) return;
-      entry.target.querySelectorAll('.reveal').forEach(function (el) { el.classList.add('is-inview'); });
-      obs.unobserve(entry.target);
-    });
-  }, { rootMargin: '0px 0px -10% 0px', threshold: 0.08 });
-  sections.forEach(function (s) { if (s.querySelector('.reveal')) io.observe(s); });
+  function setupReveals() {
+    if (reduced || !('IntersectionObserver' in window)) {
+      revealAll();
+      return true;
+    }
+    observeSections();
+    return false;
+  }
 
-  /* ─── Hero: type ONE response line in once, then static ─── */
-  var typed = document.querySelector('.type');
-  var cursor = document.querySelector('.c-cursor');
-  if (typed && typed.dataset.type) {
+  function typeOnce(typed, cursor, full) {
+    if (cursor) cursor.classList.add('is-blinking');
+    var i = 0;
+    var stepMs = Math.max(12, Math.round(600 / full.length));
+    var timer = setInterval(function () {
+      i += 1;
+      typed.textContent = full.slice(0, i);
+      if (i >= full.length) clearInterval(timer);
+    }, stepMs);
+  }
+
+  function setupTyping() {
+    var typed = document.querySelector('.type');
+    var cursor = document.querySelector('.c-cursor');
+    if (!typed || !typed.dataset.type) return;
     var full = typed.dataset.type;
     var heroDemo = document.querySelector('.demo');
-
-    function runType() {
-      if (cursor) cursor.classList.add('is-blinking');
-      var i = 0;
-      var total = 600;                                  // ~600ms total
-      var stepMs = Math.max(12, Math.round(total / full.length));
-      var timer = setInterval(function () {
-        i += 1;
-        typed.textContent = full.slice(0, i);
-        if (i >= full.length) { clearInterval(timer); }
-      }, stepMs);
-    }
-
+    function run() { typeOnce(typed, cursor, full); }
+    if (!heroDemo || !('IntersectionObserver' in window)) { run(); return; }
     var startObs = new IntersectionObserver(function (entries, obs) {
       entries.forEach(function (e) {
         if (!e.isIntersecting) return;
-        setTimeout(runType, 380);                       // begin after the reveal settles
+        setTimeout(run, 380);
         obs.disconnect();
       });
     }, { threshold: 0.4 });
-
-    if (heroDemo) startObs.observe(heroDemo); else runType();
+    startObs.observe(heroDemo);
   }
+
+  setupNavFrost();
+  setupCopy();
+  if (!setupReveals()) setupTyping();
 })();
 
 /* ─── Command palette · ⌘K / Ctrl+K · Cobalt's signature interactive feature ─── */
@@ -183,43 +201,42 @@
     else close();
   }
 
-  /* trigger click */
+  function bindGlobalKeys() {
+    document.addEventListener('keydown', function (e) {
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        toggle();
+      }
+    });
+  }
+
+  function bindPaletteKeys() {
+    palette.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+      if (e.key === 'ArrowDown') { e.preventDefault(); setSelected(selected + 1); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setSelected(selected - 1); return; }
+      if (e.key === 'Enter') { e.preventDefault(); activate(); return; }
+    });
+  }
+
+  function bindRows() {
+    rows.forEach(function (row) {
+      row.addEventListener('mousemove', function () {
+        var i = visibleRows().indexOf(row);
+        if (i !== -1 && i !== selected) setSelected(i);
+      });
+      row.addEventListener('click', function () {
+        var i = visibleRows().indexOf(row);
+        if (i !== -1) selected = i;
+        activate();
+      });
+    });
+  }
+
   trigger.addEventListener('click', open);
-
-  /* backdrop click closes */
   if (backdrop) backdrop.addEventListener('click', close);
-
-  /* global ⌘K / Ctrl+K toggles */
-  document.addEventListener('keydown', function (e) {
-    if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
-      e.preventDefault();
-      toggle();
-    }
-  });
-
-  /* within the palette: Esc, arrows, Enter */
-  palette.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
-    if (e.key === 'ArrowDown') { e.preventDefault(); setSelected(selected + 1); return; }
-    if (e.key === 'ArrowUp') { e.preventDefault(); setSelected(selected - 1); return; }
-    if (e.key === 'Enter') { e.preventDefault(); activate(); return; }
-  });
-
-  /* type to filter */
+  bindGlobalKeys();
+  bindPaletteKeys();
   input.addEventListener('input', function () { filter(input.value); });
-
-  /* pointer over a row selects it; click activates */
-  rows.forEach(function (row) {
-    row.addEventListener('mousemove', function () {
-      var vis = visibleRows();
-      var i = vis.indexOf(row);
-      if (i !== -1 && i !== selected) setSelected(i);
-    });
-    row.addEventListener('click', function () {
-      var vis = visibleRows();
-      var i = vis.indexOf(row);
-      if (i !== -1) { selected = i; }
-      activate();
-    });
-  });
+  bindRows();
 })();

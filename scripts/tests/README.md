@@ -24,10 +24,17 @@ nothing would be worse than no test.
 | `init-ci.sh` | Writes CI workflow files into the target repo and prompts interactively for the CI platform. Mutating + interactive. |
 | `init-deploy.sh` | Writes Kamal/Dokku/SSH deploy config into the target repo and expects a real VPS host/port. Mutating + needs remote infrastructure. |
 | `install-opencode.sh` | Downloads a pinned opencode release from the network into `/tmp/opencode-bin`. Network-dependent. |
-| `update-submodules.sh` | Runs `git submodule update --remote` across a list of sibling repos — network fetch plus mutation of repos outside this tree. |
 | `ci-smoke-test.sh` | Runs what CI runs (typecheck, lint, build, E2E) for the *enclosing project*; phases 2–3 need a JS/RN toolchain and can take minutes. Not hermetic. |
 | `model-env.runtime-check.sh` | Downloads the pinned opencode binary and runs real `{env:SPEC_*_MODEL}` resolution against it. Network-dependent. |
 | `validate-export-bundle.sh` | Validates an Expo web export for a React Native project; exits 2 ("skipped") in this repo and needs a full RN toolchain to reach any real assertion. |
+
+## Characterized (spec 035)
+
+`update-submodules.sh` is characterized end-to-end by
+`ac-035-update-submodules.bats`: local `git init` fixtures with `file://`
+remotes, a stub `gh` for PR creation, and `--dry-run` for the no-network
+paths. The suite covers discovery, eligibility, dirty/diverged guards, the
+local and PR-progression paths, failure exit codes, and dry-run plan output.
 
 Partial coverage is recorded where it applies:
 
@@ -41,8 +48,9 @@ Partial coverage is recorded where it applies:
 
 ## Scenario IDs
 
-AC IDs appear only on tests that cover an archived acceptance scenario from
-`docs/changes/001-tdd-scaffolding-both-tracks.md`. Tests covering behavior
-outside that scenario list are named descriptively with no `AC-` prefix —
-inventing an AC ID for a scenario that does not exist would defeat
-`scripts/check-scenario-traceability.sh`.
+AC IDs appear only on tests that cover a real acceptance scenario — either an
+archived one from `docs/changes/001-tdd-scaffolding-both-tracks.md` or a live
+one under `specs/*/20-acceptance/` (e.g. `ac-035-update-submodules.bats`).
+Tests covering behavior outside a scenario list are named descriptively with no
+`AC-` prefix — inventing an AC ID for a scenario that does not exist would
+defeat `scripts/check-scenario-traceability.sh`.

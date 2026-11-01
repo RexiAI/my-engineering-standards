@@ -120,7 +120,7 @@ frontend tasks. Note which tasks are out of scope at the top of `15-design.md`.
 
 Taste and usability are different failure modes. The `design-taste-frontend`
 skill covers taste; the Laws of UX (lawsofux.com) cover usability. Every
-frontend task must be checked against them (ADR 0015).
+frontend task must be checked against them (ADR 0019).
 
 **The rule that makes this enforcement rather than ritual:** every law you cite
 must carry a concrete consequence for the implementation **and** a way for a
@@ -219,7 +219,7 @@ Write exactly one file. Structure:
 
 ## Design Laws
 
-Required (ADR 0015). One row per law, per task where the application differs.
+Required (ADR 0019). One row per law, per task where the application differs.
 A law without a consequence and a verification method does not belong here.
 
 | Task | Law | Applies to | Concrete consequence | How a reviewer checks it |
@@ -258,13 +258,22 @@ Do not touch `00-informal.md`, `10-tasks.md`, or `20-acceptance/`.
 - Write only `specs/NNN-slug/15-design.md` and nothing else.
 - Do not commit or push. The pipeline orchestrator reads your output and stops for
   human review.
-- **Design laws (ADR 0015):** every cited law needs a concrete consequence and a
+- **Design laws (ADR 0019):** every cited law needs a concrete consequence and a
   verification method; every core-set law must be applied or explicitly excluded
   with a reason; a deliberate violation needs a reason and a compensating control.
   A law citation used as decoration is an artifact defect, not a preference.
 - If the brief is genuinely ambiguous on the frontend surface (e.g. spec says "build a
   tool" but does not specify web vs CLI), ask one question per the skill's Section 0.C
   discipline — exactly one, not a dump — then stop and wait. Do not guess.
+
+# Autopilot mode
+
+When autopilot is on (`docs/SPEC_PIPELINE.md §Autopilot mode`), the ask above is
+not a stop. Resolve the applicability call per the `## Autopilot mode` disposition
+table — choose the most conservative reversible option, record the decision in
+`specs/NNN-slug/45-decisions.md`, and continue. Never call the question tool and
+never wait for human input in autopilot; the human review gate is removed only by
+autopilot.
 
 # Output (end of turn)
 

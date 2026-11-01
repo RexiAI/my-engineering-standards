@@ -134,6 +134,19 @@ while IFS= read -r src; do
   done < <(grep -oP 'language-specific/[a-z]+/SKILL\.md' "$src" 2>/dev/null | sort -u || true)
 done < <(find "$ROOT/agents" -maxdepth 1 -name '*.md' -type f 2>/dev/null || true)
 
+# ── 5. Agent/doc single source (spec 036) ────────────────────────────────────
+# Skipped when ROOT has no docs/SPEC_PIPELINE.md (isolated commands/+agents/
+# fixtures used by older acceptance tests).
+if [ -f "$ROOT/docs/SPEC_PIPELINE.md" ] && [ -d "$ROOT/agents" ]; then
+  echo "Checking agents/ for rules duplicated from docs/SPEC_PIPELINE.md..."
+  DUP_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/check-agent-doc-duplication.sh"
+  if ! dup_out="$(bash "$DUP_SCRIPT" "$ROOT" 2>&1)"; then
+    while IFS= read -r line; do
+      [ -n "$line" ] && broken "${line%%: *}" "${line#*: }"
+    done <<< "$dup_out"
+  fi
+fi
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo ""
 if [ "$BROKEN" -eq 0 ]; then

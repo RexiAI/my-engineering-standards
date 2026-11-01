@@ -255,7 +255,7 @@ explicit_category_selected() {
 all_skip_reason() {
   local i="$1"
   if [ "${CAT_ACTIONS[$i]}" = "information" ]; then
-    printf 'informational only — media agents need external provider credentials'
+    printf 'informational only — no files are written for this capability'
     return 0
   fi
   if is_deploy_excluded "$i"; then

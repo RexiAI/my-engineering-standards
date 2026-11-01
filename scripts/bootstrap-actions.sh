@@ -272,6 +272,46 @@ act_opencode_wiring() { # symlink by default, real copies with --copy-agents
   done
 }
 
+# ── media agent family (opt-in, ADR 0018) ─────
+# The family lives in `agents-optional/`, which the default `.opencode/agents`
+# wiring never reaches, and `.opencode/agents` is a symlink into `.standards/`
+# so no file can be dropped inside it. Loading the family per repo therefore
+# means naming it in the child's own opencode.json: one `agent.*` entry per
+# agent whose prompt is a `{file:…}` reference into .standards/agents-optional/.
+act_media_agents() { # per-repo opt-in: agent.* entries in the child opencode.json
+  local entry
+  for entry in ${CAT_FILES[$1]}; do
+    track_file_entry "$entry"
+    merge_media_agent_entries "$ENTRY_DEST" "$entry"
+  done
+}
+
+merge_media_agent_entries() { # DEST ENTRY
+  if ! command -v node >/dev/null 2>&1; then
+    media_agents_manual_hint "node not found — add the four media agent entries to $2 manually"
+    return 0
+  fi
+  local rc=0
+  node "$STANDARDS_DIR/scripts/media/merge-agent-entries.mjs" "$1" || rc=$?
+  report_media_merge "$rc" "$2"
+}
+
+report_media_merge() { # RC ENTRY — merge-agent-entries.mjs exit-code contract
+  case "$1" in
+    0)
+      ACT_CREATED=$((ACT_CREATED + 1))
+      echo "  INFO: media agent entries added to $2 — restart opencode to load them from .standards/agents-optional/"
+      ;;
+    1) : ;; # every entry was already there: nothing written this run
+    2) media_agents_manual_hint "$2 is not plain JSON — add the four media agent entries manually" ;;
+    *) media_agents_manual_hint "could not update $2 (node exited $1) — add the entries manually" ;;
+  esac
+}
+
+media_agents_manual_hint() { # MESSAGE — the remediation hint every media failure shares
+  echo "  WARN: $1 (see docs/MEDIA_AGENTS.md)"
+}
+
 # Accounts for the {ci} placeholder: init-ci.sh writes those files, not this
 # verb, but they are part of the row's write plan.
 ci_plan_detail() {
@@ -384,7 +424,7 @@ report_init_ci_entries() {
 run_capability() { # run_capability INDEX
   local i="$1" id="${CAT_IDS[$1]}"
   if [ "${CAT_ACTIONS[$i]}" = "information" ]; then
-    refused "informational only — media agents need external provider credentials" "$id"
+    refused "informational only — no files are written for this capability" "$id"
     return 0
   fi
   ACT_APPLIED=0

@@ -9,7 +9,9 @@
 # finished spec is still sitting in specs/ with no docs/changes/NNN-slug.md
 # archive — i.e. the merge would land pipeline scratch on main. Exception
 # (spec 031): a 40-deploy.md recording phase-3 budget exhaustion defers the
-# archive to the human and is not a gate failure.
+# archive to the human and is not a gate failure. The exception requires a
+# line-start marker line AND a line-start `Verdict: ESCALATED` (prose that
+# merely mentions the marker must not satisfy it).
 #
 # Uses git ls-files (index-aware) so untracked local scratch under specs/ is
 # not policed; only what would actually reach the merge is checked.
@@ -38,12 +40,21 @@ while IFS= read -r report; do
     continue
   fi
   # Spec 031 exception: a spec whose 40-deploy.md records phase-3 budget
-  # exhaustion (marker text or Verdict: ESCALATED) was STOPPED before stage 5d
-  # by design — the pipeline halted and escalated to the human, so non-archival
-  # is the correct end state, not a violation. Index-aware (git show :path),
-  # same source of truth as the archive check itself.
+  # exhaustion was STOPPED before stage 5d by design — the pipeline halted and
+  # escalated to the human, so non-archival is the correct end state, not a
+  # violation. Index-aware (git show :path), same source of truth as the
+  # archive check itself.
+  #
+  # Matched at LINE START only (leading whitespace and a markdown bullet are
+  # allowed), and only as a pair: a marker line plus a Verdict: ESCALATED line.
+  # A spec whose 40-deploy.md merely *mentions* the marker in prose — e.g.
+  # explaining that no such marker applies — used to satisfy the exception and
+  # silently skip archiving. Line-anchoring makes prose unable to claim it.
   deploy_content="$(git show ":specs/$slug/40-deploy.md" 2>/dev/null || true)"
-  if printf '%s' "$deploy_content" | grep -qE 'Phase-3 budget exhausted|Verdict:[[:space:]]*ESCALATED'; then
+  marker_re='^[[:space:]]*([-*][[:space:]]+)?(\*\*)?Phase-3 budget exhausted'
+  escalated_re='^[[:space:]]*([-*][[:space:]]+)?(\*\*)?Verdict:[[:space:]]*ESCALATED(\*\*)?([[:space:]]|$)'
+  if printf '%s\n' "$deploy_content" | grep -qE "$marker_re" &&
+    printf '%s\n' "$deploy_content" | grep -qE "$escalated_re"; then
     pass "  [OK] $slug phase-3 budget exhausted (40-deploy.md records escalation) — archival deferred to the human"
     continue
   fi
