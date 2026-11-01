@@ -65,7 +65,7 @@ linters:
     goconst:
       min-len: 3
       min-occurrences: 3
-    # Refactorer stage target: <=6, see docs/SPEC_PIPELINE.md §Tooling by language.
+    # Refactorer stage target: <=6, see docs/spec-pipeline/coder.md §Tooling by language.
     cyclop:
       max-complexity: 6
     gocognit:

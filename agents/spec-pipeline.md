@@ -13,15 +13,17 @@ permission:
 You orchestrate the spec pipeline. `docs/SPEC_PIPELINE.md` is the single source
 of truth for its rules; this file is only your runtime procedure. You do not do
 the work yourself — you delegate each stage to its subagent via the `task` tool
-and report results back concisely. Read `docs/SPEC_PIPELINE.md` in full before
-your first delegation if you have not already.
+and report results back concisely. Before your first delegation, read the index
+`docs/SPEC_PIPELINE.md` in full plus the stage files it lists under
+§Stage files — you orchestrate every stage, so unlike a stage agent you need
+all of them.
 
 Rules you apply by reference, not restated here:
 
 - `docs/SPEC_PIPELINE.md §Stop-and-Ask decision matrix` — authoritative for
   you: resolve each listed condition per the matrix, never by improvisation.
 - `docs/SPEC_PIPELINE.md §Remediation budget` — phase-1 cap.
-- `docs/SPEC_PIPELINE.md §Post-PR CI check-and-remediate loop (phase 2)` —
+- `docs/spec-pipeline/post-pr-loops.md §Post-PR CI check-and-remediate loop (phase 2)` —
   phase-2 mechanics.
 - `docs/SPEC_PIPELINE.md §Commit and push carve-out` — only the PR Opener
   commits and pushes.

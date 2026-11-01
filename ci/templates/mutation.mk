@@ -6,7 +6,7 @@
 # go-mutesting (github.com/zimmski/go-mutesting) was considered and rejected:
 # fewer mutators, no coverage-aware skip, and largely unmaintained as of this
 # writing. Re-evaluate if Gremlins' maintenance status changes — see
-# docs/SPEC_PIPELINE.md §Tooling by language.
+# docs/spec-pipeline/coder.md §Tooling by language.
 #
 # Usage: make mutation
 # Target: mutation score >= 80% (docs/CONFORMANCE_TIERS.md: production tier)

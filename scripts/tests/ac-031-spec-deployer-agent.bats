@@ -2,8 +2,8 @@
 # ac-031-spec-deployer-agent.bats — acceptance tests for spec 031 Task 1
 # (specs/031-vercel-deploy-lane/20-acceptance/AC-031-spec-deployer-agent.md).
 # Carrier pattern: this repo's scripts are tested by bats (docs/TESTING.md
-# Track B); scenario IDs live in the @test names per docs/SPEC_PIPELINE.md
-# §Scenario format so check-scenario-traceability.sh check 1 traces them.
+# Track B); scenario IDs live in the @test names per
+# docs/spec-pipeline/specifier.md §Scenario format so check-scenario-traceability.sh check 1 traces them.
 
 load test_helper
 bats_require_minimum_version 1.5.0

@@ -109,5 +109,5 @@ teardown() { teardown_tmpdir; }
 }
 
 @test "unit — SPEC_PIPELINE.md carries the production-verification section (rewritten after-merge contract)" {
-  grep -qF '## Production deploy verification (post-merge)' "$REPO_ROOT/docs/SPEC_PIPELINE.md"
+  grep -qF '## Production deploy verification (post-merge)' "$REPO_ROOT/docs/spec-pipeline/post-pr-loops.md"
 }

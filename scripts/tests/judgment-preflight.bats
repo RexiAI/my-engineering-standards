@@ -16,7 +16,10 @@ STATUS="$REPO_ROOT/scripts/judgment-status.sh"
 PIPE_AGENT="$REPO_ROOT/agents/spec-pipeline.md"
 SPEC_UX="$REPO_ROOT/agents/spec-ux.md"
 CI_TRIAGE="$REPO_ROOT/skills/ci-triage/SKILL.md"
-PIPE_DOC="$REPO_ROOT/docs/SPEC_PIPELINE.md"
+# spec 037: the index keeps the cross-cutting rules; model config and the
+# typed-judgment layer live in their own shared files.
+PIPE_DOC="$REPO_ROOT/docs/spec-pipeline/model-config.md"
+TYPED_DOC="$REPO_ROOT/docs/spec-pipeline/typed-judgment.md"
 ADR_INDEX="$REPO_ROOT/docs/adr/README.md"
 ADR_034="$REPO_ROOT/docs/adr/0014-judgment-consumer-contract-fail-open-preflight.md"
 
@@ -298,7 +301,7 @@ pid_file() {
 
 @test "AC-034-30: typed-judgment layer documents the contract and the new surface" {
   local section
-  section="$(awk '/^## Typed-judgment layer/{f=1;next} /^## /{f=0} f' "$PIPE_DOC")"
+  section="$(awk '/^## Typed-judgment layer/{f=1;next} /^## /{f=0} f' "$TYPED_DOC")"
   printf '%s\n' "$section" | grep -q 'scripts/judgment-preflight\.sh'
   printf '%s\n' "$section" | grep -q -- '--max-state-bytes'
   printf '%s\n' "$section" | grep -q '12 KB'

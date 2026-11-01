@@ -19,7 +19,7 @@ Want scaffold for specific feature (Java/Go/JS) or bootstrap TDD on existing scr
 >   Track B — Bootstrap TDD on existing `scripts/*.sh` via bats/shellspec: retroactively add test harness + initial characterization tests for current shell scripts (`check-code-principles.sh`, `check-*.sh`, `detect-saga-outbox.sh`, etc.).
 
 ## Conformance tier
-`mvp` (this repo). Mutation and property testing are `production`-tier gates per `docs/CONFORMANCE_TIERS.md` and `docs/SPEC_PIPELINE.md §Conformance tiers`, so the scaffold must include them for child repos that declare `production` but the Verifier in this repo skips them — scaffold is tier-aware, not tier-gated.
+`mvp` (this repo). Mutation and property testing are `production`-tier gates per `docs/CONFORMANCE_TIERS.md` and `docs/spec-pipeline/coder.md §Conformance tiers`, so the scaffold must include them for child repos that declare `production` but the Verifier in this repo skips them — scaffold is tier-aware, not tier-gated.
 
 ---
 
@@ -512,7 +512,7 @@ Verifier run completed; record appended via scripts/record-gate-run.sh (see belo
 
 > Spec: `specs/001-tdd-scaffolding-both-tracks`
 > Stage: 5a Mutation Runner per `docs/SPEC_PIPELINE.md` and `agents/spec-mutation-runner.md`
-> Conformance tier: `mvp` (this repo) — mutation testing is `production`-tier per `docs/CONFORMANCE_TIERS.md` and `docs/SPEC_PIPELINE.md §Conformance tiers`
+> Conformance tier: `mvp` (this repo) — mutation testing is `production`-tier per `docs/CONFORMANCE_TIERS.md` and `docs/spec-pipeline/coder.md §Conformance tiers`
 
 ## Verdict
 
@@ -527,7 +527,7 @@ Verifier run completed; record appended via scripts/record-gate-run.sh (see belo
 
 ## Mutation
 
-Per `docs/SPEC_PIPELINE.md §Conformance tiers` and `docs/CONFORMANCE_TIERS.md`, mutation testing (PiTest / Gremlins / Stryker) is a `production`-tier gate. This repo declares `mvp`, so the Mutation Runner **skips** the mutation run and instead verifies that the scaffold templates contain the production-tier mutation configs at the required 80% threshold.
+Per `docs/spec-pipeline/coder.md §Conformance tiers` and `docs/CONFORMANCE_TIERS.md`, mutation testing (PiTest / Gremlins / Stryker) is a `production`-tier gate. This repo declares `mvp`, so the Mutation Runner **skips** the mutation run and instead verifies that the scaffold templates contain the production-tier mutation configs at the required 80% threshold.
 
 Templated threshold evidence:
 

@@ -59,7 +59,7 @@ it stands today.
   prose instructions, the table records the frontmatter-granted tier and notes the
   policy override.
 - **Model authority:** `opencode.json` `agent.<name>.model` is what takes effect;
-  per `docs/SPEC_PIPELINE.md §Model configuration`, shipped agents ship *without* a
+  per `docs/spec-pipeline/model-config.md §Model configuration`, shipped agents ship *without* a
   `model:` key precisely so `opencode.json` wins. The `AGENTS.md` table is a
   human-readable mirror (and adds the fallback-chain column, which only lives
   there). `docs/SPEC_PIPELINE.md:227-234` documents the strong/weak model split.
@@ -181,7 +181,7 @@ Populate the `## Model-Assignment Discipline` section. It must state, in prose:
 3. **Same-commit rule:** change a model only by editing `opencode.json` AND the
    `AGENTS.md` mirror table in the same commit. Never edit one without the other.
 4. **Frontmatter rule:** agent files must not pin a `model:` key (per
-   `docs/SPEC_PIPELINE.md §Model configuration` — a pinned `.md` model silently
+   `docs/spec-pipeline/model-config.md §Model configuration` — a pinned `.md` model silently
    overrides `opencode.json`). If a child repo pins a model in frontmatter anyway,
    that edit must land in the same commit as the mirror table edit.
 5. **Conformance note:** the section must close with an explicit conformance
@@ -618,7 +618,7 @@ design-principles gate, scenario spot-checks, mvp tier confirmed).
 
 **skipped — `mvp` tier**
 
-Per `docs/SPEC_PIPELINE.md §Conformance tiers`, mutation testing is a
+Per `docs/spec-pipeline/coder.md §Conformance tiers`, mutation testing is a
 `production`-tier gate; at `mvp` the Architect row is `skip`. The repo is `mvp`
 (no `AGENTS_*.md`, confirmed by the Verifier's auto-detection: `(tier: mvp)`).
 No mutation tooling attempted — the changed code is a shell check script plus

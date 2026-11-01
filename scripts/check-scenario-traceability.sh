@@ -48,8 +48,8 @@
 #       value)
 #
 # Standards reference:
-#   docs/SPEC_PIPELINE.md §Scenario format
-#   docs/SPEC_PIPELINE.md §Why no scenario mutation
+#   docs/spec-pipeline/specifier.md §Scenario format
+#   docs/spec-pipeline/rationale.md §Why no scenario mutation
 #   agents/spec-verifier.md (script-is-authority / BLOCK discipline)
 set -euo pipefail
 
@@ -174,7 +174,7 @@ fi
 # ── Collect scenario IDs from archived one-pagers (docs/changes/*.md) ────────
 # archive-spec.sh copies the '## AC-NNN-NN' headings verbatim into the archive,
 # so a merged spec's IDs stay resolvable after specs/NNN-slug/ is deleted
-# (docs/SPEC_PIPELINE.md §Archive in the PR). Check 2 only — an archived spec
+# (docs/spec-pipeline/pr-opener.md §Archive in the PR). Check 2 only — an archived spec
 # must not re-demand a test via check 1.
 ARCHIVED_IDS=""
 if [ -d "$ARCHIVE_DIR" ]; then

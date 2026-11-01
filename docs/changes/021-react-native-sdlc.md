@@ -750,7 +750,7 @@ This repo is the standards parent — it ships CI templates, shell scripts,
 JSON/YAML configs, and documentation. It has no application code and no
 application test suite (no JUnit, Go `testing`, or Vitest/Jest targets).
 
-Per `docs/SPEC_PIPELINE.md §Conformance tiers`, the Architect's mutation-testing
+Per `docs/spec-pipeline/coder.md §Conformance tiers`, the Architect's mutation-testing
 gate is tier-gated:
 
 | Stage | `mvp` | `production` | `multi-service` |
@@ -769,7 +769,7 @@ Mutation testing is a `production`-tier gate. This repo is `mvp`. Gate does not 
 
 1. **Tier gate.** `docs/CONFORMANCE_TIERS.md` assigns mutation testing to
    `production` and above. This repo is `mvp`. Per the tier table in
-   `docs/SPEC_PIPELINE.md §Conformance tiers`, the Architect skips mutation
+   `docs/spec-pipeline/coder.md §Conformance tiers`, the Architect skips mutation
    testing at `mvp`.
 
 2. **Nothing to mutate.** This is a standards repo. The spec 021 deliverables are:
@@ -790,7 +790,7 @@ Mutation testing is a `production`-tier gate. This repo is `mvp`. Gate does not 
 ## 3. Complexity summary (carried from Refactorer / Verifier)
 
 The Refactorer runs at all tiers for complexity + duplication
-(`docs/SPEC_PIPELINE.md §Conformance tiers`). The Verifier re-executed the
+(`docs/spec-pipeline/coder.md §Conformance tiers`). The Verifier re-executed the
 design-principles gate independently.
 
 **`scripts/check-code-principles.sh` result:** 5 FAILs, 17 WARNs

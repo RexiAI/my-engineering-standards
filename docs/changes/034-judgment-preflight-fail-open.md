@@ -843,7 +843,7 @@ matrix ("Project type ambiguous … defer to the harness default (`mvp` tier)") 
 docs/CONFORMANCE_TIERS.md §How to declare a tier, the effective tier is `mvp`.)
 ```
 
-Per `docs/SPEC_PIPELINE.md §Conformance tiers`, mutation testing is the
+Per `docs/spec-pipeline/coder.md §Conformance tiers`, mutation testing is the
 Architect row that `mvp` **skips**; the stage still runs (this report), the
 mutation *gate* does not.
 
@@ -879,7 +879,7 @@ docs/TESTING.md §Mutation Testing has a target in this repository at all.)
 
 `docs/TESTING.md §Mutation Testing` enumerates exactly four lanes — Java
 (`PiTest`, `mvn verify -Pmutation`), Go (`gremlins unleash`), JS/TS (`npx stryker
-run`), React Native (Stryker/Jest) — and `docs/SPEC_PIPELINE.md §Tooling by
+run`), React Native (Stryker/Jest) — and `docs/spec-pipeline/coder.md §Tooling by
 language` lists the same three-language set (Java / Go / JS-TS). Shell has no
 entry in either table, so a `.sh`/`.bats` change set has no configured mutator
 and no ≥80% score to report. Recorded skip with evidence, per the decision

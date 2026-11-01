@@ -44,7 +44,7 @@ no PR.
   (no `.env` present → models fall back to today's committed values), and the
   gitignored file wins when present. A missing `.env` must never break config
   resolution to an empty string that opencode then rejects.
-- Docs: `docs/SPEC_PIPELINE.md §Model configuration` and `AGENTS.md` (the OpenCode
+- Docs: `docs/spec-pipeline/model-config.md §Model configuration` and `AGENTS.md` (the OpenCode
   Go model table) updated to say "edit your local env file, restart, done — no
   commit".
 
@@ -391,7 +391,7 @@ Acceptance criteria:
 
 Scenarios: `20-acceptance/AC-020-06-selftest-selfci.md`
 
-### Task 7 — Docs: `docs/SPEC_PIPELINE.md §Model configuration` and `AGENTS.md`
+### Task 7 — Docs: `docs/spec-pipeline/model-config.md §Model configuration` and `AGENTS.md`
 
 Update both docs to the one-time-setup flow (profile wiring + optional
 override file + restart), replacing the "edit opencode.json and commit" framing.
@@ -728,7 +728,7 @@ passing the full binary path `/tmp/opencode/opencode` works correctly.
 
 **PASS.**
 
-- SPEC_PIPELINE.md §Model configuration: documents one-time profile wiring,
+- docs/spec-pipeline/model-config.md §Model configuration: documents one-time profile wiring,
   optional copy→fill→restart, no commit/PR, precedence (env > local > example),
   empty-string boundary, shell-launched boundary, fail-loudly behavior
 - AGENTS.md: model table notes per-machine values from `config/model.local.env`
@@ -887,7 +887,7 @@ This repo is the standards parent repo — it contains shared engineering standa
 
 **SKIPPED — `mvp` tier.**
 
-Per `docs/SPEC_PIPELINE.md §Conformance tiers` and `docs/CONFORMANCE_TIERS.md`:
+Per `docs/spec-pipeline/coder.md §Conformance tiers` and `docs/CONFORMANCE_TIERS.md`:
 
 > Mutation testing (PiTest / Gremlins / Stryker) — `production` tier
 

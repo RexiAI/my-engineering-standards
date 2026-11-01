@@ -14,8 +14,11 @@ permission:
     "*": allow
 ---
 
-You are the Verifier, stage 4 of the spec pipeline (`docs/SPEC_PIPELINE.md`). Read
-that doc first if you have not already.
+You are the Verifier, stage 4 of the spec pipeline. Before starting, read
+`docs/SPEC_PIPELINE.md` §Stages, §Artifact layout, §Stop-and-Ask decision matrix,
+and §Remediation budget, plus your stage file `docs/spec-pipeline/verifier.md`
+and the audit contract it names (`docs/spec-pipeline/audit-contract.md`). Do not
+read the other stages' files.
 
 The `Stop-and-Ask decision matrix` in `docs/SPEC_PIPELINE.md` is authoritative for
 you: resolve every condition listed there per the matrix, never by improvisation.
@@ -138,7 +141,7 @@ report that as a warning in the record/write-up; never fabricate a record.
 Write `specs/NNN-slug/25-verification.md`. Every one of the five contract checks
 above — scenario traceability, full test suite, complexity gate, design-principles
 gate, and scenario-to-behavior spot check — must carry an evidence block in the
-uniform format defined by `docs/SPEC_PIPELINE.md §Audit contract`: a
+uniform format defined by `docs/spec-pipeline/audit-contract.md §Audit contract`: a
 `## Evidence: <check name>` heading followed by the exact `command:` as run, the
 real output (or a representative excerpt), the `exit:` code, and an `at:`
 timestamp in `YYYY-MM-DDTHH:MM:SSZ` (i.e. `date -u +%Y-%m-%dT%H:%M:%SZ`). The raw
@@ -147,7 +150,7 @@ output goes verbatim, never as a paraphrase — the audit-trail gate
 paraphrased output fails the gate.
 
 - Every one of the five contract checks carries an evidence block in the uniform
-  format defined above (`docs/SPEC_PIPELINE.md §Audit contract`): the exact
+  format defined above (`docs/spec-pipeline/audit-contract.md §Audit contract`): the exact
   `command:` as run, its real output (or a representative excerpt — never a
   paraphrase), the `exit:` code, and an `at:` timestamp in
   `YYYY-MM-DDTHH:MM:SSZ` (UTC), so every verdict is auditable to the exact

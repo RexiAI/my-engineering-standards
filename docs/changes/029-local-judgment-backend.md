@@ -131,7 +131,7 @@ convention) and summarized in the ADR.
    `JUDGMENT_BACKEND`, local-URL example, recalibrated
    `JUDGMENT_MIN_CONFIDENCE`; `config/agent.local.env.example` notes the key
    is optional for `local`. Real values stay in gitignored per-machine files.
-6. **Docs**: amend `docs/SPEC_PIPELINE.md §Typed-judgment layer` and the
+6. **Docs**: amend `docs/spec-pipeline/typed-judgment.md §Typed-judgment layer` and the
    `docs/LOOP_ENGINEERING.md` note with the local-backend mechanism
    (provider-agnostic); OKF `okf/when-to-use-typesafe.md` gains a "Local
    backends" section (Kev/CLM may be named there — scoped operator content)
@@ -471,7 +471,7 @@ telemetry precedent.
 - **"136/136 green"** — CONFIRMED (per-file runs above; all also `ok` inside
   the full-suite run).
 - **"Property tests skipped per mvp tier"** — CONFIRMED as correct procedure:
-  gate JSON reports `"tier": "mvp"`; `docs/SPEC_PIPELINE.md §Conformance tiers`
+  gate JSON reports `"tier": "mvp"`; `docs/spec-pipeline/coder.md §Conformance tiers`
   row "Refactorer — property tests: skip at mvp". The property-tests gate ran
   (listed in `gates`) and produced no finding.
 
@@ -787,7 +787,7 @@ branch-state, not 029's uncommitted work, not the local env).
 ## Evidence: complexity gate
 
 This repo's shell complexity gate is cyclomatic complexity ≤6
-(`docs/SPEC_PIPELINE.md §Tooling` semantics); there is no shell CC linter in the
+(`docs/spec-pipeline/coder.md` §Tooling by language); there is no shell CC linter in the
 repo, so the Refactorer re-implemented `check-code-principles.sh`'s `tokens()`
 heuristic for shell. I reproduced that heuristic INDEPENDENTLY (scratch python:
 base CC 1 per `name() {…}` function; +1 per word-boundary `if|elif|for|while|
@@ -873,7 +873,7 @@ at: 2026-10-09T18:38:16Z
 (Change-scoped — the blame-scoping mode self-ci uses and the same mode 028's
 verification used: the gate judges the author's change; the 029 diff introduces
 zero findings. Tier `mvp` confirms the Refactorer's property-test skip is the
-correct tier behavior, per `docs/SPEC_PIPELINE.md §Conformance tiers`.)
+correct tier behavior, per `docs/spec-pipeline/coder.md §Conformance tiers`.)
 
 Full-tree run, transcribed for completeness:
 
@@ -1079,7 +1079,7 @@ at: 2026-10-09T19:04:36Z
 20:## Conformance tier: mvp
 ```
 
-Per `docs/SPEC_PIPELINE.md §Conformance tiers`, the matrix row for
+Per `docs/spec-pipeline/coder.md §Conformance tiers`, the matrix row for
 `Architect — mutation testing` reads:
 
 | Stage | `mvp` | `production` | `multi-service` |
@@ -1094,7 +1094,7 @@ Mutation Runner concurs: **mutation testing is skipped at this tier.**
 
 This repo's production language for mutation testing is shell (bats/bash). No
 standard shell mutation tool is configured or available in the toolchain table
-(`docs/SPEC_PIPELINE.md §Tooling by language` lists PiTest for Java,
+(`docs/spec-pipeline/coder.md §Tooling by language` lists PiTest for Java,
 go-mutesting/gremlins for Go, Stryker for JS/TS — shell has no entry). The
 skip is therefore doubly correct: (a) the tier does not require it, and (b) no
 tool is provisioned to execute it.
@@ -1500,7 +1500,7 @@ Commit count: 8 (7 task commits + 1 archive commit)
 # Post-PR CI check (phase 2) — round 1 of max 3
 
 Date: 2026-10-09. Verifier run: **attempt 2, phase 2, round 1** (phase-2 counter
-independent of phase 1 per docs/SPEC_PIPELINE.md §Post-PR CI check-and-remediate
+independent of phase 1 per docs/spec-pipeline/post-pr-loops.md §Post-PR CI check-and-remediate
 loop; phase 1 closed at attempt 1 PASS). PR #75 (draft, **stacked**: base
 `spec/028-typed-judgment-layer` = PR #73, still open),
 https://github.com/RexiAI/my-engineering-standards/pull/75, branch

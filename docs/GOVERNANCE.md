@@ -74,9 +74,9 @@ scoped operator sections for opt-in integrations.
 
 **Frontmatter rule:** every agent file — including the standalone PR-review
 agent (ADR 0003) — must not pin a `model:` key (per
-`docs/SPEC_PIPELINE.md §Model configuration`) — a pinned `.md` model
+`docs/spec-pipeline/model-config.md §Model configuration`) — a pinned `.md` model
 silently overrides `opencode.json`; the reviewer's runtime model is wired
-per repo instead (`docs/SPEC_PIPELINE.md §PR review model wiring`).
+per repo instead (`docs/spec-pipeline/model-config.md §PR review model wiring`).
 
 **Conformance note:** violating the no-docs-mirror rule is a governance defect —
 a review blocker, same class as the ADR rule. The drift observed in this repo

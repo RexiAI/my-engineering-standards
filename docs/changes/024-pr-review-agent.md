@@ -123,7 +123,7 @@ What the task must do:
 - `agents/pr-review.md` with frontmatter: `description`, `mode: subagent`, and a **literal**
   `model: opencode-zen/kimi-k3` (pinned in the agent config per the informal spec — no
   `{env:...}` indirection; this is the one deliberate exception to the "agents ship without
-  `model:`" convention in `docs/SPEC_PIPELINE.md §Model configuration`).
+  `model:`" convention in `docs/spec-pipeline/model-config.md §Model configuration`).
 - `permission` block enforcing the scope lock **in config, not just the prompt**: `edit`
   denied for all paths; `bash` allow-list restricted to read-only `gh`/`git` commands needed
   to read the PR/diff and post a review comment; no allowed command can write files, commit,
@@ -798,7 +798,7 @@ verbatim in `25-verification.md` Check 4 evidence.)
 
 ## Evidence: mutation-testing applicability
 
-command: git diff --name-only origin/main..HEAD ; docs/SPEC_PIPELINE.md §Tooling by language
+command: git diff --name-only origin/main..HEAD ; docs/spec-pipeline/coder.md §Tooling by language
 exit: 0
 at: 2026-08-19T15:12:43Z
 

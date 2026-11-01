@@ -126,7 +126,7 @@ start of each run; a loop whose kill switch is `on` does not start.
 ## Triage classification fast-path (future phase)
 
 The opt-in typed-judgment layer (spec 028; `scripts/typed-judgment.sh`,
-`docs/SPEC_PIPELINE.md §Typed-judgment layer`, ADR 0004) is available for
+`docs/spec-pipeline/typed-judgment.md §Typed-judgment layer`, ADR 0004) is available for
 loop-triage classification — a loop that classifies failing work (flake /
 regression / infra / config style) may use the typed fast-path as advisory
 input. A loop may also run its judgment calls against a local backend

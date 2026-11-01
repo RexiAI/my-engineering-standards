@@ -8,8 +8,8 @@
 # executes each scenario individually and carries the literal AC-030-NN-MM IDs
 # in its @test names: scripts/tests/*.bats is a file pattern that
 # scripts/check-scenario-traceability.sh scans, so every scenario ID stays
-# cited from the project's real test surface (docs/SPEC_PIPELINE.md
-# §Scenario format, §Why no scenario mutation), following the precedent of
+# cited from the project's real test surface (docs/spec-pipeline/specifier.md
+# §Scenario format, docs/spec-pipeline/rationale.md §Why no scenario mutation), following the precedent of
 # scripts/tests/ac-004-005-007-trace.bats.
 
 load test_helper

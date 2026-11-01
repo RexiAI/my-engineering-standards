@@ -5,7 +5,7 @@ name: CI - Vercel production deploy verification (post-merge)
 # health check against the production URL, and record the result in the job log.
 # Skip semantics (exit 0 with a reason) vs the VERCEL_TOKEN configuration defect
 # (exit non-zero) are defined in scripts/verify-production-deploy.sh and
-# docs/SPEC_PIPELINE.md §Production deploy verification (post-merge).
+# docs/spec-pipeline/post-pr-loops.md §Production deploy verification (post-merge).
 #
 # This lane is independent of the GHCR container path (ci-nextjs.yml et al.):
 # it never touches the image push, and the container path does not invoke it —

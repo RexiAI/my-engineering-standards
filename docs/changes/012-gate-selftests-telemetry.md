@@ -706,7 +706,7 @@ principles selftest 1) are documented pre-existing sibling/archived-spec and
 **skipped — `mvp` tier.**
 
 This repo auto-detects to `mvp` conformance tier (no `AGENTS_*.md`; gate report JSON
-shows `"tier":"mvp"`). Per `docs/SPEC_PIPELINE.md §Conformance tiers`, mutation
+shows `"tier":"mvp"`). Per `docs/spec-pipeline/coder.md §Conformance tiers`, mutation
 testing is a `production`-tier gate and does not run at `mvp`. The changed code is
 bash scripts + markdown + workflow YAML — no mutation tooling for shell exists in
 this repo. No mutation run attempted.

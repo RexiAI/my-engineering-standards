@@ -863,7 +863,7 @@ adds new artifacts after the Verifier's run.
 
 ## Conformance tier ruling — `mvp`
 
-Per `docs/SPEC_PIPELINE.md §Conformance tiers`, mutation testing is a `production`-tier
+Per `docs/spec-pipeline/coder.md §Conformance tiers`, mutation testing is a `production`-tier
 gate. This repo declares no `production` tier, so the ruling is `mvp` and mutation
 testing is a recorded skip, not a gap (`docs/CONFORMANCE_TIERS.md`, "Tiers are
 cumulative", and the `production` row for "Mutation testing (PiTest / Gremlins /
@@ -912,7 +912,7 @@ means "mutation testing did not apply", not "every mutant was killed".
 
 ## Complexity summary (carried from the Refactorer via the Verifier)
 
-The Refactorer writes no report artifact by design (`docs/SPEC_PIPELINE.md §Audit
+The Refactorer writes no report artifact by design (`docs/spec-pipeline/audit-contract.md §Audit
 contract`); the Verifier re-ran the structure gates and recorded the measurements. Carried
 into this report unchanged:
 

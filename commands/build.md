@@ -42,7 +42,7 @@ On success the PR Opener opens a draft PR. Report its URL. On failure, report
 `specs/$ARGUMENTS/30-report.md`'s explanation of what failed.
 
 After the PR Opener reports the PR URL, run the bounded phase-2 loop (see
-`docs/SPEC_PIPELINE.md §Post-PR CI check-and-remediate loop (phase 2)`):
+`docs/spec-pipeline/post-pr-loops.md §Post-PR CI check-and-remediate loop (phase 2)`):
 
 1. Invoke `spec-verifier` for the post-PR CI check.
 2. On PASS, report the PR URL and stop.

@@ -3,17 +3,18 @@
 # loop is wired into the spec pipeline's prompts and docs (spec 014).
 #
 # Spec 014 is a prompts/docs-only spec: it edits agents/spec-*.md,
-# commands/build.md, and docs/SPEC_PIPELINE.md, and adds no new agent and no new
-# CI infrastructure. This script is the test carrier for its acceptance
-# scenarios — every AC-014-* scenario ID below is asserted as file content, which
-# is exactly what scripts/check-scenario-traceability.sh greps for. The repo has
-# no JVM/Go/Node test stack; the shipped check script is the established carrier
-# (same pattern as check-orchestration.sh).
+# commands/build.md, and docs/spec-pipeline/post-pr-loops.md, and adds no new
+# agent and no new CI infrastructure. This script is the test carrier for its
+# acceptance scenarios — every AC-014-* scenario ID below is asserted as file
+# content, which is exactly what scripts/check-scenario-traceability.sh greps
+# for. The repo has no JVM/Go/Node test stack; the shipped check script is the
+# established carrier (same pattern as check-orchestration.sh).
 #
 # Checks, per task:
-#   Task 1 (AC-014-01) — docs/SPEC_PIPELINE.md names the exact CI query, the
-#     repo's Self CI workflow, the log read, the max-3 / independent-counter
-#     bounds, the exhaustion escalation, and the 008 ordering dependency.
+#   Task 1 (AC-014-01) — docs/spec-pipeline/post-pr-loops.md names the exact CI
+#     query, the repo's Self CI workflow, the log read, the max-3 /
+#     independent-counter bounds, the exhaustion escalation, and the 008
+#     ordering dependency.
 #   Task 2 (AC-014-02) — agents/spec-verifier.md runs the post-PR CI check and
 #     records the verdict per check and per round in 25-verification.md.
 #   Task 3 (AC-014-03) — agents/spec-coder.md and agents/spec-refactorer.md get
@@ -38,7 +39,7 @@
 #   1 — at least one assertion failed; each prints FAIL <scenario-id>
 #
 # Standards reference:
-#   docs/SPEC_PIPELINE.md §Post-PR CI check-and-remediate loop (phase 2) (spec 014)
+#   docs/spec-pipeline/post-pr-loops.md §Post-PR CI check-and-remediate loop (phase 2) (spec 014)
 set -euo pipefail
 
 ROOT="${1:-}"
@@ -48,7 +49,7 @@ if [ -z "$ROOT" ]; then
 fi
 ROOT="$(cd "$ROOT" && pwd)"
 
-DOCS="$ROOT/docs/SPEC_PIPELINE.md"
+DOCS="$ROOT/docs/spec-pipeline/post-pr-loops.md"
 VERIFIER="$ROOT/agents/spec-verifier.md"
 CODER="$ROOT/agents/spec-coder.md"
 REFACTORER="$ROOT/agents/spec-refactorer.md"
@@ -110,10 +111,10 @@ absent() { # absent <id> <file> <extended-regex>
   str_absent "$id" "${f#"$ROOT"/}" "$(cat "$f")" "$re"
 }
 
-# ── Task 1 — docs/SPEC_PIPELINE.md (AC-014-01) ───────────────────────────────
+# ── Task 1 — docs/spec-pipeline/post-pr-loops.md (AC-014-01) ─────────────────
 DOCS_P2="$(section "$DOCS" "$DOCS_HEADING")"
 
-echo "Task 1 — docs/SPEC_PIPELINE.md post-PR CI loop documentation..."
+echo "Task 1 — docs/spec-pipeline/post-pr-loops.md post-PR CI loop documentation..."
 # AC-014-01-01 — the exact CI query is named, and the bucket field is the
 # PASS/FAIL parse rule
 str_contains AC-014-01-01 "$DOCS_HEADING" "$DOCS_P2" \

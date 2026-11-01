@@ -1255,7 +1255,7 @@ Commits: 11
 # Post-PR CI check (phase 2) — round 1 of max 3
 
 Date: 2026-09-30. Verifier run: **attempt 3, phase 2, round 1** (phase-2 counter
-independent of phase 1 per docs/SPEC_PIPELINE.md §Post-PR CI check-and-remediate
+independent of phase 1 per docs/spec-pipeline/post-pr-loops.md §Post-PR CI check-and-remediate
 loop; phase 1 closed at attempt 2 PASS). PR #73 (draft),
 https://github.com/RexiAI/my-engineering-standards/pull/73, branch
 `spec/028-typed-judgment-layer`, head `7bf10afd46a93b1907d98866d48e0270dad5c85a`.
@@ -1399,7 +1399,7 @@ same content lived under `specs/028-typed-judgment-layer/` — inside the
 exclusion — so AC-028-48 passed (it was `ok` in both attempt-1 and attempt-2
 suite runs). Archiving moved the content out of the exclusion's reach; the
 failure was **latent from the moment the test was written**, because every spec
-archives to `docs/changes/` at 5b by design (docs/SPEC_PIPELINE.md §Archive in
+archives to `docs/changes/` at 5b by design (docs/spec-pipeline/pr-opener.md §Archive in
 the PR / §Definition of done item 3). First failing CI run: 36717188483 on the
 archive commit `dba52a4` itself — consistent with this timeline.
 

@@ -5,8 +5,8 @@
 # Spec 026 fixed thirteen findings from a security review of this repo's own
 # .github/workflows/, agents/pr-review.md, and headless-agent invocation
 # plumbing (specs/026-ci-security-hardening/00-informal.md). This script is
-# the test carrier for its acceptance scenarios (docs/SPEC_PIPELINE.md
-# §Scenario format, §Why no scenario mutation): it cites every AC-026-NN
+# the test carrier for its acceptance scenarios (docs/spec-pipeline/specifier.md
+# §Scenario format, docs/spec-pipeline/rationale.md §Why no scenario mutation): it cites every AC-026-NN
 # scenario ID and greps the required strings/patterns in the fixed
 # artifacts, so scripts/check-scenario-traceability.sh resolves them, and it
 # exits 0 only when every content assertion holds.

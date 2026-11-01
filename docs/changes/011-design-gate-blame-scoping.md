@@ -523,7 +523,7 @@ shows zero FAILs attributable to 011, 9 independent scenario spot-checks passed.
 
 **skipped — `mvp` tier.**
 
-Per `docs/SPEC_PIPELINE.md §Conformance tiers`, mutation testing is a `production`-tier
+Per `docs/spec-pipeline/coder.md §Conformance tiers`, mutation testing is a `production`-tier
 gate; this repo is `mvp` tier (no `AGENTS_<PROJECT>.md` at repo root; archived specs
 020/021/022 confirm). Changed code is bash scripts + markdown; no mutation tooling for
 shell exists in this repo. No mutation run attempted, no mutants generated.

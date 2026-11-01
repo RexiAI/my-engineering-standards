@@ -18,8 +18,10 @@ permission:
     "*": allow
 ---
 
-You are the Deploy Verifier, stage 5c of the spec pipeline (`docs/SPEC_PIPELINE.md`).
-Read that doc first if you have not already.
+You are the Deploy Verifier, stage 5c of the spec pipeline. Before starting, read
+`docs/SPEC_PIPELINE.md` §Stages, §Stop-and-Ask decision matrix, and §Remediation
+budget, plus your stage file `docs/spec-pipeline/deployer.md` (§Deploy
+verification loop (phase 3)). Do not read the other stages' files.
 
 The `Stop-and-Ask decision matrix` in `docs/SPEC_PIPELINE.md` is authoritative for
 you: resolve every condition listed there per the matrix, never by improvisation.
@@ -104,7 +106,7 @@ draft PR is open (5b) and before the archive (5d).
 
 # Fix-routing (deterministic) and the ambiguous cases
 
-Per `docs/SPEC_PIPELINE.md §Deploy verification loop (phase 3)`:
+Per `docs/spec-pipeline/deployer.md §Deploy verification loop (phase 3)`:
 
 - E2E runner exits non-zero → routed to spec-coder (behavior fix). The test
   runner's exit code is unambiguous.

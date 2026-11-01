@@ -8,7 +8,8 @@
 load test_helper
 bats_require_minimum_version 1.5.0
 
-DOC="$REPO_ROOT/docs/SPEC_PIPELINE.md"
+# the audit contract moved to its own shared file in spec 037
+DOC="$REPO_ROOT/docs/spec-pipeline/audit-contract.md"
 GATE="$REPO_ROOT/scripts/check-audit-trail.sh"
 
 # seed_folder <spec-folder> — a complete pre-40-deploy audit folder

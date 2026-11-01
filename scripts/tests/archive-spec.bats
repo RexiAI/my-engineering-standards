@@ -98,7 +98,7 @@ seed_archive_repo() {
 }
 
 @test "archive-spec: the 5b flow's dirty spec folder (PR line appended, staged edits) archives unaided" {
-  # docs/SPEC_PIPELINE.md §Audit contract: the PR Opener appends the PR: line
+  # docs/spec-pipeline/audit-contract.md §Audit contract: the PR Opener appends the PR: line
   # to 30-report.md before archiving, so the folder is routinely dirty — first
   # with local modifications, then with staged content — at the moment this
   # script runs. Plain `git rm -r` refused that legitimate state (spec 031,

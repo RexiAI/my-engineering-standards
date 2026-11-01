@@ -661,7 +661,7 @@ sufficient:
 1. **Conformance tier is `mvp`.** No `AGENTS_<PROJECT>.md` exists in this repo
    (verified: no such file in the tree), so the floor tier applies.
    `docs/CONFORMANCE_TIERS.md` assigns mutation testing (PiTest / Gremlins /
-   Stryker) to `production`; `docs/SPEC_PIPELINE.md §Conformance tiers` marks
+   Stryker) to `production`; `docs/spec-pipeline/coder.md §Conformance tiers` marks
    the Architect mutation gate **skip** at `mvp`. Per the tier table this is
    not a gap — it is out of scope until the repo graduates.
 2. **No test suite exists to mutate against, and no mutation tool targets the
