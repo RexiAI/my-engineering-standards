@@ -6,7 +6,8 @@ Provider-agnostic media agent family: global opencode agents driving a user-conf
 
 ## Status
 
-Accepted
+Accepted — placement amended by [0018](0018-media-agents-opt-in.md) (the family
+now lives in `agents-optional/` and is loaded by explicit opt-in only)
 
 ## Context
 
@@ -24,9 +25,10 @@ assumption that a particular vendor or command surface is present.
 
 ## Decision
 
-- Keep the four agents in `agents/` (`media-image`, `media-video`,
+- Keep the four agents (`media-image`, `media-video`,
   `media-voice`, `media-producer`), `mode: all`, with no `model:` pin. They
   inherit the user's primary model per machine (Model-Assignment Discipline).
+  Placement in `agents-optional/` is ADR 0018's territory, not this record's.
 - Define a **backend contract** file, `~/.config/opencode/media/backends.json`
   (overridable with `MEDIA_BACKENDS_FILE`), whose sections (`image`, `video`,
   `tts`, `asr`) map operations to argv arrays containing placeholders such as
@@ -81,4 +83,6 @@ assumption that a particular vendor or command surface is present.
 ## Notes
 
 - 2026-10-28: rewritten provider-agnostic. Supersedes the retired
-  vendor-specific media decision; the retired record is no longer indexed.
+  vendor-specific media decision (ADR 0007, retained as a superseded pointer).
+- 2026-11-01: placement amended by ADR 0018 — the family moved to
+  `agents-optional/` and is opt-in; the contract in this record is unchanged.

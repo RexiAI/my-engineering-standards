@@ -14,6 +14,7 @@ Proposed → Accepted → Deprecated → Superseded.
 | 0004 | [Typed-judgment layer: opt-in fast-path for probabilistic classification](0004-typed-judgment-layer.md)                                                              | Accepted |
 | 0005 | [Local judgment backend: an optional self-hosted compute backend for the typed-judgment layer](0005-local-judgment-backend.md)                                       | Accepted |
 | 0006 | [Extend the gate catalog to Python and Rust without adding gate names](0006-python-rust-gate-coverage.md)                                                            | Proposed |
+| 0007 | [Media agent family (image, video, voice, producer)](0007-media-agent-family.md)                                                                                     | Superseded by 0016; amended by 0018 |
 | 0008 | [Vercel deploy lane: a spec-deployer stage (5c), the 40-deploy.md gate artifact, and a split pipeline tail (5a/5b/5c/5d)](0008-vercel-deploy-lane.md) | Accepted |
 | 0009 | [Judgment consumer contract and AC-024-01-12 base-ref semantics](0009-judgment-consumer-contract-and-gate-base-ref.md) | Accepted |
 | 0010 | [Stage-split deploy-artifact gate: --require-deploy for the stage-5d final run](0010-audit-trail-require-deploy-flag.md) | Accepted |
@@ -24,3 +25,5 @@ Proposed → Accepted → Deprecated → Superseded.
 | 0015 | [Autopilot mode: choose-default-record-continue for unattended pipeline queue runs](0015-autopilot-mode.md) | Accepted |
 | 0016 | [Provider-agnostic media agent family: global opencode agents driving a user-configured backend contract](0016-provider-agnostic-media-agents.md) | Accepted |
 | 0017 | [Single source of truth for spec-pipeline rules](0017-pipeline-agent-single-source.md) | Accepted |
+| 0018 | [Media agents are opt-in: relocate the family to agents-optional/ and load it per repo through --with-media](0018-media-agents-opt-in.md) | Accepted |
+| 0019 | [spec-ux enforces Laws of UX as checkable consequences](0019-spec-ux-design-laws.md) | Proposed |

@@ -4,6 +4,10 @@
 // on Linux and Windows (opencode resolves ~ to %USERPROFILE% there).
 // Idempotent; safe to re-run after every `git pull` in this repo.
 //
+// Sources live in `agents-optional/`, not `agents/`: the family is opt-in, so
+// it must stay out of the default agent set every child repo links from
+// `.standards/agents` (ADR 0018).
+//
 //   node scripts/media/install.mjs            # install / update
 //   node scripts/media/install.mjs --uninstall
 //
@@ -42,6 +46,7 @@ function ensureDir(p, depth = 0) {
 }
 
 const AGENTS = ["media-image.md", "media-video.md", "media-voice.md", "media-producer.md"];
+const AGENT_SRC_DIR = join(REPO, "agents-optional");
 const EXAMPLE = join(REPO, "scripts", "media", "backends.example.json");
 const MEDIA_DIR = join(GLOBAL, "media");
 
@@ -56,7 +61,7 @@ if (uninstall) {
 ensureDir(GLOBAL);
 ensureDir(join(GLOBAL, "agents"));
 for (const a of AGENTS) {
-  const src = join(REPO, "agents", a);
+  const src = join(AGENT_SRC_DIR, a);
   if (!existsSync(src)) {
     console.error(`missing ${src} — run from a full clone of the standards repo`);
     process.exit(1);
