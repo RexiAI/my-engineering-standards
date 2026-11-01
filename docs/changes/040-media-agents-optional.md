@@ -692,7 +692,7 @@ AGENTS.md: no 'Conformance tier:' declaration (=> mvp floor)
 ```
 
 `docs/CONFORMANCE_TIERS.md §How to declare a tier` makes `mvp` the floor when nothing is
-declared, and `docs/SPEC_PIPELINE.md §Conformance tiers` lists the Architect's mutation
+declared, and `docs/spec-pipeline/coder.md §Conformance tiers` lists the Architect's mutation
 testing as `skip` at `mvp`. There is also no mutation tool to run: no `package.json`,
 `stryker.conf.*`, Maven `pom.xml`, or Go module at the repo root — this is a shell/docs
 repo whose test surface is bats, which none of PiTest/Gremlins/Stryker covers.
@@ -1001,7 +1001,7 @@ PR: https://github.com/RexiAI/my-engineering-standards/pull/109
 **Non-frontend.** The deploy-lane signals are both absent — no `vercel.json` at the
 repo root, and no `package.json` at the repo root (so no framework dependency to
 match). Per `agents/spec-deployer.md` §Scope and
-`docs/SPEC_PIPELINE.md §Deploy verification loop (phase 3)`, a non-frontend repo
+`docs/spec-pipeline/deployer.md §Deploy verification loop (phase 3)`, a non-frontend repo
 records the skip and exits cleanly: non-frontend repos never fail the deploy gate.
 
 ## Evidence: repo classification

@@ -4,7 +4,7 @@
 #
 # One test per scenario in specs/040-media-agents-optional/20-acceptance/.
 # The ID in each test name is what scripts/check-scenario-traceability.sh greps
-# for (docs/SPEC_PIPELINE.md §Scenario format).
+# for (docs/spec-pipeline/specifier.md §Scenario format).
 #
 # Fixture model (same shape as spec 033's): make_child_repo builds a hermetic
 # child repo that consumes this standards tree the way a real child does —
