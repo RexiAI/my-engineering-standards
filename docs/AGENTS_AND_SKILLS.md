@@ -176,3 +176,34 @@ The standards are enforced automatically via scripts run in CI (`.github/workflo
 - **`scripts/check-skills.sh`**: Hard CI gate validating frontmatter rules, directory name matching, length constraints, and the line-count rules — a hard 200-line cap for `language-specific/*/SKILL.md` (with a grandfather map for the four existing guides) and the 500-line `[WARN]` for `skills/*/SKILL.md`.
 - **`scripts/check-orchestration.sh`**: Hard CI gate asserting that all agent, skill, script, and documentation cross-references resolve.
 
+### Repo-level permission block
+
+`opencode.json` carries a repo-level `permission.bash` block so the never-list in
+`AGENTS.md` and `docs/SPEC_PIPELINE.md` is enforced by the harness rather than by
+good intentions. It applies to every agent and every human session in this repo.
+
+- **Ordering is load-bearing: `last matching rule wins`.** opencode evaluates the
+  patterns in order and the final match decides, so the catch-all comes first and
+  the specific rules come after. A broad `ask` placed after a narrow `deny` would
+  silently override it — the exact mistake this ordering avoids. The catch-all
+  `"*": "allow"` is therefore the first key, both `ask` rules follow it, and every
+  `deny` rule comes last.
+- **Denied** (the harness refuses to run them): force-push in every form
+  (`--force`, `-f`, `--force-with-lease`), push to `main`/`master`, remote-branch delete
+  (`git push --delete`, `git push <remote> :<branch>`), local branch deletion
+  `git branch -D`, and any `git tag` invocation — versioning belongs to Semantic
+  Release CI.
+- **Asked** (a confirmation prompt, never a silent allow): `git commit` and
+  `git push`. `AGENTS.md` requires explicit instruction before either; `ask` makes
+  that a checkpoint instead of an assumption. The spec pipeline's PR Opener runs
+  under its documented carve-out, so its `git push*: ask` frontmatter rule is
+  established convention rather than new behaviour.
+- **Agent frontmatter wins.** Agent frontmatter permission blocks merge over this
+  repo-level block and take precedence for that agent: when both declare a rule,
+  agent frontmatter is what governs. The repo block is the floor — a default for
+  agents that declare nothing — not a ceiling that agents may not tighten.
+
+The `main`/`master` patterns are deliberately prefix-broad (`git push * main*`):
+safety over precision. A branch whose name merely begins with `main` or `master`
+is denied too, because missing a real default-branch push is the expensive
+failure and refusing one extra branch is cheap.
