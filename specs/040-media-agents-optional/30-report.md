@@ -332,3 +332,17 @@ None of these was edited by this stage.
 - Reviewer attention requested on: F1 (pre-existing flake, follow-up spec) and the two
   documentation reversals the Verifier flagged for human review — the restored
   `docs/adr/0007-media-agent-family.md` and the amended 0016 Note.
+
+---
+
+## Stage 5b — PR record
+
+PR: https://github.com/RexiAI/my-engineering-standards/pull/109
+
+- Commits: **5** on `spec/040-media-agents-optional` ahead of base `39fdd21` at PR open
+  (task 1 `b302bea`, task 2 `d57a9dd`, task 3 `ecf282e`, task 4 `9376d82`, spec artifacts
+  `8f887a9`), plus this records commit.
+- Audit-trail gate at stage 5b (no `--require-deploy`): `scripts/check-audit-trail.sh
+  040-media-agents-optional` — **exit 0**.
+- Deploy artifact: `40-deploy.md` present with `Verdict: SKIPPED — Non-frontend repo —
+  deploy verification not applicable` (stage 5c-equivalent, phase-3 attempt count 0 of 3).
