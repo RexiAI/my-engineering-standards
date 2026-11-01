@@ -64,7 +64,7 @@ allowed-tools: Bash(.standards/scripts/check-code-principles.sh:*)
 
 To optimize context token usage:
 1. **Metadata (~100 tokens)**: `name` and `description` are loaded at startup.
-2. **Main Instructions (<500 lines)**: `SKILL.md` body is loaded when activated. Keep under 500 lines.
+2. **Main Instructions (<500 lines)**: `SKILL.md` body is loaded when activated. Keep under 500 lines — and under **200** lines for a `language-specific/*/SKILL.md` entry point, which is a hard gate (see §Mechanical Enforcement).
 3. **Resources (on demand)**: Move detailed documentation into `references/`, scripts into `scripts/`, templates into `assets/`.
 
 ### File References
@@ -154,7 +154,7 @@ Every time an agent (`agents/*.md`) or skill (`skills/*/SKILL.md`) is added or m
 - [ ] `name` field **matches the parent directory name** exactly.
 - [ ] `description` is ≤1024 chars, non-empty, and includes **what** it does + **when to use it** (trigger keywords).
 - [ ] `compatibility` (if present) is ≤500 chars.
-- [ ] Body line count is ≤500 lines.
+- [ ] Body line count: `skills/*/SKILL.md` stays under **500** lines (over 500 is a `[WARN]`, not a failure); a `language-specific/*/SKILL.md` entry point stays at or under **200** lines, which is a hard `[FAIL]` above the cap. The four existing oversized language guides are **grandfathered** at their current size and may not grow — `java` 282, `python` 271, `rust` 241, `go` 223. Splitting those four into an entry point plus sibling files (`PATTERNS.md`, `TESTING.md`, `NATIVE.md`) is a separate follow-up spec; the grandfather map is the only exception, and no new guide may be added to it.
 - [ ] File references are relative, one level deep, and do not create nested chains.
 - [ ] Scripts in `scripts/` handle edge cases and provide helpful error messages.
 - [ ] `scripts/check-skills.sh` passes with 0 errors.
@@ -173,5 +173,6 @@ Every time an agent (`agents/*.md`) or skill (`skills/*/SKILL.md`) is added or m
 
 The standards are enforced automatically via scripts run in CI (`.github/workflows/self-ci.yml`):
 
-- **`scripts/check-skills.sh`**: Hard CI gate validating frontmatter rules, directory name matching, length constraints, and line-count warnings for all skills.
+- **`scripts/check-skills.sh`**: Hard CI gate validating frontmatter rules, directory name matching, length constraints, and the line-count rules — a hard 200-line cap for `language-specific/*/SKILL.md` (with a grandfather map for the four existing guides) and the 500-line `[WARN]` for `skills/*/SKILL.md`.
 - **`scripts/check-orchestration.sh`**: Hard CI gate asserting that all agent, skill, script, and documentation cross-references resolve.
+
