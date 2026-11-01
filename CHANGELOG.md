@@ -1,3 +1,10 @@
+## [1.47.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.47.0...v1.47.1) (2026-11-01)
+
+
+### Bug Fixes
+
+* **scripts:** avoid a SIGPIPE race in scenario traceability lookups ([#108](https://github.com/RexiAI/my-engineering-standards/issues/108)) ([ecbf44e](https://github.com/RexiAI/my-engineering-standards/commit/ecbf44e9bdefbdb59800fb32a8446959b3bb6dad))
+
 # [1.47.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.46.0...v1.47.0) (2026-10-30)
 
 
