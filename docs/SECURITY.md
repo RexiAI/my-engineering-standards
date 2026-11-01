@@ -91,6 +91,18 @@ Passwords are verified with a deliberately slow, memory-hard password-hashing fu
 - **Verification is constant-time.** Compare through the library's `constant-time` verify function (`argon2_verify`, `bcrypt.compare`, or the platform equivalent), never with `==` / `===`, and never with an early-return byte loop. Never re-hash the candidate with application code and compare digests yourself.
 - **Rehash on login.** When a stored hash's algorithm or parameters are below the current baseline, `rehash` it during the next successful login — after the candidate is verified, never before — and do it transparently: the session stays valid and the user is not asked to log in again. A failed upgrade must not fail the login.
 
+## JWT Validation Checklist
+
+Verify in this order on every request. Nothing downstream of a failed step runs, and every item below ends in the same disposition: reject the token with `401`.
+
+- [ ] **Algorithm allowlist.** The accepted `alg` values are fixed in configuration (for example `RS256`), and the token header's `alg` only selects from that set — the header is never itself the source of trust. A token signed with an algorithm the library supports but the configuration did not list is rejected.
+- [ ] **Reject alg=none.** The header value `alg=none` — and any algorithm absent from the allowlist — is rejected before signature verification, never treated as "unsigned but acceptable". Reject on the header value alone; do not attempt verification first, and never log the payload on this path.
+- [ ] **Key selection by kid.** The verification key comes from a configured, trusted JWKS (a pinned URL or a local key set), selected by `kid`. `jku` and `x5u` are never fetched, and the token never supplies its own key: an embedded `jwk` header is ignored. An unknown `kid` is rejected rather than falling back to the first key in the set.
+- [ ] **Signature before claims.** The signature is verified before anything else is read — no claim, not even `exp` or a role, is read before the signature verifies. A bad signature is rejected without inspecting the payload.
+- [ ] **Time claims (exp, nbf, iat).** `exp` is required, so a token without it is rejected. `nbf` and `iat` are honoured together with a bounded clock skew — a small configured leeway, not "no skew check" — so legitimate hosts do not flap. An expired or not-yet-valid token is rejected.
+- [ ] **Audience and issuer (aud, iss).** Both are validated against expected values configured for this service. A missing or mismatched `aud` or `iss` is a rejection — never "accept when absent", which is the shape that lets a token minted for another service through.
+- [ ] **Reject on any failure.** Every item above ends in the same disposition: reject the token, return `401`, and log the failure class (never the token or its claims).
+
 ## Upstream Error Responses Must Not Reach the Client
 
 A third-party API's raw error response is not automatically safe to forward. Provider APIs (payment processors, LLM providers, any upstream service authenticated with a credential of yours) can include partial key material, account identifiers, or internal details in their error bodies — a 401 from an upstream provider might echo back a masked or partial version of the credential you sent it. This is a distinct leak path from log redaction (docs/OBSERVABILITY.md's "mask secrets in logs" rule): the risk here is forwarding the error body itself to *your own client's browser/app*, not writing it to your own logs.
