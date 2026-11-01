@@ -51,6 +51,17 @@ Support standard OAuth2 grant types:
 - String length, format, and range checks on all request parameters.
 - Never trust or propagate user-supplied data without validation.
 
+## SSRF (Server-Side Request Forgery)
+
+Any outbound request whose destination comes from a user or from an upstream response is an SSRF vector: the caller can point your server at itself, at another internal service, or at a cloud metadata endpoint that hands out credentials. Destination selection is therefore default-deny, not "block the hosts we thought of".
+
+- **Default-deny destination allowlist.** Keep an allowlist of scheme + host + port that this service may call. A destination supplied by a user or derived from an upstream response must match the allowlist; an unmatched destination is refused before any connection is made. A denylist of known-bad hosts is not a substitute — it is bypassable by every address it forgot.
+- **Check the resolved IP, not the hostname.** An allowlist match on a hostname proves nothing: the name can resolve to a private address. Resolve first, then validate the resolved IP against the allowlist and against the refused ranges below.
+- **Refused ranges.** `127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16`, `fe80::/10`, the cloud metadata endpoint `169.254.169.254`, and the IPv6 equivalents `::1/128` and `fc00::/7`. Refuse these even when the allowlist would otherwise match — unless reaching one specific internal host is the service's whole purpose, in which case allowlist that single address explicitly.
+- **Pin the validated address.** Connect to the IP address that was validated, not to the hostname again. Re-checking a re-resolved address is mandatory: a second resolution between the check and the connection is the **DNS rebinding** window. If the address changes, re-check the new one before use; a request that would need a new address is refused rather than retried against the name.
+- **Do not follow redirects automatically.** An allowlisted URL can redirect to a refused one. Either disable automatic redirect following, or re-validate every redirect hop against the allowlist and the refused ranges before following it, and cap the hop count.
+- Apply the same rule to webhook delivery, image/PDF fetchers, link previews, and any "fetch this URL for me" endpoint. The rule belongs in one shared outbound-request helper, not copy-pasted per caller.
+
 ## Upstream Error Responses Must Not Reach the Client
 
 A third-party API's raw error response is not automatically safe to forward. Provider APIs (payment processors, LLM providers, any upstream service authenticated with a credential of yours) can include partial key material, account identifiers, or internal details in their error bodies — a 401 from an upstream provider might echo back a masked or partial version of the credential you sent it. This is a distinct leak path from log redaction (docs/OBSERVABILITY.md's "mask secrets in logs" rule): the risk here is forwarding the error body itself to *your own client's browser/app*, not writing it to your own logs.
