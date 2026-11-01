@@ -1,3 +1,10 @@
+# [1.49.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.48.0...v1.49.0) (2026-11-01)
+
+
+### Features
+
+* **spec-ux:** enforce Laws of UX as checkable consequences ([#111](https://github.com/RexiAI/my-engineering-standards/issues/111)) ([569f68b](https://github.com/RexiAI/my-engineering-standards/commit/569f68b38eb9086af34363c46f93633bd02a8bba))
+
 # [1.48.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.47.1...v1.48.0) (2026-11-01)
 
 
