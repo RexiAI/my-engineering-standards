@@ -23,11 +23,13 @@ const ok = (name) => console.log(`[OK] ${name}`);
 const bad = (name, why) => { console.log(`[FAIL] ${name}: ${why}`); fails++; };
 
 const AGENTS = ["media-image.md", "media-video.md", "media-voice.md", "media-producer.md"];
+// Opt-in family: sources live outside the default `agents/` set (ADR 0018).
+const AGENT_SRC_DIR = join(REPO, "agents-optional");
 
 // 1. agent files: exist, description + mode frontmatter, no pinned model, no
 //    vendor-specific command surface.
 for (const f of AGENTS) {
-  const p = join(REPO, "agents", f);
+  const p = join(AGENT_SRC_DIR, f);
   if (!existsSync(p)) { bad(f, "missing"); continue; }
   const txt = readFileSync(p, "utf8");
   const fm = txt.split("---")[1] ?? "";
@@ -40,7 +42,7 @@ for (const f of AGENTS) {
 
 // 2. agents point at the backend contract
 for (const f of AGENTS) {
-  const p = join(REPO, "agents", f);
+  const p = join(AGENT_SRC_DIR, f);
   if (!existsSync(p)) continue;
   const txt = readFileSync(p, "utf8");
   if (!txt.includes("backends.json")) { bad(f, "does not reference backends.json"); continue; }
