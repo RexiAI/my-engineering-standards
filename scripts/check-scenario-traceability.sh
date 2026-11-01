@@ -208,9 +208,18 @@ REFERENCED_IDS=$(grep -rhoE 'AC[_-][0-9]{3}[_-][0-9]{2}' "$SOURCE_DIR" \
 
 
 # ── Check 1: every scenario has a matching test reference (AC-007-04-01) ─────
+#
+# NOTE: the ID lookups below are here-strings, never `echo "$LIST" | grep -qx`.
+# Under `set -o pipefail`, `grep -q` exits at the first match while `echo` may
+# still be writing a large ID list; the writer then takes SIGPIPE, its 141 wins
+# the pipeline status, and a present ID reads as missing. A real flake in this
+# script — consumer repos saw "no test references it" /
+# "no matching scenario heading exists" roughly 1 run in 4 when parallel test
+# workers invoked it concurrently, never in isolation. Same fix as
+# check-post-pr-ci-loop.sh's str_contains.
 if contains 1; then
   for id in $SCENARIO_IDS; do
-    if echo "$REFERENCED_IDS" | grep -qx "$id"; then
+    if grep -qx "$id" <<< "$REFERENCED_IDS"; then
       pass "$id — traced to a test"
       PASSED_IDS+=("$id")
     else
@@ -280,8 +289,8 @@ if contains 2; then
   for id in $REFERENCED_IDS; do
     # Resolution is by exact ID against both sources — an archived one-pager can
     # own IDs numbered differently from its filename (per-task numbering).
-    if echo "$SCENARIO_IDS" | grep -qx "$id"; then continue; fi
-    if echo "$ARCHIVED_IDS" | grep -qx "$id"; then continue; fi
+    if grep -qx "$id" <<< "$SCENARIO_IDS"; then continue; fi
+    if grep -qx "$id" <<< "$ARCHIVED_IDS"; then continue; fi
 
     # Unresolved. Only a finding if some source claims authority for the number;
     # otherwise it is a fixture/self-citation with nothing to judge it against.
