@@ -1033,3 +1033,210 @@ observation rather than being inferred from package contents.
 ## Verdict
 
 Verdict: SKIPPED — Non-frontend repo — deploy verification not applicable
+
+---
+
+# Post-PR CI check (phase 2) — round 2 of max 3
+
+- **Round:** 2 (scoped re-check of the round-1 failing check)
+- **Re-verification attempt index:** 2, phase 2 (phase-1 attempt 1 → phase-2
+  round 1 → this round 2)
+- **PR:** #109 — https://github.com/RexiAI/my-engineering-standards/pull/109
+- **Head checked:** `b5987db4ed2d82020a59ab4f11799c67919b73e8` (the stage-5d
+  archive commit; local worktree HEAD identical, working tree clean at round start)
+- **Workflows at this head:** `Self CI` (pull_request + push), `PR Review Agent`
+- **Polling:** all three runs were already terminal at the first query
+  (13:49:59Z); no `pending` check was observed and none was ruled on while pending.
+
+**Scope.** Round 1 failed solely on the two `Self CI` / `Validate` checks because
+`docs/changes/040-media-agents-optional.md` did not yet exist. This round
+re-checks those two checks at the new head, and — because in round 1 the archive
+gate sat at step 16 and masked the 17 steps after it — additionally confirms the
+**whole run executed to completion**, not just the archive step. The other gates'
+round-1 results stand per the scoped rule; the PR Review Agent's run was
+re-triggered, so it was polled to terminal state and is adjudicated below.
+
+**Fix verification.** `b5987db` is the stage-5d archive: it adds
+`docs/changes/040-media-agents-optional.md` (1035 lines at this head) and removes
+`specs/040-media-agents-optional/`. The previously failing gate now exits 0
+locally at this head (evidence below).
+
+## Round-2 verdict: **PASS** — phase-2 CI loop closes
+
+| Check | Workflow | Event | Bucket | Run / check id | Round 1 |
+|---|---|---|---|---|---|
+| Review PR / Review PR | PR Review Agent | pull_request | `fail` — **environmental, excluded** | run 41312478978, check 124865568693 | fail (excluded) |
+| Validate | Self CI | pull_request | **pass** | run 41312478810, check **124865567899** | fail (124863331920) |
+| Validate | Self CI | push | **pass** | run 41312474722, check **124865554923** | fail (124863313323) |
+
+Whole-run confirmation, pull_request event: **33 of 33 substantive steps
+`success`, zero `skipped`, zero `failure`** — including the 17 steps round 1
+never reached (audit trails, lint, pinned-opencode model env, secret scan, loop
+deliverables, remediation budget, shellcheck, bats suite, gate selftests, live
+scenario traceability, YAML). The push event at the same SHA is likewise all
+green. Bats tally identical on both events: TAP plan `1..755`, **755 ok /
+0 not ok / 0 skip**. The 13 AC-040 scenarios are green, including
+`ok 210 AC-040-04-04`.
+
+Exactly three runs exist at this head — the same workflow set as round 1; no new
+checks appeared.
+
+## Evidence: PR checks at the new head
+
+command: gh pr checks 109 --json name,state,bucket,workflow,link
+exit: 0
+at: 2026-11-01T13:51:54Z
+
+```
+[{"bucket":"fail","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/41312478978/job/124865568693","name":"Review PR / Review PR","state":"FAILURE","workflow":"PR Review Agent"},{"bucket":"pass","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/41312478810/job/124865567899","name":"Validate","state":"SUCCESS","workflow":"Self CI"},{"bucket":"pass","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/41312474722/job/124865554923","name":"Validate","state":"SUCCESS","workflow":"Self CI"}]
+```
+
+## Evidence: check runs (terminal state) at the new head
+
+command: gh api repos/RexiAI/my-engineering-standards/commits/b5987db4ed2d82020a59ab4f11799c67919b73e8/check-runs --jq '.check_runs[] | {id,name,status,conclusion,started_at,completed_at}'
+exit: 0
+at: 2026-11-01T13:51:54Z
+
+```
+{"completed_at":"2026-11-01T13:42:54Z","conclusion":"failure","id":124865568693,"name":"Review PR / Review PR","started_at":"2026-11-01T13:41:34Z","status":"completed"}
+{"completed_at":"2026-11-01T13:47:39Z","conclusion":"success","id":124865567899,"name":"Validate","started_at":"2026-11-01T13:41:34Z","status":"completed"}
+{"completed_at":"2026-11-01T13:47:46Z","conclusion":"success","id":124865554923,"name":"Validate","started_at":"2026-11-01T13:41:31Z","status":"completed"}
+```
+
+## Evidence: workflow runs at the new head
+
+command: gh run list --repo RexiAI/my-engineering-standards --branch spec/040-media-agents-optional --limit 10 --json databaseId,workflowName,event,status,conclusion,headSha,createdAt --jq '.[] | select(.headSha=="b5987db4ed2d82020a59ab4f11799c67919b73e8")'
+exit: 0
+at: 2026-11-01T13:51:58Z
+
+```
+{"conclusion":"failure","createdAt":"2026-11-01T13:41:32Z","databaseId":41312478978,"event":"pull_request","headSha":"b5987db4ed2d82020a59ab4f11799c67919b73e8","status":"completed","workflowName":"PR Review Agent"}
+{"conclusion":"success","createdAt":"2026-11-01T13:41:32Z","databaseId":41312478810,"event":"pull_request","headSha":"b5987db4ed2d82020a59ab4f11799c67919b73e8","status":"completed","workflowName":"Self CI"}
+{"conclusion":"success","createdAt":"2026-11-01T13:41:28Z","databaseId":41312474722,"event":"push","headSha":"b5987db4ed2d82020a59ab4f11799c67919b73e8","status":"completed","workflowName":"Self CI"}
+```
+
+Exactly three runs at this head — same workflow set as round 1; no new checks.
+
+## Evidence: whole-run step inventory (pull_request, previously masked steps)
+
+command: gh run view 41312478810 --json event,headSha,status,conclusion,jobs --jq '.jobs[] | {name, conclusion, total_steps:(.steps|length), non_success:[.steps[]|select(.conclusion!="success")|{number,name,conclusion}], steps:[.steps[]|{number,name,conclusion}]}'
+exit: 0
+at: 2026-11-01T13:51:58Z
+
+```
+{"conclusion":"success","name":"Validate","non_success":[],"steps":[{"conclusion":"success","name":"Set up job","number":1},{"conclusion":"success","name":"Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262","number":2},{"conclusion":"success","name":"Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065","number":3},{"conclusion":"success","name":"Install PyYAML","number":4},{"conclusion":"success","name":"Check for CRLF in committed blobs","number":5},{"conclusion":"success","name":"Check CI sweeper deliverables","number":6},{"conclusion":"success","name":"Check agent definitions are model-agnostic","number":7},{"conclusion":"success","name":"Check shell scripts parse (bash -n)","number":8},{"conclusion":"success","name":"make validate-all","number":9},{"conclusion":"success","name":"Check design-gate blame scoping (scratch repos)","number":10},{"conclusion":"success","name":"Check gate list consistency","number":11},{"conclusion":"success","name":"Check orchestration references","number":12},{"conclusion":"success","name":"Check bats assertions are not vacuous","number":13},{"conclusion":"success","name":"Check post-PR CI loop mechanics","number":14},{"conclusion":"success","name":"Check skills specification","number":15},{"conclusion":"success","name":"Check finished specs are archived","number":16},{"conclusion":"success","name":"Check spec audit trails","number":17},{"conclusion":"success","name":"make lint","number":18},{"conclusion":"success","name":"Install pinned opencode binary and verify model env resolution","number":19},{"conclusion":"success","name":"Check agent env guard and hardcoded secrets","number":20},{"conclusion":"success","name":"Run loop files check","number":21},{"conclusion":"success","name":"Check Daily Triage loop deliverables","number":22},{"conclusion":"success","name":"Check PR Babysitter loop deliverables","number":23},{"conclusion":"success","name":"Check PR review agent deliverables","number":24},{"conclusion":"success","name":"Check security-hardening deliverables","number":25},{"conclusion":"success","name":"Check remediation budget","number":26},{"conclusion":"success","name":"Install shellcheck","number":27},{"conclusion":"success","name":"shellcheck scripts and templates","number":28},{"conclusion":"success","name":"Install bats-core","number":29},{"conclusion":"success","name":"Run shell gate bats tests (spec 001 Track B)","number":30},{"conclusion":"success","name":"Run gate selftests","number":31},{"conclusion":"success","name":"Check scenario traceability (live tree)","number":32},{"conclusion":"success","name":"Validate YAML syntax (.github, ci)","number":33},{"conclusion":"success","name":"Post Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065","number":65},{"conclusion":"success","name":"Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262","number":66},{"conclusion":"success","name":"Complete job","number":67}],"total_steps":36}
+```
+
+`non_success` is empty: every step that ran concluded `success`; none is
+`skipped`. The masked tail of round 1 (steps 17–33) now executes.
+
+## Evidence: whole-run tallies and previously masked gate outputs (both events)
+
+command: gh run view 41312478810 --log > /tmp/opencode/ci-040-r2.log; gh run view 41312474722 --log > /tmp/opencode/ci-040-r2-push.log; echo "pull_request: ok=$(grep -cE 'Z ok [0-9]+' /tmp/opencode/ci-040-r2.log) notok=$(grep -cE 'Z not ok [0-9]+' /tmp/opencode/ci-040-r2.log) skip=$(grep -c '# skip' /tmp/opencode/ci-040-r2.log)"; grep -E '1\.\.[0-9]+' /tmp/opencode/ci-040-r2.log | tail -1; echo "push: ok=$(grep -cE 'Z ok [0-9]+' /tmp/opencode/ci-040-r2-push.log) notok=$(grep -cE 'Z not ok [0-9]+' /tmp/opencode/ci-040-r2-push.log) skip=$(grep -c '# skip' /tmp/opencode/ci-040-r2-push.log)"; grep -E '1\.\.[0-9]+' /tmp/opencode/ci-040-r2-push.log | tail -1; for pat in "All finished specs archived" "Done\.$" "selftest: 26 passed, 0 failed" "Scenario traceability check: every scenario traced" "ok 210 AC-040-04-04"; do grep -E "$pat" /tmp/opencode/ci-040-r2.log | tail -1 | sed -E 's/^[^\t]*\t[^\t]*\t[^\x]*Z //'; done
+exit: 0
+at: 2026-11-01T13:52:04Z
+
+```
+pull_request: ok=755 notok=0 skip=0
+1..755
+push: ok=755 notok=0 skip=0
+1..755
+All finished specs archived.
+Done.
+selftest: 26 passed, 0 failed
+✔ Scenario traceability check: every scenario traced, every reference resolves.
+ok 210 AC-040-04-04: the media agent bats suite is green against agents-optional/
+```
+
+Additional verbatim lines from the same logs:
+
+```
+Scenario IDs found: 0 live, 488 archived
+  [OK] ci/parent.yml
+ok 198 AC-040-01-01: the four agents live in agents-optional/ and not in agents/
+ok 199 AC-040-01-02: a bridged child without opt-in exposes no media agent
+ok 200 AC-040-01-03: default agents/ and commands/ never name a media agent
+ok 201 AC-040-02-01: the global installer copies from agents-optional/
+ok 202 AC-040-02-02: --uninstall removes them
+ok 203 AC-040-02-03: the media-agents catalog row keeps the --with-media flag
+ok 204 AC-040-02-04: a child bootstrapped without the flag carries no media agent
+ok 205 AC-040-03-01: ADR 0018 amends the media agent family decision
+ok 206 AC-040-03-02: the media family record points forward and the index lists it
+ok 207 AC-040-04-01: MEDIA_AGENTS.md documents the opt-in and the relocated paths
+ok 208 AC-040-04-02: no stale agents/media path survives in the docs
+ok 209 AC-040-04-03: the orchestration and skills gates stay green
+ok 210 AC-040-04-04: the media agent bats suite is green against agents-optional/
+```
+
+The `make lint` step ends `Done.`; the YAML step emits `[OK]` for every file in
+`.github/`, `ci/`, and `ci/templates/` (last line `[OK] ci/parent.yml`); gate
+selftests report `selftest: 26 passed, 0 failed`; the live traceability gate
+reports `0 live, 488 archived` and exits 0.
+
+## Evidence: round-1 failing gate — local reproduction at `b5987db`
+
+command: ./scripts/check-specs-archived.sh
+exit: 0
+at: 2026-11-01T13:52:06Z
+
+```
+All finished specs archived.
+```
+
+Run in `/home/dbueno/.local/share/opencode/worktree/471827/spec-040` at HEAD
+`b5987db` (identical to the PR head). Round 1's exit 1 is gone.
+
+## Evidence: excluded check — `Review PR / Review PR` (environmental)
+
+command: gh run view 41312478978 --log-failed | grep -E "Invalid credential|##\[error\]Process completed"
+exit: 0
+at: 2026-11-01T13:52:06Z
+
+```
+small=false agent=build mode=primary error.error="AI_APICallError: Upstream request failed: Invalid credential"
+messageID=msg_197583393001kQIS1ysAVFb7fU error="Upstream request failed: Invalid credential" stack="AI_APICallError: Upstream request failed: Invalid credential\n    at <anonymous> (/$bunfs/root/chunk-22ym6391.js:6:14582)\n    at async <anonymous> (/$bunfs/root/chunk-22ym6391.js:6:12790)\n    at processTicksAndRejections (native:7:39)"
+Error: Upstream request failed: Invalid credential
+##[error]Process completed with exit code 1.
+```
+
+Repo-wide credential failure, not a finding about this PR; excluded from the
+verdict, per the round-1 disposition.
+
+## Warnings (review hints — recorded, not pipeline stops)
+
+**W7 — `shellcheck scripts and templates` exits 1 but is `continue-on-error:
+true` by repo policy.** Its output shows 208 `SC####` references (info/warning
+level, pre-existing across the tree). The only finding in a file this change
+touched is `In scripts/bootstrap-actions.sh line 23: SC2153 (info)`, and it is
+pre-existing: the merge-base `39fdd21` version of the same file yields the same
+finding and the same count (`base_counts: 2 current_counts: 2`). The step still
+reports `success` in the step inventory because the workflow sets the policy
+deliberately. Not introduced here; no action for this spec.
+
+**W8 — the audit-trail CI step runs vacuously after the archive.** The workflow
+loops over `specs/*/30-report.md`; with 040 archived there are zero in-flight
+reports on the branch, so the loop body never executes (`errors=0`, no output,
+exit 0). This is existing archive-time behavior, not a regression from this
+change: the archived one-pager is covered by `check-scenario-traceability.sh`
+(`488 archived` IDs, green above). Recorded so a later reader does not mistake
+the green step for a re-audit of the archived 040 document.
+
+**W9 — round-1 warnings W1–W6 stand unchanged.** This is a scoped phase-2
+re-check: the design-principles, complexity, and spot-check gates were not
+re-executed, so their round-1 results (PASS, with W1 `.mjs` gate blind spot,
+W2 pre-existing CC=7 `ensureDir`, W3 `--all` coverage wording, W4 heading typo,
+W5 orchestration scan gap, W6 hallmark length) carry forward without change.
+
+**No behavioral finding in this round.** Nothing observed at the new head
+contradicts a scenario's Given/When/Then or points at the media-agents opt-in
+implementation.
+
+## Budget
+
+- Re-verification **attempt 2, phase 2, round 2**: only the previously-failing
+  `Self CI` / `Validate` gate was re-run; unchanged gates' round-1 results stand.
+- `SPEC_LOOP_COUNT=2`, `SPEC_PHASE1_RETRIES=0`, `SPEC_PHASE2_RETRIES=1`.
+- Phase-2 budget after this round: **2 of 3 used**. PASS closes the loop; no
+  remediation round is requested.
+- Telemetry: one record appended to `runs.jsonl` (`outcome: pass`,
+  `gatesFailed: []`).
