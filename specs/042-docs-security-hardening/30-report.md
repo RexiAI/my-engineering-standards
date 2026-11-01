@@ -154,3 +154,8 @@ PASS 042-docs-security-hardening: evidence block 'complexity gate' — command: 
 PASS 042-docs-security-hardening: evidence block 'design-principles gate' — command: ./scripts/check-code-principles.sh --json, exit: 0, at: 2026-11-01T15:11:42Z
 PASS 042-docs-security-hardening: evidence block 'scenario-to-behavior spot check' — command: bats --tap scripts/tests/ac-042-*.bats scripts/tests/test-helper.bats scripts/tests/check-skills.bats, exit: 0, at: 2026-11-01T15:12:36Z
 ✔ Audit-trail check: specs/042-docs-security-hardening complete, verifier evidence recorded.
+
+## PR record
+
+PR: https://github.com/RexiAI/my-engineering-standards/pull/112
+Commit count: 14 (12 task commits + 1 spec-artifact commit + 1 record commit; the stage-5d archive commit is additional)
