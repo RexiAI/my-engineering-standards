@@ -1173,3 +1173,100 @@ ok 5 unit: no moved section is still linked from the AGENTS.md one-liner
 (AC-037-03-01) on head `7dea0c2`, reproduced locally with exit 1. `Review PR /
 Review PR` is the repo-wide environmental `Invalid credential` failure and is
 excluded from the verdict. Phase-2 budget status: round 2 of max 3 consumed.
+
+---
+
+## Post-PR CI check (phase 2) — round 3
+
+**Round 3 — attempt 1, phase 2 (post-PR) of this round; overall phase-2 round 3 (final allowed round).**
+Head re-checked: `64a5dc4ae6d1b64f3dfef35e67cc931d90cfe60e` — "fix(spec-042):
+repoint archived citations after the pipeline doc split", which repointed the
+archived citation at line 914 from `docs/SPEC_PIPELINE.md §Conformance tiers` to
+`docs/spec-pipeline/coder.md §Conformance tiers` (the destination the spec-037
+moved-section map records).
+
+Round 3 verdict: **PASS**. The pipeline may proceed. `Review PR / Review PR`
+remains the repo-wide environmental `Invalid credential` failure and is excluded
+from the verdict per the orchestrator's instruction.
+
+PR: https://github.com/RexiAI/my-engineering-standards/pull/112
+Head: `64a5dc4ae6d1b64f3dfef35e67cc931d90cfe60e`
+
+| Check | Workflow / event | Bucket | Result | Check ID |
+|---|---|---|---|---|
+| Validate | Self CI / pull_request | pass | **PASS** | 127298855391 |
+| Validate | Self CI / push | pass | **PASS** | 127298812534 |
+| Review PR / Review PR | PR Review Agent / pull_request | fail | excluded — environmental (`Invalid credential`) | 127298870220 |
+
+**Whole-run verification (both Self CI `Validate` runs on `64a5dc4`):** all 36
+reported steps succeeded; zero skipped or failed steps. That includes the
+previously-failing step 30 "Run shell gate bats tests (spec 001 Track B)" as well
+as steps 31–33 ("Run gate selftests", "Check scenario traceability (live tree)",
+"Validate YAML syntax") that were skipped behind it in round 2. No step was
+left unexecuted.
+
+## Evidence: post-PR CI check (round 3)
+
+command: gh pr checks 112 --json name,state,bucket,workflow,link
+exit: 0
+at: 2026-11-05T14:57:12Z
+
+[{"bucket":"fail","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/42043123552/job/127298870220","name":"Review PR / Review PR","state":"FAILURE","workflow":"PR Review Agent"},{"bucket":"pass","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/42043123108/job/127298855391","name":"Validate","state":"SUCCESS","workflow":"Self CI"},{"bucket":"pass","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/42043110582/job/127298812534","name":"Validate","state":"SUCCESS","workflow":"Self CI"}]
+
+## Evidence: check IDs for head 64a5dc4
+
+command: gh api repos/RexiAI/my-engineering-standards/commits/64a5dc4ae6d1b64f3dfef35e67cc931d90cfe60e/check-runs --jq '.check_runs[] | "\(.name) | id=\(.id) | \(.status)/\(.conclusion) | \(.details_url)"'
+exit: 0
+at: 2026-11-05T14:57:12Z
+
+Review PR / Review PR | id=127298870220 | completed/failure | https://github.com/RexiAI/my-engineering-standards/actions/runs/42043123552/job/127298870220
+Validate | id=127298855391 | completed/success | https://github.com/RexiAI/my-engineering-standards/actions/runs/42043123108/job/127298855391
+Validate | id=127298812534 | completed/success | https://github.com/RexiAI/my-engineering-standards/actions/runs/42043110582/job/127298812534
+
+## Evidence: whole Validate run step inventory (both events)
+
+command: for r in 42043123108 42043110582; do gh run view $r --json headSha,event,conclusion,status,workflowName,jobs --jq '"sha=\(.headSha) event=\(.event) workflow=\(.workflowName) conclusion=\(.conclusion) status=\(.status)", (.jobs[] | "job=\(.name) conclusion=\(.conclusion) steps=\(.steps|length) non_success=\([.steps[]|select(.conclusion != "success")|"\(.number):\(.name):\(.conclusion)"]|join(", "))")'; done
+exit: 0
+at: 2026-11-05T14:57:16Z
+
+--- run 42043123108 ---
+sha=64a5dc4ae6d1b64f3dfef35e67cc931d90cfe60e event=pull_request workflow=Self CI conclusion=success status=completed
+job=Validate conclusion=success steps=36 non_success=
+--- run 42043110582 ---
+sha=64a5dc4ae6d1b64f3dfef35e67cc931d90cfe60e event=push workflow=Self CI conclusion=success status=completed
+job=Validate conclusion=success steps=36 non_success=
+
+## Evidence: previously-failing test reproduction (AC-037-03-01)
+
+command: bats scripts/tests/ac-037-references.bats
+exit: 0
+at: 2026-11-05T14:57:16Z
+
+1..5
+ok 1 AC-037-03-01: moved-section references are repointed to the new file
+ok 2 AC-037-03-02: index-section references keep the index path
+ok 3 AC-037-03-03: each stage agent reads its own stage file plus named index sections
+ok 4 unit: the orchestrator's full-index read is intentional and documented
+ok 5 unit: no moved section is still linked from the AGENTS.md one-liner
+
+## Evidence: previously-failing CI step re-run (make test-scripts)
+
+command: make test-scripts
+exit: 0
+at: 2026-11-05T14:57:22Z
+
+Checking bats assertions are not vacuous...
+Running bats tests (TAP)...
+ok 1 ... (848 passing assertions, 0 `not ok`)
+ok 848 unit: successful under-cap call writes no reason line at all
+
+## Round verdict
+
+**PASS** — both Self CI `Validate` runs on head `64a5dc4` are fully green (36/36
+steps success, including the previously-failing step 30 and the steps 31–33 that
+were skipped in round 2). The round-2 finding is reproduced locally as fixed:
+`bats scripts/tests/ac-037-references.bats` exits 0 and `make test-scripts` exits
+0 with 848 passing / 0 failing assertions. `Review PR / Review PR`
+(id `127298870220`) is the repo-wide environmental `Invalid credential` failure,
+excluded. Phase-2 budget status: round 3 of max 3 consumed — PASS, no further
+fix routed.
