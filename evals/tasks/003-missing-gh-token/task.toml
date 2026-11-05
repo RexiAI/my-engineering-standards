@@ -1,0 +1,21 @@
+id = "003-missing-gh-token"
+slug = "003-missing-gh-token"
+agent = "spec-pr-opener"
+timeoutSec = 900
+
+[verifier]
+command = "bash tests/run.sh"
+rewardFile = "reward.txt"
+
+[oracle]
+solution = "solution"
+environment = "environment"
+
+[probe]
+id = "missing-gh-token"
+unsetEnv = ["GH_TOKEN"]
+remote = true
+branch = "spec/902-eval-missing-token"
+
+[probe.env]
+GITHUB_TOKEN = "eval-dummy"
