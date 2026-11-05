@@ -1181,7 +1181,7 @@ excluded from the verdict. Phase-2 budget status: round 2 of max 3 consumed.
 **Round 3 — attempt 1, phase 2 (post-PR) of this round; overall phase-2 round 3 (final allowed round).**
 Head re-checked: `64a5dc4ae6d1b64f3dfef35e67cc931d90cfe60e` — "fix(spec-042):
 repoint archived citations after the pipeline doc split", which repointed the
-archived citation at line 914 from `docs/SPEC_PIPELINE.md §Conformance tiers` to
+archived citation at line 914 from the index's `§Conformance tiers` section to
 `docs/spec-pipeline/coder.md §Conformance tiers` (the destination the spec-037
 moved-section map records).
 
