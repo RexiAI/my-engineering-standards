@@ -91,6 +91,28 @@ assert_exit_code() {
   fi
 }
 
+# agent_cited_paths <file...> — every repo-relative scripts/… or
+# skills/<name>/SKILL.md path the given file(s) cite, deduped. `.standards/…`
+# child-repo paths are excluded: they resolve in the child, not here.
+agent_cited_paths() {
+  grep -hoP '(?<!standards/)scripts/[A-Za-z0-9._-]+\.(sh|ps1)|skills/[a-z-]+/SKILL\.md' "$@" \
+    | sort -u || true
+}
+
+# repo_path_exists <root> <repo-relative-path> — 0 when the path resolves under
+# root. A .sh/.ps1 twin counts: the Windows sibling satisfies a citation the
+# same way scripts/check-orchestration.sh treats it.
+repo_path_exists() {
+  local root="$1" rel="$2" twin
+  [ -f "$root/$rel" ] && return 0
+  case "$rel" in
+    *.sh)  twin="${rel%.sh}.ps1" ;;
+    *.ps1) twin="${rel%.ps1}.sh" ;;
+    *)     return 1 ;;
+  esac
+  [ -f "$root/$twin" ]
+}
+
 # Create a minimal git repo in a temp dir for tests needing git
 setup_git_repo() {
   local dir="${1:-$TMPDIR_HELPER}"
