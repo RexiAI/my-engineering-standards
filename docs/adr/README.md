@@ -28,3 +28,4 @@ Proposed → Accepted → Deprecated → Superseded.
 | 0018 | [Media agents are opt-in: relocate the family to agents-optional/ and load it per repo through --with-media](0018-media-agents-opt-in.md) | Accepted |
 | 0019 | [spec-ux enforces Laws of UX as checkable consequences](0019-spec-ux-design-laws.md) | Proposed |
 | 0020 | [Pipeline lite mode: a mechanically selected short stage set for small specs](0020-pipeline-lite-mode.md) | Proposed |
+| 0021 | [Make the pipeline's own gates fail safely and report truthfully](0021-pipeline-gate-fail-safely.md) | Accepted |
