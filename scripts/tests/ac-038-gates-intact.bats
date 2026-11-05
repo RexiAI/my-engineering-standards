@@ -90,6 +90,16 @@ fixture_agent() {
   [ "$output" = "MAX_LINES=120" ]
 }
 
+@test "AC-038-05-01 — check-orchestration, check-skills, and check-agent-line-cap all exit 0" {
+  run bash "$REPO_ROOT/scripts/check-orchestration.sh"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"All orchestration references valid."* ]]
+  run bash "$REPO_ROOT/scripts/check-skills.sh"
+  [ "$status" -eq 0 ]
+  run bash "$REPO_ROOT/scripts/check-agent-line-cap.sh"
+  [ "$status" -eq 0 ]
+}
+
 @test "unit — a gate named only in frontmatter is not reachable" {
   local dir="$TMPDIR_HELPER/agents"
   fixture_agent "$dir" spec-frontmatter-only.md "No gate is invoked in this prompt body."
