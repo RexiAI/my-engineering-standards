@@ -102,6 +102,20 @@ If you still see the OOM message: close GPU-heavy apps first (browsers with
 GPU accel, IDEs), and the next lever is shrinking Kev's state prefix cache —
 start the server with `KEV_PREFIX_CACHE=0`, then `make judgment-up` again.
 
+## Facts block, judgments advise
+
+The division of labour is not a style preference: **deterministic facts hold the
+veto; a typed judgment may advise.** A test exit code, a compile result, a lint
+result, a file hash, a path check — those can fail a gate. A Choice answer with a
+confidence is a signal: it may route work, rank candidates, or warn a human, but
+it never authorises "done" and never overrides a red gate. This is the rule ADR
+0004 states and the Verifier's evidence gates enforce.
+
+A 2026 practitioner catalogue of typed-judgment projects arrives at the same
+rule independently for an evidence guard ("facts go to code, judgments go to the
+model; only facts can block"). That is corroboration, not authority — the rule
+here comes from ADR 0004 and is tested by the gate suite.
+
 ## The jaggedness caveat
 
 Typed-judgment units are **jagged**: strong on the shapes they were built

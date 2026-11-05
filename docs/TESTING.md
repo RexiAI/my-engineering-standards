@@ -20,7 +20,12 @@ following it.
 
 - Test files mirror source package structure. One test class per production class.
 - Name tests describing the scenario and expected outcome: `shouldReturnErrorWhenUserNotFound`.
-- **Java**: Use JUnit 5 (`@ExtendWith(MockitoExtension.class)`), Mockito for mocks, AssertJ for assertions. Avoid loading Spring context in unit tests.
+- **Structure each test as Given-When-Then**, with the observable values named `actual`/`expected` so a failing assertion reads without opening the production class.
+- **Select cases from branches, not from data volume.** One test per code branch and per validation rule; do not enumerate collection sizes. A suite that tests "0 items, 1 item, 3 items" has tested one branch three times.
+- **No logic in tests.** Assert literal expected values; do not compute the expectation the same way the production code does, and do not loop over cases inside a test. KISS beats DRY here — a duplicated literal is a readable failure, a shared calculation is a tautology.
+- **Test through public APIs.** Never test private methods directly; if behaviour is only reachable privately, the design is the problem.
+- **Mock only boundaries** (repositories, HTTP clients, clocks). Verify the arguments that matter; use a wildcard only for genuinely irrelevant ones.
+- **Java**: Use JUnit 5 (`@ExtendWith(MockitoExtension.class)`), Mockito for mocks, AssertJ for assertions. `@SpringBootTest` is forbidden in unit tests — Spring context belongs to the integration layer. Capture DTO arguments with `ArgumentCaptor`, not `any()`. See [`language-specific/java/TESTING.md`](../language-specific/java/TESTING.md).
 - **Go**: Use the stdlib `testing` package as the default — it's sufficient for the large majority of tests and adds no dependency. `testify` (assertions) and `github.com/golang/mock`/`gomockhandler` (mock generation) are optional additions for projects with enough table-driven complexity or interface surface to justify them; do not add either as a default. This supersedes the previous blanket "use testify/gomock" guidance, which contradicted docs/CODING_CONVENTIONS.md §Dependencies ("prefer stdlib, justify each dependency").
 - **JS/TS**: Use Jest. Prefer React Testing Library for component tests. Use Snapshot Testing sparingly (only for stable components).
 - **React Native**: unit and component tests run through Jest with the **jest-expo** preset and [React Native Testing Library](../language-specific/react-native/TESTING.md) — distinct from plain Jest, which does not know how to render native components or mock Expo modules. See `language-specific/react-native/TESTING.md` for the RNTL vs Maestro split and what to mock.
@@ -292,6 +297,8 @@ with the code. It does not prove that either one is correct.
 *Conformance tier: `production`. See docs/CONFORMANCE_TIERS.md.*
 
 Mutation testing validates that tests actually catch bugs by introducing small changes (mutations) to production code and verifying that at least one test fails. High line coverage alone does not guarantee useful tests — mutation coverage measures test quality.
+
+The gap is not theoretical. A 2026 practitioner benchmark generated tests for one pinned Spring Petclinic target, first with a one-shot "write tests" prompt and then with a plan → generate → compile → run testing process. Both suites built and reported **100% branch coverage**; against 12 deliberately injected defects the one-shot suites caught 5, the process-driven suites caught 10–11. Scope limits the conclusion — one repository, 12 defects, vendor run — so treat it as directional support for what this section already requires: judge a suite by the mutants it kills, not by the percentage its coverage tool prints.
 
 - **Java**: PiTest (`pitest-maven` plugin, profile-activated). Run with `mvn verify -Pmutation`. Target mutation coverage >= 80%. No shared parent POM exists in this repo to pin this centrally — copy `ci/templates/pitest-profile.xml` into each project.
 - **Go**: Gremlins (`gremlins unleash`), actively maintained and coverage-aware. See `ci/templates/mutation.mk`. `go-mutesting` was considered and rejected — fewer mutators, unmaintained.
