@@ -1138,3 +1138,231 @@ in `docs/changes/039-pipeline-lite-mode.md`. Fix routed by the orchestrator to
 the archive owner (`spec-pr-opener`/`spec-coder`); re-trigger with a scoped
 re-check of the two `Validate` checks only. `Review PR` excluded as
 environmental. Phase-2 budget: attempt 1 of 3.
+
+### Round 2 (attempt 2, phase 2)
+
+- **PR:** [#114](https://github.com/RexiAI/my-engineering-standards/pull/114)
+- **Head:** `6d34600987fb083ea35773a8d9e34c331aec0716` (`spec/039-pipeline-lite-mode`) — unchanged since the round-1 query.
+- **Fix under test:** `f700072` "fix(spec-039): remove invalid refs from the archived change record"; the head commit on top of it is the phase-2 round-1 telemetry record.
+- **Checked at:** 2026-11-05T14:53:21Z
+- **Scope:** phase-2 post-PR CI only. No phase-1 source gate was re-run; this round re-checks the two `Validate` check runs that failed in round 1 and confirms the *whole* job executed instead of aborting at `validate-refs`. `Review PR` remains excluded as environmental, per the orchestrator.
+- **Budget:** `SPEC_LOOP_COUNT=2`, `SPEC_PHASE1_RETRIES=1`, `SPEC_PHASE2_RETRIES=1`.
+
+#### Evidence: post-PR CI checks
+
+command: gh pr checks 114 --json name,state,bucket,workflow,link
+exit: 0
+at: 2026-11-05T14:53:21Z
+
+```
+[{"bucket":"fail","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/42043090545/job/127298743996","name":"Review PR / Review PR","state":"FAILURE","workflow":"PR Review Agent"},{"bucket":"pass","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/42043090118/job/127298741977","name":"Validate","state":"SUCCESS","workflow":"Self CI"},{"bucket":"pass","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/42043080168/job/127298707489","name":"Validate","state":"SUCCESS","workflow":"Self CI"}]
+```
+
+command: gh api repos/RexiAI/my-engineering-standards/commits/6d34600987fb083ea35773a8d9e34c331aec0716/check-runs --jq '.check_runs[] | {id, name, status, conclusion, started_at, completed_at, details_url}'
+exit: 0
+at: 2026-11-05T14:53:22Z
+
+```
+{"completed_at":"2026-11-05T14:16:08Z","conclusion":"failure","details_url":"https://github.com/RexiAI/my-engineering-standards/actions/runs/42043090545/job/127298743996","id":127298743996,"name":"Review PR / Review PR","started_at":"2026-11-05T14:14:36Z","status":"completed"}
+{"completed_at":"2026-11-05T14:21:01Z","conclusion":"success","details_url":"https://github.com/RexiAI/my-engineering-standards/actions/runs/42043090118/job/127298741977","id":127298741977,"name":"Validate","started_at":"2026-11-05T14:14:36Z","status":"completed"}
+{"completed_at":"2026-11-05T14:21:15Z","conclusion":"success","details_url":"https://github.com/RexiAI/my-engineering-standards/actions/runs/42043080168/job/127298707489","id":127298707489,"name":"Validate","started_at":"2026-11-05T14:14:32Z","status":"completed"}
+```
+
+Both `Validate` check runs are `completed/success`; `Review PR / Review PR` is
+`completed/failure` (excluded below). No check is pending — every check is
+terminal.
+
+#### Evidence: whole Validate run (no skipped tail)
+
+command: for RUN in 42043080168 42043090118; do gh api repos/RexiAI/my-engineering-standards/actions/runs/$RUN/jobs --jq '.jobs[] | "run '"$RUN"' job=\(.name) conclusion=\(.conclusion) steps=\(.steps|length) success=\([.steps[]|select(.conclusion=="success")]|length) failure=\([.steps[]|select(.conclusion=="failure")]|length) skipped=\([.steps[]|select(.conclusion=="skipped")]|length) cancelled=\([.steps[]|select(.conclusion=="cancelled")]|length)"'; done
+exit: 0
+at: 2026-11-05T14:53:22Z
+
+```
+run 42043080168 job=Validate conclusion=success steps=36 success=36 failure=0 skipped=0 cancelled=0
+run 42043090118 job=Validate conclusion=success steps=36 success=36 failure=0 skipped=0 cancelled=0
+```
+
+command: gh api repos/RexiAI/my-engineering-standards/actions/runs/42043090118/jobs --jq '.jobs[] | .steps[] | "\(.number)\t\(.conclusion)\t\(.name)"'
+exit: 0
+at: 2026-11-05T14:53:24Z
+
+```
+job=Validate conclusion=success steps=36
+1	success	Set up job
+2	success	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+3	success	Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+4	success	Install PyYAML
+5	success	Check for CRLF in committed blobs
+6	success	Check CI sweeper deliverables
+7	success	Check agent definitions are model-agnostic
+8	success	Check shell scripts parse (bash -n)
+9	success	make validate-all
+10	success	Check design-gate blame scoping (scratch repos)
+11	success	Check gate list consistency
+12	success	Check orchestration references
+13	success	Check bats assertions are not vacuous
+14	success	Check post-PR CI loop mechanics
+15	success	Check skills specification
+16	success	Check finished specs are archived
+17	success	Check spec audit trails
+18	success	make lint
+19	success	Install pinned opencode binary and verify model env resolution
+20	success	Check agent env guard and hardcoded secrets
+21	success	Run loop files check
+22	success	Check Daily Triage loop deliverables
+23	success	Check PR Babysitter loop deliverables
+24	success	Check PR review agent deliverables
+25	success	Check security-hardening deliverables
+26	success	Check remediation budget
+27	success	Install shellcheck
+28	success	shellcheck scripts and templates
+29	success	Install bats-core
+30	success	Run shell gate bats tests (spec 001 Track B)
+31	success	Run gate selftests
+32	success	Check scenario traceability (live tree)
+33	success	Validate YAML syntax (.github, ci)
+65	success	Post Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+66	success	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+67	success	Complete job
+```
+
+(The 36 step records are the 32 workflow steps plus the runner's set-up,
+post-action, and complete records; numbers `34..64` are consumed by the
+checkout/setup composite actions, not skipped steps. The push run
+`42043080168` reports the identical `36 success / 0 failure / 0 skipped /
+0 cancelled`.)
+
+Round 1 aborted at step 9 (`make validate-all` → `validate-refs`), so steps
+10–33 never ran on `271f2cc`. In this round every one of steps 10–33 ran and
+succeeded, including `Check orchestration references`, `make lint`,
+`Run shell gate bats tests`, `Run gate selftests`, and
+`Check scenario traceability (live tree)`.
+
+#### Evidence: validate-refs (the round-1 failing gate)
+
+command: gh run view 42043090118 --log | grep -E 'Checking all docs/ cross-refs exist|All docs/ cross-references valid|All validations passed|BROKEN.*039-pipeline-lite-mode'
+exit: 0
+at: 2026-11-05T14:53:35Z
+
+```
+Validate	make validate-all	2026-11-05T14:14:56.6533218Z Checking all docs/ cross-refs exist...
+Validate	make validate-all	2026-11-05T14:14:57.0988299Z All docs/ cross-references valid.
+Validate	make validate-all	2026-11-05T14:14:57.8540463Z All validations passed.
+```
+
+command: gh run view 42043080168 --log | grep -E 'Checking all docs/ cross-refs exist|All docs/ cross-references valid|All validations passed|BROKEN.*039-pipeline-lite-mode'
+exit: 0
+at: 2026-11-05T14:53:35Z
+
+```
+Validate	make validate-all	2026-11-05T14:14:52.7141358Z Checking all docs/ cross-refs exist...
+Validate	make validate-all	2026-11-05T14:14:53.1782850Z All docs/ cross-references valid.
+Validate	make validate-all	2026-11-05T14:14:53.9556005Z All validations passed.
+```
+
+command: grep -cE 'BROKEN.*039-pipeline-lite-mode' /tmp/opencode/pr114-r2-pr.log /tmp/opencode/pr114-r2-push.log
+exit: 0
+at: 2026-11-05T14:53:35Z
+
+```
+/tmp/opencode/pr114-r2-pr.log:0
+/tmp/opencode/pr114-r2-push.log:0
+```
+
+(The only literal `[BROKEN]` in either log is inside the *name* of a passing
+bats assertion: `ok 521 check-orchestration: dangling scripts/ reference exits 1
+with a [BROKEN] line`.)
+
+command: make validate-refs
+exit: 0
+at: 2026-11-05T14:53:10Z
+
+```
+Checking all docs/ cross-refs exist...
+All docs/ cross-references valid.
+```
+
+(The local run is the same `validate-refs` target, executed on the head
+worktree before this record was appended.)
+
+#### Evidence: previously skipped tail steps
+
+command: sed -n '/Run shell gate bats tests (spec 001 Track B)/,/Run gate selftests/p' /tmp/opencode/pr114-r2-pr.log | grep -E '\snot ok ' | wc -l
+exit: 0
+at: 2026-11-05T14:53:35Z
+
+```
+0
+```
+
+command: sed -n '/Run shell gate bats tests (spec 001 Track B)/,/Run gate selftests/p' /tmp/opencode/pr114-r2-pr.log | grep -cE '# (skip|SKIP)'
+exit: 0
+at: 2026-11-05T14:53:35Z
+
+```
+0
+```
+
+command: grep -oE '1\.\.[0-9]+' /tmp/opencode/pr114-r2-pr.log | head -1
+exit: 0
+at: 2026-11-05T14:53:35Z
+
+```
+1..828
+```
+
+command: grep -E 'Scenario IDs found|every scenario traced' /tmp/opencode/pr114-r2-pr.log
+exit: 0
+at: 2026-11-05T14:53:35Z
+
+```
+Validate	Check scenario traceability (live tree)	2026-11-05T14:20:55.9303093Z Scenario IDs found: 0 live, 500 archived
+Validate	Check scenario traceability (live tree)	2026-11-05T14:20:57.1394119Z ^[[0;32m✔ Scenario traceability check: every scenario traced, every reference resolves.^[[0m
+```
+
+(The push run has the same shape: `1..828`, 0 `not ok`, 0 skips, and the same
+traceability success line at `2026-11-05T14:21:10Z`.)
+
+#### Excluded failure — PR Review Agent
+
+command: gh run view 42043090545 --log-failed
+exit: 0 (log fetch); job conclusion: FAILURE
+at: 2026-11-05T14:52:06Z
+
+```
+Review PR / Review PR	UNKNOWN STEP	2026-11-05T14:16:06.1571943Z timestamp=2026-11-05T14:15:31.506Z level=ERROR run=ecdce77c message="stream error" providerID=opencode modelID=big-pickle session.id=ses_e53f0013dffe9n3xnbMRdj8pby small=false agent=build mode=primary error.error="AI_APICallError: Upstream request failed: Invalid credential"
+Review PR / Review PR	UNKNOWN STEP	2026-11-05T14:16:06.1590094Z Error: Upstream request failed: Invalid credential
+Review PR / Review PR	UNKNOWN STEP	2026-11-05T14:16:06.1603279Z ##[error]Process completed with exit code 1.
+```
+
+Environmental: the same provider credential rejection seen in round 1, in a new
+session/run, not a code or gate defect. Excluded from this round's verdict per
+the orchestrator instruction and the PR #113 skip-cleanly change.
+
+#### Warning — shellcheck step is `continue-on-error`
+
+Step 28 (`shellcheck scripts and templates`) ends its log with
+`##[error]Process completed with exit code 1` (208 diagnostics) but is
+`success` in the job record because `.github/workflows/self-ci.yml` marks it
+`continue-on-error: true`. None of the diagnostics name the 039 scripts
+(`lite-trigger.sh`, `classify-spec-size.sh`, `resolve-pipeline-mode.sh`, or the
+`ac-039-*.bats` files); all are pre-existing findings in unrelated files. Review
+hint, not a finding against this change.
+
+#### Per-check result
+
+| Check | Workflow | Result | Verdict |
+|---|---|---|---|
+| `Validate` (id `127298741977`, run `42043090118`) | Self CI (pull_request) | SUCCESS | **PASS** |
+| `Validate` (id `127298707489`, run `42043080168`) | Self CI (push) | SUCCESS | **PASS** |
+| `Review PR / Review PR` (id `127298743996`, run `42043090545`) | PR Review Agent | FAILURE | **EXCLUDED** — environmental invalid credential |
+
+### Round 2 verdict
+
+**PASS** — both `Validate` check runs on head `6d34600` are green, and the whole
+job executed: 36/36 steps success, 0 skipped/failed/cancelled on both the push
+and pull-request runs, with `validate-refs` now reporting
+`All docs/ cross-references valid.` The round-1 broken-reference finding is gone
+(0 occurrences). `Review PR` excluded as environmental per the orchestrator.
+Phase-2 budget: attempt 2 of 3. Gate IDs: `post-pr-ci` **PASS**.
