@@ -119,7 +119,7 @@ resolved mode.
 - `docs/SPEC_PIPELINE.md` gains a `## Lite mode` section stating: trigger tokens,
   classifier script, precedence, tier refusal, skipped stages, retained gates,
   `45-decisions.md` logging, and a link to the ADR.
-- `docs/SPEC_PIPELINE.md §Conformance tiers` table gains a lite column or note.
+- `docs/spec-pipeline/coder.md §Conformance tiers` table gains a lite column or note.
 - `scripts/check-orchestration.sh` and `scripts/check-skills.sh` exit 0.
 
 ## Human review decisions (2026-10-30)
@@ -301,7 +301,7 @@ exit: 124
 at: 2026-11-01T16:35:26Z
 
 (cwd: /tmp/opencode/rel39 — a fixture repo with `specs/s/10-tasks.md` naming
-`docs/FOO.md`, `specs/s/20-acceptance/a.md` holding one scenario, and NO
+`docs/example-doc`, `specs/s/20-acceptance/a.md` holding one scenario, and NO
 `Conformance tier:` declaration anywhere at or above it. Command timed out
 after 5 s with empty stdout and empty stderr: the resolver never returns.)
 
@@ -586,7 +586,7 @@ exit: 0
 at: 2026-11-05T12:05:44Z
 
 (cwd: `/tmp/opencode/rel39-final` — the same fixture shape attempt 1 used:
-`specs/s/10-tasks.md` naming `docs/FOO.md`, `specs/s/20-acceptance/a.md` holding
+`specs/s/10-tasks.md` naming `docs/example-doc`, `specs/s/20-acceptance/a.md` holding
 one scenario, and NO `Conformance tier:` declaration at or above it. This is the
 exact command form that hung in attempt 1, run here with the documented relative
 path.)
@@ -629,7 +629,7 @@ Regression checks on the same fix (the canonicalisation must not break upward
 tier detection or the permit path):
 
     cwd=/tmp/opencode/rel39-mvp            # repo root declares `## Conformance tier: mvp`
-    specs/s == `See docs/FOO.md.` + 1 scenario (classifier: lite)
+    specs/s == `See docs/example-doc.` + 1 scenario (classifier: lite)
 
     $ timeout 5 bash scripts/resolve-pipeline-mode.sh specs/s        -> lite  rc=0
     $ timeout 5 bash scripts/resolve-pipeline-mode.sh specs/s full   -> full  rc=0
@@ -757,8 +757,8 @@ at: 2026-11-05T12:14:41Z
 skipped — production tier required (current tier is mvp, see docs/CONFORMANCE_TIERS.md)
 ```
 
-Per `docs/SPEC_PIPELINE.md §Conformance tiers` and `docs/spec-pipeline/coder.md
-§Conformance tiers`, mutation testing is a `production`-tier gate. This repo
+Per `docs/spec-pipeline/coder.md §Conformance tiers`, mutation testing is a
+`production`-tier gate. This repo
 declares no tier, so the ruling is `mvp` and mutation testing is a recorded
 skip, not a gap.
 
@@ -1008,3 +1008,133 @@ Verdict: SKIPPED — Non-frontend repo — deploy verification not applicable
 
 No `vercel deploy` was run. No deployment was created or observed. Stage 5d (the
 Archiver) may proceed.
+
+## Post-PR CI check
+
+### Round 1 (attempt 1, phase 2)
+
+- **PR:** [#114](https://github.com/RexiAI/my-engineering-standards/pull/114)
+- **Head:** `271f2ccff69af4c78db120e1bd8ca32d74cefe61` (`spec/039-pipeline-lite-mode`)
+- **Checked at:** 2026-11-05T13:04:17Z
+- **Scope:** phase-2 post-PR CI only. No source gate was re-run.
+
+#### Evidence: post-PR CI checks
+
+command: gh pr checks 114 --json name,state,bucket,workflow,link
+output:
+```json
+[{"bucket":"fail","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/42028055737/job/127247407305","name":"Review PR / Review PR","state":"FAILURE","workflow":"PR Review Agent"},{"bucket":"fail","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/42028055306/job/127247140204","name":"Validate","state":"FAILURE","workflow":"Self CI"},{"bucket":"fail","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/42028044992/job/127247112398","name":"Validate","state":"FAILURE","workflow":"Self CI"}]
+```
+exit: 0
+at: 2026-11-05T13:03:54Z
+
+command: gh api repos/RexiAI/my-engineering-standards/commits/271f2ccff69af4c78db120e1bd8ca32d74cefe61/check-runs --jq '.check_runs[] | {name, conclusion, id, started_at, completed_at}'
+output:
+```json
+{"completed_at":"2026-11-05T12:34:45Z","conclusion":"failure","id":127247407305,"name":"Review PR / Review PR","started_at":"2026-11-05T12:33:25Z"}
+{"completed_at":"2026-11-05T12:33:15Z","conclusion":"failure","id":127247140204,"name":"Validate","started_at":"2026-11-05T12:32:52Z"}
+{"completed_at":"2026-11-05T12:33:11Z","conclusion":"failure","id":127247112398,"name":"Validate","started_at":"2026-11-05T12:32:48Z"}
+```
+exit: 0
+at: 2026-11-05T13:03:54Z
+
+#### Per-check result
+
+| Check | Workflow | Result | Verdict |
+|---|---|---|---|
+| `Validate` (id `127247140204`, run `42028055306`) | Self CI | FAILURE | **FAIL** |
+| `Validate` (id `127247112398`, run `42028044992`) | Self CI | FAILURE | **FAIL** |
+| `Review PR / Review PR` (id `127247407305`, run `42028055737`) | PR Review Agent | FAILURE | **EXCLUDED** — environmental invalid credential, per orchestrator instruction and PR #113 skip-cleanly change |
+
+No check was pending at the time of the query; all three are terminal.
+
+#### Failure diagnosis — Self CI `Validate`
+
+Both `Validate` jobs fail at `make validate-all` → `validate-refs`, identically:
+
+command: gh run view 42028055306 --log-failed
+output (excerpt):
+```
+Validate	make validate-all	2026-11-05T12:33:12.2739029Z Checking all docs/ cross-refs exist...
+Validate	make validate-all	2026-11-05T12:33:12.5331429Z   [BROKEN] ./docs/changes/039-pipeline-lite-mode.md -> docs/<placeholder>.md
+Validate	make validate-all	2026-11-05T12:33:12.5332444Z   [BROKEN] ./docs/changes/039-pipeline-lite-mode.md -> docs/<placeholder>.md
+Validate	make validate-all	2026-11-05T12:33:12.5333303Z   [BROKEN] ./docs/changes/039-pipeline-lite-mode.md -> docs/<placeholder>.md
+Validate	make validate-all	2026-11-05T12:33:12.7309149Z 3 broken reference(s)!
+Validate	make validate-all	2026-11-05T12:33:12.7315669Z make: *** [Makefile:67: validate-refs] Error 1
+Validate	make validate-all	2026-11-05T12:33:12.7327004Z ##[error]Process completed with exit code 2.
+```
+exit: 0 (log fetch); job conclusion: FAILURE
+at: 2026-11-05T13:03:54Z
+
+command: gh run view 42028044992 --log-failed
+output (excerpt):
+```
+Validate	make validate-all	2026-11-05T12:33:09.8584878Z   [BROKEN] ./docs/changes/039-pipeline-lite-mode.md -> docs/<placeholder>.md
+Validate	make validate-all	2026-11-05T12:33:09.8585637Z   [BROKEN] ./docs/changes/039-pipeline-lite-mode.md -> docs/<placeholder>.md
+Validate	make validate-all	2026-11-05T12:33:09.8586073Z   [BROKEN] ./docs/changes/039-pipeline-lite-mode.md -> docs/<placeholder>.md
+Validate	make validate-all	2026-11-05T12:33:10.1316266Z 3 broken reference(s)!
+Validate	make validate-all	2026-11-05T12:33:10.1317476Z make: *** [Makefile:67: validate-refs] Error 1
+Validate	make validate-all	2026-11-05T12:33:10.1332472Z ##[error]Process completed with exit code 2.
+```
+exit: 0 (log fetch); job conclusion: FAILURE
+at: 2026-11-05T13:03:54Z
+
+Root cause: `docs/changes/039-pipeline-lite-mode.md` contains the literal
+placeholder doc path at lines 304, 589, and 632 (archive of the task
+and acceptance-scenario examples). `Makefile:67` (`validate-refs`) greps every
+tracked `*.md` for `docs/[A-Z_]+\.md` and requires the target file to exist, so
+the placeholder is counted three times. Not a tooling failure — the gate ran and
+produced findings.
+
+Spelling note: the offending placeholder is written `docs/example-doc` in the
+stage-5c sections above, and `docs/<placeholder>.md` inside the quoted CI log
+below. Reproducing the literal string in this archive would re-break the gate it
+records — `validate-refs` scans this file too, so the requirement it imposes (no
+unresolvable `docs/[A-Z_]+\.md` match anywhere in the file) applies to the
+failure record exactly as it applies to the failure.
+
+Fix (not applied by the Verifier): replace the placeholder with a non-matching
+name (e.g. `docs/example.md`) or a real file in all three occurrences, then push
+to the same branch.
+
+Fix landed (phase-2 round 1, `spec-coder`): all three occurrences replaced with
+`docs/example-doc`; the eight occurrences this round-1 record itself added while
+quoting the CI log were redacted per the spelling note above, so the archive no
+longer matches the `validate-refs` pattern anywhere (11 occurrences total → 0).
+
+Also cleared in the same round (`spec-coder`): this archive carried two stale
+pointers to the pre-037 `docs/SPEC_PIPELINE.md` location of the conformance-tiers
+section, which spec 037 moved to `docs/spec-pipeline/coder.md` — one in the Task 7
+task line, one in the mutation-skip note. `scripts/tests/ac-037-references.bats`
+case `AC-037-03-01` flags them. They were latent rather than diagnosed: the
+`Validate` job runs `make validate-all` before `make test-scripts`, and the
+`validate-refs` failure aborted the job first. Both pointers now resolve to
+`docs/spec-pipeline/coder.md`; the stale string is not reproduced here for the
+same reason as above.
+
+#### Excluded failure — PR Review Agent
+
+command: gh run view 42028055737 --log-failed
+output (excerpt):
+```
+Review PR / Review PR	UNKNOWN STEP	2026-11-05T12:34:43.3549076Z timestamp=2026-11-05T12:33:31.576Z level=INFO run=bee1d356 message=process session.id=ses_e544ccc3effeWahGp4aQyj14io messageID=msg_1abb33591001yGvU5n7cANrayQ
+Review PR / Review PR	UNKNOWN STEP	2026-11-05T12:34:43.3553131Z timestamp=2026-11-05T12:33:31.581Z level=INFO run=bee1d356 message="llm runtime selected" llm.runtime=ai-sdk llm.provider=opencode llm.model=big-pickle
+Review PR / Review PR	UNKNOWN STEP	2026-11-05T12:34:43.3570314Z timestamp=2026-11-05T12:34:43.272Z level=ERROR run=bee1d356 message=process session.id=ses_e544ccc3effeWahGp4aQyj14io messageID=msg_1abb33591001yGvU5n7cANrayQ error="Upstream request failed: Invalid credential" stack="AI_APICallError: Upstream request failed: Invalid credential\n    at <anonymous> (/$bunfs/root/chunk-22ym6391.js:6:14582)\n    at async <anonymous> (/$bunfs/root/chunk-22ym6391.js:6:12790)\n    at processTicksAndRejections (native:7:39)"
+Review PR / Review PR	UNKNOWN STEP	2026-11-05T12:34:43.3571602Z Error: Upstream request failed: Invalid credential
+Review PR / Review PR	UNKNOWN STEP	2026-11-05T12:34:43.3579420Z ##[error]Process completed with exit code 1.
+```
+exit: 0 (log fetch); job conclusion: FAILURE
+at: 2026-11-05T13:04:17Z
+
+Environmental: provider credential rejection in the review agent, not a code or
+gate defect. Excluded from this round's verdict per the orchestrator instruction
+(PR #113 makes the job skip cleanly when credentials are unusable).
+
+### Round 1 verdict
+
+**FAIL** — Self CI `Validate` fails on both check runs (ids `127247140204` and
+`127247112398`) with the same `validate-refs` finding: the placeholder doc path
+in `docs/changes/039-pipeline-lite-mode.md`. Fix routed by the orchestrator to
+the archive owner (`spec-pr-opener`/`spec-coder`); re-trigger with a scoped
+re-check of the two `Validate` checks only. `Review PR` excluded as
+environmental. Phase-2 budget: attempt 1 of 3.
