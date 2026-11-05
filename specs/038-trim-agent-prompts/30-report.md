@@ -233,3 +233,6 @@ Dirty by design at this stage: the 038 change set is uncommitted, as stage 5b co
 ## Hand-off to stage 5b
 
 Mutation gate: **skipped at `mvp`** (documented, not silently absent). Everything else GREEN. The PR Opener's precondition (`docs/SPEC_PIPELINE.md §Stop-and-Ask decision matrix`: branch `spec/NNN-slug`, `30-report.md` present and green) is satisfiable. The only staging instruction is U-1: commit `tests/AC-030-01.sh` as its own `fix(tests): …` commit referencing 037 O-2, or leave it uncommitted — do not fold it into a 038 task commit.
+
+PR: https://github.com/RexiAI/my-engineering-standards/pull/115
+Commits: 8 (task + spec commits at PR open; plus this record, the 40-deploy skip, and the archive commit)
