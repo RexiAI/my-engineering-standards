@@ -59,17 +59,26 @@ its output.
 
 1. Confirm `10-tasks.md` and `20-acceptance/` exist; if not, tell the user to
    run `/spec` first.
-2. Delegate in this order, each waiting for the previous: `spec-coder` →
+2. Resolve the mode before delegating, per `docs/SPEC_PIPELINE.md §Lite mode`
+   (the resolver reads the spec folder and your arguments, prints `lite` or
+   `full`, reports a tier refusal on stderr, and appends the decision to
+   `45-decisions.md`). Apply that section's rules; never decide the mode
+   yourself.
+3. Delegate in this order, each waiting for the previous: `spec-coder` →
    `spec-refactorer` → `spec-verifier` → `spec-mutation-runner` →
    `spec-pr-opener`. Surface each subagent's end-of-turn summary.
-3. Before every delegation to `spec-verifier`, export `SPEC_LOOP_COUNT`,
+   In `lite`, the chain is `spec-coder` → `spec-verifier` → `spec-pr-opener`
+   (5b, then 5d): `spec-refactorer`, `spec-mutation-runner`, `spec-ux`, and
+   `spec-deployer` are skipped, and the Verifier writes the lite `30-report.md`.
+4. Before every delegation to `spec-verifier`, export `SPEC_LOOP_COUNT`,
    `SPEC_PHASE1_RETRIES`, `SPEC_PHASE2_RETRIES` from your loop/retry tracking
    (export nothing if you track none; the record defaults them to 0).
-4. Phase 1 — on a Verifier BLOCK, re-delegate the failing fix back to
+5. Phase 1 — on a Verifier BLOCK, re-delegate the failing fix back to
    `spec-coder` (behavior failures) or `spec-refactorer` (structural/complexity failures),
    then re-invoke `spec-verifier` for scoped re-verification, up to **3** cycles.
-   On the 3rd BLOCK, stop — no 4th re-delegation.
-5. Phase 2 — after the PR Opener reports the PR URL, run the phase-2 loop
+   In `lite` there is no Refactorer, so a structural/complexity BLOCK goes back
+   to `spec-coder` too. On the 3rd BLOCK, stop — no 4th re-delegation.
+6. Phase 2 — after the PR Opener reports the PR URL, run the phase-2 loop
    (max 3 rounds, counter independent of Phase 1, per spec 008; an independent
    max-3 budget): `spec-verifier` checks CI; on FAIL route the fix as in step 4,
    re-invoke `spec-pr-opener` to re-push (which re-triggers Self CI), then
@@ -80,6 +89,8 @@ Stop conditions:
 
 - Do not run stage-5 agents (`spec-mutation-runner`, `spec-pr-opener`) unless
   the Verifier's verdict is PASS (a post-remediation PASS counts).
+- In `lite` mode there is no Mutation Runner to report on: the green signal is
+  the Verifier PASS plus the lite `30-report.md` the Verifier writes.
 - If the Mutation Runner reports the suite is not green, stop and relay its
   report; do not run the PR Opener.
 - If any stage reports it cannot proceed, stop and relay exactly what it said;
