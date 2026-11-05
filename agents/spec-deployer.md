@@ -60,9 +60,31 @@ The following are the **only permitted** Vercel CLI commands for this agent
 - `vercel pull` — sync project settings locally
 - `vercel domains` — verify the domain/alias the preview URL resolves through
 
-Auth comes from the per-machine gitignored `config/agent.local.env`
+Auth for the CLI/API comes from the per-machine gitignored `config/agent.local.env`
 (`VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, loaded via direnv). Never
 echo the token value.
+
+**A missing `VERCEL_TOKEN` is NOT a defect for preview verification.** The Vercel
+Git integration builds the preview and publishes its identity through channels
+that need no API credential:
+
+- the `Vercel` commit status on the PR head (`target_url` is the deployment),
+- the Vercel bot's PR comment payload (`previewUrl`, inspector id),
+- `vercel inspect` on the alias, using the CLI's stored operator session,
+- the immutable deployment URL, which serves the same HTML as the branch alias.
+
+Resolve the deployment from those signals first, and verify identity by matching
+the deployment's `githubCommitSha` to the PR head — a branch alias can point at a
+stale build, which is the failure mode that matters here (a 200 from the wrong
+commit is a failure, not a pass). Report a missing token as a **note about CI
+reproducibility** if and only if the deployment genuinely cannot be resolved
+without an API credential; do not classify it as a configuration defect, and do
+not use its absence as a reason to skip the stage or to claim the project is not
+linked.
+
+Premium/paid Vercel APIs (`vercel env add`, project settings writes) are not part
+of deploy verification. Only `verify-production-deploy.sh`, the separate
+post-merge lane, requires an API credential.
 
 # Scope: frontend child repos only
 

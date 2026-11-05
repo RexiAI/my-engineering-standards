@@ -561,8 +561,21 @@ verification loop (phase 3)`) and (2) a post-merge production check —
 `.github/workflows/ci-vercel-production-verify.yml` running
 `scripts/verify-production-deploy.sh`, which queries the Vercel API for the
 deployment built from the merged commit, health-checks the production URL, and
-records the result. Repos without a linked Vercel project skip with a reason;
-a missing `VERCEL_TOKEN` is a configuration defect and fails loudly.
+records the result. Repos without a linked Vercel project skip with a reason.
+
+A missing `VERCEL_TOKEN` means two different things in the two lanes, and they
+must not be conflated:
+
+- **Preview verification (stage 5c)** needs no API credential. The Git integration
+  publishes the deployment through the `Vercel` commit status, the bot PR comment,
+  and the immutable deployment URL. Resolve it there and match
+  `githubCommitSha` to the PR head — the branch alias can lag, and a 200 from a
+  stale build is a failure, not a pass. A missing token here is a note about CI
+  reproducibility at most, never a configuration defect and never a reason to
+  skip the stage.
+- **Post-merge production verification** (`verify-production-deploy.sh`) queries
+  the Vercel API and therefore does need `VERCEL_TOKEN`; there a missing or
+  rejected credential is recorded as a failure, not a skip.
 
 **Cost.** Vercel builds cost money: every phase-3 round re-triggers a real
 cloud build on the account that owns the linked project. The bounded phase-3
