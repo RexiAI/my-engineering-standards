@@ -19,6 +19,27 @@ the script; do not re-implement the token match here.
 Confirm `specs/$ARGUMENTS/10-tasks.md` and `specs/$ARGUMENTS/20-acceptance/` exist.
 If not, tell the user to run `/spec $ARGUMENTS` first and stop.
 
+# Pipeline mode
+
+Before delegating, apply the resolved mode. The rules, the resolver's script
+paths, and the classifier's bounds are all in `docs/SPEC_PIPELINE.md §Lite mode`
+— read that section rather than guessing. The resolver reads the spec folder
+and the arguments you were given, prints `lite` or `full`, reports a tier
+refusal on stderr, and appends one entry to
+`specs/$ARGUMENTS/45-decisions.md`. Never choose the mode yourself, and never
+re-implement the trigger match or the classifier: each has exactly one
+implementation.
+
+When the resolved mode is `lite`, run `spec-coder` → `spec-verifier` →
+`spec-pr-opener` (5b) → `spec-pr-opener` (5d) and skip the rest; `spec-refactorer`,
+`spec-mutation-runner`, `spec-ux`, and `spec-deployer` are not invoked. A
+structural or complexity BLOCK re-delegates to `spec-coder` instead of
+`spec-refactorer`, under the same phase-1 cap. The Verifier writes the lite
+`30-report.md` (`Pipeline mode: lite`, skipped stages and the mutation score as
+`skipped (lite)`), which the PR Opener accepts as green.
+
+When the resolved mode is `full`, the stage list below is unchanged.
+
 Otherwise delegate in order: `spec-coder`, then `spec-refactorer`, then `spec-verifier`,
 then `spec-mutation-runner` (stage 5a), then `spec-pr-opener` (stage 5b). Each stage
 must report green before the next starts. The Verifier's verdict must be PASS

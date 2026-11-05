@@ -4,6 +4,12 @@ Index: `docs/SPEC_PIPELINE.md` — read §Stages and §Commit and push carve-out
 Must read: `docs/spec-pipeline/audit-contract.md` (§Audit contract,
 §Definition of done) before running the audit-trail gate.
 
+## Lite mode
+
+A `lite` run has no Mutation Runner: `30-report.md` records `Pipeline mode: lite`
+and `skipped (lite)` for each skipped stage, which is the green signal — see
+`docs/spec-pipeline/lite-mode.md`. The Verifier PASS precondition is unchanged.
+
 ## Archive in the PR
 
 The `specs/NNN-slug/` folder is pipeline scratch. It belongs on the PR branch
