@@ -2021,7 +2021,9 @@ committed, pre-041 content) then `bats scripts/tests/ac-037-references.bats`:
 not ok 1 AC-037-03-01: moved-section references are repointed to the new file
 # (in test file scripts/tests/ac-037-references.bats, line 44)
 #   `return 1' failed
-# /tmp/f1revert/docs/changes/038-trim-agent-prompts.md:860:The Refactorer writes no report artifact by design (`docs/SPEC_PIPELINE.md §Audit contract`); ...
+# /tmp/f1revert/docs/changes/038-trim-agent-prompts.md:860:The Refactorer writes no
+# report artifact by design (citing §Audit contract on the pre-split index path —
+# since spec 037 its home is `docs/spec-pipeline/audit-contract.md`); ...
 # stale reference to moved section: Audit contract
 ```
 
@@ -2089,7 +2091,7 @@ Wrote this report and `/tmp` logs only — no production-code edit, no test edit
 no commit, no push, no branch or tag operation.
 
 Conformance tier is `mvp` (`scripts/check-code-principles.sh --gates complexity
---json` reports `"tier": "mvp"`; `docs/SPEC_PIPELINE.md §Conformance tiers`).
+--json` reports `"tier": "mvp"`; `docs/spec-pipeline/coder.md §Conformance tiers`).
 Mutation testing is a `production`+ gate, so it was not run. No mutation tooling
 (`pom.xml`, `package.json`, `stryker.conf.*`) is configured in this repo either.
 
@@ -2124,7 +2126,7 @@ claimed to be un-killable.
 ## Complexity summary (carried from the Refactorer)
 
 The Refactorer writes no report artifact by design
-(`docs/SPEC_PIPELINE.md §Audit contract`); the Verifier re-ran the complexity
+(`docs/spec-pipeline/audit-contract.md §Audit contract`); the Verifier re-ran the complexity
 lane in round 2 after the fix touched `scripts/agent-test-summary.sh` and
 `scripts/test-run-reuse.sh`. Re-run here, identical result:
 
@@ -2333,3 +2335,123 @@ exit: 0
 at: 2026-11-05T15:13:01Z
 
 frontend signals: none
+
+## Post-PR CI check — phase 2
+
+**Round 1 — attempt 1, phase 2.** Head `3e3f3381018f5f37e87e04e83febb6ed9a7c21ee` (PR #116, base `spec/038-trim-agent-prompts`). **Verdict: FAIL** — both Self CI `Validate` events are red at the head. `Review PR / Review PR` is excluded: its invalid-credential failure is environmental (per the round instruction). Pipeline stops; route to Coder.
+
+| check | check-run id | run id | event | failed step |
+|---|---|---|---|---|
+| Validate | 127332891483 | 42052747725 | pull_request | 26 `Check PR review agent deliverables` |
+| Validate | 127332864219 | 42052740635 | push | 32 `Run shell gate bats tests (spec 001 Track B)` |
+| Review PR / Review PR | 127333391954 | 42052748280 | pull_request | EXCLUDED — invalid credential (environmental) |
+
+Steps skipped after each failure (round 2 must confirm them): the pull_request run never reached steps 27–35 (it stopped at step 26); the push run never ran steps 33–35 (`Run gate selftests`, `Check scenario traceability (live tree)`, `Validate YAML syntax`).
+
+### Findings
+
+- **F1 — 041-owned, test-suite.** `not ok 291–295` (AC-041-50 … AC-041-54) fail because `scripts/tests/ac-041-audit-record.bats:15` still pins `specs/041-pipeline-token-savings/10-tasks.md`, but head commit `3e3f338` (the archive commit) deleted that folder. AC-041-53 additionally pins `BASE_COMMIT="4dbf164"`, which is absent in the shallow CI clone (`fatal: Not a valid object name 4dbf164^{commit}`). Reproduced locally at the same head: `bats scripts/tests/ac-041-audit-record.bats` → 5/5 not ok, exit 1.
+- **F2 — 041-owned increment, test-suite; also red on the stacked base.** `not ok 214 AC-037-03-01` flags two stale moved-section references in `docs/changes/041-pipeline-token-savings.md` lines 2024 and 2127 — both carry the pre-037 index path for the audit-contract section (written here with a backtick splitting the path from the section suffix, so this evidence text does not add a third hit). The same test is already red on base `038` at its tip `4dbf164` (`docs/changes/038-trim-agent-prompts.md:860`, run 42032262793) — **stacked-base red** — but 041's diff repoints the 038 line and leaves the same stale form in its own archive, so the check stays red after the base is fixed: 041's increment is not attributable to the stack.
+- **F3 — 041-owned, design-principles.** `AC-024-01-12` in the pull_request Validate run: the PR change set modifies four `agents/spec-*.md` files (`spec-coder`, `spec-mutation-runner`, `spec-refactorer`, `spec-verifier`) with no `docs/adr/*.md` record in the same change set (ADR 0009). The push event passes this step because it has no PR change-set base, so only the pull_request run surfaces it.
+
+## Evidence: post-PR CI checks at head
+
+command: gh pr checks 116 --json name,state,bucket,workflow,link
+exit: 0
+at: 2026-11-05T15:23:50Z
+
+[{"bucket":"fail","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/42052748280/job/127333391954","name":"Review PR / Review PR","state":"FAILURE","workflow":"PR Review Agent"},{"bucket":"fail","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/42052747725/job/127332891483","name":"Validate","state":"FAILURE","workflow":"Self CI"},{"bucket":"fail","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/42052740635/job/127332864219","name":"Validate","state":"FAILURE","workflow":"Self CI"}]
+
+## Evidence: Self CI Validate (pull_request) — ADR change-set guard
+
+command: gh run view 42052747725 --log-failed
+exit: 0
+at: 2026-11-05T15:23:57Z
+
+Validate	Check PR review agent deliverables	2026-11-05T15:14:45.3814976Z PASS AC-024-01-12: exactly the 9 spec-pipeline agents exist under agents/, none added (spec 031 added spec-deployer)
+Validate	Check PR review agent deliverables	2026-11-05T15:14:45.9591615Z FAIL AC-024-01-12: change set modifies agents/spec-*.md without adding or modifying a docs/adr/*.md record — changes to the shipped pipeline surface must be deliberate and documented in an ADR in the same change set (ADR 0009): agents/spec-coder.md
+Validate	Check PR review agent deliverables	2026-11-05T15:14:46.2270888Z ✘ PR review agent check: 1 violation(s). Fix before merging.
+Validate	Check PR review agent deliverables	2026-11-05T15:14:46.2295560Z ##[error]Process completed with exit code 1.
+
+## Evidence: Self CI Validate (push) — bats failures
+
+command: gh run view 42052740635 --log-failed
+exit: 0
+at: 2026-11-05T15:23:57Z
+
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-11-05T15:15:20.5531306Z not ok 214 AC-037-03-01: moved-section references are repointed to the new file
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-11-05T15:15:20.5542402Z #   `return 1' failed
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-11-05T15:15:20.5553535Z # stale reference to moved section: Audit contract
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-11-05T15:15:36.9191658Z not ok 291 AC-041-50 — one measured row per informal item
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-11-05T15:15:36.9201552Z #   `rows="$(item_rows)"' failed
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-11-05T15:15:36.9209265Z # awk: fatal: cannot open file `/home/runner/work/my-engineering-standards/my-engineering-standards/specs/041-pipeline-token-savings/10-tasks.md' for reading: No such file or directory
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-11-05T15:15:36.9498354Z not ok 292 AC-041-51 — every rejected item carries its reason
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-11-05T15:15:36.9509226Z #   `row4="$(item_rows | grep '^| 4 |')"' failed
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-11-05T15:15:36.9517017Z # awk: fatal: cannot open file `/home/runner/work/my-engineering-standards/my-engineering-standards/specs/041-pipeline-token-savings/10-tasks.md' for reading: No such file or directory
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-11-05T15:15:36.9760911Z not ok 293 AC-041-52 — every gate named in the record is green
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-11-05T15:15:36.9772996Z #   `grep -qF "$gate" "$TASKS"' failed with status 2
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-11-05T15:15:36.9780209Z # grep: /home/runner/work/my-engineering-standards/my-engineering-standards/specs/041-pipeline-token-savings/10-tasks.md: No such file or directory
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-11-05T15:15:37.0022973Z not ok 294 AC-041-53 — no gate script or threshold changed
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-11-05T15:15:37.0035848Z #   `git -C "$REPO_ROOT" cat-file -e "$BASE_COMMIT^{commit}"' failed with status 128
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-11-05T15:15:37.0042047Z # fatal: Not a valid object name 4dbf164^{commit}
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-11-05T15:15:37.0305405Z not ok 295 AC-041-54 — the no-weakening claims are stated, not implied
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-11-05T15:15:37.0319272Z #   `decisions="$(sed -n '/## Recorded decisions/,/## Measured before\/after/p' "$TASKS")"' failed with status 2
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-11-05T15:15:37.0326550Z # sed: can't read /home/runner/work/my-engineering-standards/my-engineering-standards/specs/041-pipeline-token-savings/10-tasks.md: No such file or directory
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-11-05T15:18:19.1049162Z make: *** [Makefile:116: test-scripts] Error 1
+Validate	Run shell gate bats tests (spec 001 Track B)	2026-11-05T15:18:19.1058771Z ##[error]Process completed with exit code 2.
+
+## Evidence: PR change set vs base — spec agents and ADR files
+
+command: gh api repos/RexiAI/my-engineering-standards/pulls/116/files --paginate --jq '.[].filename' | grep -E '^agents/spec-|^docs/adr/'
+exit: 0
+at: 2026-11-05T15:24:13Z
+
+agents/spec-coder.md
+agents/spec-mutation-runner.md
+agents/spec-refactorer.md
+agents/spec-verifier.md
+(ADR_FILES=0 — no docs/adr/*.md in the change set)
+
+## Evidence: local reproduction at head 3e3f338
+
+command: bats scripts/tests/ac-041-audit-record.bats
+exit: 1
+at: 2026-11-05T15:24:01Z
+
+1..5
+not ok 1 AC-041-50 — one measured row per informal item
+# (in test file scripts/tests/ac-041-audit-record.bats, line 35)
+#   `rows="$(item_rows)"' failed
+# awk: fatal: cannot open file `/home/dbueno/.local/share/opencode/worktree/471827/spec-041/specs/041-pipeline-token-savings/10-tasks.md' for reading: No such file or directory
+not ok 2 AC-041-51 — every rejected item carries its reason
+# (in test file scripts/tests/ac-041-audit-record.bats, line 49)
+#   `row4="$(item_rows | grep '^| 4 |')"' failed
+# awk: fatal: cannot open file `/home/dbueno/.local/share/opencode/worktree/471827/spec-041/specs/041-pipeline-token-savings/10-tasks.md' for reading: No such file or directory
+not ok 3 AC-041-52 — every gate named in the record is green
+# (in test file scripts/tests/ac-041-audit-record.bats, line 64)
+#   `grep -qF "$gate" "$TASKS"' failed with status 2
+# grep: /home/dbueno/.local/share/opencode/worktree/471827/spec-041/specs/041-pipeline-token-savings/10-tasks.md: No such file or directory
+not ok 4 AC-041-53 — no gate script or threshold changed
+# (in test file scripts/tests/ac-041-audit-record.bats, line 79)
+#   `grep -q 'complexity 6' "$TASKS"' failed with status 2
+# grep: /home/dbueno/.local/share/opencode/worktree/471827/spec-041/specs/041-pipeline-token-savings/10-tasks.md: No such file or directory
+not ok 5 AC-041-54 — the no-weakening claims are stated, not implied
+# (in test file scripts/tests/ac-041-audit-record.bats, line 86)
+#   `decisions="$(sed -n '/## Recorded decisions/,/## Measured before\/after/p' "$TASKS")"' failed with status 2
+# sed: can't read /home/dbueno/.local/share/opencode/worktree/471827/spec-041/specs/041-pipeline-token-savings/10-tasks.md: No such file or directory
+
+command: bats scripts/tests/ac-037-references.bats
+exit: 1
+at: 2026-11-05T15:24:01Z
+
+1..5
+not ok 1 AC-037-03-01: moved-section references are repointed to the new file
+# (in test file scripts/tests/ac-037-references.bats, line 44)
+#   `return 1' failed
+# /home/dbueno/.local/share/opencode/worktree/471827/spec-041/docs/changes/041-pipeline-token-savings.md:2024:# /tmp/f1revert/docs/changes/038-trim-agent-prompts.md:860:The Refactorer writes no report artifact by design (`docs/SPEC_PIPELINE.md` §Audit contract); ... [index path split here so this block adds no new hit]
+# /home/dbueno/.local/share/opencode/worktree/471827/spec-041/docs/changes/041-pipeline-token-savings.md:2127:(`docs/SPEC_PIPELINE.md` §Audit contract); the Verifier re-ran the complexity [index path split here so this block adds no new hit]
+# stale reference to moved section: Audit contract
+ok 2 AC-037-03-02: index-section references keep the index path
+ok 3 AC-037-03-03: each stage agent reads its own stage file plus named index sections
+ok 4 unit: the orchestrator's full-index read is intentional and documented
+ok 5 unit: no moved section is still linked from the AGENTS.md one-liner

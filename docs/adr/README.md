@@ -28,3 +28,4 @@ Proposed → Accepted → Deprecated → Superseded.
 | 0018 | [Media agents are opt-in: relocate the family to agents-optional/ and load it per repo through --with-media](0018-media-agents-opt-in.md) | Accepted |
 | 0019 | [spec-ux enforces Laws of UX as checkable consequences](0019-spec-ux-design-laws.md) | Proposed |
 | 0020 | [Agent prompt line cap: procedure lives in stage docs and scripts, not in the prompt](0020-agent-prompt-line-cap.md) | Accepted |
+| 0021 | [Agent test output: filtered capture and reuse of an unchanged run](0021-agent-test-output-and-run-reuse.md) | Accepted |
