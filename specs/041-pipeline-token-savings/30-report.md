@@ -4,7 +4,8 @@ Mutation score: skipped — mvp tier
 Final test status: green
 Verifier verdict: PASS
 Autopilot: false
-PR: (appended by stage 5b — the PR Opener)
+PR: https://github.com/RexiAI/my-engineering-standards/pull/116 (draft; base `spec/038-trim-agent-prompts`, retarget to `main` once #115 merges)
+Commits: 8 (7 task commits + this record commit; the stage-5d archive commit follows)
 
 ## Scope
 
