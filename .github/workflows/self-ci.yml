@@ -117,6 +117,14 @@ jobs:
       - name: Check skills specification
         run: ./scripts/check-skills.sh
 
+      # Agent prompt line-cap gate (spec 038): a prompt that grows into a
+      # procedure manual costs context on every invocation and buries the
+      # decisions it exists to carry. Procedure belongs in a stage doc under
+      # docs/spec-pipeline/ or a script under scripts/. A prompt over the cap
+      # fails the job.
+      - name: Check agent prompt line cap
+        run: ./scripts/check-agent-line-cap.sh
+
       # Finished-spec gate (docs/spec-pipeline/pr-opener.md §Archive in the PR): a spec
       # with a 30-report.md must be archived (docs/changes/NNN-slug.md) inside
       # its PR. No continue-on-error: a finished spec that would land scratch
