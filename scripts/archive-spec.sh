@@ -41,15 +41,9 @@
 #   docs/SPEC_PIPELINE.md §Commit and push carve-out
 set -euo pipefail
 
-if [ $# -lt 1 ] || [ $# -gt 2 ]; then
-  echo "Usage: archive-spec.sh NNN-slug [--force]" >&2
-  echo "  e.g. archive-spec.sh 001-discount-system" >&2
-  echo "  --force replaces an existing docs/changes/NNN-slug.md (it would otherwise refuse," >&2
-  echo "          because regenerating the one-pager discards anything appended to it)." >&2
-  exit 1
-fi
-
 FORCE=0
+SLUG=""
+POSITIONAL=0
 for arg in "$@"; do
   case "$arg" in
     --force) FORCE=1 ;;
@@ -58,16 +52,20 @@ for arg in "$@"; do
       echo "Usage: archive-spec.sh NNN-slug [--force]" >&2
       exit 1
       ;;
+    *)
+      SLUG="$arg"
+      POSITIONAL=$((POSITIONAL + 1))
+      ;;
   esac
 done
 
-SLUG=""
-for arg in "$@"; do
-  case "$arg" in
-    --force) : ;;
-    *) SLUG="$arg" ;;
-  esac
-done
+if [ "$POSITIONAL" -ne 1 ]; then
+  echo "Usage: archive-spec.sh NNN-slug [--force]" >&2
+  echo "  e.g. archive-spec.sh 001-discount-system" >&2
+  echo "  --force replaces an existing docs/changes/NNN-slug.md (it would otherwise refuse," >&2
+  echo "          because regenerating the one-pager discards anything appended to it)." >&2
+  exit 1
+fi
 SPEC_DIR="specs/$SLUG"
 CHANGES_DIR="docs/changes"
 ARCHIVE="$CHANGES_DIR/$SLUG.md"
