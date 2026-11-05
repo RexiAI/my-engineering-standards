@@ -104,7 +104,7 @@ my-engineering-standards/
 │       │   └── _tests/          #   03-maple-bakery, 05-tracejam-saas worked examples
 │       └── docs/                # recipes.md, study-examples.md (human reading)
 ├── language-specific/           # One guide per stack; SKILL.md is the small entry
-│   ├── java/SKILL.md            # Spring Boot, Maven (+ checkstyle/pmd/spotbugs)
+│   ├── java/SKILL.md            # Spring Boot, Maven (+ TESTING, checkstyle/pmd/spotbugs)
 │   ├── go/SKILL.md              # Go, golangci (+ golangci.yml)
 │   ├── javascript/SKILL.md      # TypeScript, React/Vite, Next.js, NestJS 12
 │   ├── angular/SKILL.md         # Angular v22 (+ PATTERNS, TESTING)
