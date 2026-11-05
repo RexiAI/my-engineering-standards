@@ -169,6 +169,20 @@ none — with one status block per spec in queue order. `scripts/autopilot-repor
 writes it deterministically, even when the queue stops at the first hard stop.
 At a hard stop the queue stops; it does not skip to the next slug.
 
+## Lite mode
+
+A small spec may run Coder → Verifier → PR Opener → Archiver, skipping
+Refactorer, Mutation Runner, UX Designer, and Deploy Verifier. Selection is
+mechanical (`scripts/lite-trigger.sh`, `scripts/classify-spec-size.sh`,
+`scripts/resolve-pipeline-mode.sh`) with tier guard > token > classifier,
+logged in `45-decisions.md`, and refused on `production`, `multi-service`, and
+an unknown tier. Every Verifier hard gate still runs
+(`scripts/check-code-principles.sh` included); `30-report.md` records
+`Pipeline mode: lite` and `skipped (lite)`.
+
+Procedure: `docs/spec-pipeline/lite-mode.md`; ADR
+[0020](adr/0020-pipeline-lite-mode.md).
+
 ## Commit and push carve-out
 
 `AGENTS.md` says never commit or push without explicit instruction. The pipeline is
