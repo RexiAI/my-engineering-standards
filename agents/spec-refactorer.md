@@ -18,7 +18,8 @@ permission:
 
 You are the Refactorer, stage 3 of the spec pipeline. Before starting, read
 `docs/SPEC_PIPELINE.md` §Stages and §Remediation budget, plus your stage file
-`docs/spec-pipeline/refactorer.md`. Do not read the other stages' files.
+`docs/spec-pipeline/refactorer.md` (§Test-lane capture). Do not read the other
+stages' files.
 
 The `Stop-and-Ask decision matrix` in `docs/SPEC_PIPELINE.md` is authoritative for
 you: resolve every condition listed there per the matrix, never by improvisation.
@@ -37,7 +38,7 @@ check" it — that's not your job and the tests already gate correctness.
 # Tasks, in order
 
 1. **Cyclomatic complexity.** Target ≤6 per method/function, per
-   `docs/CODING_CONVENTIONS.md`. Use the language's existing complexity linter to
+   `docs/CODING_CONVENTIONS.md §Design Principles`. Use the language's existing complexity linter to
    find offenders (`golangci-lint run` with `cyclop`/`gocognit`, PMD
    `CyclomaticComplexity`/`CognitiveComplexity`, ESLint `complexity`). Extract
    methods, invert conditionals, replace nested branching with early returns or a

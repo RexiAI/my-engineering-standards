@@ -762,7 +762,7 @@ evidence above; nothing in the round-1 evidence blocks was rewritten.
 
 ## Verdict
 
-**GREEN.** Mutation testing is a `production`-tier gate (`docs/SPEC_PIPELINE.md §Conformance tiers`); this project is `mvp`, so it is **skipped** with a recorded reason, not failed. Every gate that does apply is green on a fresh run: the full suite is 788/788 `ok`, `make validate-all` exits 0, the agent line cap is 9/9, and the read-cost budget holds.
+**GREEN.** Mutation testing is a `production`-tier gate (`docs/spec-pipeline/coder.md §Conformance tiers`); this project is `mvp`, so it is **skipped** with a recorded reason, not failed. Every gate that does apply is green on a fresh run: the full suite is 788/788 `ok`, `make validate-all` exits 0, the agent line cap is 9/9, and the read-cost budget holds.
 
 | # | Row | Value | Source |
 |---|---|---|---|
@@ -785,7 +785,7 @@ at: 2026-11-05T12:50:11Z
 skipped — production tier required (current tier is mvp, see docs/CONFORMANCE_TIERS.md)
 ```
 
-The skip is the Makefile's own tier probe (`Makefile:135-141`), not an ad-hoc decision: it greps for `Conformance tier: production` in `AGENTS.md`/`AGENTS_*.md`, finds `mvp`, and prints the documented reason. Per `docs/SPEC_PIPELINE.md §Conformance tiers`, the Architect role still runs at `mvp` (to carry the report to stage 5b); only the mutation *test* is omitted. No Stryker/PiTest/`gremlins` invocation exists for this repo's shell + markdown surface, and no `stryker.conf.*` / `pom.xml` / `go.mod` is present to host one.
+The skip is the Makefile's own tier probe (`Makefile:135-141`), not an ad-hoc decision: it greps for `Conformance tier: production` in `AGENTS.md`/`AGENTS_*.md`, finds `mvp`, and prints the documented reason. Per `docs/spec-pipeline/coder.md §Conformance tiers`, the Architect role still runs at `mvp` (to carry the report to stage 5b); only the mutation *test* is omitted. No Stryker/PiTest/`gremlins` invocation exists for this repo's shell + markdown surface, and no `stryker.conf.*` / `pom.xml` / `go.mod` is present to host one.
 
 ## Evidence: final full test suite
 
@@ -857,7 +857,7 @@ at: 2026-11-05T12:50:11Z
 
 ## Complexity summary (carried from the Refactorer)
 
-The Refactorer writes no report artifact by design (`docs/SPEC_PIPELINE.md §Audit contract`); its structural claims are re-executed by the Verifier and re-recorded in `25-verification.md`, and I re-confirm them here rather than inventing numbers:
+The Refactorer writes no report artifact by design (`docs/spec-pipeline/audit-contract.md §Audit contract`); its structural claims are re-executed by the Verifier and re-recorded in `25-verification.md`, and I re-confirm them here rather than inventing numbers:
 
 | Concern | Mechanism | Result |
 |---|---|---|
