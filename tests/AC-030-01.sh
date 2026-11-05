@@ -9,8 +9,8 @@ SK="skills/e2e-testing/SKILL.md"
 # AC-030-01-01 — Frontmatter exists with required fields
 s_030_01_01() {
   local fm; fm="$(fm_of "$SK" 2>/dev/null || true)"
-  if printf '%s\n' "$fm" | grep -qE '^name:'; then pass "AC-030-01-01: frontmatter has name field"; else fail "AC-030-01-01: frontmatter missing name field"; fi
-  if printf '%s\n' "$fm" | grep -qE '^description:'; then pass "AC-030-01-01: frontmatter has description field"; else fail "AC-030-01-01: frontmatter missing description field"; fi
+  if grep -qE '^name:' <<< "$fm"; then pass "AC-030-01-01: frontmatter has name field"; else fail "AC-030-01-01: frontmatter missing name field"; fi
+  if grep -qE '^description:' <<< "$fm"; then pass "AC-030-01-01: frontmatter has description field"; else fail "AC-030-01-01: frontmatter missing description field"; fi
 }
 
 # AC-030-01-02 — Name matches directory
@@ -22,7 +22,7 @@ s_030_01_02() {
 # AC-030-01-03 — Name format valid (^[a-z0-9]+(-[a-z0-9]+)*$, <=64 chars)
 s_030_01_03() {
   local n; n="$(fm_field "$SK" name 2>/dev/null || true)"
-  if printf '%s' "$n" | grep -qE '^[a-z0-9]+(-[a-z0-9]+)*$' && [ "${#n}" -le 64 ]; then
+  if grep -qE '^[a-z0-9]+(-[a-z0-9]+)*$' <<< "$n" && [ "${#n}" -le 64 ]; then
     pass "AC-030-01-03: name '$n' matches regex and length <=64"
   else
     fail "AC-030-01-03: name '$n' invalid format or length ${#n}"
@@ -49,9 +49,10 @@ s_030_01_05() {
 # AC-030-01-06 — Required body sections present (case-insensitive headings)
 s_030_01_06() {
   require "AC-030-01-06" "$SK" || return 0
-  local sec
+  local sec body
+  body="$(body_of "$SK")"
   for sec in 'when to use' 'invocation' 'what it does' 'what it is not' 'exit codes'; do
-    if body_of "$SK" | grep -qiE "^#{1,6}[[:space:]].*${sec}"; then
+    if grep -qiE "^#{1,6}[[:space:]].*${sec}" <<< "$body"; then
       pass "AC-030-01-06: heading for '$sec' present"
     else
       fail "AC-030-01-06: heading for '$sec' missing"
@@ -108,7 +109,7 @@ u_030_01_total_lines() {
 # unit — description carries both a what and a when (trigger guidance per docs/AGENTS_AND_SKILLS.md)
 u_030_01_description_what_when() {
   local d; d="$(fm_field "$SK" description 2>/dev/null || true)"
-  if printf '%s' "$d" | grep -qiE 'use when|use it when|trigger' && [ "${#d}" -gt 40 ]; then
+  if grep -qiE 'use when|use it when|trigger' <<< "$d" && [ "${#d}" -gt 40 ]; then
     pass "unit T1: description states what + when-to-use trigger"
   else
     fail "unit T1: description lacks a when-to-use trigger clause"
