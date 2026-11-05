@@ -162,3 +162,47 @@ per-repo `PR_REVIEW_MODEL` override in the shared workflow. The agent's scope
 lock, permissions, secret handling, and cost bounds are documented in
 `docs/CI_CD.md §PR Review Agent`, the authoritative reference for wiring it
 into child repos (`init-ci.sh --with-pr-review`).
+
+## Mechanical-stage model and effort guidance
+
+Four pipeline seats do bounded, well-specified work: `spec-deployer`,
+`spec-pr-opener`, `spec-mutation-runner`, and the `spec-pipeline` orchestrator
+(driving `/spec` and `/build`). They are worth right-sizing separately from the
+seats that carry judgment — the Specifier's ambiguity detection, the UX
+Designer's design read, the Verifier's adversarial re-check, and the standalone
+PR review agent's diff read.
+
+| Stage | Work shape | Capability class | Preferred effort |
+|---|---|---|---|
+| `spec-deployer` | deterministic waits for the Vercel preview deployment, one HTTP health check, record assembly into `40-deploy.md` | smallest model that reliably follows a multi-step procedure | `low` |
+| `spec-pr-opener` | git and gh invocations, one conventional commit per task, the archive move, PR body assembly | smallest model that reliably follows a multi-step procedure | `low` |
+| `spec-mutation-runner` | mutation-tool runs, survivor triage, one targeted test per reachable survivor, `30-report.md` assembly | smallest model that reliably follows a multi-step procedure, with enough reasoning for survivor triage | `medium` |
+| `spec-pipeline` (orchestrator) | queue dispatch, stage sequencing, gate routing, decision recording | smallest model that reliably follows a multi-step procedure | `low` |
+
+### Where `effort` actually lives
+
+`effort: xhigh` is set on the **provider model** options in `opencode.json`
+(provider `models.<id>.options`), so it applies to every stage that resolves to
+those model ids — not to "mechanical stages" as a class. The committed
+`config/model.local.env.example` sets model ids only and contains no `effort`
+key at all, so effort cannot be narrowed per stage from it.
+
+### The verified per-agent lever
+
+Per-agent effort is expressible at the config layer. On `opencode v2.2.5`,
+against a throwaway project config, `opencode debug config` resolves
+`agent.<name>.options: { "effort": "<level>" }` into
+`agent.<name>.request.body.effort`, while an agent without `options` resolves to
+no `request.body` key at all. A per-stage effort seat is therefore possible per
+machine; it is not a shipped default (see the decision below).
+
+### Decision: documented, not shipped
+
+Shipped defaults stay byte-identical — no `effort` or model id is added to
+`opencode.json` or to the committed example. A tracked per-stage model id is
+vendor coupling that a child repo inherits without choosing it, and the
+provider-level `effort` cannot be narrowed per stage from the committed example.
+The supported route is per machine: put a real `<provider>/<model-id>` for the
+stage in `config/model.local.env`, restart opencode (config is read once at
+startup), and commit nothing. That per-machine file is gitignored by design, so
+the lever never lands in a repository.
