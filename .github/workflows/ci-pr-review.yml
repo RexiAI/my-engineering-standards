@@ -174,10 +174,21 @@ jobs:
             # required check for a comment-only advisory review. The guard's
             # contract is "skip with a warning, never fail the PR on provider
             # availability".
-            if echo "$review_output" | sed 's/\x1b\[[0-9;]*m//g' | grep -qiE 'spending limit|quota exceeded|billing|rate.limit|429|402|insufficient balance|model unavailable|model not found|unknown model|no such model|stream error'; then
-              echo "::warning::Review skipped — model provider unavailable or over quota (exit ${review_rc}). Not a code defect."
-              exit 0
-            fi
+            # Credential/model-access failures are the same class of
+            # environment problem: an expired provider credential, or a
+            # PR_REVIEW_MODEL the account cannot use, must not red a required
+            # check. The classifier lives in scripts/pr-review-skip-reason.sh
+            # so it is unit-tested instead of embedded in YAML.
+            case "$(printf '%s' "$review_output" | bash scripts/pr-review-skip-reason.sh)" in
+              billing)
+                echo "::warning::Review skipped — model provider unavailable, over quota, or out of balance (exit ${review_rc}). Not a code defect."
+                exit 0
+                ;;
+              auth)
+                echo "::warning::Review skipped — model provider credential invalid or model access denied (exit ${review_rc}). Rotate the provider credential secret and/or fix the review model variable, then re-run. Not a code defect."
+                exit 0
+                ;;
+            esac
             echo "$review_output"
             exit "$review_rc"
           fi

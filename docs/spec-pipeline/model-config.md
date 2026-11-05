@@ -162,3 +162,20 @@ per-repo `PR_REVIEW_MODEL` override in the shared workflow. The agent's scope
 lock, permissions, secret handling, and cost bounds are documented in
 `docs/CI_CD.md §PR Review Agent`, the authoritative reference for wiring it
 into child repos (`init-ci.sh --with-pr-review`).
+
+**Provider failures skip, never red.** A comment-only advisory review must not
+block a PR on an environment problem. When the model run exits non-zero, the
+workflow classifies the output with `scripts/pr-review-skip-reason.sh`:
+
+| Class | Examples | Behaviour |
+|---|---|---|
+| `billing` | spending limit, quota exceeded, 429/402, insufficient balance | warn + exit 0 |
+| `auth` | invalid credential, 401/403, access to model denied, unknown model id | warn naming the fix + exit 0 |
+| `none` | anything else (agent bug, `gh` failure) | fail the step |
+
+Both skip classes name the remedy in the warning: rotate the
+`OPENCODE_API_KEY` secret and/or correct the `PR_REVIEW_MODEL` variable, then
+re-run. Switching the review to GitHub Copilot is the same two knobs — set
+`PR_REVIEW_MODEL` to a `github-copilot/<model>` id and supply a Copilot-enabled
+token in `OPENCODE_API_KEY`. Storing that secret is a maintainer action; the
+workflow never creates or rotates credentials.
