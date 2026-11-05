@@ -911,7 +911,7 @@ Verdict: **GREEN** (mutation testing skipped per tier; full suite green).
 | Remediation record | **none** — no BLOCK occurred in any phase |
 
 Mutation testing is the only thing this stage would add; at `mvp` tier the stage
-is a recorded skip by contract (`docs/SPEC_PIPELINE.md §Conformance tiers`,
+is a recorded skip by contract (`docs/spec-pipeline/coder.md §Conformance tiers`,
 `docs/CONFORMANCE_TIERS.md` §Tier assignments), not a gap.
 
 ## Evidence: mutation score
@@ -1081,3 +1081,95 @@ no vercel.json at repo root; no package.json at repo root -> non-frontend
 | Phase-3 attempt count | 0 — phase 3 never started |
 
 Verdict: SKIPPED — Non-frontend repo — deploy verification not applicable
+
+---
+
+## Post-PR CI check (phase 2)
+
+**Round 2 — attempt 1, phase 2 (post-PR) of this round; overall phase-2 round 2.**
+Round-1 fix head `aa7a37e` (Self CI green) was followed by merge commit
+`7dea0c2` (main merged into the spec branch), which is the head re-checked here.
+Round 2 verdict: **FAIL**. The pipeline stops; no fix was applied by the Verifier.
+
+PR: https://github.com/RexiAI/my-engineering-standards/pull/112
+Head: `7dea0c2de38f916e10cd04b334f306318f3edd46`
+
+| Check | Workflow / event | Bucket | Result | Check ID |
+|---|---|---|---|---|
+| Validate | Self CI / pull_request | fail | **FAIL** | 124914895804 |
+| Validate | Self CI / push | fail | **FAIL** | 124914881702 |
+| Review PR / Review PR | PR Review Agent / pull_request | fail | excluded — environmental (`Invalid credential`) | 124914894148 |
+
+Whole-run status for `7dea0c2` (both Self CI runs): steps 1–29 passed (including
+`make validate-all`, `make lint`, shellcheck, orchestration/skills/archive/audit-trail
+checks); step 30 **"Run shell gate bats tests (spec 001 Track B)" failed**; steps
+31–33 (gate selftests, live scenario traceability, YAML syntax) were skipped as a
+consequence of the step-30 failure. The job's only failing assertion is:
+
+- `scripts/tests/ac-037-references.bats:44` — `not ok 214 AC-037-03-01: moved-section references are repointed to the new file`
+- Cause: `docs/changes/042-docs-security-hardening.md:914` cites the index path for
+  `§Conformance tiers`. Spec 037 (merged into this branch by
+  `7dea0c2`) moved `## Conformance tiers` to `docs/spec-pipeline/coder.md` and added
+  AC-037-03-01, which forbids stale index citations, so the archived one-pager's
+  citation is now a finding. The section and the test did not exist at the round-1
+  head `aa7a37e` (`ac-037-references.bats` and `docs/spec-pipeline/` absent there),
+  so this is a merge-integration failure, not a regression in the round-1 fix.
+- Routed fix (not applied here): repoint line 914 to
+  `docs/spec-pipeline/coder.md §Conformance tiers` (the destination the spec-037
+  map records for that heading).
+
+## Evidence: post-PR CI check (round 2)
+
+command: gh pr checks 112 --json name,state,bucket,workflow,link
+exit: 0
+at: 2026-11-05T13:05:05Z
+
+[{"bucket":"fail","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/41328990732/job/124914895804","name":"Validate","state":"FAILURE","workflow":"Self CI"},{"bucket":"fail","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/41328990653/job/124914894148","name":"Review PR / Review PR","state":"FAILURE","workflow":"PR Review Agent"},{"bucket":"fail","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/41328986368/job/124914881702","name":"Validate","state":"FAILURE","workflow":"Self CI"}]
+
+## Evidence: failing CI check IDs
+
+command: gh api repos/RexiAI/my-engineering-standards/commits/7dea0c2de38f916e10cd04b334f306318f3edd46/check-runs --jq '.check_runs[] | "\(.name) | id=\(.id) | \(.status)/\(.conclusion) | \(.details_url)"'
+exit: 0
+at: 2026-11-05T13:05:10Z
+
+Validate | id=124914895804 | completed/failure | https://github.com/RexiAI/my-engineering-standards/actions/runs/41328990732/job/124914895804
+Review PR / Review PR | id=124914894148 | completed/failure | https://github.com/RexiAI/my-engineering-standards/actions/runs/41328990653/job/124914894148
+Validate | id=124914881702 | completed/failure | https://github.com/RexiAI/my-engineering-standards/actions/runs/41328986368/job/124914881702
+
+## Evidence: failing CI log excerpt
+
+command: gh run view 41328986368 --log-failed
+exit: 0
+at: 2026-11-05T13:05:18Z
+
+Validate	UNKNOWN STEP	2026-11-01T16:59:57.5900843Z not ok 214 AC-037-03-01: moved-section references are repointed to the new file
+Validate	UNKNOWN STEP	2026-11-01T16:59:57.5909086Z # (in test file scripts/tests/ac-037-references.bats, line 44)
+Validate	UNKNOWN STEP	2026-11-01T16:59:57.5915317Z #   `return 1' failed
+Validate	UNKNOWN STEP	2026-11-01T16:59:57.5924419Z # /home/runner/work/my-engineering-standards/my-engineering-standards/docs/changes/042-docs-security-hardening.md:914:is a recorded skip by contract (`docs/spec-pipeline/coder.md §Conformance tiers`,
+Validate	UNKNOWN STEP	2026-11-01T16:59:57.5925525Z # stale reference to moved section: Conformance tiers
+Validate	UNKNOWN STEP	2026-11-01T17:03:08.0620924Z make: *** [Makefile:116: test-scripts] Error 1
+Validate	UNKNOWN STEP	2026-11-01T17:03:08.0627716Z ##[error]Process completed with exit code 2.
+
+## Evidence: failing test reproduction (AC-037-03-01)
+
+command: bats scripts/tests/ac-037-references.bats
+exit: 1
+at: 2026-11-05T13:05:05Z
+
+1..5
+not ok 1 AC-037-03-01: moved-section references are repointed to the new file
+# (in test file scripts/tests/ac-037-references.bats, line 44)
+#   `return 1' failed
+# /tmp/opencode/verify042/docs/changes/042-docs-security-hardening.md:914:is a recorded skip by contract (`docs/spec-pipeline/coder.md §Conformance tiers`,
+# stale reference to moved section: Conformance tiers
+ok 2 AC-037-03-02: index-section references keep the index path
+ok 3 AC-037-03-03: each stage agent reads its own stage file plus named index sections
+ok 4 unit: the orchestrator's full-index read is intentional and documented
+ok 5 unit: no moved section is still linked from the AGENTS.md one-liner
+
+## Round verdict
+
+**FAIL** — Self CI `Validate` fails at `scripts/tests/ac-037-references.bats`
+(AC-037-03-01) on head `7dea0c2`, reproduced locally with exit 1. `Review PR /
+Review PR` is the repo-wide environmental `Invalid credential` failure and is
+excluded from the verdict. Phase-2 budget status: round 2 of max 3 consumed.
