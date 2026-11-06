@@ -1,3 +1,10 @@
+# [1.54.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.53.0...v1.54.0) (2026-11-06)
+
+
+### Features
+
+* pipeline token savings (041) ([#116](https://github.com/RexiAI/my-engineering-standards/issues/116)) ([f916645](https://github.com/RexiAI/my-engineering-standards/commit/f9166452f89085cf09373d360d9e7972c8b9380a))
+
 # [1.53.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.52.1...v1.53.0) (2026-11-06)
 
 
