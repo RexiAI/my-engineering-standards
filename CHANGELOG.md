@@ -1,3 +1,10 @@
+## [1.51.2](https://github.com/RexiAI/my-engineering-standards/compare/v1.51.1...v1.51.2) (2026-11-06)
+
+
+### Bug Fixes
+
+* **ci:** bound every workflow job with timeout-minutes ([#119](https://github.com/RexiAI/my-engineering-standards/issues/119)) ([2b7b23c](https://github.com/RexiAI/my-engineering-standards/commit/2b7b23cf526e988d676744c964f346604692efa5))
+
 ## [1.51.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.51.0...v1.51.1) (2026-11-05)
 
 
