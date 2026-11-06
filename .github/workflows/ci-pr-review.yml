@@ -51,9 +51,9 @@ jobs:
     env:
       DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
-      # gh auth for the read-only PR queries (early-exit) and the review
-      # comment the agent posts through scripts/pr-review-gh.sh. The wrapper
-      # exposes no merge/edit subcommand, so this token cannot change the PR.
+      # gh auth for the early-exit queries and the gh pr comment the workflow
+      # runs after the agent returns. The agent process is started with this
+      # variable removed from its environment and has no shell.
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       PR_NUMBER: ${{ inputs.pr-number }}
       HEAD_SHA: ${{ inputs.head-sha }}
@@ -138,8 +138,17 @@ jobs:
           # pattern as ci-sweeper.yml). No permission auto-approval flag is
           # passed: the review is comment-only and the agent's permission
           # block enforces that.
-          # shellcheck disable=SC1091
-          set -a; . config/model.local.env.example; set +a
+          # A bootstrapped child keeps the example under .standards/config/;
+          # sourcing a missing file under set -e would fail the step.
+          for env_example in config/model.local.env.example .standards/config/model.local.env.example; do
+            if [ -f "$env_example" ]; then
+              set -a
+              # shellcheck disable=SC1090
+              . "$env_example"
+              set +a
+              break
+            fi
+          done
 
           # Default model: DeepSeek official (ADR 0023). The committed example
           # carries the same id for local runs and this repo's CI; a child repo
@@ -193,7 +202,9 @@ jobs:
           prompt="Review PR ${PR_NUMBER} at head ${HEAD_SHA}. Read .pr-review/context.json and .pr-review/pr.diff with the read tool. Return ONLY the review comment body, ending with: Reviewed-SHA: ${HEAD_SHA}"
 
           review_log="$(mktemp)"
-          review_output=$(set +e; /tmp/opencode-bin/opencode run --print-logs \
+          # env -u: the agent never sees the GitHub token even though the step
+          # needs it for the gh calls around the run.
+          review_output=$(set +e; env -u GH_TOKEN -u GITHUB_TOKEN /tmp/opencode-bin/opencode run --print-logs \
             --agent pr-review \
             "${prompt}" 2>"$review_log") && review_rc=0 || review_rc=$?
 
@@ -205,7 +216,7 @@ jobs:
             # required check for a comment-only advisory review. The guard's
             # contract is "skip with a warning, never fail the PR on provider
             # availability".
-            if { cat "$review_log"; printf '%s\n' "$review_output"; } | sed 's/\x1b\[[0-9;]*m//g' | grep -qiE 'spending limit|quota exceeded|billing|rate.limit|429|402|insufficient balance|model unavailable|model not found|unknown model|no such model|stream error|invalid credential|invalid api key|unauthorized|authentication|401'; then
+            if { cat "$review_log"; printf '%s\n' "$review_output"; } | sed 's/\x1b\[[0-9;]*m//g' | grep -qiE 'spending limit|quota exceeded|billing|rate.limit|429|402|insufficient balance|model unavailable|model not found|unknown model|no such model|stream error|invalid credential|invalid api key|unauthorized|authentication|401 unauthorized'; then
               echo "::warning::Review skipped — model provider unavailable, rejected the credential, or is over quota (exit ${review_rc}). Check DEEPSEEK_API_KEY (default provider) or OPENCODE_API_KEY (override provider). Not a code defect."
               exit 0
             fi
@@ -221,7 +232,11 @@ jobs:
             echo "::warning::Review skipped — the agent returned an empty comment."
             exit 0
           fi
-          # Accept the documented placeholder and substitute the real SHA.
+          # Drop any model narration before the first markdown heading, then
+          # accept the documented SHA placeholder and substitute the real one.
+          if grep -q '^## ' <<< "$review_output"; then
+            review_output="$(printf '%s\n' "$review_output" | sed -n '/^## /,$p')"
+          fi
           review_output="${review_output//Reviewed-SHA: <head sha>/Reviewed-SHA: ${HEAD_SHA}}"
           if ! grep -q "Reviewed-SHA: ${HEAD_SHA}" <<< "$review_output"; then
             review_output="${review_output}"$'\n\n'"Reviewed-SHA: ${HEAD_SHA}"

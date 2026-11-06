@@ -80,6 +80,12 @@ the override path for other providers and for already-configured child repos.
   repo's next PR event runs this revision. Child repos still pin the shared
   workflow by SHA and stay on the previous revision until the follow-up moves
   the pin and adds the `DEEPSEEK_API_KEY` mapping to `init-ci.sh`.
+- Follow-up scope is larger than a pin bump. A bootstrapped child also needs
+  (a) the `deepseek` provider block in `templates/opencode.json.bridge` — without
+  it the new default resolves to "Model not found" — and (b) the
+  `.standards/config/model.local.env.example` fallback the workflow now carries,
+  because a child has no top-level `config/` example. Both are recorded here so
+  the child change is not mistaken for a one-line pin edit.
 - A provider auth failure now produces a skipped check, not a red one. That is
   the intended contract for an advisory, comment-only review, and it is recorded
   in the run's warning rather than hidden.

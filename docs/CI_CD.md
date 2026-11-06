@@ -586,12 +586,12 @@ only `contents: read` + `pull-requests: write` (comment-only).
 - **Auth**: the `DEEPSEEK_API_KEY` GitHub Actions secret, exported to the
   review run as the env var the `deepseek` provider block declares. A run with
   an explicit non-DeepSeek `PR_REVIEW_MODEL` uses `OPENCODE_API_KEY` instead,
-  which is kept for compatibility with already-configured child repos. Either
-  secret unset ⇒ the review step skips; neither is a required check. A rejected
-  credential (invalid key, 401, unauthorized) is treated as a provider-side
-  failure and skipped with a warning, never failed as a code defect. Values are
-  **never committed** — only secret names appear in committed files, consistent
-  with `docs/SECURITY.md §Secrets Management`.
+  which is kept for compatibility with already-configured child repos. The step
+  skips only when **both** secrets are unset; a rejected credential (invalid
+  key, 401 unauthorized) also skips with a warning, never fails as a code
+  defect. Neither is a required check. Values are **never committed** — only
+  secret names appear in committed files, consistent with
+  `docs/SECURITY.md §Secrets Management`.
 
 ### Opting in (child repos)
 
@@ -603,17 +603,19 @@ PR review is opt-in per child, mirroring `§Release Process`:
 
 The flag appends a `pr-review` job to the generated `.github/workflows/ci.yml`
 that calls `RexiAI/my-engineering-standards/.github/workflows/ci-pr-review.yml@<commit-sha>  # pinned — see docs/SECURITY.md §CI/CD Supply Chain`
-with `DEEPSEEK_API_KEY` mapped from the repo's secrets (plus the optional
-`OPENCODE_API_KEY` override), and prompts for the key during generation. On
+with `OPENCODE_API_KEY` mapped from the repo's secrets, and prompts for the
+secret during generation. The child-side `DEEPSEEK_API_KEY` mapping and pin
+bump land together in the follow-up described in ADR 0023 — until then the
+generated job still calls the previous shared-workflow revision. On
 `--platform gitlab` the flag prints a warning and emits nothing — the shared
 workflow is GitHub Actions-only.
 
 **The no-op boundary.** A child that never opts in is unaffected: a default
 `init-ci.sh` run emits no `pr-review` job and requires no review secret, so
 unit/lint/build CI stays green. The generated job is secret-guarded
-(`if: secrets.DEEPSEEK_API_KEY != '' || secrets.OPENCODE_API_KEY != ''`), so
-even an opted-in child without a key configured gets a skipped job, never a
-failure. Opting in is purely additive.
+(`if: secrets.OPENCODE_API_KEY != ''`), so even an opted-in child without the
+key configured gets a skipped job, never a failure. Opting in is purely
+additive.
 
 ### Cost and bounds
 

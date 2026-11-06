@@ -272,7 +272,9 @@ if [ -f "$AGENT" ]; then
   # Every allowed bash pattern is glob-matched against the forbidden write
   # operations: a pattern like `gh pr *` would match `gh pr merge` and must
   # fail the check.
-  ALLOWED_PATTERNS="$(printf '%s\n' "$AGENT_FM" | sed -n '/bash:/,/^[[:space:]]*[^[:space:]-]/p' \
+  # bash: is the last key in the frontmatter, so capture to EOF rather than to
+  # the next indented line — otherwise only the first entry is ever inspected.
+  ALLOWED_PATTERNS="$(printf '%s\n' "$AGENT_FM" | awk '/^[[:space:]]*bash:[[:space:]]*$/{f=1;next} f' \
     | sed -nE 's/^[[:space:]]*"([^"]+)":[[:space:]]*allow.*/\1/p')"
   FORBIDDEN_WRITES=("git push" "git commit" "git add" "git checkout" "git reset" \
     "git worktree" "gh pr merge" "gh pr edit" "touch " "tee " "vim " "nano ")
@@ -294,8 +296,12 @@ if [ -f "$AGENT" ]; then
   # The reviewer runs with no shell at all: the workflow supplies the diff and
   # posts its answer. Denying bash is what makes that boundary hold in headless
   # CI, where any unmatched command is auto-rejected.
-  BASH_BLOCK="$(printf '%s\n' "$AGENT_FM" | sed -n '/bash:/,/^[[:space:]]*[^[:space:]-]/p')"
-  str_contains AC-024-01-05 'agents/pr-review.md bash block' "$BASH_BLOCK" '"*": deny'
+  BASH_BLOCK="$(printf '%s\n' "$AGENT_FM" | awk '/^[[:space:]]*bash:[[:space:]]*$/{f=1;next} f')"
+  if grep -qE ':[[:space:]]*"?allow' <<< "$BASH_BLOCK"; then
+    fail "AC-024-01-05: bash block must be deny-only — found: $(grep -oE '"[^"]+":[[:space:]]*"?allow' <<< "$BASH_BLOCK" | tr '\n' ' ')"
+  else
+    pass "AC-024-01-05: bash block denies every command"
+  fi
 fi
 
 echo ""
