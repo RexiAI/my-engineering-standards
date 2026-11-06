@@ -80,6 +80,65 @@ To optimize context token usage:
 4. **# What it is not**: Explicit non-goals or boundary limits.
 5. **# Exit codes**: Document return codes (`0` pass, `1` fail, etc.).
 
+### Behavioral Validation (Cook-First)
+
+Structural checks (`scripts/check-skills.sh`) prove a skill is *well-formed*.
+They cannot prove it *works*. A skill that passes every frontmatter rule can
+still be a recipe that only cooks with the ingredients of the one session it
+came from.
+
+The house method is **cook first, write second, validate on a second real
+session**:
+
+1. **Cook** — solve the task with the agent without thinking about a skill.
+2. **Distill** — at the end, ask the agent which skills it saw in the session,
+   then write the one that repeats. Capture the corrections you made, not the
+   happy path; they are what the agent did not know.
+3. **Repeat** — the next time that task comes up, run it with the skill loaded.
+   Do not re-read the skill to judge it. Use it.
+4. **Refine** — when you have to correct the agent, fix the recipe, not only
+   the dish. The correction belongs in `SKILL.md` (or `references/`), or it
+   recurs next time.
+
+**The second-session rule.** A skill is not validated until it has been used
+on a second real task, with different inputs. Reviewing the text — or asking
+the agent whether it looks good — validates nothing. The measurable bar: fewer
+corrections on the second run than on the first.
+
+| Level | What it is | Cost | Proves |
+|---|---|---|---|
+| 0 | First session, before the skill existed | none | the task is possible |
+| 1 | Second real session with the skill loaded | low | the recipe generalises past one input |
+| 2 | Blind eval: same task with and without the skill | medium | no regression, correct activation |
+| 3 | Agent jury: several agents/models cook with the recipe | high | ambiguity, model dependence |
+
+Do not skip level 1 to reach 2 or 3. A skill that passes synthetic evals but
+has never run twice on real input is validated against invented cases.
+
+**`description` is a trigger.** It exists so the agent loads the skill without
+being named. Write the phrase you actually typed when the session started
+("what's on my plate", "qué tengo pendiente") into it. A description that
+merely summarises the skill does not activate.
+
+**Margin notes.** Keep a `# Margin notes` section at the bottom of the skill
+for corrections that are not yet general rules. Promote a note into the body
+once it repeats; a note that stays forever is a rule you have not admitted.
+
+**Split when it hurts.** Do not pre-fracture a skill into five ten-line skills
+that are always used together. Split when maintenance gets hard, or when a part
+is reused elsewhere — not before.
+
+**Scrub before committing.** A session carries client names, absolute paths,
+tokens, internal URLs. Review the skill before it lands in a shared repo;
+`scripts/check-no-hardcoded-secrets.sh` scans `skills/` and
+`language-specific/` for credential literals, but it cannot recognise a client
+name or an internal hostname.
+
+**Not a CI gate.** Behavioral validation is a judgment recorded in the skill's
+`# Validation` block (see `templates/SKILL.md`), not a machine-checkable
+assertion. Claiming a static check proves this is the same error as reading a
+recipe and calling the dish good.
+
 ---
 
 ## Part 2: OpenCode Agents (`agents/*.md`)
@@ -157,6 +216,10 @@ Every time an agent (`agents/*.md`) or skill (`skills/*/SKILL.md`) is added or m
 - [ ] Body line count is ≤500 lines.
 - [ ] File references are relative, one level deep, and do not create nested chains.
 - [ ] Scripts in `scripts/` handle edge cases and provide helpful error messages.
+- [ ] `description` carries the real phrases that should trigger the skill, not a summary of it.
+- [ ] `# Validation` section records the sessions used (level 1 minimum) — see §Behavioral Validation.
+- [ ] `# Margin notes` section present; repeated notes promoted into the body.
+- [ ] Session-specific details scrubbed (client names, absolute paths, internal URLs).
 - [ ] `scripts/check-skills.sh` passes with 0 errors.
 
 ### Agents Checklist (`agents/*.md`)
@@ -175,3 +238,8 @@ The standards are enforced automatically via scripts run in CI (`.github/workflo
 
 - **`scripts/check-skills.sh`**: Hard CI gate validating frontmatter rules, directory name matching, length constraints, and line-count warnings for all skills.
 - **`scripts/check-orchestration.sh`**: Hard CI gate asserting that all agent, skill, script, and documentation cross-references resolve.
+- **`scripts/check-no-hardcoded-secrets.sh`**: Hard CI gate scanning `skills/` and `language-specific/` (among other authored dirs) for literal credential values. Structural only — it cannot audit session leakage.
+
+Structural gates stop at well-formed. Behavioral validation (§Behavioral
+Validation) is a human/agent judgment recorded in the skill, and no script
+pretends otherwise.

@@ -1,6 +1,6 @@
 ---
 name: java
-description: Java standards: project shape, build commands, code conventions, test guidance, and pointers to PATTERNS.md / TESTING.md / checkstyle.xml / pmd-rules.xml. Use whenever a child repo uses Java or Spring Boot.
+description: Java standards: project shape, build commands, code conventions, test guidance, and pointers to TESTING.md / checkstyle.xml / pmd-rules.xml / spotbugs-include.xml. Use whenever a child repo uses Java or Spring Boot.
 license: See repo root
 applyTo: "**/pom.xml, **/*.java"
 ---
@@ -56,6 +56,15 @@ Every Java project inherits from the organization's parent POM:
 | `mvn spotless:apply` | Fix code formatting |
 | `mvn pmd:pmd pmd:cpd` | Run PMD + copy-paste detection |
 | `mvn spotbugs:spotbugs` | Run SpotBugs + FindSecBugs |
+
+## Testing
+
+JUnit 5 + Mockito + AssertJ. Unit tests run `@ExtendWith(MockitoExtension.class)`
+and never load a Spring context (`@SpringBootTest` is integration-only). Test
+shape, case selection, mock rules, and assertion idioms:
+[`TESTING.md`](TESTING.md); layer definitions and the acceptance/scenario rules:
+[`docs/TESTING.md`](../../docs/TESTING.md). Mutation testing (PiTest, ≥ 80%)
+is the `production`-tier signal that the suite catches defects, not just lines.
 
 ## Key Dependencies
 

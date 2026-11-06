@@ -72,3 +72,5 @@ gate threshold: agents fix the prompt, never the constant.
 - 2026-11-01: Decision recorded (spec 038). Number 0018 is reserved by spec 040.
 - 2026-11-05: Renumbered 0019 → 0020 at rebase; main had since taken 0018
   (spec 040) and 0019 (spec-ux design laws, #111).
+- 2026-11-06: Renumbered 0020 → 0022 at rebase; main had since taken 0020
+  (pipeline lite mode, #113) and 0021 (gates that fail safely, #117).

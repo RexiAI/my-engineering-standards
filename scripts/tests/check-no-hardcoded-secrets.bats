@@ -130,3 +130,25 @@ teardown() { teardown_tmpdir; }
   [[ "$output" == *"literal token prefix"* ]]
   [[ "$output" != *"SuperSecretTokenBodyThatMustNeverAppear"* ]]
 }
+
+@test "check-no-hardcoded-secrets: a credential literal in skills/ is caught (widened scope)" {
+  # Skills are distilled from real sessions — a copied token is exactly the
+  # leak docs/AGENTS_AND_SKILLS.md §Behavioral Validation tells authors to scrub.
+  mkdir -p "$TMPDIR_HELPER/skills/probe"
+  printf 'API_TOKEN=%s\n' 'realliteralvalue123' > "$TMPDIR_HELPER/skills/probe/SKILL.md"
+  run bash "$REPO_ROOT/scripts/check-no-hardcoded-secrets.sh" "$TMPDIR_HELPER"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"skills/probe/SKILL.md:1"* ]]
+  [[ "$output" == *"secret-style assignment"* ]]
+}
+
+@test "check-no-hardcoded-secrets: placeholders in language-specific/ still pass (no doc false positive)" {
+  # The guides legitimately show `TOKEN=<your-token>` forms; widening scope
+  # must not turn house documentation red.
+  mkdir -p "$TMPDIR_HELPER/language-specific/probe"
+  printf 'API_TOKEN=<your-token-here>\n' > "$TMPDIR_HELPER/language-specific/probe/SKILL.md"
+  run bash "$REPO_ROOT/scripts/check-no-hardcoded-secrets.sh" "$TMPDIR_HELPER"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"PASS"* ]]
+}
+

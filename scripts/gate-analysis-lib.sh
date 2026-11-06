@@ -48,7 +48,7 @@ check_dry() {
     $1 != prev { if (count > 0 && count >= 2 && prevloc != "") print count "\t" prev "\t" prevloc; prev=$1; count=0; prevloc="" }
     { count++; if (prevloc=="") prevloc=$2 }
     END { if (count >= 2 && prevloc != "") print count "\t" prev "\t" prevloc }
-  ' | sort -rn | head -10 > "$tmp"
+  ' | sort -rn | awk 'NR<=10' > "$tmp"
   if [ -s "$tmp" ]; then
     local dfile dline sev
     while IFS=$'\t' read -r count win loc; do

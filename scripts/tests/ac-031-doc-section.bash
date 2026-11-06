@@ -4,14 +4,18 @@
 # a byte-identical private copy. The extraction mirrors the awk section helper
 # used by scripts/check-post-pr-ci-loop.sh, scoped to the docs file under test
 # ($DOC, set by the loading test file before the call).
+section_of() { # section_of <file> <heading> — body of that file's `## <heading>` section
+  awk -v want="## $2" '
+    /^## / { if (found) exit; if ($0 == want) { found = 1; next } }
+    found { print }
+  ' "$1"
+}
+
 section() { # section <heading> — body of the `## <heading>` section, from "$DOC" or a split doc
-  local want="## $1" f out
+  local f out
   for f in "$DOC" "$REPO_ROOT"/docs/spec-pipeline/*.md; do
     [ -f "$f" ] || continue
-    out="$(awk -v want="$want" '
-      /^## / { if (found) exit; if ($0 == want) { found = 1; next } }
-      found { print }
-    ' "$f")"
+    out="$(section_of "$f" "$1")"
     if [ -n "$out" ]; then printf '%s\n' "$out"; return 0; fi
   done
   return 0

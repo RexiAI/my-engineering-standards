@@ -42,7 +42,7 @@ One evidence block per check, in `docs/spec-pipeline/audit-contract.md`
 §Audit contract's format: a `## Evidence: <check name>` heading, the exact
 `command:`, the real output (or an excerpt — never a paraphrase), the `exit:`
 code, and an `at:` timestamp in `YYYY-MM-DDTHH:MM:SSZ`. `scripts/check-audit-trail.sh`
-parses those markers, so a missing marker or a paraphrase fails that gate.
+parses those markers.
 
 Each check reports PASS/FAIL/BLOCK with its command and real output; the spot
 check reports which scenarios you read and what you found, and "no unaccounted
@@ -66,3 +66,11 @@ results stand. Narrow further where the script supports a scoped flag:
 Checks 2, 3, 4 are re-run whole — still scoped relative to the full suite. The
 re-run appends to its gate in `25-verification.md`, preserving the prior full run:
 the report is full run + delta, never a rewrite, and the verdict reflects it.
+
+## Lite mode
+
+In `lite` (`docs/SPEC_PIPELINE.md §Lite mode`) the same hard gates run: full
+suite, secrets scan, `scripts/check-code-principles.sh` (a FAIL blocks), and
+traceability. This stage also authors `30-report.md`; the retained-gate list,
+the `Pipeline mode: lite` / `skipped (lite)` markers, and the report format are
+in `docs/spec-pipeline/lite-mode.md`.
