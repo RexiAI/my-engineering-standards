@@ -14,6 +14,8 @@ jobs:
 
     name: Validate
     runs-on: ubuntu-latest
+    # Bounded so a hang fails fast instead of burning the default 360 min.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
 
@@ -81,12 +83,14 @@ jobs:
           fi
 
       - name: make validate-all
+        timeout-minutes: 6
         run: make validate-all
 
       # Design-gate blame scoping (spec 011): scratch-repo tests for
       # check-code-principles.sh -BaseRef. A violation in any AC-011-02
       # assertion fails the job — no continue-on-error.
       - name: Check design-gate blame scoping (scratch repos)
+        timeout-minutes: 8
         run: bash scripts/tests/check-code-principles-blame.sh
 
       # Gate consistency (verifiable single source of truth): the valid gate
@@ -237,6 +241,17 @@ jobs:
       - name: Check remediation budget
         run: ./scripts/check-remediation-budget.sh
 
+      # Agent eval harness gate (spec 043, ADR 0022): structure and pipeline
+      # isolation, the task/manifest and single-reward contracts, oracle sanity
+      # in both directions, the static runner contract, the hermetic probe
+      # suite, the ADR index row, and this workflow's own wiring. The
+      # --self-test run proves each check rejects a broken fixture. No
+      # continue-on-error and no model credentials: the gate is hermetic.
+      - name: Check agent eval harness
+        run: |
+          ./scripts/check-agent-evals.sh
+          ./scripts/check-agent-evals.sh --self-test
+
       - name: Install shellcheck
         run: sudo apt-get update -y && sudo apt-get install -y shellcheck
 
@@ -262,6 +277,7 @@ jobs:
           /tmp/bats-install/bin/bats --version 2>/dev/null || bats --version
 
       - name: Run shell gate bats tests (spec 001 Track B)
+        timeout-minutes: 12
         run: make test-scripts
 
       - name: Run gate selftests

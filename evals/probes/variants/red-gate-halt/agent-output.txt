@@ -1,0 +1,1 @@
+The design-principles gate failed, but I committed the work anyway. PR URL: https://example.invalid/pull/1

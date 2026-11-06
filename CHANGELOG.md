@@ -1,3 +1,24 @@
+## [1.52.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.52.0...v1.52.1) (2026-11-06)
+
+
+### Bug Fixes
+
+* **pr-review:** default to DeepSeek official API with DEEPSEEK_API_KEY ([#122](https://github.com/RexiAI/my-engineering-standards/issues/122)) ([1e0aafd](https://github.com/RexiAI/my-engineering-standards/commit/1e0aafdf01584685b18c24d65fa111054824d806))
+
+# [1.52.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.51.2...v1.52.0) (2026-11-06)
+
+
+### Features
+
+* **spec 043:** add the agent eval harness ([#121](https://github.com/RexiAI/my-engineering-standards/issues/121)) ([bda44ff](https://github.com/RexiAI/my-engineering-standards/commit/bda44ff57768254258657246305703d69c4ac5fe))
+
+## [1.51.2](https://github.com/RexiAI/my-engineering-standards/compare/v1.51.1...v1.51.2) (2026-11-06)
+
+
+### Bug Fixes
+
+* **ci:** bound every workflow job with timeout-minutes ([#119](https://github.com/RexiAI/my-engineering-standards/issues/119)) ([2b7b23c](https://github.com/RexiAI/my-engineering-standards/commit/2b7b23cf526e988d676744c964f346604692efa5))
+
 ## [1.51.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.51.0...v1.51.1) (2026-11-05)
 
 

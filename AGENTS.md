@@ -6,12 +6,12 @@ Before coding in any child repo, read the relevant docs from this submodule. The
 
 ## General Rules
 
-- Prefer layered architecture: controller → service → repository.
-- Business logic belongs in services, never in controllers or repositories.
+- Prefer layered architecture: controller → service → repository. — *advisory* (see §Enforcement status)
+- Business logic belongs in services, never in controllers or repositories. — *advisory* (see §Enforcement status)
 - Use dependency injection; avoid service locator or static state.
 - Handle errors at the boundary (controller advice / middleware), return structured error responses.
-- Every service must expose health endpoints (`/health`) that check all external dependencies.
-- Log at boundaries of every service method. Use structured logging with trace IDs.
+- Every service must expose health endpoints (`/health`) that check all external dependencies. — *advisory* (see §Enforcement status)
+- Log at boundaries of every service method. Use structured logging with trace IDs. — *advisory* (see §Enforcement status)
 - Never commit secrets, credentials, or tokens. For small projects `.env` files are fine (always in `.gitignore`). For production, use a secrets manager.
 - Write tests in layers: unit, acceptance, integration, e2e — see `docs/TESTING.md`. Use mutation testing to validate test quality (`production` tier, see `docs/CONFORMANCE_TIERS.md`).
 - Design principles (KISS, DRY, YAGNI, SOLID, cyclomatic ≤6, property tests) are mechanically enforced by `scripts/check-code-principles.sh` — see `docs/CODING_CONVENTIONS.md §Design Principles`. The spec pipeline's Verifier runs it as an independent gate; run it standalone via the `check-principles` skill any time you want a design audit. A FAIL is a defect; a WARN is a review hint.
@@ -21,11 +21,39 @@ Before coding in any child repo, read the relevant docs from this submodule. The
 - Use conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`.
 - Never commit or push changes unless the user explicitly instructs it. Commits and pushes require manual confirmation. **Exception**: the spec pipeline's PR Opener stage (`agents/spec-pr-opener.md`) may commit, push, and open a draft PR unattended, but only on a `spec/NNN-slug` branch and only after every configured quality gate is green (including a green Mutation Runner report) — see `docs/SPEC_PIPELINE.md §Commit and push carve-out`. The Mutation Runner (`agents/spec-mutation-runner.md`) never commits or pushes. No other agent or workflow gets this exception.
 - **All changes reach `main` via pull request. Direct push to `main` or `master` is forbidden — for humans and agents alike, with no exceptions.** This applies to this repo and every child repo. See `docs/GIT_WORKFLOW.md §Strategy: Trunk-Based Development` and `templates/branch-protection.md`.
-- **Never create git version tags.** Tags are created automatically by CI (Semantic Release) after a PR merges to `main`. See `docs/GIT_WORKFLOW.md §Versioning` and `docs/CI_CD.md.md §Release Process`.
+- **Never create git version tags.** Tags are created automatically by CI (Semantic Release) after a PR merges to `main`. See `docs/GIT_WORKFLOW.md §Versioning` and `docs/CI_CD.md §Release Process`.
 - In plan mode, every plan must state whether the agent should auto-commit after completing the work or wait for user confirmation.
 - Loops never skip L1 (report) on a production repo — see `docs/LOOP_ENGINEERING.md §Readiness levels`.
 - Verify agent-delivered work against the live system before calling it done — a diff that compiles and a diff that works are different claims. For an API change, that means actually calling the endpoint (curl, a test client, whatever's fastest) and checking the response, not just reading the code and reasoning that it should work. Field-name mismatches, wrong status codes, and auth-header mistakes are exactly the class of bug that "looks right" in a diff and fails on the first real request.
 - Every language guide lives at `language-specific/<lang>/SKILL.md` as a small entry point — project shape, always-rules, and pointers to the rest. Keep that file small; deep material lives in sibling files in the same directory (e.g. `PATTERNS.md`, `NATIVE.md`, `TESTING.md`). The index links to siblings; it does not embed them.
+
+### Enforcement status
+
+Four bullets above are marked `— *advisory* (see §Enforcement status)`. They state
+three rules — the layering bullet and the business-logic bullet both express the
+same layering rule. Advisory means reviewed in the PR, and not enforced by a gate:
+nothing fails the build when one of them is violated, and a reviewer is the only
+check.
+
+| Rule | Status | Checked today by |
+|---|---|---|
+| Layered architecture (`controller → service → repository`) | advisory | PR review |
+| `/health` checks every external dependency | advisory | PR review |
+| Structured logging with trace IDs | advisory | PR review |
+
+There is **no script check** for any of the three today, and adding one is a
+`new spec` — not a silent promotion of the sentence into a gate. Each would need
+runtime or cross-language structural analysis a static repo gate cannot do
+honestly: a `/health` body is not provably dependency-complete from source text,
+and "structured logging with trace IDs" is not statically checkable across
+Java / Go / Node. Labelling them advisory is honest; a gate that only pretends to
+check them is worse than none.
+
+Rules that cite a `scripts/check-*.sh` gate are mechanically enforced: self-ci runs
+that gate on every push and pull request, and a failure blocks the merge. The
+enforced set is exactly the set named in the bullets above (design principles,
+orchestration wiring, agent and skill standards) — if a rule has no such script,
+it is not enforced, whatever its wording says.
 
 ## Language Selection
 
@@ -67,7 +95,7 @@ Every guide is distilled from official upstream documentation at a pinned versio
 
 ## Model Configuration
 
-This repo's spec pipeline agents are configured to use models via `opencode.json` `{env:SPEC_*_MODEL}` references. `config/model.local.env.example` ships placeholder values only — no provider or model is assumed. Real model ids live in the gitignored `config/model.local.env`; the pipeline does not run until you set them there. Docs intentionally carry no model or provider ids — switch models by editing your local override, never tracked files.
+This repo's spec pipeline agents are configured to use models via `opencode.json` `{env:SPEC_*_MODEL}` references. `config/model.local.env.example` ships placeholder values for every pipeline seat except the PR-review default recorded in ADR 0023 — no other provider or model is assumed. Real model ids live in the gitignored `config/model.local.env`; the pipeline does not run until you set them there. Docs otherwise carry no model or provider ids — switch models by editing your local override, never tracked files.
 
 Per-machine values arrive via the gitignored repo-root `.envrc` (direnv). It
 loads the committed `config/model.local.env.example` placeholders, then the

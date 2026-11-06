@@ -40,21 +40,22 @@ directly, so every `FAIL` and `WARN` line must be recorded verbatim.
 
 ## Telemetry record
 
-After every run — PASS, FAIL, or BLOCK — append one record to `runs.jsonl` via
-`scripts/record-gate-run.sh` (no `permission.edit` widening). Fields: `specSlug`,
-`gatesFailed`, `warnings`, `durationSec`, `outcome` (`block` > `fail` > `pass`).
-`runId`, `loopCount` and retry counts are generated or defaulted from `SPEC_*`
-(spec 008). A failed append is a warning, never a fabricated record.
+After every completed run — PASS, FAIL, or BLOCK — append one record to
+`runs.jsonl` via `scripts/record-gate-run.sh` (no `permission.edit` widening).
+Fields: `specSlug`, `gatesFailed`, `warnings`, `durationSec`, `outcome` — `block`
+if any gate BLOCKed, else `fail` if the verdict is FAIL, else `pass`. `runId`,
+`loopCount` and retry counts come from `SPEC_*` (spec 008). A failed append is a
+warning, never a fabricated record.
 
 ## Report format
 
-One block per check, in the shape `audit-contract.md §Evidence block format`
-defines; a missing marker fails `scripts/check-audit-trail.sh`.
+One block per check in the `audit-contract.md §Evidence block format` shape; a
+missing marker fails `scripts/check-audit-trail.sh`.
 
 For the suite, immediately after `at:` record `Test-run hash: <64-hex>` from
 `scripts/test-run-reuse.sh --print-hash`, computed **after** the run; a differing
 pre-run hash adds `tree-changed-during-run` naming both, and the post-run hash is
-recorded. This stage runs the suite itself every time and never reuses a prior run.
+recorded. This stage always runs the suite and never reuses a prior run.
 
 Verdict from exit codes, never from your reading of the diff:
 

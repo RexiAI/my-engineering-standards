@@ -59,30 +59,19 @@ Every Java project inherits from the organization's parent POM:
 
 ## Testing
 
-JUnit 5 + Mockito + AssertJ. Unit tests run `@ExtendWith(MockitoExtension.class)`
-and never load a Spring context (`@SpringBootTest` is integration-only). Test
-shape, case selection, mock rules, and assertion idioms:
-[`TESTING.md`](TESTING.md); layer definitions and the acceptance/scenario rules:
-[`docs/TESTING.md`](../../docs/TESTING.md). Mutation testing (PiTest, ≥ 80%)
-is the `production`-tier signal that the suite catches defects, not just lines.
+JUnit 5 + Mockito + AssertJ. Unit tests use `@ExtendWith(MockitoExtension.class)`
+and never load a Spring context (`@SpringBootTest` is integration-only). Shape,
+case selection, mocks, assertions, layers, and PiTest mutation (≥ 80%): see
+[`TESTING.md`](TESTING.md).
 
 ## Key Dependencies
 
 Managed by the parent POM. Common starters and libraries:
 
-```xml
-<dependencies>
-  <dependency>com.company:application-starter</dependency>
-  <dependency>com.company:company-commons</dependency>
-  <dependency>com.company:feign-starter</dependency>
-  <dependency>org.springframework.boot:spring-boot-starter-web</dependency>
-  <dependency>org.springframework.boot:spring-boot-starter-actuator</dependency>
-  <dependency>org.springframework.boot:spring-boot-starter-data-jpa</dependency>
-  <dependency>org.springframework.boot:spring-boot-starter-data-redis</dependency>
-  <dependency>org.springframework.boot:spring-boot-starter-validation</dependency>
-  <dependency>org.springframework.boot:spring-boot-starter</dependency>  <!-- Exclude Tomcat; add Undertow or Jetty as needed -->
-</dependencies>
-```
+- Company modules: `com.company:application-starter`, `com.company:company-commons`,
+  `com.company:feign-starter`.
+- Spring Boot: `spring-boot-starter-web`, `-actuator`, `-data-jpa`, `-data-redis`,
+  `-validation`, and plain `spring-boot-starter` (exclude Tomcat; add Undertow or Jetty).
 
 All versions are managed by the parent POM. Do not specify versions in child POMs.
 

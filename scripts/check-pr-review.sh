@@ -149,15 +149,19 @@ str_contains() {
 #   shared-workflow and trigger-workflow checks (AC-024-02-04 / AC-024-03-06)
 #   — the same rule, one implementation.
 verify_secret_name_only() {
-  local acid="$1" file="$2" label="$3"
-  if grep 'OPENCODE_API_KEY' "$file" \
-     | grep -v 'secrets.OPENCODE_API_KEY' \
-     | grep -v 'OPENCODE_API_KEY:' \
-     | grep -v 'env.OPENCODE_API_KEY' | grep -q .; then
-    fail "$acid: OPENCODE_API_KEY appears in $label in a form other than the secret name reference"
-  else
-    pass "$acid: OPENCODE_API_KEY appears in $label only as the secret name"
-  fi
+  local acid="$1" file="$2" label="$3" name
+  for name in DEEPSEEK_API_KEY OPENCODE_API_KEY; do
+    if grep "$name" "$file" \
+       | grep -vE '^[[:space:]]*#' \
+       | grep -v '::warning::' \
+       | grep -v "secrets.$name" \
+       | grep -v "$name:" \
+       | grep -v "env.$name" | grep -q .; then
+      fail "$acid: $name appears in $label in a form other than the secret name reference"
+    else
+      pass "$acid: $name appears in $label only as the secret name"
+    fi
+  done
 }
 
 # Key-shaped strings that must never appear in committed files: only the
@@ -218,10 +222,30 @@ echo ""
 if [ -f "$OPENCODE_JSON" ]; then
   PROVIDER_SEC="$(sed -n '/"provider"/,$p' "$OPENCODE_JSON")"
   if [ -n "$PROVIDER_SEC" ]; then
-    str_contains AC-024-01-03 'opencode.json provider block' "$PROVIDER_SEC" '"OPENCODE_API_KEY"'
+    # ADR 0023: the default review provider is DeepSeek official. A committed
+    # block must map one of the two supported review keys by env reference.
+    if grep -q '"DEEPSEEK_API_KEY"' <<< "$PROVIDER_SEC" || grep -q '"OPENCODE_API_KEY"' <<< "$PROVIDER_SEC"; then
+      pass "AC-024-01-03: provider block maps a supported review key by env reference"
+    else
+      fail "AC-024-01-03: provider block must map DEEPSEEK_API_KEY (or OPENCODE_API_KEY) by env reference"
+    fi
   else
     pass "AC-024-01-03: no committed provider block (per-machine provider config); provider wiring is not in the reviewer agent"
   fi
+  # The shipped default is no longer optional operator config: if the example
+  # defaults to deepseek/*, the matching block and model must exist. Deriving
+  # the expectation from the default stops a deleted block from passing.
+  DEFAULT_MODEL="$(grep '^SPEC_PR_REVIEW_MODEL=' "$ROOT_DIR/config/model.local.env.example" 2>/dev/null | cut -d= -f2- || true)"
+  case "$DEFAULT_MODEL" in
+    deepseek/*)
+      if grep -q '"deepseek"' <<< "$PROVIDER_SEC"; then
+        str_contains AC-024-01-03 'DeepSeek official endpoint' "$PROVIDER_SEC" 'https://api.deepseek.com/v1'
+        str_contains AC-024-01-03 'DeepSeek default model' "$PROVIDER_SEC" '"deepseek-flash"'
+      else
+        fail "AC-024-01-03: committed default is $DEFAULT_MODEL but opencode.json has no deepseek provider block"
+      fi
+      ;;
+  esac
   # The reviewer is a roster agent: its model must be an env reference.
   AGENT_ENTRY="$(grep -E '^[[:space:]]*"pr-review"' "$OPENCODE_JSON" || true)"
   if [ -n "$AGENT_ENTRY" ]; then
@@ -241,7 +265,7 @@ if [ -f "$AGENT" ]; then
   # repo paths (.github/workflows/…, docs/…, shared/…) — those are not model
   # ids and are filtered out before the comparison.
   AGENT_MODEL_IDS="$(grep -oE '[A-Za-z0-9._-]+/[A-Za-z0-9._-]+' "$AGENT" \
-    | grep -vE '^(\.github|docs|shared|language)/' | sort -u || true)"
+    | grep -vE '^(\.github|\.pr-review|docs|shared|language|scripts)/' | sort -u || true)"
   if [ -z "$AGENT_MODEL_IDS" ]; then
     pass "AC-024-01-04: agents/pr-review.md carries no model ids"
   else
@@ -258,7 +282,9 @@ if [ -f "$AGENT" ]; then
   # Every allowed bash pattern is glob-matched against the forbidden write
   # operations: a pattern like `gh pr *` would match `gh pr merge` and must
   # fail the check.
-  ALLOWED_PATTERNS="$(printf '%s\n' "$AGENT_FM" | sed -n '/bash:/,/^[[:space:]]*[^[:space:]-]/p' \
+  # bash: is the last key in the frontmatter, so capture to EOF rather than to
+  # the next indented line — otherwise only the first entry is ever inspected.
+  ALLOWED_PATTERNS="$(printf '%s\n' "$AGENT_FM" | awk '/^[[:space:]]*bash:[[:space:]]*$/{f=1;next} f' \
     | sed -nE 's/^[[:space:]]*"([^"]+)":[[:space:]]*allow.*/\1/p')"
   FORBIDDEN_WRITES=("git push" "git commit" "git add" "git checkout" "git reset" \
     "git worktree" "gh pr merge" "gh pr edit" "touch " "tee " "vim " "nano ")
@@ -276,6 +302,20 @@ if [ -f "$AGENT" ]; then
     pass "AC-024-01-05: no allowed bash pattern matches git push/commit/add/checkout/reset/worktree, gh pr merge/edit, or file editors"
   else
     fail "AC-024-01-05: allowed bash pattern matches a write operation: ${WRITE_MATCHES[*]}"
+  fi
+  # The reviewer runs with no shell at all: the workflow supplies the diff and
+  # posts its answer. Denying bash is what makes that boundary hold in headless
+  # CI, where any unmatched command is auto-rejected.
+  if ! grep -qE '^[[:space:]]*bash:[[:space:]]*$' <<< "$AGENT_FM"; then
+    fail "AC-024-01-05: bash must be a block mapping (bash: followed by deny entries)"
+  fi
+  BASH_BLOCK="$(printf '%s\n' "$AGENT_FM" | awk '/^[[:space:]]*bash:[[:space:]]*$/{f=1;next} f')"
+  if [ -z "$BASH_BLOCK" ]; then
+    fail "AC-024-01-05: bash block is empty"
+  elif grep -qE ':[[:space:]]*"?allow' <<< "$BASH_BLOCK"; then
+    fail "AC-024-01-05: bash block must be deny-only — found: $(grep -oE '"[^"]+":[[:space:]]*"?allow' <<< "$BASH_BLOCK" | tr '\n' ' ')"
+  else
+    pass "AC-024-01-05: bash block denies every command"
   fi
 fi
 
@@ -412,7 +452,7 @@ echo ""
 # AC-024-02-01 — Shared workflow exists as a reusable
 if [ -f "$SHARED_WF" ]; then
   verify_grep AC-024-02-01 "$SHARED_WF" "shared workflow is a workflow_call reusable" \
-    "workflow_call" "pr-number" "head-sha" "OPENCODE_API_KEY"
+    "workflow_call" "pr-number" "head-sha" "DEEPSEEK_API_KEY" "OPENCODE_API_KEY"
 else
   fail "AC-024-02-01: .github/workflows/ci-pr-review.yml is missing"
 fi
@@ -432,17 +472,22 @@ echo ""
 # AC-024-02-03 — Secret optional; empty key skips the job cleanly
 if [ -f "$SHARED_WF" ]; then
   SECRETS_BLOCK="$(sed -n '/^    secrets:/,/^permissions:/p' "$SHARED_WF")"
+  str_contains AC-024-02-03 'workflow_call secrets block' "$SECRETS_BLOCK" 'DEEPSEEK_API_KEY:'
   str_contains AC-024-02-03 'workflow_call secrets block' "$SECRETS_BLOCK" 'OPENCODE_API_KEY:'
   if grep -q 'required: true' <<< "$SECRETS_BLOCK"; then
-    fail "AC-024-02-03: OPENCODE_API_KEY must be declared without required: true"
+    fail "AC-024-02-03: review keys must be declared without required: true"
   else
-    pass "AC-024-02-03: OPENCODE_API_KEY is declared without required: true"
+    pass "AC-024-02-03: review keys are declared without required: true"
   fi
   # Empty-key guard (AC-024-02-03): secrets is not a legal context in an if:
-  # at any scope, so the guard must gate on the mapped job env var. Verify
-  # the job env maps the secret and a step guards on env.OPENCODE_API_KEY.
+  # at any scope, so the guard must gate on the mapped job env vars. Verify
+  # the job env maps both secrets and a step guards on them.
   verify_grep AC-024-02-03 "$SHARED_WF" "review job guarded by the empty-key check" \
-    "env.OPENCODE_API_KEY != ''"
+    "env.DEEPSEEK_API_KEY != ''" "env.OPENCODE_API_KEY != ''"
+  # A rejected credential is a provider-side failure, not a code defect: the
+  # guard must skip cleanly rather than fail the PR (ADR 0023).
+  verify_grep AC-024-02-03 "$SHARED_WF" "auth failures skip cleanly" \
+    "invalid credential" "unauthorized"
 fi
 
 echo ""
@@ -461,6 +506,13 @@ if [ -f "$SHARED_WF" ]; then
     "submodules: true" "persist-credentials: false"
   verify_grep AC-024-02-05 "$SHARED_WF" "run step passes pr-number and head-sha into the invocation" \
     "inputs.pr-number" "inputs.head-sha" "PR_NUMBER" "HEAD_SHA"
+  # The agent has no shell: the workflow fetches the PR context and diff and
+  # posts the agent's final answer, so the review never depends on a permission
+  # prompt that headless CI cannot answer.
+  verify_grep AC-024-02-05 "$SHARED_WF" "workflow supplies the PR context and diff" \
+    'gh pr view "$PR_NUMBER"' 'gh pr diff "$PR_NUMBER"' '.pr-review/pr.diff'
+  verify_grep AC-024-02-05 "$SHARED_WF" "workflow posts the agent's answer" \
+    'gh pr comment "$PR_NUMBER" --body-file -'
 fi
 
 echo ""
@@ -537,6 +589,10 @@ echo ""
 
 # AC-024-03-03 — Calls the shared workflow with PR context
 if [ -f "$TRIGGER_WF" ]; then
+  # SHA-pinned for the same reason as child wiring: a same-repo PR can modify
+  # a local workflow file, and a pull_request run executes the PR's revision
+  # with the job's secrets. A local `uses:` here would hand an author the
+  # review tokens.
   verify_grep AC-024-03-03 "$TRIGGER_WF" "job calls the shared pr-review workflow, pinned to a commit SHA (not @main)" \
     "RexiAI/my-engineering-standards/.github/workflows/ci-pr-review.yml@21046d96796467f8238d6d613ce3a552bf3fced0 # pinned; bump deliberately, never track a branch"
   verify_grep AC-024-03-03 "$TRIGGER_WF" "pr-number and head-sha passed from the PR event" \
@@ -548,6 +604,8 @@ echo ""
 
 # AC-024-03-04 — Key supplied via GitHub secret
 if [ -f "$TRIGGER_WF" ]; then
+  # The pinned revision declares only OPENCODE_API_KEY; DEEPSEEK_API_KEY is
+  # added to the trigger in the pin-bump follow-up together with the new pin.
   verify_grep AC-024-03-04 "$TRIGGER_WF" "OPENCODE_API_KEY mapped from secrets" \
     "OPENCODE_API_KEY: \${{ secrets.OPENCODE_API_KEY }}"
 fi
@@ -573,7 +631,7 @@ fi
 
 echo ""
 
-# AC-024-03-07 — Self-hosting wiring is identical to child wiring
+# AC-024-03-07 — Self-hosting wiring is identical to child wiring (SHA-pinned).
 if [ -f "$TRIGGER_WF" ] && [ -f "$INIT_CI" ]; then
   SHARED_URL='RexiAI/my-engineering-standards/.github/workflows/ci-pr-review.yml@21046d96796467f8238d6d613ce3a552bf3fced0 # pinned; bump deliberately, never track a branch'
   if grep -qF -- "$SHARED_URL" "$TRIGGER_WF" && grep -qF -- "$SHARED_URL" "$INIT_CI"; then
@@ -738,10 +796,12 @@ echo ""
 # AC-024-05-02 — Required Secrets table gains the new secret
 if [ -f "$CI_CD" ]; then
   SECRETS_TABLE="$(awk '/^### Required Secrets/{f=1;next} /^## /{if(f)exit} f' "$CI_CD")"
-  if grep -q '`OPENCODE_API_KEY`' <<< "$SECRETS_TABLE" && grep -q 'opt-in' <<< "$SECRETS_TABLE"; then
-    pass "AC-024-05-02: Required Secrets table lists OPENCODE_API_KEY as opt-in"
+  if grep -q '`DEEPSEEK_API_KEY`' <<< "$SECRETS_TABLE" \
+     && grep -q '`OPENCODE_API_KEY`' <<< "$SECRETS_TABLE" \
+     && grep -q 'opt-in' <<< "$SECRETS_TABLE"; then
+    pass "AC-024-05-02: Required Secrets table lists both review keys as opt-in"
   else
-    fail "AC-024-05-02: Required Secrets table must list OPENCODE_API_KEY with an opt-in marker"
+    fail "AC-024-05-02: Required Secrets table must list DEEPSEEK_API_KEY and OPENCODE_API_KEY with an opt-in marker"
   fi
 else
   fail "AC-024-05-02: docs/CI_CD.md is missing"

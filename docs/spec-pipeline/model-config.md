@@ -146,19 +146,22 @@ resolve `{env:SPEC_*_MODEL}` references via `§Model configuration`; the
 standalone PR-review agent gets its runtime model per repo instead:
 
 - **Provider config** — `opencode.json` may carry provider blocks (base URL,
-  auth env var, available models). That is operator configuration, not
-  documentation: which providers appear there is each machine's/repo's own
-  decision.
-- **Model selection** — the shared review workflow takes its model from the
-  `PR_REVIEW_MODEL` repository variable and its key from the
-  `OPENCODE_API_KEY` secret. Either unset ⇒ the review skips cleanly (green
-  CI, no review); there is no shipped default model.
+  auth env var, available models). This repo ships one for DeepSeek official
+  (`https://api.deepseek.com/v1`, `DEEPSEEK_API_KEY`) at the end of the file;
+  other providers are each machine's/repo's own configuration (ADR 0023).
+- **Model selection** — the shared review workflow defaults to
+  `deepseek/deepseek-flash`, overridable with the `PR_REVIEW_MODEL` repository
+  variable. Its default key is the `DEEPSEEK_API_KEY` secret; an explicit
+  non-DeepSeek override uses `OPENCODE_API_KEY`. The review skips cleanly
+  (green CI, no review) when both keys are unset or the provider rejects the
+  credential.
 
 **PR review agent model**: `agents/pr-review.md` (the PR review agent,
 spec 024) ships without a `model:` key, same as every other agent. Its model
 resolves through `{env:SPEC_PR_REVIEW_MODEL}` in `opencode.json`, with the
-placeholder default in `config/model.local.env.example` and an optional
-per-repo `PR_REVIEW_MODEL` override in the shared workflow. The agent's scope
+committed `deepseek/deepseek-flash` default in
+`config/model.local.env.example` and an optional per-repo `PR_REVIEW_MODEL`
+override in the shared workflow. The agent's scope
 lock, permissions, secret handling, and cost bounds are documented in
 `docs/CI_CD.md §PR Review Agent`, the authoritative reference for wiring it
 into child repos (`init-ci.sh --with-pr-review`).

@@ -13,7 +13,12 @@
 #      language-specific/<lang>/SKILL.md -> name == <lang>.
 #   4. 'description' field — required, non-empty, 1-1024 chars.
 #   5. 'compatibility' field — optional; if present, 1-500 chars.
-#   6. Line count — WARN if >500 lines (recommend progressive disclosure).
+#   6. Line count — skills/*/SKILL.md: WARN if >500 lines (Agent Skills spec
+#      guidance, unchanged). language-specific/*/SKILL.md: hard FAIL above
+#      200 lines. The four existing oversized language guides are grandfathered
+#      at their current line count and may not grow (LANG_SKILL_GRANDFATHERED
+#      in validate_skill); an entry is removed only after that guide is split
+#      into an entry point plus sibling files.
 #   7. Nested reference chains — WARN if reference files themselves contain
 #      relative links to other reference files.
 #
@@ -69,10 +74,52 @@ except Exception as e:
     print(f"FAIL:{rel_path}:Cannot read file: {e}")
     sys.exit(0)
 
-# Check line count
+# Check line count: skills/ keeps the Agent Skills spec's 500-line guidance as a
+# warning; a language-specific/ entry point has a hard 200-line cap, because it
+# exists to be small and to point at siblings. The four guides already over the
+# cap are grandfathered at their current count — frozen, not permitted to grow —
+# until a follow-up spec splits them.
+LANG_SKILL_MAX_LINES = 200
+LANG_SKILL_GRANDFATHERED = {
+    "language-specific/java/SKILL.md": 282,
+    "language-specific/python/SKILL.md": 271,
+    "language-specific/rust/SKILL.md": 241,
+    "language-specific/go/SKILL.md": 223,
+}
+LANG_SKILL_MOVE_HINT = "move detail to a sibling file such as PATTERNS.md or TESTING.md"
+
+
+def line_count_finding(rel_path, total_lines):
+    """The line-count rule for one SKILL.md.
+
+    Returns ('error'|'warning', message), or None when the file is within its
+    limit. Each ceiling is one early-return branch, so no branch nests.
+    """
+    if not rel_path.startswith("language-specific/"):
+        if total_lines <= 500:
+            return None
+        return ("warning", f"Body has {total_lines} lines (>500 limit recommended "
+                           f"by Agent Skills spec; move details to references/)")
+    ceiling = LANG_SKILL_GRANDFATHERED.get(rel_path, LANG_SKILL_MAX_LINES)
+    if total_lines <= ceiling:
+        return None
+    if rel_path in LANG_SKILL_GRANDFATHERED:
+        return ("error", f"Body has {total_lines} lines (> grandfathered ceiling of "
+                         f"{ceiling} for this guide — it is frozen at its current "
+                         f"size and may not grow; {LANG_SKILL_MOVE_HINT}, then remove "
+                         f"its grandfather entry)")
+    return ("error", f"Body has {total_lines} lines (> {LANG_SKILL_MAX_LINES}-line "
+                     f"limit for language-specific/*/SKILL.md — {LANG_SKILL_MOVE_HINT})")
+
+
 total_lines = len(lines)
-if total_lines > 500:
-    warnings.append(f"Body has {total_lines} lines (>500 limit recommended by Agent Skills spec; move details to references/)")
+finding = line_count_finding(rel_path, total_lines)
+if finding is not None:
+    severity, message = finding
+    if severity == "error":
+        errors.append(message)
+    else:
+        warnings.append(message)
 
 content = "".join(lines)
 
