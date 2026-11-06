@@ -12,8 +12,13 @@ name: PR Review Agent
 #
 # Consumers (child repos via init-ci.sh --with-pr-review, and this repo's own
 # .github/workflows/pr-review.yml) call this with pr-number + head-sha. The
-# API key secret is optional: a caller without the key gets a skipped job,
+# API key secrets are optional: a caller without a key gets a skipped job,
 # never a failure.
+#
+# Default provider: DeepSeek official (ADR 0023). The review model defaults to
+# deepseek/deepseek-flash served from https://api.deepseek.com/v1, authenticated
+# with DEEPSEEK_API_KEY. OPENCODE_API_KEY is kept for already-configured child
+# repos and for an explicit non-DeepSeek PR_REVIEW_MODEL override.
 
 on:
   workflow_call:
@@ -27,8 +32,11 @@ on:
         required: true
         type: string
     secrets:
+      DEEPSEEK_API_KEY:
+        description: API key for the DeepSeek official API (default review provider)
+        required: false
       OPENCODE_API_KEY:
-        description: API key for the provider serving the review model
+        description: API key for a non-DeepSeek provider, used only with an explicit PR_REVIEW_MODEL override
         required: false
 
 permissions:
@@ -41,6 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
       PR_NUMBER: ${{ inputs.pr-number }}
       HEAD_SHA: ${{ inputs.head-sha }}
@@ -112,11 +121,10 @@ jobs:
         # Empty-key guard (AC-024-02-03): an absent key yields a skipped step,
         # never a failure — the PR's required checks are unaffected. secrets is
         # not a legal context in an if: at any scope, so gate on the job env
-        # (the secret is mapped into the env in the job env block).
-        # Empty-model guard (ADR 0003): when PR_REVIEW_MODEL is unset, the
-        # step skips too — a repo opts in by configuring BOTH the key and the
-        # model; neither has a shipped default.
-        if: ${{ steps.early-exit.outputs.skip != 'true' && env.OPENCODE_API_KEY != '' }}
+        # (the secret is mapped into the env in the job env block). Either key
+        # is enough: DEEPSEEK_API_KEY serves the default model, OPENCODE_API_KEY
+        # serves an explicit non-DeepSeek PR_REVIEW_MODEL override (ADR 0023).
+        if: ${{ steps.early-exit.outputs.skip != 'true' && (env.DEEPSEEK_API_KEY != '' || env.OPENCODE_API_KEY != '') }}
         run: |
           set -euo pipefail
           # Headless run on a bare runner has no shell profile, so load the
@@ -129,11 +137,19 @@ jobs:
           # shellcheck disable=SC1091
           set -a; . config/model.local.env.example; set +a
 
+          # Default model: DeepSeek official (ADR 0023). The committed example
+          # carries the same id for local runs and this repo's CI; a child repo
+          # still on the placeholder gets the default here. The provider block
+          # lives in opencode.json (baseURL https://api.deepseek.com/v1, key
+          # DEEPSEEK_API_KEY).
+          case "${SPEC_PR_REVIEW_MODEL:-}" in
+            ""|your-provider/*) export SPEC_PR_REVIEW_MODEL="deepseek/deepseek-flash" ;;
+          esac
+
           # Model override: when PR_REVIEW_MODEL is set in the caller's
           # environment, export it as SPEC_PR_REVIEW_MODEL so opencode.json's
           # {env:SPEC_PR_REVIEW_MODEL} resolves to the override value instead
-          # of the committed default. The step's if: guarantees the variable
-          # is set here — there is no shipped fallback model.
+          # of the default above.
           if [ -n "${PR_REVIEW_MODEL:-}" ]; then
             export SPEC_PR_REVIEW_MODEL="$PR_REVIEW_MODEL"
           fi
@@ -175,8 +191,8 @@ jobs:
             # required check for a comment-only advisory review. The guard's
             # contract is "skip with a warning, never fail the PR on provider
             # availability".
-            if echo "$review_output" | sed 's/\x1b\[[0-9;]*m//g' | grep -qiE 'spending limit|quota exceeded|billing|rate.limit|429|402|insufficient balance|model unavailable|model not found|unknown model|no such model|stream error'; then
-              echo "::warning::Review skipped — model provider unavailable or over quota (exit ${review_rc}). Not a code defect."
+            if echo "$review_output" | sed 's/\x1b\[[0-9;]*m//g' | grep -qiE 'spending limit|quota exceeded|billing|rate.limit|429|402|insufficient balance|model unavailable|model not found|unknown model|no such model|stream error|invalid credential|invalid api key|unauthorized|authentication|401'; then
+              echo "::warning::Review skipped — model provider unavailable, rejected the credential, or is over quota (exit ${review_rc}). Check DEEPSEEK_API_KEY (default provider) or OPENCODE_API_KEY (override provider). Not a code defect."
               exit 0
             fi
             echo "$review_output"

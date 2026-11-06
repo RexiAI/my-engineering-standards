@@ -149,15 +149,19 @@ str_contains() {
 #   shared-workflow and trigger-workflow checks (AC-024-02-04 / AC-024-03-06)
 #   — the same rule, one implementation.
 verify_secret_name_only() {
-  local acid="$1" file="$2" label="$3"
-  if grep 'OPENCODE_API_KEY' "$file" \
-     | grep -v 'secrets.OPENCODE_API_KEY' \
-     | grep -v 'OPENCODE_API_KEY:' \
-     | grep -v 'env.OPENCODE_API_KEY' | grep -q .; then
-    fail "$acid: OPENCODE_API_KEY appears in $label in a form other than the secret name reference"
-  else
-    pass "$acid: OPENCODE_API_KEY appears in $label only as the secret name"
-  fi
+  local acid="$1" file="$2" label="$3" name
+  for name in DEEPSEEK_API_KEY OPENCODE_API_KEY; do
+    if grep "$name" "$file" \
+       | grep -vE '^[[:space:]]*#' \
+       | grep -v '::warning::' \
+       | grep -v "secrets.$name" \
+       | grep -v "$name:" \
+       | grep -v "env.$name" | grep -q .; then
+      fail "$acid: $name appears in $label in a form other than the secret name reference"
+    else
+      pass "$acid: $name appears in $label only as the secret name"
+    fi
+  done
 }
 
 # Key-shaped strings that must never appear in committed files: only the
@@ -218,7 +222,17 @@ echo ""
 if [ -f "$OPENCODE_JSON" ]; then
   PROVIDER_SEC="$(sed -n '/"provider"/,$p' "$OPENCODE_JSON")"
   if [ -n "$PROVIDER_SEC" ]; then
-    str_contains AC-024-01-03 'opencode.json provider block' "$PROVIDER_SEC" '"OPENCODE_API_KEY"'
+    # ADR 0023: the default review provider is DeepSeek official. A committed
+    # block must map one of the two supported review keys by env reference.
+    if grep -q '"DEEPSEEK_API_KEY"' <<< "$PROVIDER_SEC" || grep -q '"OPENCODE_API_KEY"' <<< "$PROVIDER_SEC"; then
+      pass "AC-024-01-03: provider block maps a supported review key by env reference"
+    else
+      fail "AC-024-01-03: provider block must map DEEPSEEK_API_KEY (or OPENCODE_API_KEY) by env reference"
+    fi
+    if grep -q '"deepseek"' <<< "$PROVIDER_SEC"; then
+      str_contains AC-024-01-03 'DeepSeek official endpoint' "$PROVIDER_SEC" 'https://api.deepseek.com/v1'
+      str_contains AC-024-01-03 'DeepSeek default model' "$PROVIDER_SEC" '"deepseek-flash"'
+    fi
   else
     pass "AC-024-01-03: no committed provider block (per-machine provider config); provider wiring is not in the reviewer agent"
   fi
@@ -412,7 +426,7 @@ echo ""
 # AC-024-02-01 — Shared workflow exists as a reusable
 if [ -f "$SHARED_WF" ]; then
   verify_grep AC-024-02-01 "$SHARED_WF" "shared workflow is a workflow_call reusable" \
-    "workflow_call" "pr-number" "head-sha" "OPENCODE_API_KEY"
+    "workflow_call" "pr-number" "head-sha" "DEEPSEEK_API_KEY" "OPENCODE_API_KEY"
 else
   fail "AC-024-02-01: .github/workflows/ci-pr-review.yml is missing"
 fi
@@ -432,17 +446,22 @@ echo ""
 # AC-024-02-03 — Secret optional; empty key skips the job cleanly
 if [ -f "$SHARED_WF" ]; then
   SECRETS_BLOCK="$(sed -n '/^    secrets:/,/^permissions:/p' "$SHARED_WF")"
+  str_contains AC-024-02-03 'workflow_call secrets block' "$SECRETS_BLOCK" 'DEEPSEEK_API_KEY:'
   str_contains AC-024-02-03 'workflow_call secrets block' "$SECRETS_BLOCK" 'OPENCODE_API_KEY:'
   if grep -q 'required: true' <<< "$SECRETS_BLOCK"; then
-    fail "AC-024-02-03: OPENCODE_API_KEY must be declared without required: true"
+    fail "AC-024-02-03: review keys must be declared without required: true"
   else
-    pass "AC-024-02-03: OPENCODE_API_KEY is declared without required: true"
+    pass "AC-024-02-03: review keys are declared without required: true"
   fi
   # Empty-key guard (AC-024-02-03): secrets is not a legal context in an if:
-  # at any scope, so the guard must gate on the mapped job env var. Verify
-  # the job env maps the secret and a step guards on env.OPENCODE_API_KEY.
+  # at any scope, so the guard must gate on the mapped job env vars. Verify
+  # the job env maps both secrets and a step guards on them.
   verify_grep AC-024-02-03 "$SHARED_WF" "review job guarded by the empty-key check" \
-    "env.OPENCODE_API_KEY != ''"
+    "env.DEEPSEEK_API_KEY != ''" "env.OPENCODE_API_KEY != ''"
+  # A rejected credential is a provider-side failure, not a code defect: the
+  # guard must skip cleanly rather than fail the PR (ADR 0023).
+  verify_grep AC-024-02-03 "$SHARED_WF" "auth failures skip cleanly" \
+    "invalid credential" "unauthorized"
 fi
 
 echo ""
@@ -548,7 +567,9 @@ echo ""
 
 # AC-024-03-04 — Key supplied via GitHub secret
 if [ -f "$TRIGGER_WF" ]; then
-  verify_grep AC-024-03-04 "$TRIGGER_WF" "OPENCODE_API_KEY mapped from secrets" \
+  verify_grep AC-024-03-04 "$TRIGGER_WF" "DEEPSEEK_API_KEY mapped from secrets" \
+    "DEEPSEEK_API_KEY: \${{ secrets.DEEPSEEK_API_KEY }}"
+  verify_grep AC-024-03-04 "$TRIGGER_WF" "OPENCODE_API_KEY override mapped from secrets" \
     "OPENCODE_API_KEY: \${{ secrets.OPENCODE_API_KEY }}"
 fi
 
@@ -611,6 +632,7 @@ if [ -f "$INIT_CI" ]; then
     if [ -f "$FIX/.github/workflows/ci.yml" ]; then
       verify_grep AC-024-04-02 "$FIX/.github/workflows/ci.yml" "generated ci.yml carries the pr-review job" \
         "pr-review:" "RexiAI/my-engineering-standards/.github/workflows/ci-pr-review.yml@21046d96796467f8238d6d613ce3a552bf3fced0 # pinned; bump deliberately, never track a branch" \
+        "DEEPSEEK_API_KEY: \${{ secrets.DEEPSEEK_API_KEY }}" \
         "OPENCODE_API_KEY: \${{ secrets.OPENCODE_API_KEY }}"
     else
       fail "AC-024-04-02: init-ci.sh did not generate .github/workflows/ci.yml"
@@ -677,24 +699,25 @@ echo ""
 # AC-024-04-04/05 — Secret prompt gating (structural: the read is inside the
 # flag guard; the interactive proof lives in check-pr-review.selftest.sh)
 if [ -f "$INIT_CI" ]; then
-  # The OPENCODE_API_KEY prompt must sit textually inside the
+  # The review-key prompts must sit textually inside the
   # `if [ "$WITH_PR_REVIEW_FLAG" = "true" ]; then` guard. Find the line of the
-  # guard and the line of the prompt and confirm the guard opens before the
-  # prompt and its `fi` closes after it.
+  # guard and the line of the primary prompt and confirm the guard opens before
+  # the prompt and its `fi` closes after it.
   GUARD_LINE="$(grep -nF 'if [ "$WITH_PR_REVIEW_FLAG" = "true" ]; then' "$INIT_CI" | head -1 | cut -d: -f1)"
-  PROMPT_LINE="$(grep -nF 'OPENCODE_API_KEY (PR review agent, opt-in)' "$INIT_CI" | head -1 | cut -d: -f1)"
+  PROMPT_LINE="$(grep -nF 'DEEPSEEK_API_KEY (PR review agent' "$INIT_CI" | head -1 | cut -d: -f1)"
   FI_LINE="$(awk -v start="$GUARD_LINE" 'NR>start && $0 ~ /^[[:space:]]*fi[[:space:]]*$/{print NR; exit}' "$INIT_CI" || true)"
   if [ -n "$GUARD_LINE" ] && [ -n "$PROMPT_LINE" ] && [ -n "$FI_LINE" ] \
      && [ "$GUARD_LINE" -lt "$PROMPT_LINE" ] && [ "$PROMPT_LINE" -lt "$FI_LINE" ]; then
-    pass "AC-024-04-04: OPENCODE_API_KEY prompt is gated on WITH_PR_REVIEW_FLAG"
+    pass "AC-024-04-04: DEEPSEEK_API_KEY prompt is gated on WITH_PR_REVIEW_FLAG"
   else
-    fail "AC-024-04-04: OPENCODE_API_KEY must be prompted only inside the --with-pr-review guard"
+    fail "AC-024-04-04: DEEPSEEK_API_KEY must be prompted only inside the --with-pr-review guard"
   fi
-  READS="$(grep -c 'read -rp.*OPENCODE_API_KEY' "$INIT_CI" || true)"
-  if [ "$READS" -eq 1 ]; then
-    pass "AC-024-04-05: exactly one OPENCODE_API_KEY prompt exists, and it is flag-gated (never prompted without the flag)"
+  READS="$(grep -c 'read -rp.*DEEPSEEK_API_KEY' "$INIT_CI" || true)"
+  OPTIONAL_READS="$(grep -c 'read -rp.*OPENCODE_API_KEY' "$INIT_CI" || true)"
+  if [ "$READS" -eq 1 ] && [ "$OPTIONAL_READS" -le 1 ]; then
+    pass "AC-024-04-05: review-key prompts exist only inside the guard (never prompted without the flag)"
   else
-    fail "AC-024-04-05: expected exactly one OPENCODE_API_KEY prompt (found $READS)"
+    fail "AC-024-04-05: expected exactly one DEEPSEEK_API_KEY prompt and at most one OPENCODE_API_KEY prompt (found $READS / $OPTIONAL_READS)"
   fi
 fi
 
@@ -702,8 +725,9 @@ echo ""
 
 # AC-024-04-06 — Summary lists the required secret for GitHub
 if [ -f "$INIT_CI" ]; then
-  verify_grep AC-024-04-06 "$INIT_CI" "summary's GitHub next steps list OPENCODE_API_KEY" \
-    "OPENCODE_API_KEY OPENCODE_API_KEY (PR review agent, opt-in only)" \
+  verify_grep AC-024-04-06 "$INIT_CI" "summary's GitHub next steps list the review keys" \
+    "DEEPSEEK_API_KEY (DeepSeek official" \
+    "OPENCODE_API_KEY (only for a non-DeepSeek PR_REVIEW_MODEL override)" \
     "docs/CI_CD.md §PR Review Agent"
 fi
 
@@ -738,10 +762,12 @@ echo ""
 # AC-024-05-02 — Required Secrets table gains the new secret
 if [ -f "$CI_CD" ]; then
   SECRETS_TABLE="$(awk '/^### Required Secrets/{f=1;next} /^## /{if(f)exit} f' "$CI_CD")"
-  if grep -q '`OPENCODE_API_KEY`' <<< "$SECRETS_TABLE" && grep -q 'opt-in' <<< "$SECRETS_TABLE"; then
-    pass "AC-024-05-02: Required Secrets table lists OPENCODE_API_KEY as opt-in"
+  if grep -q '`DEEPSEEK_API_KEY`' <<< "$SECRETS_TABLE" \
+     && grep -q '`OPENCODE_API_KEY`' <<< "$SECRETS_TABLE" \
+     && grep -q 'opt-in' <<< "$SECRETS_TABLE"; then
+    pass "AC-024-05-02: Required Secrets table lists both review keys as opt-in"
   else
-    fail "AC-024-05-02: Required Secrets table must list OPENCODE_API_KEY with an opt-in marker"
+    fail "AC-024-05-02: Required Secrets table must list DEEPSEEK_API_KEY and OPENCODE_API_KEY with an opt-in marker"
   fi
 else
   fail "AC-024-05-02: docs/CI_CD.md is missing"

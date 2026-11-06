@@ -30,4 +30,5 @@ jobs:
       pr-number: ${{ github.event.pull_request.number }}
       head-sha: ${{ github.event.pull_request.head.sha }}
     secrets:
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}

@@ -30,3 +30,4 @@ Proposed → Accepted → Deprecated → Superseded.
 | 0020 | [Pipeline lite mode: a mechanically selected short stage set for small specs](0020-pipeline-lite-mode.md) | Proposed |
 | 0021 | [Make the pipeline's own gates fail safely and report truthfully](0021-pipeline-gate-fail-safely.md) | Accepted |
 | 0022 | [Agent eval harness](0022-agent-eval-harness.md) | Proposed |
+| 0023 | [PR review defaults to DeepSeek official](0023-pr-review-deepseek-official.md) | Proposed |
