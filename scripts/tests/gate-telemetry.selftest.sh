@@ -296,10 +296,14 @@ bash "$TMP/scratch/scripts/record-gate-run.sh" -f "$TMP/other.jsonl" -record "$N
 # ── AC-012-06: Verifier / orchestrator telemetry wiring ───────────────────────
 echo "== AC-012-06 verifier + orchestrator =="
 VERIFIER="$ROOT/agents/spec-verifier.md"
+# 038 moved the Verifier's procedure into its stage file; the rule must still be
+# documented, so accept either the agent prompt or docs/spec-pipeline/verifier.md.
+VERIFIER_STAGE="$ROOT/docs/spec-pipeline/verifier.md"
 PIPELINE="$ROOT/agents/spec-pipeline.md"
-if grep -q 'record-gate-run.sh' "$VERIFIER" && grep -q 'runs.jsonl' "$VERIFIER" \
-   && grep -q 'gatesFailed' "$VERIFIER" && grep -q 'durationSec' "$VERIFIER" \
-   && grep -q 'specSlug' "$VERIFIER" && grep -q 'runId' "$VERIFIER"; then
+vhas() { grep -q "$1" "$VERIFIER" || grep -q "$1" "$VERIFIER_STAGE"; }
+if vhas 'record-gate-run.sh' && vhas 'runs.jsonl' \
+   && vhas 'gatesFailed' && vhas 'durationSec' \
+   && vhas 'specSlug' && vhas 'runId'; then
   ok "AC-012-06-01: spec-verifier.md documents the telemetry step and its field mapping"
 else
   bad "AC-012-06-01: spec-verifier.md missing telemetry instructions"
@@ -308,9 +312,9 @@ fi
 awk '/^permission:/,/^---/' "$VERIFIER" | grep -q 'specs/\*/25-verification.md' \
   && ok "AC-012-06-02: verifier edit permission unchanged (append via record-gate-run.sh bash path)" \
   || bad "AC-012-06-02: verifier frontmatter edit scope changed"
-grep -q 'every completed run' "$VERIFIER" && grep -q 'verdict is FAIL' "$VERIFIER" \
+vhas 'every completed run' && vhas 'verdict is FAIL' \
   && ok "AC-012-06-03: verifier records even on FAIL/BLOCK verdicts" || bad "AC-012-06-03: fail-verdict recording not documented"
-grep -q 'outcome' "$VERIFIER" && grep -q 'if any gate BLOCKed' "$VERIFIER" \
+vhas 'outcome' && vhas 'if any gate BLOCKed' \
   && ok "AC-012-06-04: outcome precedence (block > fail > pass) documented" || bad "AC-012-06-04: outcome precedence missing"
 for v in SPEC_LOOP_COUNT SPEC_PHASE1_RETRIES SPEC_PHASE2_RETRIES; do
   grep -q "$v" "$PIPELINE" || bad "AC-012-06-05: spec-pipeline.md missing $v export instruction"
