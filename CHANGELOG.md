@@ -1,3 +1,10 @@
+# [1.52.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.51.2...v1.52.0) (2026-11-06)
+
+
+### Features
+
+* **spec 043:** add the agent eval harness ([#121](https://github.com/RexiAI/my-engineering-standards/issues/121)) ([bda44ff](https://github.com/RexiAI/my-engineering-standards/commit/bda44ff57768254258657246305703d69c4ac5fe))
+
 ## [1.51.2](https://github.com/RexiAI/my-engineering-standards/compare/v1.51.1...v1.51.2) (2026-11-06)
 
 
