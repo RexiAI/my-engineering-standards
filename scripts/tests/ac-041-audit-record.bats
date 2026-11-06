@@ -32,10 +32,9 @@ PINNED_BASE="4dbf164"
 # passing vacuously.
 base_commit() {
   local ref merge_base
-  if git -C "$REPO_ROOT" rev-parse --verify -q "${PINNED_BASE}^{commit}" >/dev/null 2>&1; then
-    printf '%s\n' "$PINNED_BASE"
-    return 0
-  fi
+  # Prefer the merge-base with a base branch: once the branch has merged main
+  # (the normal stacked-PR resolution), the pinned sha still exists locally but
+  # no longer frames this branch's own changes.
   for ref in origin/main origin/master main master; do
     git -C "$REPO_ROOT" rev-parse --verify -q "${ref}^{commit}" >/dev/null 2>&1 || continue
     merge_base="$(git -C "$REPO_ROOT" merge-base HEAD "$ref" 2>/dev/null || true)"
@@ -44,6 +43,10 @@ base_commit() {
       return 0
     fi
   done
+  if git -C "$REPO_ROOT" rev-parse --verify -q "${PINNED_BASE}^{commit}" >/dev/null 2>&1; then
+    printf '%s\n' "$PINNED_BASE"
+    return 0
+  fi
   return 1
 }
 
@@ -112,7 +115,13 @@ item_rows() {
   fi
   for script in scripts/check-audit-trail.sh scripts/check-scenario-traceability.sh \
                 scripts/check-code-principles.sh scripts/check-agent-line-cap.sh; do
-    run git -C "$REPO_ROOT" diff --quiet "$base" -- "$script"
+    # A gate script added by a stacked base PR (038 adds check-agent-line-cap.sh)
+    # does not exist at the base commit, so it cannot have been changed there.
+    # Skipping it keeps the claim exact: no gate that existed at base was altered.
+    git -C "$REPO_ROOT" cat-file -e "$base:$script" 2>/dev/null || continue
+    # Compare the branch's own commits, never the working tree: a merge of main
+    # legitimately imports main's changes to the same scripts.
+    run git -C "$REPO_ROOT" diff --quiet "$base" HEAD -- "$script"
     [ "$status" -eq 0 ]
   done
   grep -q 'complexity 6' "$RECORD"

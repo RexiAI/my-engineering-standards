@@ -322,7 +322,7 @@ MAX_LINES=120
         run: ./scripts/check-agent-line-cap.sh
 ```
 
-`python3 -c "import yaml; yaml.safe_load(open('.github/workflows/self-ci.yml'))"` → parsed OK, jobs: `['validate']`. `make lint` → exit 0. ADR `docs/adr/0020-agent-prompt-line-cap.md` exists, Status **Accepted**, indexed in `docs/adr/README.md` as `| 0020 | … | Accepted |`.
+`python3 -c "import yaml; yaml.safe_load(open('.github/workflows/self-ci.yml'))"` → parsed OK, jobs: `['validate']`. `make lint` → exit 0. ADR `docs/adr/0022-agent-prompt-line-cap.md` exists, Status **Accepted**, indexed in `docs/adr/README.md` as `| 0020 | … | Accepted |`.
 
 ## Supplementary gate — repo checks green (AC-038-05-01)
 
@@ -962,7 +962,7 @@ Run without `--require-deploy` (stage 5b's invocation, `docs/SPEC_PIPELINE.md §
 
 **Read-cost headroom:** verifier 24401/25418 (**1017 B** free), pr-opener 24906/25418 (**512 B** free) — still tight, see W-5 below.
 
-**Change set:** 14 tracked files changed (+557 / −585), 5 new in-scope files (`scripts/check-agent-line-cap.sh` + 4 `scripts/tests/ac-038-*.bats`), 1 new ADR (`docs/adr/0020-agent-prompt-line-cap.md`), plus the spec folder itself.
+**Change set:** 14 tracked files changed (+557 / −585), 5 new in-scope files (`scripts/check-agent-line-cap.sh` + 4 `scripts/tests/ac-038-*.bats`), 1 new ADR (`docs/adr/0022-agent-prompt-line-cap.md`), plus the spec folder itself.
 
 ## Findings carried forward
 

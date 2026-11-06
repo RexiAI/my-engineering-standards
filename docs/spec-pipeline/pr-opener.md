@@ -6,22 +6,24 @@ Must read: `docs/spec-pipeline/audit-contract.md` (§Audit contract,
 
 Deliverable: a draft PR on `spec/NNN-slug` (5b), then the archive commit (5d).
 
-## Archive in the PR
+## Lite mode
 
-`specs/NNN-slug/` is pipeline scratch: on the PR branch, not `main`, where it
-becomes a graveyard of stale intent read instead of the code
-(`docs/spec-pipeline/rationale.md`).
+A `lite` run has no Mutation Runner: `30-report.md` records `Pipeline mode: lite`
+and `skipped (lite)` per skipped stage (see `docs/spec-pipeline/lite-mode.md`).
+The Verifier PASS precondition is unchanged.
+
+## Archive in the PR
 
 `scripts/archive-spec.sh NNN-slug` writes a one-pager to
 `docs/changes/NNN-slug.md` (original ask, tasks, scenario IDs, verdict,
 mutation/complexity report) and `git rm -r`s `specs/NNN-slug/`.
-**Stage 5d runs it as the pipeline's genuinely final act, inside the PR, after
+**Stage 5d runs it as the pipeline's final act, inside the PR, after
 stage 5c's deploy verification**, so the merge commit carries the archive.
 
 Enforcement: `scripts/check-specs-archived.sh` (`validate` job of
-`.github/workflows/self-ci.yml`, no `continue-on-error`) fails a PR that would
-merge a *finished* spec — one with a `30-report.md` — without its archive; it is
-index-aware (`git ls-files`), so untracked scratch is ignored.
+`.github/workflows/self-ci.yml`, no `continue-on-error`) fails a PR merging
+a *finished* spec (one with a `30-report.md`) without its archive; `git ls-files`-based,
+so untracked scratch is ignored.
 `archive-spec.sh` refuses a spec with no `30-report.md`; a human can still run it
 post-merge for legacy specs.
 
@@ -34,9 +36,6 @@ source authoritative **for that spec number**:
 | `specs/NNN-*/` exists (in flight) | `specs/*/20-acceptance/*.md` |
 | `docs/changes/NNN-*.md` exists (archived) | that one-pager |
 | neither exists | out of scope — skipped, not a finding |
-
-Deleting `specs/NNN-slug/` leaves tests citing its IDs, so the archive is the
-second ID source; the third row keeps the check quiet about IDs nothing can judge.
 
 ## Stage 5b — commit, push, open the draft PR
 
@@ -51,7 +50,7 @@ Only after `30-report.md` is green; every step is a gate.
    still fails. Non-zero → report; commit, push, and PR nothing.
 3. **One conventional commit per task** in `10-tasks.md`, on the current branch,
    which must be `spec/NNN-slug` — never `main`/`master`. Before every commit
-   review `git status` and stage ONLY task-named files plus `specs/NNN-slug/`:
+   review `git status` and stage ONLY task-named files plus `specs/NNN-slug/` —
    never `git add .`, `git add -A`, or `git add specs/`.
 4. **Push the branch.**
 5. **Open the PR as a draft** (`.github/PULL_REQUEST_TEMPLATE.md` when present),

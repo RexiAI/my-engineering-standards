@@ -401,6 +401,20 @@ Recorded here because they are the reason a guide says what it says.
 
 ---
 
+## Practitioner sources (non-authoritative)
+
+Material that informed house practice but is **not** an upstream authority for
+any `language-specific/` claim. Listed so a reviewer can audit where a rule came
+from and how far it can be trusted. All three were read in full on 2026-11-05.
+
+| Source | What it informed | Trust note |
+|---|---|---|
+| [12 ideas you can build with Jev](https://www.webreactiva.com/blog/ideas-construir-con-jev) | Corroboration of the facts-block/judgments-advise rule (`okf/when-to-use-typesafe.md`). Candidate ideas were reviewed; none adopted as architecture. | Practitioner blog. Its performance figures are the cited projects' own claims, and the article says so. No licence stated beyond linking. |
+| [Cook-First Skills](https://www.webreactiva.com/blog/cook-first-skills) | Skill behavioral validation — second-session rule, validation levels 0–3, margin notes (`docs/AGENTS_AND_SKILLS.md §Behavioral Validation`, `templates/SKILL.md`). | Practitioner method, no benchmark. Paraphrased and linked; not reproduced. |
+| [mavka-ai/unit-tests-skills](https://github.com/mavka-ai/unit-tests-skills) | Java unit-test rules (Given-When-Then, branch-first selection, no logic in tests, public-API-only, `@SpringBootTest` ban, `ArgumentCaptor`) in `language-specific/java/TESTING.md`; the coverage-vs-mutation data point in `docs/TESTING.md §Mutation Testing`. | MIT for code; docs under the same repo. Benchmark is **one pinned Spring Petclinic target, 12 injected defects, vendor-run** — directional only. The skills were **not installed**; only the rules were adapted. |
+
+---
+
 ## Refreshing these guides
 
 Upstream moves; these pins go stale. When refreshing:

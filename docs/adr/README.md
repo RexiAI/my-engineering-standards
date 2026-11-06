@@ -27,5 +27,7 @@ Proposed → Accepted → Deprecated → Superseded.
 | 0017 | [Single source of truth for spec-pipeline rules](0017-pipeline-agent-single-source.md) | Accepted |
 | 0018 | [Media agents are opt-in: relocate the family to agents-optional/ and load it per repo through --with-media](0018-media-agents-opt-in.md) | Accepted |
 | 0019 | [spec-ux enforces Laws of UX as checkable consequences](0019-spec-ux-design-laws.md) | Proposed |
-| 0020 | [Agent prompt line cap: procedure lives in stage docs and scripts, not in the prompt](0020-agent-prompt-line-cap.md) | Accepted |
-| 0021 | [Agent test output: filtered capture and reuse of an unchanged run](0021-agent-test-output-and-run-reuse.md) | Accepted |
+| 0020 | [Pipeline lite mode: a mechanically selected short stage set for small specs](0020-pipeline-lite-mode.md) | Proposed |
+| 0021 | [Make the pipeline's own gates fail safely and report truthfully](0021-pipeline-gate-fail-safely.md) | Accepted |
+| 0022 | [Agent prompt line cap: procedure lives in stage docs and scripts, not in the prompt](0022-agent-prompt-line-cap.md) | Accepted |
+| 0023 | [Agent test output: filtered capture and reuse of an unchanged run](0023-agent-test-output-and-run-reuse.md) | Accepted |

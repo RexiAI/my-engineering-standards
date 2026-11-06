@@ -33,7 +33,7 @@ This project structure supports Java, Go, JavaScript/TypeScript (including NestJ
 
 | Stack | Guide | Deep dives |
 |---|---|---|
-| Java | `language-specific/java/SKILL.md` | — |
+| Java | `language-specific/java/SKILL.md` | `TESTING.md` |
 | Go | `language-specific/go/SKILL.md` | — |
 | JavaScript / TypeScript, NestJS | `language-specific/javascript/SKILL.md` | `PATTERNS.md`, `TESTING.md` |
 | Angular | `language-specific/angular/SKILL.md` | `PATTERNS.md`, `TESTING.md` |

@@ -8,20 +8,24 @@ Index: `docs/SPEC_PIPELINE.md` — read §Stages, §Artifact layout,
 Per `docs/CONFORMANCE_TIERS.md`, the pipeline runs fewer stages at lower tiers
 instead of being all-or-nothing:
 
-| Stage | `mvp` | `production` | `multi-service` |
-|---|---|---|---|
-| Specifier | yes | yes | yes |
-| UX Designer (frontend specs only) | yes | yes | yes |
-| Coder | yes | yes | yes |
-| Refactorer — complexity + duplication | yes | yes | yes |
-| Refactorer — property tests | skip | yes | yes |
-| Verifier — traceability, tests, complexity re-check, design-principles gate | yes | yes | yes |
-| Architect — mutation testing | skip | yes | yes |
+| Stage | `lite` | `mvp` | `production` | `multi-service` |
+|---|---|---|---|---|
+| Specifier | yes | yes | yes | yes |
+| UX Designer (frontend specs only) | skip | yes | yes | yes |
+| Coder | yes | yes | yes | yes |
+| Refactorer — complexity + duplication | skip | yes | yes | yes |
+| Refactorer — property tests | skip | skip | yes | yes |
+| Verifier — traceability, tests, complexity re-check, design-principles gate | yes | yes | yes | yes |
+| Architect — mutation testing | skip | skip | yes | yes |
 
 An `mvp` project runs a 4-stage pipeline (Specifier, Coder, Refactorer, Verifier)
 and conforms fully to it — see `docs/CONFORMANCE_TIERS.md` for what "conforms fully
 to a subset" means. Architect still runs at `mvp` to commit/push/open the PR; it
 simply skips the mutation-testing gate.
+
+The `lite` column is not a tier: it is a per-spec mode selected mechanically and
+refused on `production`/`multi-service`. It removes stages, never gates — see
+`docs/spec-pipeline/lite-mode.md`.
 
 ## Tooling by language
 
