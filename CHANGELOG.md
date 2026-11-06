@@ -1,3 +1,15 @@
+# [1.53.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.52.1...v1.53.0) (2026-11-06)
+
+
+### Features
+
+* **agents:** trim spec-pipeline prompts under a 120-line cap (038) ([#115](https://github.com/RexiAI/my-engineering-standards/issues/115)) ([8ff8884](https://github.com/RexiAI/my-engineering-standards/commit/8ff8884d94dea8af2e75b393d6ca65b6b43fb9e3))
+
+
+### Performance Improvements
+
+* **ci:** shard the bats gate suite across cores ([#120](https://github.com/RexiAI/my-engineering-standards/issues/120)) ([c8a6a4c](https://github.com/RexiAI/my-engineering-standards/commit/c8a6a4cd717cbf4d6801da820bbd6e6efd718c33))
+
 ## [1.52.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.52.0...v1.52.1) (2026-11-06)
 
 
