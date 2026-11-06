@@ -41,13 +41,31 @@
 #   docs/SPEC_PIPELINE.md §Commit and push carve-out
 set -euo pipefail
 
-if [ $# -ne 1 ]; then
-  echo "Usage: archive-spec.sh NNN-slug" >&2
+FORCE=0
+SLUG=""
+POSITIONAL=0
+for arg in "$@"; do
+  case "$arg" in
+    --force) FORCE=1 ;;
+    -*)
+      echo "ERROR: unknown option '$arg'" >&2
+      echo "Usage: archive-spec.sh NNN-slug [--force]" >&2
+      exit 1
+      ;;
+    *)
+      SLUG="$arg"
+      POSITIONAL=$((POSITIONAL + 1))
+      ;;
+  esac
+done
+
+if [ "$POSITIONAL" -ne 1 ]; then
+  echo "Usage: archive-spec.sh NNN-slug [--force]" >&2
   echo "  e.g. archive-spec.sh 001-discount-system" >&2
+  echo "  --force replaces an existing docs/changes/NNN-slug.md (it would otherwise refuse," >&2
+  echo "          because regenerating the one-pager discards anything appended to it)." >&2
   exit 1
 fi
-
-SLUG="$1"
 SPEC_DIR="specs/$SLUG"
 CHANGES_DIR="docs/changes"
 ARCHIVE="$CHANGES_DIR/$SLUG.md"
@@ -72,6 +90,23 @@ if [ ! -f "$SPEC_DIR/30-report.md" ]; then
 fi
 
 mkdir -p "$CHANGES_DIR"
+
+# Never clobber an existing one-pager. This script composes the archive from
+# scratch, so re-running it on an already-archived spec silently discards
+# anything written into the one-pager after the first run. Stage 4 appends
+# post-PR CI evidence to a spec-folder artifact that this script embeds, but an
+# older or hand-run archive may have appended directly to the one-pager
+# (observed on spec 004: a re-archive at stage 5d wiped the phase-2 evidence
+# committed moments earlier at stage 5b). Refusing by default turns a silent
+# data loss into a decision — `--force` is the explicit "replace it" signal.
+if [ -f "$ARCHIVE" ] && [ "$FORCE" != "1" ]; then
+  echo "ERROR: $ARCHIVE already exists — refusing to overwrite an archive one-pager." >&2
+  echo "  Re-archiving regenerates the file and would discard anything appended to it" >&2
+  echo "  after the first run (e.g. post-PR CI evidence)." >&2
+  echo "  Move that content into specs/$SLUG/ (it is embedded automatically), or" >&2
+  echo "  pass --force if you genuinely intend to replace the archive." >&2
+  exit 1
+fi
 
 # Read input files (best-effort: missing files are skipped, not fatal).
 read_file() { [ -f "$1" ] && cat "$1" || echo "_(not produced)_"; }

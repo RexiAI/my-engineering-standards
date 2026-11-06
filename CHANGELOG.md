@@ -1,3 +1,17 @@
+## [1.51.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.51.0...v1.51.1) (2026-11-05)
+
+
+### Bug Fixes
+
+* **pipeline:** gates that fail safely and report truthfully (ADR 0020) ([#117](https://github.com/RexiAI/my-engineering-standards/issues/117)) ([5de28c9](https://github.com/RexiAI/my-engineering-standards/commit/5de28c995613c73cb028d6ec1c3a0b52d8d646f3))
+
+# [1.51.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.50.1...v1.51.0) (2026-11-05)
+
+
+### Features
+
+* **spec 039:** pipeline lite mode ([#114](https://github.com/RexiAI/my-engineering-standards/issues/114)) ([98dd801](https://github.com/RexiAI/my-engineering-standards/commit/98dd8014f599b9c806c020c489a0717fa0305d42))
+
 ## [1.50.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.50.0...v1.50.1) (2026-11-01)
 
 

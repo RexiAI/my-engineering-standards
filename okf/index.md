@@ -14,6 +14,7 @@ How we work with AI. Practices, decisions, and runbooks distilled from real sess
 ## Runbooks
 
 - [Detect Context Rot](detect-context-rot.md) — Recognise the signs of a degrading session and recover before it breaks
+- [Validate a Skill](validate-a-skill.md) — Cook-First second-session rule: run a skill on new inputs, count corrections, fix the recipe
 - [MCP Server Connection](mcp-server-connection.md) — Configure, verify, and troubleshoot MCP servers in opencode
 
 ---
