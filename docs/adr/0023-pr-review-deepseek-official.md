@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted — ships with this change.
 
 ## Context
 
@@ -10,8 +10,9 @@ ADR 0003 removed the last provider pin from PR review: the shared workflow took
 its model only from the `PR_REVIEW_MODEL` repository variable and its key from
 `OPENCODE_API_KEY`, with no shipped default. That kept the feature
 provider-agnostic but made it inert for any repo that had not configured the
-variable — and the self-hosted trigger on this repo had no variable set, so the
-review ran against the opencode Zen default and failed every PR with
+variable — and this repo's `PR_REVIEW_MODEL` variable was pinned to the
+opencode Zen free model, authenticated with an `OPENCODE_API_KEY` that the
+provider rejected. Every review run failed with
 `AI_APICallError: Invalid credential`.
 
 Owner decision (2026-11-06): the review should work out of the box on this repo,
@@ -31,28 +32,29 @@ the override path for other providers and for already-configured child repos.
    `deepseek/deepseek-flash` when the resolved value is empty or still the
    `your-provider/*` placeholder. `PR_REVIEW_MODEL` still wins, and a real
    `SPEC_PR_REVIEW_MODEL` from the caller's env is never overwritten.
-4. `DEEPSEEK_API_KEY` is the primary review secret (`workflow_call` + this
-   repo's trigger). `OPENCODE_API_KEY` stays declared and mapped for an explicit
-   non-DeepSeek `PR_REVIEW_MODEL` override, preserving ADR 0003 decision 5's
-   compatibility promise. `init-ci.sh` child wiring is deliberately unchanged
-   here: it still pins the pre-change workflow by SHA, so passing the new secret
-   before that pin moves would make the reusable-workflow call fail to start.
-   The pin bump and the child wiring land together in a follow-up.
-5. The self-hosted trigger calls the reusable workflow by local path
-   (`./.github/workflows/ci-pr-review.yml`) instead of a SHA pin, so this
-   repo's PRs exercise exactly the workflow revision in the same commit. Child
-   repos keep the SHA-pinned remote reference (supply-chain rule); the local
-   path is not a branch reference and cannot drift.
+4. `DEEPSEEK_API_KEY` is the primary review secret and is declared by the
+   shared `workflow_call`. `OPENCODE_API_KEY` stays declared and mapped for an
+   explicit non-DeepSeek `PR_REVIEW_MODEL` override, preserving ADR 0003
+   decision 5's compatibility promise. The trigger and `init-ci.sh` keep
+   passing only `OPENCODE_API_KEY` in this change: they still pin the
+   pre-change workflow, which does not declare the new secret, and passing an
+   undeclared secret makes the reusable-workflow call fail to start. The pin
+   bump, the trigger mapping, and the child wiring land together in the
+   follow-up.
+5. Both the self-hosted trigger and child wiring keep the SHA-pinned remote
+   call. A local `uses: ./.github/...` would execute the PR head's workflow
+   revision with this job's secrets on a same-repo `pull_request`, which is the
+   supply-chain hole the pin exists to close. The pin bump is therefore part of
+   the follow-up, not a shortcut around it.
 6. A rejected credential (`Invalid credential`, `invalid api key`,
-   `unauthorized`, `authentication`, `401`) joins the provider-side skip guard:
+   `unauthorized`, `authentication`, `401 unauthorized`) joins the provider-side skip guard:
    the review skips with a warning instead of failing the PR. Auth is not a code
    defect, and the review check is advisory.
-7. Gates updated in `scripts/check-pr-review.sh`: the provider block must map a
-   supported review key by env reference, the `deepseek` block must carry the
-   official endpoint and default model, both secrets must be declared optional,
-   the trigger must map both secrets and call the local workflow, and the
-   workflow must carry the auth-skip phrases. No gate is weakened; each
-   assertion is tightened to cover the new default.
+7. Gates updated in `scripts/check-pr-review.sh`: when the committed default is
+   `deepseek/*`, the provider block must exist with the official endpoint and
+   model; both secrets must be declared optional; the trigger and child wiring
+   must stay SHA-pinned; and the workflow must carry the auth-skip phrases and
+   the resolved-model/key match. No gate is weakened.
 
 ## Alternatives Considered
 
@@ -76,10 +78,12 @@ the override path for other providers and for already-configured child repos.
 - ADR 0003 decisions 2 and 3 ("no shipped default model", "opting in = key and
   model") are superseded for the default provider. Decision 5 (keep
   `OPENCODE_API_KEY` for compatibility) still holds.
-- Self-hosting needs no pin bump: the trigger calls the local workflow, so this
-  repo's next PR event runs this revision. Child repos still pin the shared
-  workflow by SHA and stay on the previous revision until the follow-up moves
-  the pin and adds the `DEEPSEEK_API_KEY` mapping to `init-ci.sh`.
+- Self-hosting stays on the pinned revision until the follow-up moves the pin
+  to this change's merge commit. During that window the review resolves the
+  DeepSeek model but the pinned workflow does not pass `DEEPSEEK_API_KEY`, so
+  the check is red or skipped — the pre-existing broken state, not a regression.
+  The same follow-up adds the `DEEPSEEK_API_KEY` mapping to the trigger and
+  `init-ci.sh`.
 - Follow-up scope is larger than a pin bump. A bootstrapped child also needs
   (a) the `deepseek` provider block in `templates/opencode.json.bridge` — without
   it the new default resolves to "Model not found" — and (b) the

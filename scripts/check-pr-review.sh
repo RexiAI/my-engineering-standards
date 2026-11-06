@@ -45,7 +45,7 @@
 #   AC-024-03-04  key supplied via GitHub secret
 #   AC-024-03-05  no key: job skipped, never a required-check failure
 #   AC-024-03-06  no literal key in the trigger workflow
-#   AC-024-03-07  self-hosting calls the local workflow; child wiring pins it by SHA
+#   AC-024-03-07  self-hosting wiring identical to child wiring
 #   AC-024-04-01  --with-pr-review accepted, usage line lists it
 #   AC-024-04-02  GitHub generation emits the pr-review job
 #   AC-024-04-03  default output unchanged without the flag
@@ -229,13 +229,23 @@ if [ -f "$OPENCODE_JSON" ]; then
     else
       fail "AC-024-01-03: provider block must map DEEPSEEK_API_KEY (or OPENCODE_API_KEY) by env reference"
     fi
-    if grep -q '"deepseek"' <<< "$PROVIDER_SEC"; then
-      str_contains AC-024-01-03 'DeepSeek official endpoint' "$PROVIDER_SEC" 'https://api.deepseek.com/v1'
-      str_contains AC-024-01-03 'DeepSeek default model' "$PROVIDER_SEC" '"deepseek-flash"'
-    fi
   else
     pass "AC-024-01-03: no committed provider block (per-machine provider config); provider wiring is not in the reviewer agent"
   fi
+  # The shipped default is no longer optional operator config: if the example
+  # defaults to deepseek/*, the matching block and model must exist. Deriving
+  # the expectation from the default stops a deleted block from passing.
+  DEFAULT_MODEL="$(grep '^SPEC_PR_REVIEW_MODEL=' "$ROOT_DIR/config/model.local.env.example" 2>/dev/null | cut -d= -f2- || true)"
+  case "$DEFAULT_MODEL" in
+    deepseek/*)
+      if grep -q '"deepseek"' <<< "$PROVIDER_SEC"; then
+        str_contains AC-024-01-03 'DeepSeek official endpoint' "$PROVIDER_SEC" 'https://api.deepseek.com/v1'
+        str_contains AC-024-01-03 'DeepSeek default model' "$PROVIDER_SEC" '"deepseek-flash"'
+      else
+        fail "AC-024-01-03: committed default is $DEFAULT_MODEL but opencode.json has no deepseek provider block"
+      fi
+      ;;
+  esac
   # The reviewer is a roster agent: its model must be an env reference.
   AGENT_ENTRY="$(grep -E '^[[:space:]]*"pr-review"' "$OPENCODE_JSON" || true)"
   if [ -n "$AGENT_ENTRY" ]; then
@@ -296,8 +306,13 @@ if [ -f "$AGENT" ]; then
   # The reviewer runs with no shell at all: the workflow supplies the diff and
   # posts its answer. Denying bash is what makes that boundary hold in headless
   # CI, where any unmatched command is auto-rejected.
+  if ! grep -qE '^[[:space:]]*bash:[[:space:]]*$' <<< "$AGENT_FM"; then
+    fail "AC-024-01-05: bash must be a block mapping (bash: followed by deny entries)"
+  fi
   BASH_BLOCK="$(printf '%s\n' "$AGENT_FM" | awk '/^[[:space:]]*bash:[[:space:]]*$/{f=1;next} f')"
-  if grep -qE ':[[:space:]]*"?allow' <<< "$BASH_BLOCK"; then
+  if [ -z "$BASH_BLOCK" ]; then
+    fail "AC-024-01-05: bash block is empty"
+  elif grep -qE ':[[:space:]]*"?allow' <<< "$BASH_BLOCK"; then
     fail "AC-024-01-05: bash block must be deny-only — found: $(grep -oE '"[^"]+":[[:space:]]*"?allow' <<< "$BASH_BLOCK" | tr '\n' ' ')"
   else
     pass "AC-024-01-05: bash block denies every command"
@@ -574,11 +589,12 @@ echo ""
 
 # AC-024-03-03 — Calls the shared workflow with PR context
 if [ -f "$TRIGGER_WF" ]; then
-  # Self-hosting calls the local reusable workflow at the same revision, so the
-  # repo's own PRs test exactly what ships. Child wiring stays SHA-pinned
-  # (AC-024-03-07) — the local path is not a branch reference.
-  verify_grep AC-024-03-03 "$TRIGGER_WF" "job calls the shared pr-review workflow at the local revision" \
-    "./.github/workflows/ci-pr-review.yml"
+  # SHA-pinned for the same reason as child wiring: a same-repo PR can modify
+  # a local workflow file, and a pull_request run executes the PR's revision
+  # with the job's secrets. A local `uses:` here would hand an author the
+  # review tokens.
+  verify_grep AC-024-03-03 "$TRIGGER_WF" "job calls the shared pr-review workflow, pinned to a commit SHA (not @main)" \
+    "RexiAI/my-engineering-standards/.github/workflows/ci-pr-review.yml@21046d96796467f8238d6d613ce3a552bf3fced0 # pinned; bump deliberately, never track a branch"
   verify_grep AC-024-03-03 "$TRIGGER_WF" "pr-number and head-sha passed from the PR event" \
     "pr-number: \${{ github.event.pull_request.number }}" \
     "head-sha: \${{ github.event.pull_request.head.sha }}"
@@ -588,9 +604,9 @@ echo ""
 
 # AC-024-03-04 — Key supplied via GitHub secret
 if [ -f "$TRIGGER_WF" ]; then
-  verify_grep AC-024-03-04 "$TRIGGER_WF" "DEEPSEEK_API_KEY mapped from secrets" \
-    "DEEPSEEK_API_KEY: \${{ secrets.DEEPSEEK_API_KEY }}"
-  verify_grep AC-024-03-04 "$TRIGGER_WF" "OPENCODE_API_KEY override mapped from secrets" \
+  # The pinned revision declares only OPENCODE_API_KEY; DEEPSEEK_API_KEY is
+  # added to the trigger in the pin-bump follow-up together with the new pin.
+  verify_grep AC-024-03-04 "$TRIGGER_WF" "OPENCODE_API_KEY mapped from secrets" \
     "OPENCODE_API_KEY: \${{ secrets.OPENCODE_API_KEY }}"
 fi
 
@@ -615,16 +631,13 @@ fi
 
 echo ""
 
-# AC-024-03-07 — Self-hosting and child wiring call the same workflow file.
-# Self-hosting uses the local revision (so the repo tests what ships); child
-# wiring pins a commit SHA (so a child cannot be moved by a branch update).
+# AC-024-03-07 — Self-hosting wiring is identical to child wiring (SHA-pinned).
 if [ -f "$TRIGGER_WF" ] && [ -f "$INIT_CI" ]; then
-  SHARED_SHA_URL='RexiAI/my-engineering-standards/.github/workflows/ci-pr-review.yml@21046d96796467f8238d6d613ce3a552bf3fced0 # pinned; bump deliberately, never track a branch'
-  if grep -qF -- './.github/workflows/ci-pr-review.yml' "$TRIGGER_WF" \
-     && grep -qF -- "$SHARED_SHA_URL" "$INIT_CI"; then
-    pass "AC-024-03-07: self-hosting calls the local ci-pr-review.yml; child wiring pins the same file by SHA"
+  SHARED_URL='RexiAI/my-engineering-standards/.github/workflows/ci-pr-review.yml@21046d96796467f8238d6d613ce3a552bf3fced0 # pinned; bump deliberately, never track a branch'
+  if grep -qF -- "$SHARED_URL" "$TRIGGER_WF" && grep -qF -- "$SHARED_URL" "$INIT_CI"; then
+    pass "AC-024-03-07: trigger workflow and init-ci.sh emit the same SHA-pinned shared pr-review workflow reference"
   else
-    fail "AC-024-03-07: self-hosting must call ./.github/workflows/ci-pr-review.yml and init-ci.sh must pin ci-pr-review.yml@<sha>"
+    fail "AC-024-03-07: trigger workflow and init-ci.sh must reference the same pinned ci-pr-review.yml@<sha>"
   fi
 fi
 

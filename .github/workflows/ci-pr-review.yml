@@ -138,6 +138,10 @@ jobs:
           # pattern as ci-sweeper.yml). No permission auto-approval flag is
           # passed: the review is comment-only and the agent's permission
           # block enforces that.
+          # An inherited model is an explicit caller decision: remember it so
+          # the example defaults below cannot overwrite it (ADR 0023 §3).
+          inherited_spec_model="${SPEC_PR_REVIEW_MODEL:-}"
+
           # A bootstrapped child keeps the example under .standards/config/;
           # sourcing a missing file under set -e would fail the step.
           for env_example in config/model.local.env.example .standards/config/model.local.env.example; do
@@ -150,22 +154,37 @@ jobs:
             fi
           done
 
-          # Default model: DeepSeek official (ADR 0023). The committed example
-          # carries the same id for local runs and this repo's CI; a child repo
-          # still on the placeholder gets the default here. The provider block
-          # lives in opencode.json (baseURL https://api.deepseek.com/v1, key
-          # DEEPSEEK_API_KEY).
+          # Restore an inherited model over the example file, then apply the
+          # default only when the value is empty or still a placeholder.
+          if [ -n "$inherited_spec_model" ]; then
+            export SPEC_PR_REVIEW_MODEL="$inherited_spec_model"
+          fi
           case "${SPEC_PR_REVIEW_MODEL:-}" in
             ""|your-provider/*) export SPEC_PR_REVIEW_MODEL="deepseek/deepseek-flash" ;;
           esac
 
-          # Model override: when PR_REVIEW_MODEL is set in the caller's
-          # environment, export it as SPEC_PR_REVIEW_MODEL so opencode.json's
-          # {env:SPEC_PR_REVIEW_MODEL} resolves to the override value instead
-          # of the default above.
+          # Model override: PR_REVIEW_MODEL has the highest precedence.
           if [ -n "${PR_REVIEW_MODEL:-}" ]; then
             export SPEC_PR_REVIEW_MODEL="$PR_REVIEW_MODEL"
           fi
+
+          echo "Resolved review model: ${SPEC_PR_REVIEW_MODEL}"
+          # An empty-key guard on either secret is not enough: the key must
+          # match the provider of the resolved model.
+          case "$SPEC_PR_REVIEW_MODEL" in
+            deepseek/*)
+              if [ -z "${DEEPSEEK_API_KEY:-}" ]; then
+                echo "::warning::Review skipped — DEEPSEEK_API_KEY is unset for ${SPEC_PR_REVIEW_MODEL}. Not a code defect."
+                exit 0
+              fi
+              ;;
+            *)
+              if [ -z "${OPENCODE_API_KEY:-}" ]; then
+                echo "::warning::Review skipped — OPENCODE_API_KEY is unset for ${SPEC_PR_REVIEW_MODEL}. Not a code defect."
+                exit 0
+              fi
+              ;;
+          esac
 
           # Billing/quota guard: capture output so we can detect provider
           # errors (spending limit, quota, rate limit) and skip gracefully.

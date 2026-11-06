@@ -612,10 +612,10 @@ workflow is GitHub Actions-only.
 
 **The no-op boundary.** A child that never opts in is unaffected: a default
 `init-ci.sh` run emits no `pr-review` job and requires no review secret, so
-unit/lint/build CI stays green. The generated job is secret-guarded
-(`if: secrets.OPENCODE_API_KEY != ''`), so even an opted-in child without the
-key configured gets a skipped job, never a failure. Opting in is purely
-additive.
+unit/lint/build CI stays green. The generated job delegates to the shared
+workflow, whose review step is gated on the mapped key env var (`secrets` is
+not a legal context in `if:`), so even an opted-in child without the key
+configured gets a skipped job, never a failure. Opting in is purely additive.
 
 ### Cost and bounds
 
