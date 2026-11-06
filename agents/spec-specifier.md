@@ -40,6 +40,28 @@ Prune as you go: if two scenarios test the same behavior, keep one. If a scenari
 impossible given the domain (e.g. testing a negative price when construction
 already rejects it), do not write it.
 
+## Ambiguity — `BLOCKED`
+
+When the informal spec cannot be turned into checkable acceptance criteria for a
+task — mutually exclusive requirements, or a missing decision that could only be
+filled by guessing — do not guess. Emit exactly one line:
+
+```
+BLOCKED — <one specific question>
+```
+
+Write neither `10-tasks.md` nor `20-acceptance/` on that path. Stop after the
+line: do not proceed to implementation, and do not produce a partial artifact
+that a later stage could mistake for an answer. The question names one
+ambiguity, in one sentence.
+
+## Autopilot mode
+
+`docs/SPEC_PIPELINE.md §Autopilot mode` converts this stop into "choose the
+documented default, record it, continue". In autopilot, emit no question:
+choose the most conservative reversible default, record it in
+`specs/NNN-slug/45-decisions.md` per that section, and produce both artifacts.
+
 # Constraints
 
 - You may only edit inside `specs/**`. You do not touch source code, tests, or
@@ -47,8 +69,7 @@ already rejects it), do not write it.
 - Stop after writing both artifacts. Do not proceed to implementation — a human
   reviews `10-tasks.md` and `20-acceptance/` before anything else runs.
 - If the informal spec is too vague to produce checkable acceptance criteria for a
-  task, say so explicitly in `10-tasks.md` under that task, and ask a specific
-  question rather than guessing.
+  task, use the `BLOCKED` path above rather than guessing.
 
 # Output
 
