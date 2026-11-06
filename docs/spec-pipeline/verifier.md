@@ -29,9 +29,9 @@ For gates 1 and 3.5 the `--json` transcript plus the exit code is the verdict.
 After every completed run — PASS, FAIL, or BLOCK — append one record to
 `runs.jsonl` via `scripts/record-gate-run.sh` (its own bash execution, so no
 `permission.edit` widening). Fields: `specSlug`; `gatesFailed`; `warnings`;
-`durationSec`; `outcome` (`block` > `fail` > `pass`). Omit `runId`, `loopCount`,
-`phase1Retries`, `phase2Retries` — the script generates the first and defaults the
-rest to 0 from the orchestrator's `SPEC_*` exports (spec 008).
+`durationSec`; `outcome` — `block` if any gate BLOCKed, else `fail` if the
+verdict is FAIL, else `pass`. `runId`, `loopCount` and retry counts are generated
+or defaulted from `SPEC_*` (spec 008).
 
 A FAIL or BLOCK still records; if the append fails, report it as a warning and
 never fabricate a record.
