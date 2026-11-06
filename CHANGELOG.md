@@ -1,3 +1,10 @@
+## [1.52.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.52.0...v1.52.1) (2026-11-06)
+
+
+### Bug Fixes
+
+* **pr-review:** default to DeepSeek official API with DEEPSEEK_API_KEY ([#122](https://github.com/RexiAI/my-engineering-standards/issues/122)) ([1e0aafd](https://github.com/RexiAI/my-engineering-standards/commit/1e0aafdf01584685b18c24d65fa111054824d806))
+
 # [1.52.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.51.2...v1.52.0) (2026-11-06)
 
 
