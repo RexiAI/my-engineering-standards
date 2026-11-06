@@ -1,4 +1,4 @@
-# Architecture Decision Record (ADR)
+# 0022 — Agent eval harness
 
 ## Title
 
@@ -95,6 +95,7 @@ reward through `evals/lib/reward.sh`; the oracle runs the untouched environment
 
 ## Notes
 
+- 2026-11-06: Originally numbered ADR 0020; renumbered to 0022 after main allocated 0020 (pipeline lite mode) and 0021 (gate fail-safe).
 - 2026-11-05: Decision recorded.
 - 2026-11-05: **Isolation model (phase-1 remediation).** The probe workspace is
   a detached `git worktree` whose parent is a scratch `git init` repository

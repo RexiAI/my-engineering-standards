@@ -1598,14 +1598,14 @@ The spec-043 diff maps to Tasks 1–10: `evals/` to Tasks 2–9, the runner to T
 8, the ADR to Task 1, the Specifier `BLOCKED` path to Task 5, and the self-CI
 step to Task 10. The sandbox files (`evals/lib/sandbox.sh`,
 `evals/sandbox/Dockerfile`, `evals/probes/isolation/control.sh`) map to the
-phase-1 remediation recorded in ADR 0020 §Notes. No untraceable production
+phase-1 remediation recorded in ADR 0022 §Notes. No untraceable production
 logic was found.
 
 Finding line (not a gate failure; recorded and referred to the Architect): the
 host-side verifier executes git against the agent-controlled workspace. That is
 visible in `run_verifier` and intended, but the security consequence
 (`core.fsmonitor`/`core.hooksPath`/filter drivers planted by the agent) is not
-documented in ADR 0020 or `evals/README.md`; see §Residual limitations item 1.
+documented in ADR 0022 or `evals/README.md`; see §Residual limitations item 1.
 
 ## Gate integrity — nothing weakened
 

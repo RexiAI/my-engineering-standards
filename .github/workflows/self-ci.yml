@@ -225,7 +225,7 @@ jobs:
       - name: Check remediation budget
         run: ./scripts/check-remediation-budget.sh
 
-      # Agent eval harness gate (spec 043, ADR 0020): structure and pipeline
+      # Agent eval harness gate (spec 043, ADR 0022): structure and pipeline
       # isolation, the task/manifest and single-reward contracts, oracle sanity
       # in both directions, the static runner contract, the hermetic probe
       # suite, the ADR index row, and this workflow's own wiring. The

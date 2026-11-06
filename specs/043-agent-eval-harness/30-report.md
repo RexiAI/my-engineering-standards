@@ -293,7 +293,7 @@ follow-up (grade a copy, run the verifier in the same container, or force
 change set — the 6 tracked files the Verifier recorded (`.github/workflows/self-ci.yml`,
 `Makefile`, `agents/spec-specifier.md`, `docs/adr/README.md`,
 `docs/spec-pipeline/specifier.md`, `runs.jsonl`) plus the untracked spec deliverables
-(`docs/adr/0020-agent-eval-harness.md`, `evals/`, `scripts/check-agent-evals.sh`, the
+(`docs/adr/0022-agent-eval-harness.md`, `evals/`, `scripts/check-agent-evals.sh`, the
 six `scripts/tests/ac-043-*.bats` files, and `specs/`). There is no unrelated dirt.
 Nothing was stashed, committed, or reverted. `runs.jsonl` still shows exactly the
 three Verifier telemetry insertions; this stage's runs added none.

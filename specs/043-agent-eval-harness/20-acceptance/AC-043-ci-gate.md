@@ -29,7 +29,7 @@ And no `curl` or `wget` invocation occurs
 
 ## AC-043-63 — The governance link is enforced
 Given `scripts/check-agent-evals.sh`
-When `docs/adr/0020-agent-eval-harness.md` is missing
+When `docs/adr/0022-agent-eval-harness.md` is missing
 And, in a second fixture, its row is absent from `docs/adr/README.md`
 Then the gate exits 1
 And the failure names the missing ADR or the missing index row

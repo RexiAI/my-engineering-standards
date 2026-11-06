@@ -29,4 +29,4 @@ Proposed → Accepted → Deprecated → Superseded.
 | 0019 | [spec-ux enforces Laws of UX as checkable consequences](0019-spec-ux-design-laws.md) | Proposed |
 | 0020 | [Pipeline lite mode: a mechanically selected short stage set for small specs](0020-pipeline-lite-mode.md) | Proposed |
 | 0021 | [Make the pipeline's own gates fail safely and report truthfully](0021-pipeline-gate-fail-safely.md) | Accepted |
-| 0020 | [Agent eval harness](0020-agent-eval-harness.md) | Proposed |
+| 0022 | [Agent eval harness](0022-agent-eval-harness.md) | Proposed |

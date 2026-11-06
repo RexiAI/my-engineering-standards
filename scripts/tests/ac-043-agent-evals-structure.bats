@@ -10,7 +10,7 @@ load test_helper
 bats_require_minimum_version 1.5.0
 
 GATE="$REPO_ROOT/scripts/check-agent-evals.sh"
-ADR="$REPO_ROOT/docs/adr/0020-agent-eval-harness.md"
+ADR="$REPO_ROOT/docs/adr/0022-agent-eval-harness.md"
 ADR_INDEX="$REPO_ROOT/docs/adr/README.md"
 WORKFLOW="$REPO_ROOT/.github/workflows/self-ci.yml"
 
@@ -110,9 +110,9 @@ fixture_root() {
 }
 
 @test "AC-043-04: the ADR is indexed exactly once and governance passes" {
-  [ "$(grep -c '^| 0020 |' "$ADR_INDEX")" -eq 1 ]
-  grep -E '^\| 0020 \|' "$ADR_INDEX" | grep -q '0020-agent-eval-harness.md'
-  grep -E '^\| 0020 \|' "$ADR_INDEX" | grep -q 'Proposed'
+  [ "$(grep -c '^| 0022 |' "$ADR_INDEX")" -eq 1 ]
+  grep -E '^\| 0022 \|' "$ADR_INDEX" | grep -q '0022-agent-eval-harness.md'
+  grep -E '^\| 0022 \|' "$ADR_INDEX" | grep -q 'Proposed'
   run bash "$REPO_ROOT/scripts/check-governance.sh"
   [ "$status" -eq 0 ]
 }
@@ -372,9 +372,9 @@ PY
   run bash "$GATE" --only 8 "$root"
   [ "$status" -eq 1 ]
   [[ "$output" == *'FAIL AC-043-63'* ]]
-  [[ "$output" == *'0020-agent-eval-harness.md'* ]]
+  [[ "$output" == *'0022-agent-eval-harness.md'* ]]
 
-  cat > "$root/docs/adr/0020-agent-eval-harness.md" <<'ADR'
+  cat > "$root/docs/adr/0022-agent-eval-harness.md" <<'ADR'
 ## Title
 x
 ## Status

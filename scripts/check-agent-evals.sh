@@ -1,7 +1,7 @@
 #!/bin/bash
 # check-agent-evals.sh — Verify the agent eval harness and its isolation.
 #
-# Spec: specs/043-agent-eval-harness/ (ADR: docs/adr/0020-agent-eval-harness.md).
+# Spec: specs/043-agent-eval-harness/ (ADR: docs/adr/0022-agent-eval-harness.md).
 #
 # Checks:
 #   1. Structure (AC-043-05)         evals/README.md + evals/tasks/ + contract keywords
@@ -492,7 +492,7 @@ _check_adr_headings() {
   for heading in "${headings[@]}"; do
     n="$(grep -nF "$heading" "$adr" | head -1 | cut -d: -f1)"
     if [ -z "$n" ] || [ "$n" -le "$last" ]; then
-      fail AC-043-01 "docs/adr/0020-agent-eval-harness.md" "heading '$heading' missing or out of order"
+      fail AC-043-01 "docs/adr/0022-agent-eval-harness.md" "heading '$heading' missing or out of order"
     else
       last="$n"
     fi
@@ -502,7 +502,7 @@ _check_adr_headings() {
 _check_adr_status() {
   local adr="$1"
   if ! grep -A2 '^## Status$' "$adr" | grep -q '^Proposed$'; then
-    fail AC-043-01 "docs/adr/0020-agent-eval-harness.md" "status is not Proposed"
+    fail AC-043-01 "docs/adr/0022-agent-eval-harness.md" "status is not Proposed"
   fi
 }
 
@@ -510,25 +510,25 @@ _check_adr_decision_terms() {
   local adr="$1" decision term
   decision="$(sed -n '/^## Decision$/,/^### Alternatives Considered$/p' "$adr")"
   for term in 'scripts/check-agent-evals.sh' 'self-CI' 'evals/' 'record-gate-run.sh' 'runs.jsonl' 'eval-' 'BLOCKED — <question>' 'Specifier'; do
-    grep -qF "$term" <<< "$decision" || fail AC-043-02 "docs/adr/0020-agent-eval-harness.md" "Decision does not state '$term'"
+    grep -qF "$term" <<< "$decision" || fail AC-043-02 "docs/adr/0022-agent-eval-harness.md" "Decision does not state '$term'"
   done
 }
 
 _check_adr_alternatives() {
   local adr="$1" alts
   alts="$(sed -n '/^### Alternatives Considered$/,/^## Consequences$/p' "$adr")"
-  grep -qi 'separate' <<< "$alts" || fail AC-043-03 "docs/adr/0020-agent-eval-harness.md" "alternatives omit a separate eval runs file"
-  grep -qi 'schema key' <<< "$alts" || fail AC-043-03 "docs/adr/0020-agent-eval-harness.md" "alternatives omit a new runs.jsonl key"
-  grep -qi 'hosted' <<< "$alts" || fail AC-043-03 "docs/adr/0020-agent-eval-harness.md" "alternatives omit a hosted runner"
-  grep -qi 'vendor' <<< "$alts" || fail AC-043-03 "docs/adr/0020-agent-eval-harness.md" "alternatives omit vendoring"
+  grep -qi 'separate' <<< "$alts" || fail AC-043-03 "docs/adr/0022-agent-eval-harness.md" "alternatives omit a separate eval runs file"
+  grep -qi 'schema key' <<< "$alts" || fail AC-043-03 "docs/adr/0022-agent-eval-harness.md" "alternatives omit a new runs.jsonl key"
+  grep -qi 'hosted' <<< "$alts" || fail AC-043-03 "docs/adr/0022-agent-eval-harness.md" "alternatives omit a hosted runner"
+  grep -qi 'vendor' <<< "$alts" || fail AC-043-03 "docs/adr/0022-agent-eval-harness.md" "alternatives omit vendoring"
 }
 
 _check_adr_out_of_scope() {
   local adr="$1" term
-  grep -q 'generic coding benchmarks' "$adr" || fail AC-043-03 "docs/adr/0020-agent-eval-harness.md" "out-of-scope list omits generic coding benchmarks"
-  grep -q 'no root `LICENSE`' "$adr" || fail AC-043-03 "docs/adr/0020-agent-eval-harness.md" "does not state the no-root-LICENSE reason"
+  grep -q 'generic coding benchmarks' "$adr" || fail AC-043-03 "docs/adr/0022-agent-eval-harness.md" "out-of-scope list omits generic coding benchmarks"
+  grep -q 'no root `LICENSE`' "$adr" || fail AC-043-03 "docs/adr/0022-agent-eval-harness.md" "does not state the no-root-LICENSE reason"
   for term in 'Modal' 'Opik' 'Kitaru' 'sandbox backends' 'hosted runners'; do
-    grep -qi "$term" "$adr" || fail AC-043-03 "docs/adr/0020-agent-eval-harness.md" "out-of-scope list omits '$term'"
+    grep -qi "$term" "$adr" || fail AC-043-03 "docs/adr/0022-agent-eval-harness.md" "out-of-scope list omits '$term'"
   done
 }
 
@@ -538,19 +538,19 @@ _check_adr_index() {
     fail AC-043-63 "docs/adr/README.md" "missing"
     return
   fi
-  rows="$(grep -c '^| 0020 |' "$index" || true)"
-  [ "$rows" -eq 1 ] || fail AC-043-63 "docs/adr/README.md" "expected exactly one | 0020 | row (got $rows)"
-  grep -E '^\| 0020 \|' "$index" | grep -q '0020-agent-eval-harness.md' \
-    || fail AC-043-63 "docs/adr/README.md" "the 0020 row does not link to 0020-agent-eval-harness.md"
-  grep -E '^\| 0020 \|' "$index" | grep -q 'Proposed' \
-    || fail AC-043-63 "docs/adr/README.md" "the 0020 row status is not Proposed"
+  rows="$(grep -c '^| 0022 |' "$index" || true)"
+  [ "$rows" -eq 1 ] || fail AC-043-63 "docs/adr/README.md" "expected exactly one | 0022 | row (got $rows)"
+  grep -E '^\| 0022 \|' "$index" | grep -q '0022-agent-eval-harness.md' \
+    || fail AC-043-63 "docs/adr/README.md" "the 0022 row does not link to 0022-agent-eval-harness.md"
+  grep -E '^\| 0022 \|' "$index" | grep -q 'Proposed' \
+    || fail AC-043-63 "docs/adr/README.md" "the 0022 row status is not Proposed"
 }
 
 check_governance() {
-  local before="$VIOLATIONS" adr="$ROOT/docs/adr/0020-agent-eval-harness.md"
+  local before="$VIOLATIONS" adr="$ROOT/docs/adr/0022-agent-eval-harness.md"
   local index="$ROOT/docs/adr/README.md"
   if [ ! -f "$adr" ]; then
-    fail AC-043-63 "docs/adr/0020-agent-eval-harness.md" "missing"
+    fail AC-043-63 "docs/adr/0022-agent-eval-harness.md" "missing"
     return
   fi
 
@@ -681,9 +681,9 @@ TOML
 
   # 3. missing ADR index row
   local f3="$tmp/f3"; fixture_root "$f3"
-  cp "$ROOT/docs/adr/0020-agent-eval-harness.md" "$f3/docs/adr/" 2>/dev/null || {
+  cp "$ROOT/docs/adr/0022-agent-eval-harness.md" "$f3/docs/adr/" 2>/dev/null || {
     printf '## Title\nx\n## Status\nProposed\n## Context\nx\n## Decision\nx\n### Alternatives Considered\nx\n## Consequences\nx\n## Compliance\nx\n## Notes\nx\n' \
-      > "$f3/docs/adr/0020-agent-eval-harness.md"
+      > "$f3/docs/adr/0022-agent-eval-harness.md"
   }
   printf '# Index\n| ADR | Title | Status |\n| --- | --- | --- |\n| 0001 | [Other](0001-other.md) | Accepted |\n' \
     > "$f3/docs/adr/README.md"

@@ -149,7 +149,7 @@ ln -sfn ../agents "$WT/.opencode/agents"
 
 # Q3: a per-run permission overlay. Verified against the pinned binary: the
 # agent's markdown frontmatter wins for keys it defines, so this supplies
-# absent keys only. See ADR 0020 §Notes.
+# absent keys only. See ADR 0022 §Notes.
 python3 - "$WT/opencode.json" "$AGENT" <<'PY'
 import json, os, sys
 path, agent = sys.argv[1], sys.argv[2]

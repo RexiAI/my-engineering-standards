@@ -10,7 +10,7 @@ with the pipeline and never loaded by it: no pipeline file may reference
 3. **A `BLOCKED — <question>` ambiguity path** for the Specifier when criteria
    cannot be made checkable.
 
-The decision record is [ADR 0020](../docs/adr/0020-agent-eval-harness.md).
+The decision record is [ADR 0022](../docs/adr/0022-agent-eval-harness.md).
 
 ## Layout
 

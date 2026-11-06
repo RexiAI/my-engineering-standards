@@ -54,10 +54,10 @@ ADR requirement is review-blocking, not a separate-PR requirement.
 
 ---
 
-## Task 1 — Record the decision in ADR 0020
+## Task 1 — Record the decision in ADR 0022
 
 **Depends on:** none.
-**Files:** `docs/adr/0020-agent-eval-harness.md` (new), `docs/adr/README.md`.
+**Files:** `docs/adr/0022-agent-eval-harness.md` (new), `docs/adr/README.md`.
 **Acceptance file:** `20-acceptance/AC-043-adr.md`.
 **Verification:** `bash scripts/check-governance.sh` exits 0; the ADR headings and
 index row are asserted by `scripts/tests/ac-043-agent-evals-structure.bats`.
@@ -68,7 +68,7 @@ the ADR later is the failure mode the rule exists to prevent.
 
 Acceptance criteria:
 
-- `docs/adr/0020-agent-eval-harness.md` is written from `templates/ADR.md` and
+- `docs/adr/0022-agent-eval-harness.md` is written from `templates/ADR.md` and
   carries `## Title`, `## Status`, `## Context`, `## Decision`,
   `### Alternatives Considered`, `## Consequences`, `## Compliance`, `## Notes`
   in that order; status is `Proposed`.
@@ -83,8 +83,8 @@ Acceptance criteria:
 - The Consequences/Notes record the out-of-scope list verbatim in intent:
   generic coding benchmarks, vendored upstream code (no root `LICENSE`), and
   Modal / Opik / Kitaru / sandbox / hosted runners.
-- `docs/adr/README.md` gains exactly one row: `| 0020 | [Agent eval
-  harness](0020-agent-eval-harness.md) | Proposed |` (title wording may vary;
+- `docs/adr/README.md` gains exactly one row: `| 0022 | [Agent eval
+  harness](0022-agent-eval-harness.md) | Proposed |` (title wording may vary;
   the number, link target, and status may not).
 - `scripts/check-governance.sh` exits 0.
 
@@ -237,7 +237,7 @@ the same file references `Autopilot mode`).
 Probe 1 asserts a `BLOCKED` outcome that the Specifier prompt does not currently
 produce: it says "ask a specific question", not `BLOCKED — <question>`. This task
 makes the asserted outcome real; it is the one pipeline-surface change in this
-spec and is recorded in ADR 0020.
+spec and is recorded in ADR 0022.
 
 Acceptance criteria:
 
@@ -449,7 +449,7 @@ Acceptance criteria:
   `git push` (the baseline remote is seeded with `git clone --bare`, never a
   push); no `--auto`; the `eval-` `specSlug` prefix.
 - Check 7 (negative controls) runs `evals/runner/run-probes.sh --hermetic`.
-- Check 8 (governance) fails when `docs/adr/0020-agent-eval-harness.md` is
+- Check 8 (governance) fails when `docs/adr/0022-agent-eval-harness.md` is
   missing or unindexed.
 - `--self-test` carries fixtures for: missing task entry, always-`1` verifier
   (`task cannot fail`), missing ADR row, and missing self-CI step; each fixture
@@ -496,7 +496,7 @@ the agent under test `edit`/`bash` allow plus the existing deny list; (b)
 `--auto` scoped to the throwaway worktree; (c) transcript-only assertions and an
 acknowledged weaker probe. **Recommended default: (a);** if the overlay
 mechanism cannot be verified against the pinned binary, fall back to (c) and
-record the limitation in ADR 0020. Probe 3's positive path needs edits to be
+record the limitation in ADR 0022. Probe 3's positive path needs edits to be
 possible for the "refuses before commit" claim to mean anything.
 
 **Q4 — What makes probe 2's gate "red"?**
