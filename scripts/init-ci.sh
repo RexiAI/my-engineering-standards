@@ -287,7 +287,7 @@ fi
 
 # ── Step 3: Ask for secrets ───────────────────
 collect_secrets() {
-  GHCR_TOKEN=""; MAVEN_USERNAME=""; MAVEN_PASSWORD=""; NPM_TOKEN=""; EXPO_TOKEN=""; SONAR_TOKEN=""; PACT_BROKER_URL=""; GH_TOKEN=""; DEEPSEEK_API_KEY=""; OPENCODE_API_KEY=""
+  GHCR_TOKEN=""; MAVEN_USERNAME=""; MAVEN_PASSWORD=""; NPM_TOKEN=""; EXPO_TOKEN=""; SONAR_TOKEN=""; PACT_BROKER_URL=""; GH_TOKEN=""; OPENCODE_API_KEY=""
 
   if [ ! -t 0 ]; then
     info "Non-interactive stdin — skipping secrets prompt (add secrets manually later)."
@@ -328,13 +328,9 @@ _prompt_secrets() {
     read -rp "  GH_TOKEN (Semantic Release, opt-in): " GH_TOKEN
   fi
   if [ "$WITH_PR_REVIEW_FLAG" = "true" ]; then
-    # PR review is opt-in (AC-024-04-04/05): the review keys are only prompted
+    # PR review is opt-in (AC-024-04-04/05): OPENCODE_API_KEY is only prompted
     # when the flag is set — a child that never opts in has no required secret.
-    # DEEPSEEK_API_KEY serves the default DeepSeek official provider (ADR 0023);
-    # OPENCODE_API_KEY is optional and only used with a non-DeepSeek
-    # PR_REVIEW_MODEL override.
-    read -rp "  DEEPSEEK_API_KEY (PR review agent — DeepSeek official, opt-in): " DEEPSEEK_API_KEY
-    read -rp "  OPENCODE_API_KEY (optional, non-DeepSeek PR_REVIEW_MODEL only): " OPENCODE_API_KEY
+    read -rp "  OPENCODE_API_KEY (PR review agent, opt-in): " OPENCODE_API_KEY
   fi
 }
 
@@ -536,30 +532,29 @@ EOF
 # set. The job calls the shared reusable workflow; reviews are per-PR, so there
 # is no default-branch gate — but the job must not run on push events (where
 # github.event.pull_request is empty), hence the event_name guard. The job is
-# secret-guarded: a child without either review key gets a skipped job, never a
+# secret-guarded: a child without OPENCODE_API_KEY gets a skipped job, never a
 # failure. GitHub Actions-only (AC-024-04-07): on GitLab the flag prints a
 # warning and emits nothing.
 _gh_pr_review_job() {
   local target="$1"
   # Regression guard (AC-024-04-03): without --with-pr-review the default
-  # output is byte-compatible with today — no pr-review job, no review-key line.
+  # output is byte-compatible with today — no pr-review job, no
+  # OPENCODE_API_KEY line.
   [ "$WITH_PR_REVIEW_FLAG" != "true" ] && return 0
 
   cat >> "$target" << EOF
 
   pr-review:
-    if: \${{ github.event_name == 'pull_request' && (secrets.DEEPSEEK_API_KEY != '' || secrets.OPENCODE_API_KEY != '') }}
+    if: \${{ github.event_name == 'pull_request' && secrets.OPENCODE_API_KEY != '' }}
     uses: RexiAI/my-engineering-standards/.github/workflows/ci-pr-review.yml@21046d96796467f8238d6d613ce3a552bf3fced0 # pinned; bump deliberately, never track a branch
     with:
       pr-number: \${{ github.event.pull_request.number }}
       head-sha: \${{ github.event.pull_request.head.sha }}
     secrets:
-      DEEPSEEK_API_KEY: \${{ secrets.DEEPSEEK_API_KEY }}
       OPENCODE_API_KEY: \${{ secrets.OPENCODE_API_KEY }}
 EOF
   ok "Added pr-review job to ci.yml (PR review agent, per-PR)"
-  info "Set the DEEPSEEK_API_KEY secret (DeepSeek official — default review provider) in GitHub → Settings → Secrets and variables → Actions"
-  info "OPENCODE_API_KEY is optional and only needed for a non-DeepSeek PR_REVIEW_MODEL override"
+  info "Set the OPENCODE_API_KEY secret (provider API key) in GitHub → Settings → Secrets and variables → Actions"
 }
 
 # Frontend job block: react-native swaps the docker-registry/GHCR pair for a
@@ -1037,14 +1032,13 @@ _print_release_note() {
 }
 
 _print_pr_review_note() {
-  # PR review note (AC-024-04-06): lists the review keys with a pointer to
+  # PR review note (AC-024-04-06): lists OPENCODE_API_KEY with a pointer to
   # the PR review docs when the flag is set.
   [ "${WITH_PR_REVIEW_FLAG:-}" != "true" ] && return 0
   echo ""
   echo "PR review agent (opt-in):"
   echo "  • pr-review job added to ci.yml (per-PR, review + suggested fixes only)"
-  echo "  • Set secret: DEEPSEEK_API_KEY (DeepSeek official — default review provider; never commit the value)"
-  echo "  • Optional secret: OPENCODE_API_KEY (only for a non-DeepSeek PR_REVIEW_MODEL override)"
+  echo "  • Set secret: OPENCODE_API_KEY (provider API key — never commit the value)"
   echo "  • Reference: docs/CI_CD.md §PR Review Agent"
 }
 

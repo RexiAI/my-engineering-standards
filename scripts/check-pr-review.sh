@@ -45,7 +45,7 @@
 #   AC-024-03-04  key supplied via GitHub secret
 #   AC-024-03-05  no key: job skipped, never a required-check failure
 #   AC-024-03-06  no literal key in the trigger workflow
-#   AC-024-03-07  self-hosting wiring identical to child wiring
+#   AC-024-03-07  self-hosting calls the local workflow; child wiring pins it by SHA
 #   AC-024-04-01  --with-pr-review accepted, usage line lists it
 #   AC-024-04-02  GitHub generation emits the pr-review job
 #   AC-024-04-03  default output unchanged without the flag
@@ -556,8 +556,11 @@ echo ""
 
 # AC-024-03-03 — Calls the shared workflow with PR context
 if [ -f "$TRIGGER_WF" ]; then
-  verify_grep AC-024-03-03 "$TRIGGER_WF" "job calls the shared pr-review workflow, pinned to a commit SHA (not @main)" \
-    "RexiAI/my-engineering-standards/.github/workflows/ci-pr-review.yml@21046d96796467f8238d6d613ce3a552bf3fced0 # pinned; bump deliberately, never track a branch"
+  # Self-hosting calls the local reusable workflow at the same revision, so the
+  # repo's own PRs test exactly what ships. Child wiring stays SHA-pinned
+  # (AC-024-03-07) — the local path is not a branch reference.
+  verify_grep AC-024-03-03 "$TRIGGER_WF" "job calls the shared pr-review workflow at the local revision" \
+    "./.github/workflows/ci-pr-review.yml"
   verify_grep AC-024-03-03 "$TRIGGER_WF" "pr-number and head-sha passed from the PR event" \
     "pr-number: \${{ github.event.pull_request.number }}" \
     "head-sha: \${{ github.event.pull_request.head.sha }}"
@@ -594,13 +597,16 @@ fi
 
 echo ""
 
-# AC-024-03-07 — Self-hosting wiring is identical to child wiring
+# AC-024-03-07 — Self-hosting and child wiring call the same workflow file.
+# Self-hosting uses the local revision (so the repo tests what ships); child
+# wiring pins a commit SHA (so a child cannot be moved by a branch update).
 if [ -f "$TRIGGER_WF" ] && [ -f "$INIT_CI" ]; then
-  SHARED_URL='RexiAI/my-engineering-standards/.github/workflows/ci-pr-review.yml@21046d96796467f8238d6d613ce3a552bf3fced0 # pinned; bump deliberately, never track a branch'
-  if grep -qF -- "$SHARED_URL" "$TRIGGER_WF" && grep -qF -- "$SHARED_URL" "$INIT_CI"; then
-    pass "AC-024-03-07: trigger workflow and init-ci.sh emit the same SHA-pinned shared pr-review workflow reference"
+  SHARED_SHA_URL='RexiAI/my-engineering-standards/.github/workflows/ci-pr-review.yml@21046d96796467f8238d6d613ce3a552bf3fced0 # pinned; bump deliberately, never track a branch'
+  if grep -qF -- './.github/workflows/ci-pr-review.yml' "$TRIGGER_WF" \
+     && grep -qF -- "$SHARED_SHA_URL" "$INIT_CI"; then
+    pass "AC-024-03-07: self-hosting calls the local ci-pr-review.yml; child wiring pins the same file by SHA"
   else
-    fail "AC-024-03-07: trigger workflow and init-ci.sh must reference the same pinned ci-pr-review.yml@<sha>"
+    fail "AC-024-03-07: self-hosting must call ./.github/workflows/ci-pr-review.yml and init-ci.sh must pin ci-pr-review.yml@<sha>"
   fi
 fi
 
@@ -632,7 +638,6 @@ if [ -f "$INIT_CI" ]; then
     if [ -f "$FIX/.github/workflows/ci.yml" ]; then
       verify_grep AC-024-04-02 "$FIX/.github/workflows/ci.yml" "generated ci.yml carries the pr-review job" \
         "pr-review:" "RexiAI/my-engineering-standards/.github/workflows/ci-pr-review.yml@21046d96796467f8238d6d613ce3a552bf3fced0 # pinned; bump deliberately, never track a branch" \
-        "DEEPSEEK_API_KEY: \${{ secrets.DEEPSEEK_API_KEY }}" \
         "OPENCODE_API_KEY: \${{ secrets.OPENCODE_API_KEY }}"
     else
       fail "AC-024-04-02: init-ci.sh did not generate .github/workflows/ci.yml"
@@ -699,25 +704,24 @@ echo ""
 # AC-024-04-04/05 — Secret prompt gating (structural: the read is inside the
 # flag guard; the interactive proof lives in check-pr-review.selftest.sh)
 if [ -f "$INIT_CI" ]; then
-  # The review-key prompts must sit textually inside the
+  # The OPENCODE_API_KEY prompt must sit textually inside the
   # `if [ "$WITH_PR_REVIEW_FLAG" = "true" ]; then` guard. Find the line of the
-  # guard and the line of the primary prompt and confirm the guard opens before
-  # the prompt and its `fi` closes after it.
+  # guard and the line of the prompt and confirm the guard opens before the
+  # prompt and its `fi` closes after it.
   GUARD_LINE="$(grep -nF 'if [ "$WITH_PR_REVIEW_FLAG" = "true" ]; then' "$INIT_CI" | head -1 | cut -d: -f1)"
-  PROMPT_LINE="$(grep -nF 'DEEPSEEK_API_KEY (PR review agent' "$INIT_CI" | head -1 | cut -d: -f1)"
+  PROMPT_LINE="$(grep -nF 'OPENCODE_API_KEY (PR review agent, opt-in)' "$INIT_CI" | head -1 | cut -d: -f1)"
   FI_LINE="$(awk -v start="$GUARD_LINE" 'NR>start && $0 ~ /^[[:space:]]*fi[[:space:]]*$/{print NR; exit}' "$INIT_CI" || true)"
   if [ -n "$GUARD_LINE" ] && [ -n "$PROMPT_LINE" ] && [ -n "$FI_LINE" ] \
      && [ "$GUARD_LINE" -lt "$PROMPT_LINE" ] && [ "$PROMPT_LINE" -lt "$FI_LINE" ]; then
-    pass "AC-024-04-04: DEEPSEEK_API_KEY prompt is gated on WITH_PR_REVIEW_FLAG"
+    pass "AC-024-04-04: OPENCODE_API_KEY prompt is gated on WITH_PR_REVIEW_FLAG"
   else
-    fail "AC-024-04-04: DEEPSEEK_API_KEY must be prompted only inside the --with-pr-review guard"
+    fail "AC-024-04-04: OPENCODE_API_KEY must be prompted only inside the --with-pr-review guard"
   fi
-  READS="$(grep -c 'read -rp.*DEEPSEEK_API_KEY' "$INIT_CI" || true)"
-  OPTIONAL_READS="$(grep -c 'read -rp.*OPENCODE_API_KEY' "$INIT_CI" || true)"
-  if [ "$READS" -eq 1 ] && [ "$OPTIONAL_READS" -le 1 ]; then
-    pass "AC-024-04-05: review-key prompts exist only inside the guard (never prompted without the flag)"
+  READS="$(grep -c 'read -rp.*OPENCODE_API_KEY' "$INIT_CI" || true)"
+  if [ "$READS" -eq 1 ]; then
+    pass "AC-024-04-05: exactly one OPENCODE_API_KEY prompt exists, and it is flag-gated (never prompted without the flag)"
   else
-    fail "AC-024-04-05: expected exactly one DEEPSEEK_API_KEY prompt and at most one OPENCODE_API_KEY prompt (found $READS / $OPTIONAL_READS)"
+    fail "AC-024-04-05: expected exactly one OPENCODE_API_KEY prompt (found $READS)"
   fi
 fi
 
@@ -725,9 +729,8 @@ echo ""
 
 # AC-024-04-06 — Summary lists the required secret for GitHub
 if [ -f "$INIT_CI" ]; then
-  verify_grep AC-024-04-06 "$INIT_CI" "summary's GitHub next steps list the review keys" \
-    "DEEPSEEK_API_KEY (DeepSeek official" \
-    "OPENCODE_API_KEY (only for a non-DeepSeek PR_REVIEW_MODEL override)" \
+  verify_grep AC-024-04-06 "$INIT_CI" "summary's GitHub next steps list OPENCODE_API_KEY" \
+    "OPENCODE_API_KEY OPENCODE_API_KEY (PR review agent, opt-in only)" \
     "docs/CI_CD.md §PR Review Agent"
 fi
 

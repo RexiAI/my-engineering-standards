@@ -31,20 +31,28 @@ the override path for other providers and for already-configured child repos.
    `deepseek/deepseek-flash` when the resolved value is empty or still the
    `your-provider/*` placeholder. `PR_REVIEW_MODEL` still wins, and a real
    `SPEC_PR_REVIEW_MODEL` from the caller's env is never overwritten.
-4. `DEEPSEEK_API_KEY` is the primary review secret (`workflow_call` + trigger +
-   `init-ci.sh`). `OPENCODE_API_KEY` stays declared and mapped for an explicit
+4. `DEEPSEEK_API_KEY` is the primary review secret (`workflow_call` + this
+   repo's trigger). `OPENCODE_API_KEY` stays declared and mapped for an explicit
    non-DeepSeek `PR_REVIEW_MODEL` override, preserving ADR 0003 decision 5's
-   compatibility promise.
-5. A rejected credential (`Invalid credential`, `invalid api key`,
+   compatibility promise. `init-ci.sh` child wiring is deliberately unchanged
+   here: it still pins the pre-change workflow by SHA, so passing the new secret
+   before that pin moves would make the reusable-workflow call fail to start.
+   The pin bump and the child wiring land together in a follow-up.
+5. The self-hosted trigger calls the reusable workflow by local path
+   (`./.github/workflows/ci-pr-review.yml`) instead of a SHA pin, so this
+   repo's PRs exercise exactly the workflow revision in the same commit. Child
+   repos keep the SHA-pinned remote reference (supply-chain rule); the local
+   path is not a branch reference and cannot drift.
+6. A rejected credential (`Invalid credential`, `invalid api key`,
    `unauthorized`, `authentication`, `401`) joins the provider-side skip guard:
    the review skips with a warning instead of failing the PR. Auth is not a code
    defect, and the review check is advisory.
-6. Gates updated in `scripts/check-pr-review.sh`: the provider block must map a
+7. Gates updated in `scripts/check-pr-review.sh`: the provider block must map a
    supported review key by env reference, the `deepseek` block must carry the
    official endpoint and default model, both secrets must be declared optional,
-   the trigger and `init-ci` must map both secrets, and the workflow must carry
-   the auth-skip phrases. No gate is weakened; each assertion is tightened to
-   cover the new default.
+   the trigger must map both secrets and call the local workflow, and the
+   workflow must carry the auth-skip phrases. No gate is weakened; each
+   assertion is tightened to cover the new default.
 
 ## Alternatives Considered
 
@@ -68,9 +76,10 @@ the override path for other providers and for already-configured child repos.
 - ADR 0003 decisions 2 and 3 ("no shipped default model", "opting in = key and
   model") are superseded for the default provider. Decision 5 (keep
   `OPENCODE_API_KEY` for compatibility) still holds.
-- The trigger workflow pins the shared workflow by commit SHA. Until that pin is
-  bumped to a commit containing this change, the self-hosted review keeps
-  running the previous revision; the bump is a deliberate follow-up after merge.
+- Self-hosting needs no pin bump: the trigger calls the local workflow, so this
+  repo's next PR event runs this revision. Child repos still pin the shared
+  workflow by SHA and stay on the previous revision until the follow-up moves
+  the pin and adds the `DEEPSEEK_API_KEY` mapping to `init-ci.sh`.
 - A provider auth failure now produces a skipped check, not a red one. That is
   the intended contract for an advisory, comment-only review, and it is recorded
   in the run's warning rather than hidden.
