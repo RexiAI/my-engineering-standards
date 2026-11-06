@@ -1,0 +1,15 @@
+id = "001-ambiguous-specifier"
+slug = "001-ambiguous-specifier"
+agent = "spec-specifier"
+timeoutSec = 900
+
+[verifier]
+command = "bash tests/run.sh"
+rewardFile = "reward.txt"
+
+[oracle]
+solution = "solution"
+environment = "environment"
+
+[probe]
+id = "ambiguous-specifier"

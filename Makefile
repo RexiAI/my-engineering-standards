@@ -1,4 +1,4 @@
-.PHONY: help validate validate-docs validate-refs validate-all lint format stats test test-scripts test-shell test-java test-go test-js mutation property-tests ci-fast ci ci-full judgment-up judgment-down judgment-status install-media uninstall-media smoke-media
+.PHONY: help validate validate-docs validate-refs validate-all lint format stats test test-scripts test-shell test-java test-go test-js mutation property-tests ci-fast ci ci-full judgment-up judgment-down judgment-status install-media uninstall-media smoke-media eval-sandbox
 
 DOCS := AGENTS.md README.md \
   docs/AGENTS_AND_SKILLS.md \
@@ -34,6 +34,7 @@ help:
 	@echo "  stats          Show file sizes"
 	@echo "  install-media  Install media agents + backend example into ~/.config/opencode (Linux/macOS/Windows via node)"
 	@echo "  uninstall-media Remove the agents; smoke-media  Zero-cost structural smoke (structure + contract, no network)"
+	@echo "  eval-sandbox   Build the pinned Docker image the agent eval harness runs the agent in"
 	@echo ""
 	@echo "Releases: handled by Semantic Release CI after merge to main."
 	@echo "  See docs/CI_CD.md §Release Process and ci/templates/releaserc.json."
@@ -118,6 +119,16 @@ test-scripts:   # Run bats shell gate tests (Track B, spec 001)
 	else \
 		bats --tap scripts/tests/*.bats; \
 	fi
+
+# --- Agent eval sandbox (spec 043) — Docker required, build once ---
+# The tag is the pinned base digest's short SHA, so the tag and the Dockerfile
+# cannot drift apart silently.
+EVAL_SANDBOX_TAG := spec-eval-sandbox:734a72b3d614
+
+eval-sandbox:
+	@command -v docker >/dev/null 2>&1 || { echo "ERROR: docker not found — the eval sandbox is Docker-only" >&2; exit 1; }
+	@docker build -t $(EVAL_SANDBOX_TAG) evals/sandbox
+	@echo "eval sandbox built: $(EVAL_SANDBOX_TAG)"
 
 test-shell: test-scripts
 

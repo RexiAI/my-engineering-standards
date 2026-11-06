@@ -1,6 +1,7 @@
 #!/bin/bash
 # check-no-hardcoded-secrets.sh — Refuse hardcoded credential values in
-# .github/, agents/, commands/, scripts/, config/, templates/, ci/, docs/.
+# .github/, agents/, commands/, scripts/, config/, templates/, ci/, docs/,
+# skills/, language-specific/.
 #
 # Scans those dirs for two classes of credential-looking content:
 #   1. Literal token prefixes — GitHub fine-grained PAT (ghp/gho/ghu/ghs/ghr),
@@ -25,6 +26,12 @@
 # and ci/. docs/changes/ stays excluded: archived spec one-pagers embed the
 # 30-report, which legitimately quotes token-prefix patterns and selftest
 # fixtures as documentation — historical records, not live credentials.
+#
+# skills/ and language-specific/ are in scope for the reason the skill
+# authoring standard gives (docs/AGENTS_AND_SKILLS.md §Behavioral Validation):
+# skills are distilled from real sessions and are the one authored surface
+# most likely to carry a credential or an internal hostname copied out of a
+# transcript. They were the last authored dirs not scanned.
 #
 # Prints each match as file:line and exits 1 on any match. The pattern
 # definitions are assembled at runtime by string concatenation so scanning
@@ -63,7 +70,7 @@ ASSIGN_RE='^(export[[:space:]]+)?[A-Z0-9_]+(TOKEN|SECRET|KEY|PASSWORD|CREDENTIAL
 PLACEHOLDER_RE='(PLACEHOLDER|YOUR_[A-Z0-9_]*|xxx|changeme|example|dummy|sample)'
 
 VIOLATIONS=0
-DIRS="agents commands scripts docs .github config templates ci"
+DIRS="agents commands scripts docs .github config templates ci skills language-specific"
 
 # report_hit FILE LINE LABEL — print one violation as <root-relative>:line and
 # count it. Shared by both scan classes so the format lives in one place.
@@ -174,7 +181,8 @@ if [ "${1:-}" = "--self-test" ]; then
   # closes), and every legitimate placeholder form still passes clean.
   TMPROOT="$(mktemp -d)"
   trap 'rm -rf "$TMPROOT"' EXIT
-  mkdir -p "$TMPROOT/config" "$TMPROOT/.github/workflows"
+  mkdir -p "$TMPROOT/config" "$TMPROOT/.github/workflows" \
+    "$TMPROOT/skills/probe" "$TMPROOT/language-specific/probe"
   FAILURES=0
 
   # Case 1: quoted real-looking secret in config/ — must be CAUGHT (exit 1).
@@ -223,7 +231,33 @@ if [ "${1:-}" = "--self-test" ]; then
     echo "PASS case 4: literal token prefix in .github/ (widened scope) is caught"
   fi
 
-  rm -f /tmp/nhcs-case1.$$ /tmp/nhcs-case2.$$ /tmp/nhcs-case3.$$ /tmp/nhcs-case4.$$
+  # Case 5: a credential literal in skills/ (widened scope) — must be CAUGHT.
+  # Skills are distilled from real sessions; that is exactly where a copied
+  # token or a shell line from a transcript lands.
+  printf 'API_TOKEN=%s\n' 'realliteralvalue123' > "$TMPROOT/skills/probe/SKILL.md"
+  rc=0; run_check "$TMPROOT" > /tmp/nhcs-case5.$$ 2>&1 || rc=$?
+  rm -f "$TMPROOT/skills/probe/SKILL.md"
+  if [ "$rc" -eq 0 ]; then
+    echo "FAIL case 5: credential literal in skills/ (widened scope) was not caught"
+    FAILURES=$((FAILURES + 1))
+  else
+    echo "PASS case 5: credential literal in skills/ (widened scope) is caught"
+  fi
+
+  # Case 6: a documented placeholder in language-specific/ — must PASS. The
+  # guides legitimately show `TOKEN=<your-token>` forms; widening scope must
+  # not turn house documentation red.
+  printf 'API_TOKEN=<your-token-here>\n' > "$TMPROOT/language-specific/probe/SKILL.md"
+  if run_check "$TMPROOT" > /tmp/nhcs-case6.$$ 2>&1; then
+    echo "PASS case 6: placeholder in language-specific/ (widened scope) still passes"
+  else
+    echo "FAIL case 6: placeholder in language-specific/ (widened scope) was wrongly flagged"
+    FAILURES=$((FAILURES + 1))
+  fi
+  rm -f "$TMPROOT/language-specific/probe/SKILL.md"
+
+  rm -f /tmp/nhcs-case1.$$ /tmp/nhcs-case2.$$ /tmp/nhcs-case3.$$ /tmp/nhcs-case4.$$ \
+    /tmp/nhcs-case5.$$ /tmp/nhcs-case6.$$
 
   echo ""
   if [ "$FAILURES" -gt 0 ]; then

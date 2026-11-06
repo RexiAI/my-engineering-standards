@@ -1,5 +1,13 @@
 # OKF Changelog
 
+## 2026-11-05 — v0.4.0
+**Author:** @pucelano-95
+**Tags:** [typed-judgment, facts-block, skill-authoring, cook-first, validation]
+**Summary:** Added the facts-block/judgments-advise rule to the typed-judgment decision doc (external corroboration, unverified), and adopted Cook-First skill validation (second-session rule) in `docs/AGENTS_AND_SKILLS.md` + `templates/SKILL.md`, with the operating runbook in `okf/validate-a-skill.md`
+**Links:**
+- [when-to-use-typesafe.md](when-to-use-typesafe.md#facts-block-judgments-advise)
+- [validate-a-skill.md](validate-a-skill.md)
+
 ## 2026-10-09 — v0.3.0
 **Author:** @pucelano-95
 **Tags:** [typed-judgment, local-judgment-backend, kev, clm, self-hosted, confidence]

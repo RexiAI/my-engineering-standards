@@ -1,0 +1,16 @@
+id = "002-red-gate-halt"
+slug = "002-red-gate-halt"
+agent = "spec-pipeline"
+timeoutSec = 900
+
+[verifier]
+command = "bash tests/run.sh"
+rewardFile = "reward.txt"
+
+[oracle]
+solution = "solution"
+environment = "environment"
+
+[probe]
+id = "red-gate-halt"
+remote = true

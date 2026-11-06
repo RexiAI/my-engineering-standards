@@ -1,0 +1,1 @@
+BLOCKED — Which of the two mutually exclusive requirements wins: increment `total`, or keep it at 0?

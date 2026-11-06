@@ -51,6 +51,58 @@ Support standard OAuth2 grant types:
 - String length, format, and range checks on all request parameters.
 - Never trust or propagate user-supplied data without validation.
 
+## SSRF (Server-Side Request Forgery)
+
+Any outbound request whose destination comes from a user or from an upstream response is an SSRF vector: the caller can point your server at itself, at another internal service, or at a cloud metadata endpoint that hands out credentials. Destination selection is therefore default-deny, not "block the hosts we thought of".
+
+- **Default-deny destination allowlist.** Keep an allowlist of scheme + host + port that this service may call. A destination supplied by a user or derived from an upstream response must match the allowlist; an unmatched destination is refused before any connection is made. A denylist of known-bad hosts is not a substitute — it is bypassable by every address it forgot.
+- **Check the resolved IP, not the hostname.** An allowlist match on a hostname proves nothing: the name can resolve to a private address. Resolve first, then validate the resolved IP against the allowlist and against the refused ranges below.
+- **Refused ranges.** `127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16`, `fe80::/10`, the cloud metadata endpoint `169.254.169.254`, and the IPv6 equivalents `::1/128` and `fc00::/7`. Refuse these even when the allowlist would otherwise match — unless reaching one specific internal host is the service's whole purpose, in which case allowlist that single address explicitly.
+- **Pin the validated address.** Connect to the IP address that was validated, not to the hostname again. Re-checking a re-resolved address is mandatory: a second resolution between the check and the connection is the **DNS rebinding** window. If the address changes, re-check the new one before use; a request that would need a new address is refused rather than retried against the name.
+- **Do not follow redirects automatically.** An allowlisted URL can redirect to a refused one. Either disable automatic redirect following, or re-validate every redirect hop against the allowlist and the refused ranges before following it, and cap the hop count.
+- Apply the same rule to webhook delivery, image/PDF fetchers, link previews, and any "fetch this URL for me" endpoint. The rule belongs in one shared outbound-request helper, not copy-pasted per caller.
+
+## CSRF (Cross-Site Request Forgery)
+
+CSRF is the browser being tricked into attaching your user's session cookie to a request the user never made. It exists only where the credential is ambient — attached by the browser automatically.
+
+- **Cookie-authenticated state-changing requests need a CSRF token.** Any POST/PUT/PATCH/DELETE that mutates state and is authenticated by a cookie must carry a CSRF token the attacker's page cannot read (synchronizer token or double-submit, bound to the session). A state-changing request authenticated by a cookie without a valid token is rejected with `403`, before the handler runs. Safe methods such as `GET` and `HEAD` never mutate state — an endpoint that changes data on `GET` cannot be CSRF-protected and must be redesigned.
+- **Session cookies carry a SameSite policy.** Set session cookies `SameSite=Lax` or `SameSite=Strict`. `SameSite=None` turns that protection off, so it is allowed only for a cookie that genuinely must cross-site, is not the session cookie, and always carries the `Secure` attribute. Session cookies also carry `Secure` and `HttpOnly`.
+- **Validate `Origin`, fall back to `Referer`.** A state-changing request whose `Origin` header does not match an allowlist of your own origins is rejected. When no `Origin` header is present, validate `Referer` against the same allowlist; if neither header is present, reject. Compare as an exact origin, never a substring or suffix match.
+- **Bearer-token APIs need no CSRF token.** A header-borne bearer token, sent in `Authorization: Bearer <token>`, is not CSRF-susceptible: it is attached by the caller's code rather than by the browser, so a cross-site form post cannot carry it: a pure bearer API does not need a CSRF token. Keep it that way — never store the bearer token in a cookie (that makes it ambient and re-introduces CSRF), and never accept the same token from either a cookie or a header on the same endpoint.
+- Framework CSRF middleware counts only if it is enabled for the endpoint. A globally disabled filter is not protection.
+
+## CORS (Cross-Origin Resource Sharing)
+
+CORS is a browser relaxation mechanism, not a security boundary (see the last bullet). Misconfigured, it hands any website the ability to read your authenticated responses.
+
+- **Never combine a wildcard with credentials.** `Access-Control-Allow-Origin: *` is never used on an endpoint that returns credentialed or authenticated data. `*` combined with `Access-Control-Allow-Credentials: true` is invalid per the Fetch standard — browsers reject such a response outright, so emitting both is both broken and an admission that the endpoint trusts everyone.
+- **Echo an exact allowlist match, nothing else.** Configure allowed origins explicitly. When the request's `Origin` matches an allowlist entry exactly, echo that origin back in `Access-Control-Allow-Origin` and add `Vary: Origin` so a cache never serves one origin's response to another. An unmatched origin receives no CORS header at all. The request's `Origin` is never reflected unvalidated — reflection is equivalent to `*` with credentials, and a substring or suffix match is bypassable with `evil-example.com`.
+- **Keep preflight responses minimal.** A preflight response allows only the methods the endpoint actually uses (no blanket `GET, POST, PUT, PATCH, DELETE, OPTIONS`) and only the headers the endpoint actually reads. A wildcard `Access-Control-Allow-Headers` is not combined with credentials; when credentials are allowed, list the headers explicitly. Keep `Access-Control-Expose-Headers` just as narrow, and `Access-Control-Max-Age` short enough that a policy change takes effect the same day.
+- **CORS is not access control.** CORS does not protect against non-browser clients: curl, a server-side script, or a native app ignores it completely. Authorization is enforced server-side on every request, independently of any CORS decision. A request CORS "blocked" still reached your server, and its side effects already happened.
+
+## Password Hashing
+
+Passwords are verified with a deliberately slow, memory-hard password-hashing function. Nothing else.
+
+- **Algorithm.** `Argon2id` is preferred; `bcrypt` is the accepted alternative where Argon2id is unavailable. A password is never stored in plaintext and never encrypted reversibly — "we can decrypt it for support" is not an exception.
+- **Forbidden.** Fast general-purpose hashes are unacceptable for password storage: `MD5`, `SHA-1`, and `SHA-256` — plain, salted, iterated, or "with a pepper" — are all rejected for this use. They are designed to be fast, which is exactly the property an offline attacker wants, and a home-grown construction built from them inherits the same problem.
+- **Minimum parameters.** bcrypt: a `cost` (work factor) of at least `12`, raised as hardware improves. Argon2id: at least `19 MiB` of memory, at least 2 `iterations`, and `parallelism` of at least 1 — the OWASP baseline; tune upward, never down. Store the algorithm and its parameters alongside the hash so verification knows what produced it.
+- **Verification is constant-time.** Compare through the library's `constant-time` verify function (`argon2_verify`, `bcrypt.compare`, or the platform equivalent), never with `==` / `===`, and never with an early-return byte loop. Never re-hash the candidate with application code and compare digests yourself.
+- **Rehash on login.** When a stored hash's algorithm or parameters are below the current baseline, `rehash` it during the next successful login — after the candidate is verified, never before — and do it transparently: the session stays valid and the user is not asked to log in again. A failed upgrade must not fail the login.
+
+## JWT Validation Checklist
+
+Verify in this order on every request. Nothing downstream of a failed step runs, and every item below ends in the same disposition: reject the token with `401`.
+
+- [ ] **Algorithm allowlist.** The accepted `alg` values are fixed in configuration (for example `RS256`), and the token header's `alg` only selects from that set — the header is never itself the source of trust. A token signed with an algorithm the library supports but the configuration did not list is rejected.
+- [ ] **Reject alg=none.** The header value `alg=none` — and any algorithm absent from the allowlist — is rejected before signature verification, never treated as "unsigned but acceptable". Reject on the header value alone; do not attempt verification first, and never log the payload on this path.
+- [ ] **Key selection by kid.** The verification key comes from a configured, trusted JWKS (a pinned URL or a local key set), selected by `kid`. `jku` and `x5u` are never fetched, and the token never supplies its own key: an embedded `jwk` header is ignored. An unknown `kid` is rejected rather than falling back to the first key in the set.
+- [ ] **Signature before claims.** The signature is verified before anything else is read — no claim, not even `exp` or a role, is read before the signature verifies. A bad signature is rejected without inspecting the payload.
+- [ ] **Time claims (exp, nbf, iat).** `exp` is required, so a token without it is rejected. `nbf` and `iat` are honoured together with a bounded clock skew — a small configured leeway, not "no skew check" — so legitimate hosts do not flap. An expired or not-yet-valid token is rejected.
+- [ ] **Audience and issuer (aud, iss).** Both are validated against expected values configured for this service. A missing or mismatched `aud` or `iss` is a rejection — never "accept when absent", which is the shape that lets a token minted for another service through.
+- [ ] **Reject on any failure.** Every item above ends in the same disposition: reject the token, return `401`, and log the failure class (never the token or its claims).
+
 ## Upstream Error Responses Must Not Reach the Client
 
 A third-party API's raw error response is not automatically safe to forward. Provider APIs (payment processors, LLM providers, any upstream service authenticated with a credential of yours) can include partial key material, account identifiers, or internal details in their error bodies — a 401 from an upstream provider might echo back a masked or partial version of the credential you sent it. This is a distinct leak path from log redaction (docs/OBSERVABILITY.md's "mask secrets in logs" rule): the risk here is forwarding the error body itself to *your own client's browser/app*, not writing it to your own logs.

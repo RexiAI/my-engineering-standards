@@ -225,6 +225,17 @@ jobs:
       - name: Check remediation budget
         run: ./scripts/check-remediation-budget.sh
 
+      # Agent eval harness gate (spec 043, ADR 0022): structure and pipeline
+      # isolation, the task/manifest and single-reward contracts, oracle sanity
+      # in both directions, the static runner contract, the hermetic probe
+      # suite, the ADR index row, and this workflow's own wiring. The
+      # --self-test run proves each check rejects a broken fixture. No
+      # continue-on-error and no model credentials: the gate is hermetic.
+      - name: Check agent eval harness
+        run: |
+          ./scripts/check-agent-evals.sh
+          ./scripts/check-agent-evals.sh --self-test
+
       - name: Install shellcheck
         run: sudo apt-get update -y && sudo apt-get install -y shellcheck
 
