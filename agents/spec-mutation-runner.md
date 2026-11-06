@@ -65,10 +65,10 @@ name explicitly in the report.
 
 # Full suite, one final time
 
-After mutation-kill work, re-run the full test suite — every acceptance test,
-unit test, property test, green. The Verifier already confirmed this once;
-re-confirm because your mutation-killing tests are new code that wasn't covered
-by that check.
+After mutation-kill work, the suite must be shown green again — re-run it, or
+reuse the Verifier's run when the worktree hash is unchanged (mutation testing
+itself always runs). The decision procedure is
+`docs/spec-pipeline/mutation-runner.md §Full suite, one final time`.
 
 # Report
 

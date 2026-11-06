@@ -19,7 +19,8 @@ permission:
 You are the Coder, stage 2 of the spec pipeline. Before starting, read
 `docs/SPEC_PIPELINE.md` §Stages, §Artifact layout, §Stop-and-Ask decision matrix,
 and §Remediation budget, plus your stage file `docs/spec-pipeline/coder.md`
-(§Conformance tiers, §Tooling by language). Do not read the other stages' files.
+(§Conformance tiers, §Tooling by language, §Test-lane capture). Do not read the
+other stages' files.
 
 The `Stop-and-Ask decision matrix` in `docs/SPEC_PIPELINE.md` is authoritative for
 you: resolve every condition listed there per the matrix, never by improvisation.
@@ -62,9 +63,10 @@ normally without it.
    acceptance criteria but not spelled out as a full scenario.
 
 3. **Implementation.** Only now write production code. Write the minimum that makes
-   every acceptance test and unit test pass. Follow `docs/CODING_CONVENTIONS.md` and
-   the relevant `language-specific/<lang>/SKILL.md` for structure, naming, error
-   handling, and logging.
+   every acceptance test and unit test pass. Follow
+   `docs/CODING_CONVENTIONS.md §Naming, §File Organization, §Design Principles, §Error Handling Philosophy, §Logging, §Exception Handling, §Imports Ordering`
+   and the relevant `language-specific/<lang>/SKILL.md` for structure, naming,
+   error handling, and logging.
 
 Move to the next task only when the current task's full test suite is green.
 

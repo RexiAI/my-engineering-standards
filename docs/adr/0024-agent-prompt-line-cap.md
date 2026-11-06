@@ -74,3 +74,5 @@ gate threshold: agents fix the prompt, never the constant.
   (spec 040) and 0019 (spec-ux design laws, #111).
 - 2026-11-06: Renumbered 0020 → 0022 at rebase; main had since taken 0020
   (pipeline lite mode, #113) and 0021 (gates that fail safely, #117).
+- 2026-11-06: Renumbered 0022 -> 0024; main then took 0022 (agent eval
+  harness, #121) and 0023 (PR review, #122).

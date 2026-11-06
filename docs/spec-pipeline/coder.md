@@ -42,3 +42,13 @@ refused on `production`/`multi-service`. It removes stages, never gates — see
 existing demotion of `testify`/`gomock` to optional. It generates simple types well
 (ints, strings, slices); reach for a real library only if a project's domain types
 need custom generators it can't express.
+
+## Test-lane capture
+
+Run each per-task suite through
+`scripts/agent-test-summary.sh --run <log-path> -- <real command>` and read only
+its stdout — the signal lines plus the one `SUMMARY:` line, never the log file.
+The log is author feedback, not evidence: this stage leaves no report artifact, so
+nothing is appended to `25-verification.md`. The shape, and the canonical append
+recipe used by the stages that do write evidence, live in
+`docs/spec-pipeline/verifier.md §Test-log capture`.

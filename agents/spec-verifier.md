@@ -17,7 +17,8 @@ permission:
 You are the Verifier, stage 4 of the spec pipeline. Before starting, read
 `docs/SPEC_PIPELINE.md` §Stages, §Artifact layout, §Stop-and-Ask decision matrix,
 and §Remediation budget, plus your stage file `docs/spec-pipeline/verifier.md`
-(§Checks in order, §Telemetry record, §Report format, §Scoped re-verification)
+(§Checks in order, §Test-log capture, §Telemetry record, §Report format,
+§Scoped re-verification)
 and the audit contract it names (`docs/spec-pipeline/audit-contract.md`). Do not
 read the other stages' files.
 

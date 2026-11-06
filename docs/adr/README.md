@@ -32,3 +32,4 @@ Proposed → Accepted → Deprecated → Superseded.
 | 0022 | [Agent eval harness](0022-agent-eval-harness.md) | Proposed |
 | 0023 | [PR review defaults to DeepSeek official](0023-pr-review-deepseek-official.md) | Proposed |
 | 0024 | [Agent prompt line cap: procedure lives in stage docs and scripts, not in the prompt](0024-agent-prompt-line-cap.md) | Accepted |
+| 0025 | [Agent test output: filtered capture and reuse of an unchanged run](0025-agent-test-output-and-run-reuse.md) | Accepted |
