@@ -79,7 +79,9 @@ fixture_agent() {
 }
 
 @test "AC-038-04-02 — the skill line-limit threshold is still 500" {
-  run grep -F 'total_lines > 500' "$REPO_ROOT/scripts/check-skills.sh"
+  # The checker moved from a bash `total_lines > 500` test to a Python
+  # `total_lines <= 500` branch (main, spec 042 era); the threshold is unchanged.
+  run grep -F 'total_lines <= 500' "$REPO_ROOT/scripts/check-skills.sh"
   [ "$status" -eq 0 ]
   [[ "$output" == *"500"* ]]
 }
