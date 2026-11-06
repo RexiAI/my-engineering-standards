@@ -357,7 +357,8 @@ Steps:
 | `PACT_BROKER_URL` | Contract tests (optional) |
 | `EXPO_TOKEN` | EAS build (React Native; merge-to-main path only) |
 | `GH_TOKEN` | Semantic Release (release, opt-in only) |
-| `OPENCODE_API_KEY` | API key for the PR review agent's provider (opt-in via `init-ci.sh --with-pr-review` only) |
+| `DEEPSEEK_API_KEY` | API key for the PR review agent's default provider, DeepSeek official (opt-in via `init-ci.sh --with-pr-review` only) |
+| `OPENCODE_API_KEY` | Optional: API key for a non-DeepSeek provider used with an explicit `PR_REVIEW_MODEL` override (opt-in only) |
 
 ## CI Job Orchestration — Parallel Feedback
 
@@ -576,14 +577,21 @@ only `contents: read` + `pull-requests: write` (comment-only).
   chain as every other agent (`agent.local.env` > `model.local.env` >
   committed example). The shared workflow additionally honors the
   `PR_REVIEW_MODEL` repository variable as an explicit per-repo override.
-- **Endpoint**: provider base URLs live in the provider blocks of
-  `opencode.json` — operator configuration, not documentation.
-- **Auth**: the `OPENCODE_API_KEY` GitHub Actions secret, exported to the
-  review run as the `OPENCODE_API_KEY` env var that the configured provider
-  block(s) in `opencode.json` declare. The value is **never committed** — only
-  the secret name appears in committed files, consistent with
-  `docs/SECURITY.md §Secrets Management`. Provider endpoints and model lists
-  live in those provider blocks: config, not docs.
+- **Default provider and endpoint**: DeepSeek official (ADR 0023). The
+  committed `deepseek` provider block in `opencode.json` points at
+  `https://api.deepseek.com/v1` and lists `deepseek-flash` (default) and
+  `deepseek-v4-pro`. Another provider can be selected by setting the
+  `PR_REVIEW_MODEL` repository variable; its provider block is then operator
+  configuration in `opencode.json`, not documentation.
+- **Auth**: the `DEEPSEEK_API_KEY` GitHub Actions secret, exported to the
+  review run as the env var the `deepseek` provider block declares. A run with
+  an explicit non-DeepSeek `PR_REVIEW_MODEL` uses `OPENCODE_API_KEY` instead,
+  which is kept for compatibility with already-configured child repos. The step
+  skips only when **both** secrets are unset; a rejected credential (invalid
+  key, 401 unauthorized) also skips with a warning, never fails as a code
+  defect. Neither is a required check. Values are **never committed** — only
+  secret names appear in committed files, consistent with
+  `docs/SECURITY.md §Secrets Management`.
 
 ### Opting in (child repos)
 
@@ -596,15 +604,18 @@ PR review is opt-in per child, mirroring `§Release Process`:
 The flag appends a `pr-review` job to the generated `.github/workflows/ci.yml`
 that calls `RexiAI/my-engineering-standards/.github/workflows/ci-pr-review.yml@<commit-sha>  # pinned — see docs/SECURITY.md §CI/CD Supply Chain`
 with `OPENCODE_API_KEY` mapped from the repo's secrets, and prompts for the
-secret during generation. On `--platform gitlab` the flag prints a warning and
-emits nothing — the shared workflow is GitHub Actions-only.
+secret during generation. The child-side `DEEPSEEK_API_KEY` mapping and pin
+bump land together in the follow-up described in ADR 0023 — until then the
+generated job still calls the previous shared-workflow revision. On
+`--platform gitlab` the flag prints a warning and emits nothing — the shared
+workflow is GitHub Actions-only.
 
 **The no-op boundary.** A child that never opts in is unaffected: a default
-`init-ci.sh` run emits no `pr-review` job and requires no `OPENCODE_API_KEY`
-secret, so unit/lint/build CI stays green. The generated job is secret-guarded
-(`if: secrets.OPENCODE_API_KEY != ''`), so even an opted-in child without the
-key configured gets a skipped job, never a failure. Opting in is purely
-additive.
+`init-ci.sh` run emits no `pr-review` job and requires no review secret, so
+unit/lint/build CI stays green. The generated job delegates to the shared
+workflow, whose review step is gated on the mapped key env var (`secrets` is
+not a legal context in `if:`), so even an opted-in child without the key
+configured gets a skipped job, never a failure. Opting in is purely additive.
 
 ### Cost and bounds
 

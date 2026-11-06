@@ -94,7 +94,7 @@ Every guide is distilled from official upstream documentation at a pinned versio
 
 ## Model Configuration
 
-This repo's spec pipeline agents are configured to use models via `opencode.json` `{env:SPEC_*_MODEL}` references. `config/model.local.env.example` ships placeholder values only — no provider or model is assumed. Real model ids live in the gitignored `config/model.local.env`; the pipeline does not run until you set them there. Docs intentionally carry no model or provider ids — switch models by editing your local override, never tracked files.
+This repo's spec pipeline agents are configured to use models via `opencode.json` `{env:SPEC_*_MODEL}` references. `config/model.local.env.example` ships placeholder values for every pipeline seat except the PR-review default recorded in ADR 0023 — no other provider or model is assumed. Real model ids live in the gitignored `config/model.local.env`; the pipeline does not run until you set them there. Docs otherwise carry no model or provider ids — switch models by editing your local override, never tracked files.
 
 Per-machine values arrive via the gitignored repo-root `.envrc` (direnv). It
 loads the committed `config/model.local.env.example` placeholders, then the

@@ -231,9 +231,9 @@ uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
 
 Cross-repository reusable workflows follow the same rule — pin
 `RexiAI/my-engineering-standards/.github/workflows/<name>.yml` to a commit
-SHA, bump deliberately, never track `@main`. This repo's own
-consumer-facing workflows do this (`.github/workflows/pr-review.yml`,
-`scripts/init-ci.sh`'s `STANDARDS_PIN`).
+SHA, bump deliberately, never track `@main`. This repo's own consumer-facing
+workflows do this (`.github/workflows/pr-review.yml`, `scripts/init-ci.sh`'s
+`STANDARDS_PIN`).
 
 ### Caller workflows must grant what a reusable workflow declares
 

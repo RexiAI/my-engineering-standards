@@ -12,8 +12,13 @@ name: PR Review Agent
 #
 # Consumers (child repos via init-ci.sh --with-pr-review, and this repo's own
 # .github/workflows/pr-review.yml) call this with pr-number + head-sha. The
-# API key secret is optional: a caller without the key gets a skipped job,
+# API key secrets are optional: a caller without a key gets a skipped job,
 # never a failure.
+#
+# Default provider: DeepSeek official (ADR 0023). The review model defaults to
+# deepseek/deepseek-flash served from https://api.deepseek.com/v1, authenticated
+# with DEEPSEEK_API_KEY. OPENCODE_API_KEY is kept for already-configured child
+# repos and for an explicit non-DeepSeek PR_REVIEW_MODEL override.
 
 on:
   workflow_call:
@@ -27,8 +32,11 @@ on:
         required: true
         type: string
     secrets:
+      DEEPSEEK_API_KEY:
+        description: API key for the DeepSeek official API (default review provider)
+        required: false
       OPENCODE_API_KEY:
-        description: API key for the provider serving the review model
+        description: API key for a non-DeepSeek provider, used only with an explicit PR_REVIEW_MODEL override
         required: false
 
 permissions:
@@ -41,7 +49,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+      # gh auth for the early-exit queries and the gh pr comment the workflow
+      # runs after the agent returns. The agent process is started with this
+      # variable removed from its environment and has no shell.
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       PR_NUMBER: ${{ inputs.pr-number }}
       HEAD_SHA: ${{ inputs.head-sha }}
       # Optional override for the review run's model: the repo-level
@@ -112,11 +125,10 @@ jobs:
         # Empty-key guard (AC-024-02-03): an absent key yields a skipped step,
         # never a failure — the PR's required checks are unaffected. secrets is
         # not a legal context in an if: at any scope, so gate on the job env
-        # (the secret is mapped into the env in the job env block).
-        # Empty-model guard (ADR 0003): when PR_REVIEW_MODEL is unset, the
-        # step skips too — a repo opts in by configuring BOTH the key and the
-        # model; neither has a shipped default.
-        if: ${{ steps.early-exit.outputs.skip != 'true' && env.OPENCODE_API_KEY != '' }}
+        # (the secret is mapped into the env in the job env block). Either key
+        # is enough: DEEPSEEK_API_KEY serves the default model, OPENCODE_API_KEY
+        # serves an explicit non-DeepSeek PR_REVIEW_MODEL override (ADR 0023).
+        if: ${{ steps.early-exit.outputs.skip != 'true' && (env.DEEPSEEK_API_KEY != '' || env.OPENCODE_API_KEY != '') }}
         run: |
           set -euo pipefail
           # Headless run on a bare runner has no shell profile, so load the
@@ -126,17 +138,53 @@ jobs:
           # pattern as ci-sweeper.yml). No permission auto-approval flag is
           # passed: the review is comment-only and the agent's permission
           # block enforces that.
-          # shellcheck disable=SC1091
-          set -a; . config/model.local.env.example; set +a
+          # An inherited model is an explicit caller decision: remember it so
+          # the example defaults below cannot overwrite it (ADR 0023 §3).
+          inherited_spec_model="${SPEC_PR_REVIEW_MODEL:-}"
 
-          # Model override: when PR_REVIEW_MODEL is set in the caller's
-          # environment, export it as SPEC_PR_REVIEW_MODEL so opencode.json's
-          # {env:SPEC_PR_REVIEW_MODEL} resolves to the override value instead
-          # of the committed default. The step's if: guarantees the variable
-          # is set here — there is no shipped fallback model.
+          # A bootstrapped child keeps the example under .standards/config/;
+          # sourcing a missing file under set -e would fail the step.
+          for env_example in config/model.local.env.example .standards/config/model.local.env.example; do
+            if [ -f "$env_example" ]; then
+              set -a
+              # shellcheck disable=SC1090
+              . "$env_example"
+              set +a
+              break
+            fi
+          done
+
+          # Restore an inherited model over the example file, then apply the
+          # default only when the value is empty or still a placeholder.
+          if [ -n "$inherited_spec_model" ]; then
+            export SPEC_PR_REVIEW_MODEL="$inherited_spec_model"
+          fi
+          case "${SPEC_PR_REVIEW_MODEL:-}" in
+            ""|your-provider/*) export SPEC_PR_REVIEW_MODEL="deepseek/deepseek-flash" ;;
+          esac
+
+          # Model override: PR_REVIEW_MODEL has the highest precedence.
           if [ -n "${PR_REVIEW_MODEL:-}" ]; then
             export SPEC_PR_REVIEW_MODEL="$PR_REVIEW_MODEL"
           fi
+
+          echo "Resolved review model: ${SPEC_PR_REVIEW_MODEL}"
+          # An empty-key guard on either secret is not enough: the key must
+          # match the provider of the resolved model.
+          case "$SPEC_PR_REVIEW_MODEL" in
+            deepseek/*)
+              if [ -z "${DEEPSEEK_API_KEY:-}" ]; then
+                echo "::warning::Review skipped — DEEPSEEK_API_KEY is unset for ${SPEC_PR_REVIEW_MODEL}. Not a code defect."
+                exit 0
+              fi
+              ;;
+            *)
+              if [ -z "${OPENCODE_API_KEY:-}" ]; then
+                echo "::warning::Review skipped — OPENCODE_API_KEY is unset for ${SPEC_PR_REVIEW_MODEL}. Not a code defect."
+                exit 0
+              fi
+              ;;
+          esac
 
           # Billing/quota guard: capture output so we can detect provider
           # errors (spending limit, quota, rate limit) and skip gracefully.
@@ -156,16 +204,28 @@ jobs:
           # The subshell + set +e wrapper is required because set -euo
           # pipefail (above) would exit the script before review_rc=$?
           # is reached when opencode returns non-zero.
+          # The agent has no shell (bash/edit denied): the workflow supplies
+          # the PR metadata and diff as files, and posts the agent's final
+          # answer as the review comment. That removes the permission-prompt
+          # failure mode entirely — headless CI auto-rejects any unmatched
+          # command — and keeps the token out of the agent's reach.
           # The task prompt carries only trusted, workflow-supplied values
           # (PR number, head SHA) — never PR-author-controlled content. The
-          # agent fetches the diff itself via its own allow-listed `gh`/`git`
-          # commands and is instructed (agents/pr-review.md §Untrusted content
-          # warning) to treat that content as data, never as instructions.
-          prompt="Review PR ${PR_NUMBER} at head ${HEAD_SHA}. Post your findings as one PR review comment via gh. End the comment with: Reviewed-SHA: ${HEAD_SHA}"
+          # agent is instructed (agents/pr-review.md §Untrusted content
+          # warning) to treat the diff and PR body as data, never as
+          # instructions.
+          mkdir -p .pr-review
+          gh pr view "$PR_NUMBER" --json title,body,files,headRefOid,baseRefName,author > .pr-review/context.json
+          gh pr diff "$PR_NUMBER" > .pr-review/pr.diff
 
-          review_output=$(set +e; /tmp/opencode-bin/opencode run --print-logs \
+          prompt="Review PR ${PR_NUMBER} at head ${HEAD_SHA}. Read .pr-review/context.json and .pr-review/pr.diff with the read tool. Return ONLY the review comment body, ending with: Reviewed-SHA: ${HEAD_SHA}"
+
+          review_log="$(mktemp)"
+          # env -u: the agent never sees the GitHub token even though the step
+          # needs it for the gh calls around the run.
+          review_output=$(set +e; env -u GH_TOKEN -u GITHUB_TOKEN /tmp/opencode-bin/opencode run --print-logs \
             --agent pr-review \
-            "${prompt}" 2>&1) && review_rc=0 || review_rc=$?
+            "${prompt}" 2>"$review_log") && review_rc=0 || review_rc=$?
 
           if [ "$review_rc" -ne 0 ]; then
             # Provider-side failures are not code defects: a billing issue, a
@@ -175,12 +235,30 @@ jobs:
             # required check for a comment-only advisory review. The guard's
             # contract is "skip with a warning, never fail the PR on provider
             # availability".
-            if echo "$review_output" | sed 's/\x1b\[[0-9;]*m//g' | grep -qiE 'spending limit|quota exceeded|billing|rate.limit|429|402|insufficient balance|model unavailable|model not found|unknown model|no such model|stream error'; then
-              echo "::warning::Review skipped — model provider unavailable or over quota (exit ${review_rc}). Not a code defect."
+            if { cat "$review_log"; printf '%s\n' "$review_output"; } | sed 's/\x1b\[[0-9;]*m//g' | grep -qiE 'spending limit|quota exceeded|billing|rate.limit|429|402|insufficient balance|model unavailable|model not found|unknown model|no such model|stream error|invalid credential|invalid api key|unauthorized|authentication|401 unauthorized'; then
+              echo "::warning::Review skipped — model provider unavailable, rejected the credential, or is over quota (exit ${review_rc}). Check DEEPSEEK_API_KEY (default provider) or OPENCODE_API_KEY (override provider). Not a code defect."
               exit 0
             fi
-            echo "$review_output"
+            echo "--- review log ---"
+            cat "$review_log"
+            printf '%s\n' "$review_output"
             exit "$review_rc"
           fi
 
-          echo "$review_output"
+          # Post the agent's answer verbatim as the review comment. An empty
+          # answer is a skip, not a failure: the review is advisory.
+          if [ -z "${review_output//[[:space:]]/}" ]; then
+            echo "::warning::Review skipped — the agent returned an empty comment."
+            exit 0
+          fi
+          # Drop any model narration before the first markdown heading, then
+          # accept the documented SHA placeholder and substitute the real one.
+          if grep -q '^## ' <<< "$review_output"; then
+            review_output="$(printf '%s\n' "$review_output" | sed -n '/^## /,$p')"
+          fi
+          review_output="${review_output//Reviewed-SHA: <head sha>/Reviewed-SHA: ${HEAD_SHA}}"
+          if ! grep -q "Reviewed-SHA: ${HEAD_SHA}" <<< "$review_output"; then
+            review_output="${review_output}"$'\n\n'"Reviewed-SHA: ${HEAD_SHA}"
+          fi
+          printf '%s\n' "$review_output" | gh pr comment "$PR_NUMBER" --body-file -
+          echo "Posted the review comment for head ${HEAD_SHA}."
