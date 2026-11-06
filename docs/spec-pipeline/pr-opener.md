@@ -43,7 +43,7 @@ Only after `30-report.md` is green; every step is a gate.
 
 1. **Credentials first.** `$GITHUB_TOKEN` and `$GH_TOKEN` both non-empty
    (direnv → `config/agent.local.env`; never a prompt literal). Missing → report
-   and stop; there is no env script to source.
+   and stop.
 2. **Audit-trail gate (mandatory), without `--require-deploy`**:
    `scripts/check-audit-trail.sh NNN-slug`. Stage 5c writes `40-deploy.md` only
    after the PR exists, so a *missing* one is tolerated here while a malformed one
