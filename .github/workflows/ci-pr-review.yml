@@ -39,6 +39,7 @@ jobs:
   review:
     name: Review PR
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
       PR_NUMBER: ${{ inputs.pr-number }}
