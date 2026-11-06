@@ -10,7 +10,7 @@ Proposed → Accepted → Deprecated → Superseded.
 | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
 | 0001 | [Pure direnv dotenv for spec-pipeline model configuration and credentials](0001-direnv-model-env.md)                                                                 | Accepted |
 | 0002 | [Provider-agnostic general documentation](0002-provider-agnostic-docs.md)                                                                                            | Accepted |
-| 0003 | [Provider-agnostic PR-review wiring](0003-provider-agnostic-pr-review.md)                                                                                            | Accepted |
+| 0003 | [Provider-agnostic PR-review wiring](0003-provider-agnostic-pr-review.md)                                                                                            | Accepted — decisions 2–3 superseded by 0023 |
 | 0004 | [Typed-judgment layer: opt-in fast-path for probabilistic classification](0004-typed-judgment-layer.md)                                                              | Accepted |
 | 0005 | [Local judgment backend: an optional self-hosted compute backend for the typed-judgment layer](0005-local-judgment-backend.md)                                       | Accepted |
 | 0006 | [Extend the gate catalog to Python and Rust without adding gate names](0006-python-rust-gate-coverage.md)                                                            | Proposed |
@@ -30,4 +30,5 @@ Proposed → Accepted → Deprecated → Superseded.
 | 0020 | [Pipeline lite mode: a mechanically selected short stage set for small specs](0020-pipeline-lite-mode.md) | Proposed |
 | 0021 | [Make the pipeline's own gates fail safely and report truthfully](0021-pipeline-gate-fail-safely.md) | Accepted |
 | 0022 | [Agent eval harness](0022-agent-eval-harness.md) | Proposed |
-| 0023 | [Agent prompt line cap: procedure lives in stage docs and scripts, not in the prompt](0023-agent-prompt-line-cap.md) | Accepted |
+| 0023 | [PR review defaults to DeepSeek official](0023-pr-review-deepseek-official.md) | Proposed |
+| 0024 | [Agent prompt line cap: procedure lives in stage docs and scripts, not in the prompt](0024-agent-prompt-line-cap.md) | Accepted |

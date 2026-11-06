@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted
+Accepted — decisions 2–3 superseded by
+[0023](0023-pr-review-deepseek-official.md) for the default provider; decision 5
+(keep `OPENCODE_API_KEY` for compatibility) stands.
 
 ## Context
 
