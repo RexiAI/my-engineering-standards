@@ -270,6 +270,10 @@ jobs:
 
       - name: Run shell gate bats tests (spec 001 Track B)
         timeout-minutes: 12
+        # Shard across the runner's cores: each bats file is independent
+        # (per-test tmpdir + private GIT_CONFIG_GLOBAL). ~4x wall-clock saving.
+        env:
+          BATS_JOBS: 4
         run: make test-scripts
 
       - name: Run gate selftests

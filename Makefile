@@ -114,7 +114,11 @@ test-scripts:   # Run bats shell gate tests (Track B, spec 001)
 	@echo "Checking bats assertions are not vacuous..."
 	@./scripts/check-bats-assertions.sh
 	@echo "Running bats tests (TAP)..."
-	@bats --tap scripts/tests/*.bats
+	@if [ "$${BATS_JOBS:-1}" -gt 1 ]; then \
+		./scripts/run-bats-parallel.sh --jobs "$${BATS_JOBS}"; \
+	else \
+		bats --tap scripts/tests/*.bats; \
+	fi
 
 # --- Agent eval sandbox (spec 043) — Docker required, build once ---
 # The tag is the pinned base digest's short SHA, so the tag and the Dockerfile
