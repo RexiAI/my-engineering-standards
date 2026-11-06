@@ -1648,3 +1648,282 @@ follow-up and is not reachable by the three shipped verifiers.
 PASS — phase 1, attempt 3. Telemetry: `SPEC_LOOP_COUNT=2`,
 `SPEC_PHASE1_RETRIES=2`, `SPEC_PHASE2_RETRIES=0`. Stage 5a (Mutation Runner)
 may proceed.
+
+---
+
+## Re-verification 4 — post-PR ADR renumber (phase 1 bookkeeping)
+
+Attempt: 4 (phase 1, scoped re-verification of commit `6f92e33`; a post-PR
+bookkeeping re-check, not a new BLOCK-remediation cycle — the phase-1 budget
+closed green at attempt 3).
+Telemetry: `SPEC_LOOP_COUNT=2`, `SPEC_PHASE1_RETRIES=2`, `SPEC_PHASE2_RETRIES=0`
+Re-verified at: 2026-11-06T08:51:30Z
+Commit: `6f92e33 fix(adr): renumber eval-harness ADR to 0022 after main took 0020/0021`
+
+Scope: the renumber only — diff scope, ADR/index state, stale references,
+AC-043 traceability, the six requested gate scripts, check-8 governance-link
+enforcement, and the ADR decision/alternatives content. The attempt-1/2/3
+sections above are preserved unchanged.
+
+**Overall verdict: PASS.** The commit is a pure `0020` → `0022` substitution in
+11 files plus the ADR's H1/history line; no acceptance requirement, gate
+decision, or ADR decision changed. All six requested commands exit 0, all 63
+AC-043 ids still trace, and check 8 still fails closed on both a missing ADR and
+a missing index row.
+
+### Diff scope
+
+command: git show 6f92e33 --stat
+exit: 0
+at: 2026-11-06T08:51:30Z
+
+```
+ .github/workflows/self-ci.yml                      |  2 +-
+ ...-eval-harness.md => 0022-agent-eval-harness.md} |  3 +-
+ docs/adr/README.md                                 |  2 +-
+ evals/README.md                                    |  2 +-
+ evals/runner/run-task.sh                           |  2 +-
+ scripts/check-agent-evals.sh                       | 42 +++++++++++-----------
+ scripts/tests/ac-043-agent-evals-structure.bats    | 12 +++----
+ specs/043-agent-eval-harness/10-tasks.md           | 16 ++++-----
+ .../20-acceptance/AC-043-adr.md                    | 10 +++---
+ .../20-acceptance/AC-043-ci-gate.md                |  2 +-
+ specs/043-agent-eval-harness/25-verification.md    |  4 +--
+ specs/043-agent-eval-harness/30-report.md          |  2 +-
+ 12 files changed, 50 insertions(+), 49 deletions(-)
+```
+
+Pure-substitution audit (old blob with `0020`→`0022` vs new blob): PURE-SUB for
+all 11 modified files; the ADR rename differs from a pure substitution only by
+the H1 and the new history line:
+
+```
+PURE-SUB  .github/workflows/self-ci.yml
+PURE-SUB  docs/adr/README.md
+PURE-SUB  evals/README.md
+PURE-SUB  evals/runner/run-task.sh
+PURE-SUB  scripts/check-agent-evals.sh
+PURE-SUB  scripts/tests/ac-043-agent-evals-structure.bats
+PURE-SUB  specs/043-agent-eval-harness/10-tasks.md
+PURE-SUB  specs/043-agent-eval-harness/20-acceptance/AC-043-adr.md
+PURE-SUB  specs/043-agent-eval-harness/20-acceptance/AC-043-ci-gate.md
+PURE-SUB  specs/043-agent-eval-harness/25-verification.md
+PURE-SUB  specs/043-agent-eval-harness/30-report.md
+# ADR rename vs pure substitution:
+< # Architecture Decision Record (ADR)
+> # 0022 — Agent eval harness
+> - 2026-11-06: Originally numbered ADR 0020; renumbered to 0022 after main allocated 0020 (pipeline lite mode) and 0021 (gate fail-safe).
+```
+
+No semantic edit to acceptance text: AC-043-01/02/03/04 and AC-043-63 differ
+only by `0020`→`0022` (including the two `0022` literals in AC-043-04's Then
+lines). No semantic edit to gate logic: every changed line in
+`scripts/check-agent-evals.sh` is the embedded ADR path/number, proven by the
+pure-substitution diff; `bash -n scripts/check-agent-evals.sh
+evals/runner/run-task.sh` exits 0. No ADR decision text changed: the 98%-similar
+rename touches only the H1 and `## Notes`; `## Decision`, `### Alternatives
+Considered`, `## Consequences` and the out-of-scope list are unchanged.
+
+Finding (review hint, not a gate failure): the new H1 is
+`# 0022 — Agent eval harness`, not the mandated template H1
+`# Architecture Decision Record (ADR)` (`templates/ADR.md`). No gate enforces
+the H1 — AC-043-01 and `_check_adr_headings` start at `## Title` — and every
+gate is green, so this is a WARN for the Architect, not a FAIL.
+
+### ADR and index state
+
+- `docs/adr/0022-agent-eval-harness.md` exists; H1 is `# 0022 — Agent eval harness`.
+- `## Notes` records `2026-11-06: Originally numbered ADR 0020; renumbered to 0022 after main allocated 0020 (pipeline lite mode) and 0021 (gate fail-safe).`
+- `docs/adr/README.md` has exactly one `| 0022 | [Agent eval harness](0022-agent-eval-harness.md) | Proposed |` row.
+- §Decision still states all four choices: (1) `scripts/check-agent-evals.sh` as a self-CI gate; (2) a top-level `evals/` package the pipeline never loads; (3) append to `runs.jsonl` via `scripts/record-gate-run.sh`, separated by `specSlug: "eval-<task-id>"`; (4) the Specifier `BLOCKED — <question>` ambiguity path.
+- §Alternatives Considered still lists all five rejected options (separate eval runs file, new `runs.jsonl` schema key, hosted runner, vendoring, `--auto`); §Consequences still carries the full out-of-scope list (generic coding benchmarks; no root `LICENSE`/vendored code; Modal/Opik/Kitaru/sandbox backends/hosted runners; token/context rules; gate-stats filtering).
+
+### `0020` inventory
+
+`grep -rn '0020-agent-eval-harness' --exclude-dir=.git .` → no matches.
+
+Remaining literal `0020` in the tree:
+
+| Location | What it is |
+|---|---|
+| `docs/adr/0022-agent-eval-harness.md:98` | This ADR's history note ("Originally numbered ADR 0020…") |
+| `.github/workflows/*.yml` `setup-node@49933ea…f7d6820020` etc. | Substring of the pinned action SHA; not an ADR reference |
+
+`origin/main` (`a225e69`) carries `docs/adr/0020-pipeline-lite-mode.md` and
+`docs/adr/0021-pipeline-gate-fail-safely.md` — main's ADRs, not this one. This
+branch is based before that point, so it does not contain those files; the merge
+must preserve main's `0020`/`0021` rows alongside the branch's `0022` row.
+
+### Evidence: scenario traceability
+
+command: bash scripts/check-scenario-traceability.sh
+exit: 0
+at: 2026-11-06T08:42:02Z
+
+```
+Scenario IDs found: 63 live, 493 archived
+
+PASS AC-043-01 — traced to a test
+...
+PASS AC-043-63 — traced to a test
+
+✔ Scenario traceability check: every scenario traced, every reference resolves.
+```
+
+Machine form (`bash scripts/check-scenario-traceability.sh --json`, exit 0,
+at 2026-11-06T08:51:14Z): `checks: [1, 2]`, `passes: 63`, `fails: 0`.
+
+### Evidence: full test suite
+
+command: make test-scripts
+exit: 0
+at: 2026-11-06T08:42:18Z
+
+```
+...
+ok 242 AC-043-01: ADR follows the mandated template in order and is Proposed
+ok 243 AC-043-02: ADR records the four load-bearing decisions
+ok 244 AC-043-03: ADR records rejected alternatives and the out-of-scope list
+ok 245 AC-043-04: the ADR is indexed exactly once and governance passes
+...
+ok 873 unit: successful under-cap call writes no reason line at all
+EXIT=0
+at: 2026-11-06T08:49:41Z
+```
+
+873 `ok`, 0 `not ok`, 0 `# skip`; 63 `AC-043-*` tests. `Makefile:131`
+(`test: test-scripts`) makes this the full shell suite.
+
+### Evidence: complexity gate
+
+command: bash scripts/check-code-principles.sh --json
+exit: 0
+at: 2026-11-06T08:50:35Z
+
+```
+tier: mvp
+fails: 0
+warns: 58
+warns_under_evals: 0
+```
+
+Human form ended `✔ Design-principles check: 0 FAIL(s), 58 WARN(s).` All 58
+WARNs are the same pre-existing set recorded in attempt 3; none is under
+`evals/`.
+
+### Evidence: design-principles gate
+
+command: bash scripts/check-code-principles.sh
+exit: 0
+at: 2026-11-06T08:50:35Z
+
+```
+Checking design principles in: . (tier: mvp)
+...
+---------------------------------------------
+✔ Design-principles check: 0 FAIL(s), 58 WARN(s).
+  WARNs are review hints — verify each before merging.
+```
+
+No FAIL. The 58 WARNs are the pre-existing set (ci/templates, skills/hallmark,
+scripts comments/naming); the renumber adds none.
+
+### Evidence: scenario-to-behavior spot check
+
+command: manual read of the renumbered scenarios against their bats assertions; bats --tap -f 'AC-043-63' scripts/tests/ac-043-agent-evals-structure.bats
+exit: 0
+at: 2026-11-06T08:51:30Z
+
+1. **AC-043-01** — text now names `docs/adr/0022-agent-eval-harness.md`; the test asserts the eight `##` headings are present and strictly ordered and that `## Status` is `Proposed`. Matches.
+2. **AC-043-02** — text says §Decision states the four choices; the test asserts `scripts/check-agent-evals.sh`, `self-CI`, `evals/`, `pipeline never`, `record-gate-run.sh`, `runs.jsonl`, `eval-`, `BLOCKED — <question>`, and `Specifier` inside §Decision. Matches (stronger than the text).
+3. **AC-043-03 / AC-043-04** — text now names ADR 0022 and the `| 0022 |` row; the test asserts exactly one `| 0022 |` row, the `0022-agent-eval-harness.md` link, status `Proposed`, and `check-governance.sh` exit 0. Matches.
+4. **AC-043-63** — first fixture has no ADR file, second has the ADR but no index row; the test requires exit 1, `FAIL AC-043-63`, and the `0022-agent-eval-harness.md` / `docs/adr/README.md` names. Matches; the bats test passes (`ok 1 AC-043-63`).
+5. **AC-043-45** (random unaffected control) — the test asserts `inside=true`, `branch=detached`, `agents-link=../agents`, `seed=seed`, `pwd=.*/wt`, `common-dir=.*/scratch/\.git`, the source path absent, and source HEAD/branch unchanged. Matches the scenario text.
+
+### Re-run gate batch
+
+command: bash scripts/check-agent-evals.sh
+exit: 0
+at: 2026-11-06T08:42:02Z
+
+```
+...
+PASS AC-043-01 — ADR follows the mandated template
+PASS AC-043-02 — ADR records the four load-bearing decisions
+PASS AC-043-03 — ADR records the rejected alternatives and the out-of-scope list
+PASS AC-043-04 — the ADR is indexed exactly once
+...
+PASS AC-043-59 — self-CI runs the gate and its self-test
+PASS AC-043-60 — the agent-eval step cannot be skipped
+```
+
+command: bash scripts/check-agent-evals.sh --self-test
+exit: 0
+at: 2026-11-06T08:42:02Z
+
+```
+self-test: missing task entry ok
+self-test: task cannot fail ok
+self-test: missing ADR row ok
+self-test: missing self-CI step ok
+```
+
+Check 8 still fails closed on both paths:
+
+- missing ADR (manual fixture, `--only 8`): `FAIL AC-043-63 — docs/adr/0022-agent-eval-harness.md: missing`, exit 1.
+- missing index row (self-test fixture f3 + manual fixture): `FAIL AC-043-63 — docs/adr/README.md: expected exactly one | 0022 | row (got 0)`, exit 1.
+- `bats --tap -f 'AC-043-63' scripts/tests/ac-043-agent-evals-structure.bats` → `ok 1 AC-043-63: the governance link is enforced`, exit 0.
+
+The self-test carries the "missing ADR row" fixture; the "missing ADR" fixture
+lives in the AC-043-63 bats test, not in `--self-test`. Both exercise the same
+`check_governance` path, and the renumber did not weaken either.
+
+command: bash scripts/check-governance.sh
+exit: 0
+at: 2026-11-06T08:50:15Z
+
+```
+...
+PASS AC-010-06-02 — compliant repo passes all checks (exit 0)
+✔ Governance check: every governance requirement verified.
+```
+
+command: bash scripts/check-orchestration.sh
+exit: 0
+at: 2026-11-06T08:42:02Z
+
+```
+...
+All orchestration references valid.
+```
+
+command: bash scripts/check-audit-trail.sh 043-agent-eval-harness
+exit: 0
+at: 2026-11-06T08:42:02Z
+
+```
+PASS 043-agent-eval-harness: evidence block 'scenario traceability' — ...
+PASS 043-agent-eval-harness: evidence block 'full test suite' — ...
+PASS 043-agent-eval-harness: evidence block 'complexity gate' — ...
+PASS 043-agent-eval-harness: evidence block 'design-principles gate' — ...
+PASS 043-agent-eval-harness: evidence block 'scenario-to-behavior spot check' — ...
+✔ Audit-trail check: specs/043-agent-eval-harness complete, verifier evidence recorded.
+```
+
+### No unaccounted behavior
+
+No untraceable logic: all 12 changed files map to the renumber (the ADR rename,
+its index row, the paths/literals in `scripts/check-agent-evals.sh`, its bats
+test, the spec's acceptance/tasks/verification/report text, the `evals/README`
+link, the runner comment, and the self-ci comment). The only non-literal edits
+are the ADR H1 and the dated history line, both part of the renumber record.
+Finding line (review hint): the H1 now diverges from `templates/ADR.md`; no gate
+enforces the H1.
+
+**PASS.**
+
+## Phase-1 verdict
+PASS — phase 1, attempt 4 (post-PR bookkeeping re-verification). Telemetry:
+`SPEC_LOOP_COUNT=2`, `SPEC_PHASE1_RETRIES=2`, `SPEC_PHASE2_RETRIES=0`. The
+attempt-3 PASS stands; the renumber changed no requirement, no gate logic, and
+no ADR decision.
