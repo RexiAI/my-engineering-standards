@@ -224,9 +224,7 @@ jobs:
           # Accept the documented placeholder and substitute the real SHA.
           review_output="${review_output//Reviewed-SHA: <head sha>/Reviewed-SHA: ${HEAD_SHA}}"
           if ! grep -q "Reviewed-SHA: ${HEAD_SHA}" <<< "$review_output"; then
-            review_output="${review_output}
-
-Reviewed-SHA: ${HEAD_SHA}"
+            review_output="${review_output}"$'\n\n'"Reviewed-SHA: ${HEAD_SHA}"
           fi
           printf '%s\n' "$review_output" | gh pr comment "$PR_NUMBER" --body-file -
           echo "Posted the review comment for head ${HEAD_SHA}."
