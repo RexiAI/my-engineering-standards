@@ -255,7 +255,7 @@ if [ -f "$AGENT" ]; then
   # repo paths (.github/workflows/…, docs/…, shared/…) — those are not model
   # ids and are filtered out before the comparison.
   AGENT_MODEL_IDS="$(grep -oE '[A-Za-z0-9._-]+/[A-Za-z0-9._-]+' "$AGENT" \
-    | grep -vE '^(\.github|docs|shared|language)/' | sort -u || true)"
+    | grep -vE '^(\.github|docs|shared|language|scripts)/' | sort -u || true)"
   if [ -z "$AGENT_MODEL_IDS" ]; then
     pass "AC-024-01-04: agents/pr-review.md carries no model ids"
   else
@@ -290,6 +290,22 @@ if [ -f "$AGENT" ]; then
     pass "AC-024-01-05: no allowed bash pattern matches git push/commit/add/checkout/reset/worktree, gh pr merge/edit, or file editors"
   else
     fail "AC-024-01-05: allowed bash pattern matches a write operation: ${WRITE_MATCHES[*]}"
+  fi
+  # The only allowed executable is the fixed-subcommand wrapper: this is what
+  # makes the boundary hold in headless CI, where an unmatched command is
+  # auto-rejected and a bare `gh`/`git` allow would also permit writes.
+  str_contains AC-024-01-05 'agents/pr-review.md frontmatter' "$AGENT_FM" '"scripts/pr-review-gh.sh*": allow'
+  WRAPPER="$ROOT_DIR/scripts/pr-review-gh.sh"
+  if [ -x "$WRAPPER" ]; then
+    pass "AC-024-01-05: pr-review wrapper exists and is executable"
+  else
+    fail "AC-024-01-05: scripts/pr-review-gh.sh is missing or not executable"
+  fi
+  if grep -qE 'exec gh pr (view|diff|checks|comment)' "$WRAPPER" \
+     && ! grep -qE 'exec gh pr (merge|edit|close|reopen|ready)' "$WRAPPER"; then
+    pass "AC-024-01-05: wrapper exposes only view/diff/checks/comment"
+  else
+    fail "AC-024-01-05: wrapper must expose only view/diff/checks/comment"
   fi
 fi
 

@@ -51,6 +51,10 @@ jobs:
     env:
       DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+      # gh auth for the read-only PR queries (early-exit) and the review
+      # comment the agent posts through scripts/pr-review-gh.sh. The wrapper
+      # exposes no merge/edit subcommand, so this token cannot change the PR.
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       PR_NUMBER: ${{ inputs.pr-number }}
       HEAD_SHA: ${{ inputs.head-sha }}
       # Optional override for the review run's model: the repo-level

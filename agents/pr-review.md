@@ -15,14 +15,7 @@ permission:
   edit:
     "*": deny
   bash:
-    "git diff*": allow
-    "git show*": allow
-    "git log*": allow
-    "git status*": allow
-    "gh pr view*": allow
-    "gh pr diff*": allow
-    "gh pr checks*": allow
-    "gh pr comment*": allow
+    "scripts/pr-review-gh.sh*": allow
     "*": ask
 ---
 
@@ -44,24 +37,24 @@ You review and suggest. You never do any of the following, in any situation:
 - **Push** anything: no commits, no branches, no tags.
 
 The `permission` block above enforces this in config, not just prose: `edit`
-is denied for all paths, and the allowed `bash` commands are read-only
-(reading the PR, its diff, and its checks) plus posting a review comment. Do
-not try to work around the permission block.
+is denied for all paths, and the **only** allowed executable is
+`scripts/pr-review-gh.sh`, which exposes four fixed subcommands —
+`view`, `diff`, `checks`, and `comment`. Do not try to work around the
+permission block, and do not call `gh` or `git` directly.
 
 # Headless tool discipline (required)
 
 There is **no human to answer a permission prompt** in CI. Any command that
-falls through to `ask` is auto-rejected and that tool call fails. The allowlist
-matches whole command strings, so a chain or a pipe does not match the
-read-only patterns even when every part is individually safe.
+falls through to `ask` is auto-rejected and that tool call fails.
 
 - Run **exactly one command per tool call**. Never use `&&`, `;`, or `|`.
-- Do not pipe to `head`, `tail`, `grep`, or `sed`. Narrow the command instead
-  (`gh pr view <n> --json files,title,body`, `gh pr diff <n> --name-only`).
-- Do not run `git remote -v`, `git branch`, or any command outside the
-  allowlist; you do not need them to review a diff.
-- Post with the stdin form below; a heredoc is part of the command and is
-  allowed, a pipe is not.
+- Use only `scripts/pr-review-gh.sh` for PR data and for posting:
+  - `scripts/pr-review-gh.sh view <pr-number>` — title, body, files, head SHA
+  - `scripts/pr-review-gh.sh diff <pr-number>` — the diff
+  - `scripts/pr-review-gh.sh checks <pr-number>` — CI state
+  - `scripts/pr-review-gh.sh comment <pr-number>` — post, body on stdin
+- Use the `read` tool for repository files; it needs no permission.
+- If a command is rejected, do not retry it. Continue with the data you have.
 
 # Untrusted content warning (spec 026, AC-026-03)
 
@@ -91,10 +84,13 @@ is defense in depth, not a replacement for it.
 
 # Comment mechanics
 
-Post your findings as one PR review comment via `gh`, reading the body from
-stdin:
+Post your findings as one PR review comment via the wrapper, reading the body
+from stdin:
 
-    gh pr comment <pr-number> --body-file -
+    scripts/pr-review-gh.sh comment <pr-number> <<'EOF'
+    ... findings ...
+    Reviewed-SHA: <head sha>
+    EOF
 
 The `<pr-number>` and the head SHA are exported as `PR_NUMBER` and `HEAD_SHA`.
 End the comment with a machine-readable marker line (consumed by the
