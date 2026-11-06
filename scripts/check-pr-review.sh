@@ -255,7 +255,7 @@ if [ -f "$AGENT" ]; then
   # repo paths (.github/workflows/…, docs/…, shared/…) — those are not model
   # ids and are filtered out before the comparison.
   AGENT_MODEL_IDS="$(grep -oE '[A-Za-z0-9._-]+/[A-Za-z0-9._-]+' "$AGENT" \
-    | grep -vE '^(\.github|docs|shared|language|scripts)/' | sort -u || true)"
+    | grep -vE '^(\.github|\.pr-review|docs|shared|language|scripts)/' | sort -u || true)"
   if [ -z "$AGENT_MODEL_IDS" ]; then
     pass "AC-024-01-04: agents/pr-review.md carries no model ids"
   else
@@ -291,22 +291,11 @@ if [ -f "$AGENT" ]; then
   else
     fail "AC-024-01-05: allowed bash pattern matches a write operation: ${WRITE_MATCHES[*]}"
   fi
-  # The only allowed executable is the fixed-subcommand wrapper: this is what
-  # makes the boundary hold in headless CI, where an unmatched command is
-  # auto-rejected and a bare `gh`/`git` allow would also permit writes.
-  str_contains AC-024-01-05 'agents/pr-review.md frontmatter' "$AGENT_FM" '"scripts/pr-review-gh.sh*": allow'
-  WRAPPER="$ROOT_DIR/scripts/pr-review-gh.sh"
-  if [ -x "$WRAPPER" ]; then
-    pass "AC-024-01-05: pr-review wrapper exists and is executable"
-  else
-    fail "AC-024-01-05: scripts/pr-review-gh.sh is missing or not executable"
-  fi
-  if grep -qE 'exec gh pr (view|diff|checks|comment)' "$WRAPPER" \
-     && ! grep -qE 'exec gh pr (merge|edit|close|reopen|ready)' "$WRAPPER"; then
-    pass "AC-024-01-05: wrapper exposes only view/diff/checks/comment"
-  else
-    fail "AC-024-01-05: wrapper must expose only view/diff/checks/comment"
-  fi
+  # The reviewer runs with no shell at all: the workflow supplies the diff and
+  # posts its answer. Denying bash is what makes that boundary hold in headless
+  # CI, where any unmatched command is auto-rejected.
+  BASH_BLOCK="$(printf '%s\n' "$AGENT_FM" | sed -n '/bash:/,/^[[:space:]]*[^[:space:]-]/p')"
+  str_contains AC-024-01-05 'agents/pr-review.md bash block' "$BASH_BLOCK" '"*": deny'
 fi
 
 echo ""
@@ -496,6 +485,13 @@ if [ -f "$SHARED_WF" ]; then
     "submodules: true" "persist-credentials: false"
   verify_grep AC-024-02-05 "$SHARED_WF" "run step passes pr-number and head-sha into the invocation" \
     "inputs.pr-number" "inputs.head-sha" "PR_NUMBER" "HEAD_SHA"
+  # The agent has no shell: the workflow fetches the PR context and diff and
+  # posts the agent's final answer, so the review never depends on a permission
+  # prompt that headless CI cannot answer.
+  verify_grep AC-024-02-05 "$SHARED_WF" "workflow supplies the PR context and diff" \
+    'gh pr view "$PR_NUMBER"' 'gh pr diff "$PR_NUMBER"' '.pr-review/pr.diff'
+  verify_grep AC-024-02-05 "$SHARED_WF" "workflow posts the agent's answer" \
+    'gh pr comment "$PR_NUMBER" --body-file -'
 fi
 
 echo ""

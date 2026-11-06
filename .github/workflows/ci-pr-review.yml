@@ -176,16 +176,26 @@ jobs:
           # The subshell + set +e wrapper is required because set -euo
           # pipefail (above) would exit the script before review_rc=$?
           # is reached when opencode returns non-zero.
+          # The agent has no shell (bash/edit denied): the workflow supplies
+          # the PR metadata and diff as files, and posts the agent's final
+          # answer as the review comment. That removes the permission-prompt
+          # failure mode entirely — headless CI auto-rejects any unmatched
+          # command — and keeps the token out of the agent's reach.
           # The task prompt carries only trusted, workflow-supplied values
           # (PR number, head SHA) — never PR-author-controlled content. The
-          # agent fetches the diff itself via its own allow-listed `gh`/`git`
-          # commands and is instructed (agents/pr-review.md §Untrusted content
-          # warning) to treat that content as data, never as instructions.
-          prompt="Review PR ${PR_NUMBER} at head ${HEAD_SHA}. Post your findings as one PR review comment via gh. End the comment with: Reviewed-SHA: ${HEAD_SHA}"
+          # agent is instructed (agents/pr-review.md §Untrusted content
+          # warning) to treat the diff and PR body as data, never as
+          # instructions.
+          mkdir -p .pr-review
+          gh pr view "$PR_NUMBER" --json title,body,files,headRefOid,baseRefName,author > .pr-review/context.json
+          gh pr diff "$PR_NUMBER" > .pr-review/pr.diff
 
+          prompt="Review PR ${PR_NUMBER} at head ${HEAD_SHA}. Read .pr-review/context.json and .pr-review/pr.diff with the read tool. Return ONLY the review comment body, ending with: Reviewed-SHA: ${HEAD_SHA}"
+
+          review_log="$(mktemp)"
           review_output=$(set +e; /tmp/opencode-bin/opencode run --print-logs \
             --agent pr-review \
-            "${prompt}" 2>&1) && review_rc=0 || review_rc=$?
+            "${prompt}" 2>"$review_log") && review_rc=0 || review_rc=$?
 
           if [ "$review_rc" -ne 0 ]; then
             # Provider-side failures are not code defects: a billing issue, a
@@ -195,12 +205,28 @@ jobs:
             # required check for a comment-only advisory review. The guard's
             # contract is "skip with a warning, never fail the PR on provider
             # availability".
-            if echo "$review_output" | sed 's/\x1b\[[0-9;]*m//g' | grep -qiE 'spending limit|quota exceeded|billing|rate.limit|429|402|insufficient balance|model unavailable|model not found|unknown model|no such model|stream error|invalid credential|invalid api key|unauthorized|authentication|401'; then
+            if { cat "$review_log"; printf '%s\n' "$review_output"; } | sed 's/\x1b\[[0-9;]*m//g' | grep -qiE 'spending limit|quota exceeded|billing|rate.limit|429|402|insufficient balance|model unavailable|model not found|unknown model|no such model|stream error|invalid credential|invalid api key|unauthorized|authentication|401'; then
               echo "::warning::Review skipped — model provider unavailable, rejected the credential, or is over quota (exit ${review_rc}). Check DEEPSEEK_API_KEY (default provider) or OPENCODE_API_KEY (override provider). Not a code defect."
               exit 0
             fi
-            echo "$review_output"
+            echo "--- review log ---"
+            cat "$review_log"
+            printf '%s\n' "$review_output"
             exit "$review_rc"
           fi
 
-          echo "$review_output"
+          # Post the agent's answer verbatim as the review comment. An empty
+          # answer is a skip, not a failure: the review is advisory.
+          if [ -z "${review_output//[[:space:]]/}" ]; then
+            echo "::warning::Review skipped — the agent returned an empty comment."
+            exit 0
+          fi
+          # Accept the documented placeholder and substitute the real SHA.
+          review_output="${review_output//Reviewed-SHA: <head sha>/Reviewed-SHA: ${HEAD_SHA}}"
+          if ! grep -q "Reviewed-SHA: ${HEAD_SHA}" <<< "$review_output"; then
+            review_output="${review_output}
+
+Reviewed-SHA: ${HEAD_SHA}"
+          fi
+          printf '%s\n' "$review_output" | gh pr comment "$PR_NUMBER" --body-file -
+          echo "Posted the review comment for head ${HEAD_SHA}."
