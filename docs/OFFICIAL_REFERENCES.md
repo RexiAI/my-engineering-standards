@@ -33,6 +33,11 @@ describes behaviour from a different major version is a defect.
 | FastAPI | **0.143.1** | Python `>= 3.10` | [PyPI JSON API](https://pypi.org/pypi/fastapi/json) |
 | Rust | **1.99.0** (2026-10-01) | Edition **2024** | [Release announcement](https://blog.rust-lang.org/releases/latest/) · [releases.rs](https://releases.rs/) |
 | Vercel CLI | **64.5.0** (Apache-2.0 per the package manifest) | Node `>= 20` | [npm registry — vercel@64.5.0](https://registry.npmjs.org/vercel/64.5.0) |
+| Java | **21** (LTS) | JDK `21` toolchain — records, sealed types, virtual threads | [Java SE 21 documentation](https://docs.oracle.com/en/java/javase/21/) |
+| Go | **resolved from `go.mod`** — the module's `go` and `toolchain` lines are authoritative, not this table | per-module `go.mod` | [Go toolchains](https://go.dev/doc/toolchain) |
+| React Native | **0.88.1** | Node `^22.13.0`, `^24.3.0`, `>= 26.0.0`; React peer `^19.3.0` | [npm registry — react-native@0.88.1](https://registry.npmjs.org/react-native/0.88.1) |
+
+**Added 2026-11-01 (spec 042):** the `Java`, `Go`, and `React Native` rows above were added on `2026-11-01`; the pre-existing rows keep the document's `2026-10-15` retrieval date.
 
 ### Support windows worth knowing
 
@@ -67,6 +72,9 @@ Short idiomatic code snippets are fine.
 | FastAPI | MIT | MIT |
 | Rust | Dual MIT / Apache-2.0 | Books under CC-BY; see [doc.rust-lang.org](https://doc.rust-lang.org/) |
 | Vercel CLI | **Apache-2.0** (`"license":"Apache-2.0"` in the package manifest) | Not reproduced — links only |
+| Java | — | Not reproduced — links only |
+| Go | — | Not reproduced — links only |
+| React Native | — | Not reproduced — links only |
 
 ---
 
