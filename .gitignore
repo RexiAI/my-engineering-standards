@@ -13,6 +13,12 @@ reports/
 *~
 .env
 .env.local
+
+# Spec 042: every dotenv variant is local state, not just .env / .env.local.
+# The committed templates stay trackable — config/model.local.env.example,
+# config/agent.local.env.example, and templates/.envrc.example do not match
+# this pattern, and .envrc keeps its own entry below.
+.env.*
 .serena/
 
 # Per-machine model overrides for the spec pipeline (see docs/SPEC_PIPELINE.md
@@ -37,6 +43,11 @@ config/agent.local.env
 # .cache/judgment/).
 .cache/
 .cache/judgment/
+
+# Spec 042: rb_* are gate-run capture dumps (the raw stdout of a gate script,
+# kept while dogfooding record-gate-run.sh), not source — untracked and
+# ignored. runs.jsonl is deliberately NOT covered: it is the long-lived gate-run telemetry ledger written by scripts/record-gate-run.sh and stays tracked.
+rb_*
 
 # Local dogfooding scaffold — this repo's own agent/ and command/ symlinked in
 # for testing the spec pipeline against itself (docs/SPEC_PIPELINE.md). Child

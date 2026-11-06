@@ -122,3 +122,47 @@ setup_git_repo() {
   git -C "$dir" config user.name "Test"
   echo "$dir"
 }
+
+# md_section <file> <heading> [min-level [max-level]] — print the body of the
+# exact ATX heading line <heading>: the lines after it, up to (not including) the
+# next ATX heading whose level is within [min-level, max-level]. Both levels
+# default to the heading's own level. Exits 1 and prints nothing when the
+# heading is absent, so a caller can tell "no such section" from "empty body".
+#
+# Content assertions read a section, not a whole document, so text that lives in
+# a different section can never satisfy them. One extractor for every docs
+# assertion keeps the four shapes (whole section, section incl. subsections,
+# table rows, fenced blocks) from drifting apart.
+md_section() {
+  awk -v want="$2" -v lo="${3:-0}" -v hi="${4:-0}" '
+    function level(s) { match(s, /^#+/); return RLENGTH }
+    $0 == want {
+      if (lo == 0) lo = level($0)
+      if (hi == 0) hi = lo
+      found = 1; inside = 1; next
+    }
+    inside && /^#/ {
+      l = level($0)
+      if (substr($0, l + 1, 1) == " " && l >= lo && l <= hi) exit
+    }
+    inside { print }
+    END { if (!found) exit 1 }
+  ' "$1"
+}
+
+# make_skill <path> <name> <total-lines> — a valid SKILL.md fixture with an exact
+# total line count (frontmatter included — the metric scripts/check-skills.sh
+# measures). Shared by the line-cap cases so the fixture body cannot drift
+# between them.
+make_skill() {
+  local path="$1" name="$2" lines="$3" i
+  mkdir -p "$(dirname "$path")"
+  {
+    printf -- '---\n'
+    printf 'name: %s\n' "$name"
+    printf 'description: Fixture SKILL.md for the check-skills line-cap cases.\n'
+    printf -- '---\n'
+    for ((i = 5; i <= lines; i++)); do printf 'fixture body line %d\n' "$i"; done
+  } > "$path"
+  [ "$(wc -l < "$path")" -eq "$lines" ]
+}

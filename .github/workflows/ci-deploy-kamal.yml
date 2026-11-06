@@ -44,6 +44,7 @@ jobs:
   check-secrets:
     name: Check deployment prerequisites
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     outputs:
       deploy-ready: ${{ steps.check.outputs.deploy_ready }}
     steps:
@@ -69,6 +70,7 @@ jobs:
     needs: check-secrets
     if: needs.check-secrets.outputs.deploy-ready == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment:
       name: production
     steps:
@@ -130,6 +132,7 @@ jobs:
     needs: check-secrets
     if: needs.check-secrets.outputs.deploy-ready != 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Report skipped deployment
         run: |

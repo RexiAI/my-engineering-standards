@@ -1,0 +1,1 @@
+The design-principles gate failed (complexity) and 30-report.md is not green. The pipeline stops before any commit or push; nothing is committed, pushed, or deployed.

@@ -34,3 +34,25 @@ framework, with the ID in the test name:
 
 The ID is what `scripts/check-scenario-traceability.sh` greps for
 (`docs/spec-pipeline/rationale.md §Why no scenario mutation`).
+
+## Ambiguity — `BLOCKED`
+
+Acceptance criteria must be checkable by reading code. When the informal spec
+cannot be turned into checkable criteria for a task — mutually exclusive
+requirements, or a missing decision that could only be filled by guessing — the
+Specifier emits exactly one line:
+
+```
+BLOCKED — <one specific question>
+```
+
+Do not guess. It writes neither `10-tasks.md` nor `20-acceptance/` on that
+path and stops. The `BLOCKED` path is conditioned on criteria that cannot be
+made checkable; a spec whose criteria can be made checkable still produces both
+artifacts.
+
+In autopilot, `docs/SPEC_PIPELINE.md §Autopilot mode` converts the stop into
+"choose the documented default, record it, continue": the Specifier chooses the
+most conservative reversible default, records it in `45-decisions.md`, and
+produces both artifacts. `agents/spec-specifier.md` carries the same rule, so
+the stage file and the agent do not disagree.
