@@ -1,3 +1,10 @@
+# [1.55.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.54.0...v1.55.0) (2026-11-08)
+
+
+### Features
+
+* **voice:** voice console (spec 044) ([#123](https://github.com/RexiAI/my-engineering-standards/issues/123)) ([5911249](https://github.com/RexiAI/my-engineering-standards/commit/59112495956f3de21b13b28d3eede7c9c52365fd))
+
 # [1.54.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.53.0...v1.54.0) (2026-11-06)
 
 
