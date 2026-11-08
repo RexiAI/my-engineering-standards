@@ -8,18 +8,32 @@ import { createClient, createPartFilter } from "./opencode-client.mjs";
 import { createSpeaker, readScript, speakDeferredWindow, speakWindow } from "./narrate.mjs";
 import { withTimeout } from "./timeout.mjs";
 
-const REPLY_TIMEOUT_MS = 1500;
+// A real assistant turn can take tens of seconds to emit `idle`; the window is
+// a fail-open guard against a dead stream, not a latency budget. Default 120 s,
+// overridable with VOICE_REPLY_TIMEOUT_MS (positive integer, ignored otherwise).
+const DEFAULT_REPLY_TIMEOUT_MS = 120000;
+
+export function resolveReplyTimeoutMs(value) {
+  if (value === undefined || !/^\d+$/.test(String(value))) return DEFAULT_REPLY_TIMEOUT_MS;
+  const ms = Number(value);
+  return ms > 0 ? ms : DEFAULT_REPLY_TIMEOUT_MS;
+}
+
+const REPLY_TIMEOUT_MS = resolveReplyTimeoutMs(process.env.VOICE_REPLY_TIMEOUT_MS);
 
 function createReplyCollector(session, ledger, onNotice) {
   const filter = createPartFilter({ session });
   const chunkers = new Map();
   let sentences = [];
   let waiter = null;
+  let idle = false;
 
   function deliver() {
+    idle = true;
     if (!waiter) return;
     const resolve = waiter;
     waiter = null;
+    idle = false;
     resolve(sentences);
     sentences = [];
   }
@@ -41,6 +55,15 @@ function createReplyCollector(session, ledger, onNotice) {
       for (const sentence of chunker.feed(accepted.delta)) sentences.push(sentence);
     },
     nextTurn() {
+      // A fast turn can emit text and `idle` before sendPrompt() resolves. The
+      // buffered turn is handed to the first nextTurn() instead of waiting for
+      // an idle that already happened.
+      if (idle) {
+        idle = false;
+        const buffered = sentences;
+        sentences = [];
+        return Promise.resolve(buffered);
+      }
       return new Promise((resolve) => {
         waiter = resolve;
       });

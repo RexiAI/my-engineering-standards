@@ -1,7 +1,8 @@
 #!/usr/bin/env bats
 # voice-console.bats — acceptance suite for spec 044 (voice console).
 #
-# Every scenario in specs/044-voice-console/20-acceptance/ appears exactly once
+# Every scenario in the 044 acceptance set — the live spec folder before stage
+# 5d, docs/changes/044-voice-console.md after it — appears exactly once
 # as `@test "AC-044-NN-MM: ..."`. The suite is hermetic: file modes only, the
 # fake opencode server binds 127.0.0.1, and every write lands in $TMPDIR_HELPER
 # or a temp OPENCODE_CONFIG_DIR. Device paths are exercised with stub binaries
@@ -15,6 +16,14 @@ VOICE="$REPO_ROOT/scripts/voice"
 TESTS="$REPO_ROOT/scripts/tests"
 NODE_BIN="$(command -v node)"
 PYTHON_BIN="$(command -v python3 || true)"
+
+# The acceptance IDs live in the live spec folder before stage 5d and in the
+# archived one-pager after it (archive-spec.sh copies the `## AC-044-NN-MM`
+# headings verbatim). Resolve the live folder first, the archive second, so the
+# citation check holds on the branch and on main after merge — same source
+# choice as scripts/tests/ac-041-audit-record.bats.
+SPEC_IDS_DIR="$REPO_ROOT/specs/044-voice-console/20-acceptance"
+SPEC_IDS_ARCHIVE="$REPO_ROOT/docs/changes/044-voice-console.md"
 
 setup() {
   setup_tmpdir
@@ -438,6 +447,7 @@ policy_run() {
   printf 'n\n' > "$TMPDIR_HELPER/script"
   start_server "$events" "$record"
   voice_split --mode control --session ses_parent --tts-engine silent \
+    --audio-out "file:$TMPDIR_HELPER/audio" \
     --input-script "$TMPDIR_HELPER/script" \
     --opencode-url "http://127.0.0.1:$SERVER_PORT" --artifacts "$TMPDIR_HELPER/run"
   [ "$status" -eq 0 ]
@@ -1115,6 +1125,7 @@ SH
   start_server "$events" "$record" --reply-events "$replies"
   voice_split --mode converse --session ses_parent --audio-in "file:$TMPDIR_HELPER/two.wav" \
     --asr "file:$TMPDIR_HELPER/transcript.txt" --tts-engine silent \
+    --audio-out "file:$TMPDIR_HELPER/audio" \
     --opencode-url "http://127.0.0.1:$SERVER_PORT" --artifacts "$TMPDIR_HELPER/run"
   [ "$status" -eq 0 ]
   [ "$(wc -l < "$record")" -eq 1 ]
@@ -1886,8 +1897,13 @@ write_question_events() {
 # --- AC-044-15: bats acceptance suite ---------------------------------------
 
 @test "AC-044-15-01: every scenario is cited exactly once" {
-  grep -rhoE '^## (AC-044-[0-9]{2}-[0-9]{2})' "$REPO_ROOT/specs/044-voice-console/20-acceptance" \
-    | sed -E 's/^## //' | sort > "$TMPDIR_HELPER/spec-ids.txt"
+  if [ -d "$SPEC_IDS_DIR" ]; then
+    grep -rhoE '^## (AC-044-[0-9]{2}-[0-9]{2})' "$SPEC_IDS_DIR" \
+      | sed -E 's/^## //' | sort > "$TMPDIR_HELPER/spec-ids.txt"
+  else
+    grep -oE '^## (AC-044-[0-9]{2}-[0-9]{2})' "$SPEC_IDS_ARCHIVE" \
+      | sed -E 's/^## //' | sort > "$TMPDIR_HELPER/spec-ids.txt"
+  fi
   grep -oE '^@test "AC-044-[0-9]{2}-[0-9]{2}:' "$REPO_ROOT/scripts/tests/voice-console.bats" \
     | sed -E 's/^@test "//; s/:$//' | sort > "$TMPDIR_HELPER/test-ids.txt"
   cmp "$TMPDIR_HELPER/spec-ids.txt" "$TMPDIR_HELPER/test-ids.txt"
