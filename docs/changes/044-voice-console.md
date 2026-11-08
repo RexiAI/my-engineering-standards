@@ -1,3 +1,745 @@
+# 044-voice-console
+
+> Spec pipeline archive. Original source: `specs/044-voice-console/` (deleted by this script).
+> Archived: 2026-11-08
+
+## Original ask
+
+# Voice console for the spec pipeline
+
+## Problem
+
+The spec pipeline is text-only. Every interaction with it — asking what stage a spec
+reached, reading why the Verifier blocked, approving the human gate — means reading
+markdown in a terminal. That is fine at a desk and useless when the operator is
+away from the screen, mid-task, or visually occupied.
+
+Kyutai's Pocket TTS (`https://github.com/kyutai-labs/pocket-tts`) makes local,
+CPU-only, ~200 ms-first-chunk speech output cheap: no GPU, no cloud TTS bill, MIT
+code, ~100M params (English variants down to 1.9M), and a streaming Python API with
+a cancellation `threading.Event`.
+
+We want a voice console on top of opencode's v2 HTTP API so the operator can hear
+the pipeline and, with an explicit opt-in, answer its gates by voice.
+
+## What we want
+
+A local voice bridge that speaks pipeline output through Pocket TTS and accepts
+spoken input through local speech recognition, driving an opencode session whose
+agent is the spec pipeline.
+
+Two capabilities, deliberately separable:
+
+1. **Narrate (output only).** Speak the orchestrator's assistant text as it streams.
+   No microphone, no speech recognition, no consent surface. Useful on its own.
+2. **Converse (input + output).** Capture speech, transcribe locally, send the
+   transcript to the session, speak the reply. Read-only by default.
+3. **Gated control (opt-in).** Surface `question.asked` and `permission.asked`
+   events as spoken questions with numbered options, and reply to them by voice.
+   Mutating actions (starting `/spec` or `/build`, approving a push) require a
+   second confirmation in the terminal UI, not voice alone.
+
+## Decisions already taken (defaults; flag if wrong)
+
+- **Speech recognition runs locally.** `docs/MEDIA_AGENTS.md` documents that a
+  Token-Plan `sk-sp-` key cannot upload a local audio file, so `bl speech
+  recognize` cannot transcribe a microphone recording without a standard `sk-` key.
+  Local ASR is the default; the Bailian path stays an optional fallback for
+  URL/long audio only.
+- **Read-only by default.** Control is behind an explicit flag, never the default.
+- **One narrator voice.** Per-subagent voice personas are out of scope.
+- **Speech budget.** At most 3 sentences or ~45 seconds per turn by default; the
+  operator can ask for the rest.
+- **Speak the orchestrator, not the swarm.** Only top-level assistant text in the
+  parent session is spoken. Subagent chatter arrives as subtask parts and is
+  suppressed.
+
+## Constraints
+
+- **Opt-in install.** Follow the precedent of spec 040: the agent and the bridge are
+  installed into the user's global opencode config by an explicit installer
+  (`make install-voice`), not loaded by default in every child repo.
+- **No new default test dependency.** Python, PyTorch, and Pocket TTS are an
+  optional runtime; the repo's `make test` must stay green without them. Smoke
+  tests are structural and download no model weights.
+- **No pinned model ids.** The new agent must not carry a `model:` frontmatter key
+  (ADR 0011); model choice resolves through the existing per-machine mechanism.
+- **Never-list stays absolute.** The bridge must refuse merge, git tag, push to
+  main/master, force-push, branch deletion, gate-threshold change, secret
+  creation/rotation, writes outside the target repo, and `git init`/submodule
+  scaffolding — enforced in code before any API call, not by prompt wording.
+- **No realtime duplex.** Pocket TTS is not a conversational model and has no ASR.
+  The console is half-duplex with voice-activity endpointing. Claiming full duplex
+  would be a lie.
+- **Headless-safe.** This development shell has no sound card (`arecord -l` reports
+  no capture devices). Every audio path must have a file-based mode so it can be
+  exercised in CI and on a headless host; real device audio is verified on the
+  operator's desktop.
+- **Licensing.** The repository is MIT; model weights carry their own Hugging Face
+  card terms and a prohibited-use clause on voice cloning. Do not redistribute
+  weights as part of this repo.
+
+## Scope boundary
+
+In scope: the TTS worker, the bridge (microphone, endpointing, ASR, opencode client,
+sentence chunking, playback, cancellation), the read-only concierge agent, the
+opt-in installer, the operator documentation, and the structural smoke test.
+
+Out of scope: wake-word detection, full-duplex barge-in conversation, per-agent
+voices, word-level timestamp highlighting, any cloud TTS/ASR service, and any
+change to the spec pipeline's own stages or gates.
+
+## Open questions for the reviewer
+
+- Which local ASR engine: `faster-whisper` (CTranslate2, int8) or `sherpa-onnx`?
+  Pick one as the shipped default; the other stays a documented alternative.
+- Should the concierge be a **separate primary agent** (`voice-concierge`,
+  read-only, short spoken answers) or reuse `spec-pipeline` with a spoken-answer
+  system prompt? A separate agent keeps the read-only guarantee structural.
+- For gated control, does the terminal confirmation happen before the bridge
+  replies, or does the bridge reply and the terminal confirm asynchronously?
+  The first is safer; the second is smoother.
+
+## Tasks
+
+# 044 — Voice console: tasks
+
+Context (facts from the repo, not requirements): `agents/*.md` is symlinked into
+every child repo's `.opencode/agents`, so anything placed there loads by default;
+spec 040 (accepted at its human gate) establishes `agents-optional/` as the
+opt-in location and `scripts/media/install.mjs` as the installer shape.
+`scripts/check-orchestration.sh` scans only `agents/` and `commands/` at
+`maxdepth 1`; `scripts/check-agent-models.sh` scans only `agents/` and
+`.opencode/agents`. Shell tests live in `scripts/tests/*.bats` and run under
+`make test-scripts`; `scripts/check-bats-assertions.sh` rejects vacuous
+assertions. `docs/GOVERNANCE.md` §Agent-to-tier mapping is validated by
+`scripts/check-governance.sh`, which requires rows shaped
+`| \`agent-name\` |` and refuses any `**T3**` assignment. The dev shell has no
+capture device, and `make test` must stay green with no Python, PyTorch, or
+Pocket TTS installed.
+
+Three deliverables are the point: the TTS worker, the bridge, and the read-only
+concierge agent — plus the opt-in installer, operator docs, and a structural
+smoke that downloads no model weights.
+
+## Interface decisions taken by the Specifier (veto at review)
+
+The informal spec fixes intent but not wire-level detail. Every value below is
+needed to make an acceptance criterion checkable; each is recorded here so the
+human gate can veto one line instead of re-reading a scenario set.
+
+| # | Decision | Value | Basis |
+|---|---|---|---|
+| D1 | Concierge agent location | `agents-optional/voice-concierge.md` | "not loaded by default in every child repo" + spec 040's accepted `agents-optional/` folder |
+| D2 | Concierge is its own agent (00-informal OQ2) | separate agent, read-only, `mode: primary` | Scope boundary names "the read-only concierge agent" as a deliverable; a separate agent is the only way the read-only guarantee is structural |
+| D3 | Gated-control ordering (00-informal OQ3) | terminal confirmation **before** the bridge replies; timeout or EOF ⇒ no reply sent | "not voice alone" + "the first is safer"; fail-closed is the only reading that makes the never-list enforceable in code |
+| D4 | Modes | `--mode narrate\|converse\|control`, default `narrate` | The three capabilities named in "What we want"; control is the opt-in flag |
+| D5 | Exit codes | `0` ok, `2` usage, `3` missing runtime/dependency, `4` policy refusal, `5` upstream/transport | Needed so "refused in code" is observable, not prose |
+| D6 | Speech budget | 3 sentences **and** 45 s, seconds estimated at 2.5 words/s | "at most 3 sentences or ~45 seconds per turn"; whole sentences only, never split mid-sentence |
+| D7 | Voice-activity endpointing | 16 kHz mono s16le; RMS threshold 500; ≥300 ms speech starts an utterance; 800 ms silence ends it; 30 s force-split | Half-duplex with endpointing is required; these constants make it testable on synthetic WAVs |
+| D8 | CI audio test double | `--tts-engine silent` (no third-party imports) plus `tts-worker.py --self-check` | "Every audio path must have a file-based mode"; "smoke tests are structural and download no model weights" |
+| D9 | Run artifacts | `--artifacts DIR` (default `.cache/voice/runs/<runId>`) holding `ledger.jsonl` and `audio/NNNN.wav` | The only way a spoken turn can be asserted in CI without a sound card |
+| D10 | Local command words | `more`, `stop`, `repeat` — consumed by the bridge, never sent to the session | "the operator can ask for the rest" needs a concrete trigger |
+| D11 | Never-list rule ids | `merge`, `tag`, `push-main`, `force-push`, `delete-branch`, `gate-threshold`, `secret-rotate`, `write-outside-repo`, `git-init` | Nine items in the informal never-list sentence; ids let each be asserted separately |
+| D12 | Session binding | `--session <id>` required for `narrate` and `control`; optional for `converse`, where it creates a session with `--agent` (default `voice-concierge`) | "Speak the orchestrator, not the swarm" requires naming the parent session |
+| D13 | HTTP surface | One mapping table in `docs/VOICE_CONSOLE.md §API mapping`; `scripts/voice/opencode-client.mjs` is its only implementation and `scripts/tests/voice-fake-server.mjs` its executable contract | The repo carries no v2 API doc; a single table keeps a shape correction to one place (see Q2) |
+| D14 | Artifact retention | never pruned by the bridge; the operator deletes `.cache/voice/` | Retention policy is not in the informal spec; doing nothing is the reversible choice |
+
+## Task 1 — CLI surface, configuration resolution, run artifacts
+
+`scripts/voice/voice-console.mjs` (entry point) and `scripts/voice/config.mjs`.
+
+- Both files exist and pass `node --check`.
+- `--help` exits 0 and lists the three modes and the five exit codes.
+- `--print-config` prints exactly one JSON object to stdout, exits 0, opens no
+  socket, loads no model, and writes no file.
+- The printed object carries the keys `mode`, `control`, `session`, `agent`,
+  `opencodeUrl`, `audioIn`, `audioOut`, `asr`, `tts`, `budget`, `artifacts`,
+  `modelCache`. `budget` is `{"maxSentences":3,"maxSeconds":45,"wordsPerSecond":2.5}`;
+  `modelCache` is `.cache/voice/models`.
+- Precedence per option is flag > `VOICE_*` environment variable > default. The
+  env names are `VOICE_MODE`, `VOICE_OPENCODE_URL`, `VOICE_SESSION`,
+  `VOICE_ASR_ENGINE`, `VOICE_ARTIFACTS_DIR`.
+- `--mode` accepts only `narrate`, `converse`, `control`; anything else exits 2
+  with the accepted values named on stderr and nothing on stdout.
+- `--max-sentences` accepts integers ≥ 1 only; `0`, `-1`, `abc`, and a missing
+  value each exit 2.
+- `narrate` with any audio-input flag, and `narrate` or `control` without
+  `--session`, exit 2 before any socket or child process is created.
+- An unknown flag exits 2, names the flag on stderr, and prints nothing on
+  stdout.
+- `--artifacts DIR` creates `DIR/ledger.jsonl` and `DIR/audio/` on first write
+  only, and never writes outside `DIR`.
+- `ledger.jsonl` records are one JSON object per line with keys `seq` (1-based,
+  contiguous, no gaps), `kind`, `turn`, `text`, `rule`, `detail`. `kind` is one
+  of `spoken`, `deferred`, `resumed`, `prompt-sent`, `reply-sent`, `refused`,
+  `pending`, `ignored`, `skipped-utterance`, `cancelled`, `nothing-more`.
+- No ledger record contains a wall-clock timestamp or a process id.
+- Scenarios: AC-044-01.
+
+## Task 2 — Never-list policy module
+
+`scripts/voice/policy.mjs`: a pure classifier, no I/O.
+
+- Exports `RULES` (array of the nine ids from D11, in that order),
+  `classify(intent)`, and a CLI: `node policy.mjs --intent '<json>'` prints one
+  JSON object `{"blocked":bool,"rule":string|null,"requiresConfirmation":bool}`
+  and exits 0 whether or not the intent is blocked.
+- The module imports nothing from `node:fs`, `node:net`, `node:http`, or
+  `node:https`, and contains no `fetch(` call.
+- `intent` shape: `{"tool":"bash"|"edit"|"write"|"read"|"grep"|"glob"|string,
+  "command":string|null,"paths":string[],"repoRoot":string}`.
+- `merge` blocks any bash command matching `gh pr merge`, `glab mr merge`, or
+  `git merge`.
+- `tag` blocks `git tag` (any subcommand) and `gh release create`.
+- `push-main` blocks `git push` whose arguments contain a whole token equal to
+  `main`, `master`, `refs/heads/main`, `refs/heads/master`, a refspec ending in
+  `:main`/`:master`, or one of `--all`, `--mirror`.
+- `force-push` blocks `git push` with `-f`, `--force`, `--force-with-lease`, or a
+  refspec beginning with `+`.
+- `delete-branch` blocks `git branch -d`/`-D`, `git push --delete`, and a
+  `git push` refspec of the form `:branch`.
+- `gate-threshold` blocks any edit/write whose path matches
+  `**/check-code-principles.sh`, `**/pmd*.xml`, `**/*golangci*.yml`,
+  `**/.eslintrc*`, `**/stryker.conf.json`, `**/mutation.mk`,
+  `**/pitest-profile.xml`, or `**/mutmut-pyproject.toml`.
+- `secret-rotate` blocks `gh secret`, `glab variable`, `security add-generic-password`,
+  and any edit/write to `config/agent.local.env`, `config/model.local.env`, or
+  `.envrc`.
+- `write-outside-repo` blocks any edit/write path whose realpath-joined form is
+  not under `repoRoot`; a `..` segment or a symlink escaping the root is blocked.
+- `git-init` blocks `git init`, `git submodule add`, and `git submodule update
+  --init`.
+- Matching is case-insensitive and collapses runs of whitespace in `command`;
+  `command` is split on whitespace before token comparison, so `git  push` and
+  `GIT PUSH` behave identically to the single-space lower-case form.
+- A `read`/`grep`/`glob` intent is never blocked and never requires
+  confirmation.
+- An unknown tool with no command and no paths returns `blocked:false`,
+  `rule:null`, `requiresConfirmation:true`.
+- Classification has no filesystem side effect: after any call the working tree
+  is byte-identical.
+- Scenarios: AC-044-02.
+
+## Task 3 — Enforcement at the outbound boundary
+
+`scripts/voice/guard.mjs`, used by every mode that can reply.
+
+- `guard.authorize(intent)` calls `policy.classify`; a blocked result throws a
+  `PolicyRefusal` carrying `rule`, which the caller prints as
+  `refused: <rule>` and turns into exit 4 when nothing else remains to do.
+- A blocked action is never sent: with the fake server recording requests, a
+  blocked permission reply produces zero recorded requests.
+- A never-list refusal is not overridable: no flag (`--yes`, `--force`,
+  `--confirm all`) changes the outcome. `--yes` is not a recognised flag and
+  exits 2 as an unknown flag.
+- `opencode-client.mjs` exports the only reply-sending function in the
+  codebase; `control.mjs` is its only caller, and it calls `guard.authorize`
+  immediately before each send (grep-checkable: no other module imports the
+  reply function).
+- The installer (`scripts/voice/install.mjs`) does not route through the guard —
+  it writes only to `$OPENCODE_CONFIG_DIR`, and Task 14 asserts that scope
+  directly.
+- For a non-blocked mutating tool (`bash`, `edit`, `write`), the guard returns
+  `requiresConfirmation:true`; the caller sends only after a terminal `y`.
+- For a non-blocked read-only tool (`read`, `grep`, `glob`), the guard returns
+  `requiresConfirmation:false`; the caller may send on a spoken yes.
+- Scenarios: AC-044-03.
+
+## Task 4 — Pocket TTS worker
+
+`scripts/voice/tts-worker.py` — a streaming, cancellable speech worker driven
+over JSONL on stdin/stdout.
+
+- `--self-check` prints one JSON object with keys `python`, `pocket_tts`,
+  `torch`, `sample_rate`; exits 0 whether or not the optional packages are
+  importable; performs no network access and downloads nothing.
+- `--engine silent` imports no third-party module (no top-level `import torch`,
+  no `import pocket_tts`) and synthesises a WAV from text alone.
+- Output is 24 kHz mono 16-bit PCM WAV unless `--sample-rate` overrides it.
+- Request protocol: one JSON object per stdin line, `{"id","text","out"}`.
+  Response events on stdout, one JSON object per line: `{"id","event":"start"}`,
+  then one or more `{"id","event":"chunk","bytes":N}`, then
+  `{"id","event":"done","path","durationMs","sampleRate","cancelled":false}`.
+- Empty `text` or a missing `id` yields
+  `{"id":...,"event":"error","code":"bad-request","message":...}` and the worker
+  stays alive for the next request.
+- `{"event":"cancel","id":"<id>"}` cancels that request: the worker emits `done`
+  with `cancelled:true` and stops writing within 500 ms.
+- `SIGINT` cancels the in-flight request the same way and exits 0 within 2 s.
+  The cancellation mechanism is a `threading.Event`, per the Pocket TTS API.
+- `--engine pocket-tts` when the package is absent emits
+  `{"event":"error","code":"missing-runtime"}` and exits 3.
+- `durationMs` equals `frames * 1000 / sampleRate` within 1 ms.
+- The worker never opens an audio device: no `sounddevice`, `pyaudio`, or
+  playback `subprocess` in the file; it writes only to the `out` path it is
+  given.
+- Scenarios: AC-044-04.
+
+## Task 5 — Sentence chunking and the speech budget
+
+`scripts/voice/chunk.mjs`.
+
+- `splitSentences(text)` returns whole sentences with their terminator retained.
+- A boundary exists at `!` or `?` followed by whitespace or end of text.
+- A boundary exists at `.` followed by whitespace or end of text, except when
+  the preceding token is one of `e.g`, `i.e`, `etc`, `vs`, `Dr`, `Mr`, `Mrs`,
+  `Ms`, `No`, `Fig`, `cf`, or when the period sits between two digits.
+- `Pi is 3.14 exactly.` is one sentence; `Hello there. Next one!` is two.
+- `takeWindow(sentences, budget)` returns `{spoken, deferred, estimatedSeconds}`;
+  `spoken.length <= maxSentences`; whole sentences only — no sentence is ever
+  truncated.
+- `estimatedSeconds` is the spoken word count divided by `wordsPerSecond`;
+  words are whitespace-separated non-empty tokens.
+- Sentences are added while the running estimate stays at or below
+  `maxSeconds`; the first sentence is always included even when it alone
+  exceeds the estimate.
+- Feeding the deferred remainder to a second `takeWindow` with the same budget
+  yields the next window; repeated calls eventually return an empty `spoken`
+  with a non-empty `deferred` of length 0.
+- The chunker is a deterministic pure module: same input, identical output,
+  no I/O imports.
+- Streaming: `feed(delta)` returns only sentences completed by that delta;
+  `finish()` flushes the remainder as one sentence; text already returned is
+  never returned twice when the same source part grows.
+- Scenarios: AC-044-05.
+
+## Task 6 — opencode client and the parent-only event filter
+
+`scripts/voice/opencode-client.mjs` and the test double
+`scripts/tests/voice-fake-server.mjs`.
+
+- The client's HTTP surface is the table in
+  `docs/VOICE_CONSOLE.md §API mapping`; the fake server implements exactly that
+  table and nothing else.
+- `connect()` subscribes to the event stream and dispatches newline-delimited
+  JSON events.
+- A text part is spoken only when all four hold: its `sessionID` equals the
+  configured parent session, the cached role for its `messageID` is
+  `assistant`, its `type` is `text`, and it carries no subtask marker
+  (`type: "subtask"`, `synthetic: true`, or a non-empty `parentID`).
+- Parts from another session, user-role parts, subtask parts, and non-text
+  parts are dropped before the chunker and leave no ledger record.
+- A part that is re-sent with a longer `text` yields only the delta; the already
+  spoken prefix is not spoken again.
+- `sendPrompt(sessionID, text)` issues exactly one request carrying the text as
+  a single text part; the fake server's recording shows the verbatim text and no
+  second request.
+- `sendReply(kind, id, body)` issues exactly one request per call to the
+  documented reply path for that kind (`question`, `permission`).
+- A non-2xx response is retried once after 250 ms, then the process exits 5 with
+  the status and path on stderr; no ledger record claims success.
+- Stream reconnect: three attempts with 500 ms base backoff, then exit 5.
+- `--dry-run` prints the requests it would send as JSONL on stdout and opens no
+  socket.
+- The fake server takes `--events FILE`, `--record FILE`, `--port 0`; prints
+  exactly `LISTENING <port>` on stdout; appends one JSON object per received
+  request to the record file; exits 0 on `SIGTERM`.
+- Scenarios: AC-044-06.
+
+## Task 7 — Audio capture and voice-activity endpointing
+
+`scripts/voice/audio-in.mjs`, with the deterministic fixture writer
+`scripts/tests/voice-fixtures.mjs`.
+
+- `voice-fixtures.mjs` exports `toneMs(ms, {freq, amplitude})`,
+  `silenceMs(ms)`, and `wav({sampleRate, channels, samples})`; identical
+  arguments produce byte-identical output.
+- `--audio-in file:PATH` reads a 16 kHz mono s16le WAV and emits utterances
+  through one callback.
+- Endpointing per D7: RMS threshold 500; speech is ≥ `--min-utterance-ms`
+  (default 300) of supra-threshold samples; an utterance ends after
+  `--silence-ms` (default 800) of sub-threshold samples; a run longer than
+  `--max-utterance-ms` (default 30000) is force-split into equal parts.
+- A fixture of `tone(500) + silence(900) + tone(500) + silence(900)` yields
+  exactly two utterances, each within one frame of the 500 ms tone length.
+- Leading and trailing silence produce no utterance.
+- A 100 ms blip is dropped, not emitted.
+- Continuous speech longer than `--max-utterance-ms` yields
+  `ceil(total/max)` utterances, none shorter than `--min-utterance-ms`.
+- `--audio-in device` spawns `arecord -f S16_LE -r 16000 -c 1 -t raw` and
+  funnels its stdout through the same endpointing path as file mode.
+- When `arecord` is absent, `--audio-in device` exits 3, names `arecord` on
+  stderr, and writes no ledger record.
+- File mode spawns no child process.
+- Scenarios: AC-044-07.
+
+## Task 8 — Local speech-recognition adapter
+
+`scripts/voice/asr.mjs`.
+
+- Engine resolution: `--asr-engine` > `VOICE_ASR_ENGINE` > `ASR_DEFAULT_ENGINE`
+  exported from `scripts/voice/config.mjs`.
+- The accepted set is exactly `["faster-whisper","sherpa-onnx"]`; any other
+  value exits 2 and lists both on stderr.
+- `--asr file:PATH` bypasses every engine: line N of the file is the transcript
+  of utterance N. Blank lines are ignored; an utterance with no available line
+  is skipped with ledger `kind: "skipped-utterance"`.
+- A transcript line that is empty after trimming produces no prompt and no
+  ledger `prompt-sent` record.
+- No cloud path: the module contains no `http://` or `https://` literal and
+  spawns no `bl` process.
+- With a real engine selected and its package absent, the adapter exits 3 with
+  `missing-runtime` and the engine name before reading any audio.
+- `--print-config` reports `asr.engine` and `asr.kind` (`file` or `local`), and
+  `modelCache` as `.cache/voice/models`.
+- `docs/VOICE_CONSOLE.md` names the same engine as `ASR_DEFAULT_ENGINE`
+  (single-source consistency; the value itself is open question Q1).
+- Scenarios: AC-044-08.
+
+## Task 9 — Playback and cancellation
+
+`scripts/voice/audio-out.mjs`.
+
+- `--audio-out file:DIR` writes `NNNN.wav` (four digits, starting at `0001`)
+  one file per utterance, in order, and creates `DIR` if absent.
+- Numbering continues across turns and never overwrites an existing file — a
+  pre-existing `0001.wav` makes the next write `0002.wav`.
+- File mode spawns no child process; a `ffplay` shim that exits 99 on `PATH`
+  does not affect it.
+- `--audio-out device` plays each file with
+  `ffplay -nodisp -autoexit -loglevel quiet <path>`; when `ffplay` is absent
+  the mode exits 3 naming `ffplay`.
+- `cancel()` stops the current playback within 500 ms (`SIGTERM`, then
+  `SIGKILL` after 1 s) and returns `{cancelled:true}`.
+- A new utterance while one is playing cancels the previous one — playback
+  depth is one — and the cancelled utterance is reported with reason
+  `superseded`.
+- Scenarios: AC-044-09.
+
+## Task 10 — Narrate mode
+
+`scripts/voice/narrate.mjs`, wired from `voice-console.mjs`.
+
+- Narrate constructs no capture adapter and no ASR adapter: an `arecord` shim
+  that exits 99 on `PATH` is never invoked, and the ledger contains no
+  `prompt-sent` or transcript record.
+- End-to-end, file-based: a fixture event stream with five parent sentences and
+  one subtask paragraph plus `--tts-engine silent --audio-out file:OUT`
+  produces exactly three `spoken` ledger records, one `deferred` record for the
+  remaining two sentences, three WAV files `0001`–`0003`, and no ledger text
+  from the subtask paragraph.
+- Ledger `seq` is contiguous from 1 and `turn` is 1 for every record of the
+  first turn.
+- `more` on `--input-script` speaks the deferred sentences as a second window
+  (`resumed` then `spoken` records); a second `more` after exhaustion records
+  `nothing-more` and writes no WAV.
+- `stop` cancels the in-flight utterance and writes a `cancelled` record; the
+  process keeps running and accepts a later turn.
+- `SIGINT` cancels the in-flight utterance, writes one `cancelled` record, and
+  exits 0 within 2 s; a second `SIGINT` exits 130.
+- When stdin is not a TTY and `--input-script` is absent, narrate ignores stdin,
+  never blocks on it, and exits 0 when the event stream ends.
+- Scenarios: AC-044-10.
+
+## Task 11 — Converse mode
+
+`scripts/voice/converse.mjs`.
+
+- End-to-end, file-based: a two-utterance WAV plus a two-line transcript file
+  produces two `prompt-sent` records in utterance order with the verbatim
+  transcript text, and two assistant replies spoken and recorded.
+- `turn` increments per utterance; records for one turn are contiguous in `seq`.
+- An utterance with an empty transcript writes `skipped-utterance` and sends no
+  prompt.
+- A four-sentence reply is spoken as three sentences with one deferred; `more`
+  speaks the fourth.
+- `--mode converse` without `--session` creates a session with `--agent`
+  (default `voice-concierge`) and records the returned session id in the ledger
+  `detail` of the first `prompt-sent` record.
+- Device capture with no capture device exits 3 naming `arecord`
+  (operator-verified; CI uses file mode).
+- Scenarios: AC-044-11.
+
+## Task 12 — Gated control (opt-in)
+
+`scripts/voice/control.mjs`.
+
+- `control` is reachable only via `--mode control`; in `narrate` and `converse`
+  a `question.asked` or `permission.asked` event writes `ignored` and sends
+  nothing.
+- `question.asked` with options: the bridge speaks the header followed by the
+  numbered option labels, and records one `spoken` ledger entry containing each
+  label.
+- A spoken answer matching `1`–`9` or a label (case-insensitive, punctuation
+  stripped) sends that option's label as the reply; an unmatched phrase
+  re-prompts once, then leaves the question `pending` with no reply.
+- A question with no options sends the trimmed transcript verbatim.
+- `permission.asked` whose intent classifies as read-only: a spoken `yes` sends
+  the reply without any terminal confirmation.
+- `permission.asked` whose intent classifies as mutating: the bridge speaks a
+  summary (tool plus command or paths) and sends nothing until a terminal `y`;
+  `n` sends nothing and records `refused` with rule `not-confirmed`; EOF or
+  `--confirm-timeout` (default 60 s) expiry records `pending` and sends nothing.
+- `permission.asked` whose intent is blocked is refused with its rule id, sends
+  no request, and is not overridable by a terminal `y`.
+- A spoken prompt whose trimmed text starts with `/` requires terminal
+  confirmation: `y` sends it, `n`/EOF sends nothing and records `refused` with
+  rule `not-confirmed`.
+- Terminal input comes from stdin, or from `--input-script FILE` which supplies
+  the same lines; `--input-script` never opens the microphone and never blocks.
+- Scenarios: AC-044-12.
+
+## Task 13 — Read-only concierge agent and governance row
+
+- `agents-optional/voice-concierge.md` exists at exactly that path.
+- Frontmatter has `description`, `mode: primary`, and no `model:` key.
+- Frontmatter permission block: `read: "*": allow`; `edit: "*": deny`;
+  `bash: "*": deny`; `task: "*": deny`.
+- The prompt states, in its own words, that the agent answers in at most three
+  sentences, that it never performs or claims to perform a mutation, and that it
+  says it is read-only when asked to change anything.
+- The prompt references `docs/VOICE_CONSOLE.md`, which exists (Task 16).
+- `docs/GOVERNANCE.md` gains one mapping-table row beginning
+  `` | `voice-concierge` | `` with trust tier **T0**, a frontmatter basis
+  naming the deny-all edit/bash/task grants, and no **T3** anywhere in the
+  table.
+- `scripts/check-governance.sh` exits 0 after the row is added.
+- `scripts/check-agent-models.sh` is not modified, and its scan set remains
+  `agents` and `.opencode/agents`; the no-pin guarantee for this file is
+  asserted by `scripts/voice/smoke.mjs` and by AC-044-13.
+- Scenarios: AC-044-13.
+
+## Task 14 — Opt-in installer, make targets, structural smoke
+
+`scripts/voice/install.mjs` and `scripts/voice/smoke.mjs`, mirroring
+`scripts/media/install.mjs`.
+
+- `install.mjs` copies `agents-optional/voice-concierge.md` to
+  `$OPENCODE_CONFIG_DIR/agents/voice-concierge.md` and every
+  `scripts/voice/*.mjs` plus `scripts/voice/tts-worker.py` to
+  `$OPENCODE_CONFIG_DIR/voice/`.
+- `OPENCODE_CONFIG_DIR` defaults to `~/.config/opencode`.
+- A second run is idempotent: exit 0 and an unchanged file set.
+- `--uninstall` removes exactly the installed paths and nothing else; a sentinel
+  file in the config dir survives.
+- `--dry-run` prints each destination path, one per line, and writes nothing.
+- A missing source file exits 3, names the missing path, and copies nothing.
+- With a temporary `HOME` and `OPENCODE_CONFIG_DIR`, no file is created outside
+  the config dir and no file is created under the temporary `HOME` except
+  through the config dir.
+- `make install-voice`, `make uninstall-voice`, and `make smoke-voice` invoke
+  the two scripts; all three appear in `.PHONY` and in `make help` output.
+- `scripts/voice/smoke.mjs` exits 0 and prints at least these lines:
+  `[OK] agent voice-concierge.md`, `[OK] policy refuses`, `[OK] install dry-run`,
+  one `[OK] <file> parses` per `.mjs`, and `[OK] print-config`.
+- Smoke performs no network access: the file imports no `node:http`/`node:https`
+  and contains no `fetch(` call; it downloads no model weights.
+- When `python3` is absent the smoke prints `[SKIP] tts-worker.py` and still
+  exits 0.
+- Scenarios: AC-044-14.
+
+## Task 15 — Bats acceptance suite
+
+`scripts/tests/voice-console.bats`.
+
+- The file exists and every scenario id `AC-044-*` in
+  `specs/044-voice-console/20-acceptance/` appears in exactly one
+  `@test "AC-044-NN-MM: ..."` name.
+- `scripts/check-scenario-traceability.sh` exits 0.
+- `scripts/check-bats-assertions.sh` exits 0.
+- `make test-scripts` passes on a machine with Node and no Python, PyTorch,
+  Pocket TTS, `arecord`, or `ffplay` installed: absent-runtime paths assert
+  exit 3, and only the operator-only device scenarios use `skip`.
+- No test opens a socket other than to `127.0.0.1`, and no test downloads a
+  model or writes outside `$TMPDIR_HELPER` or a temp `OPENCODE_CONFIG_DIR`.
+- Every test runs with `setup_tmpdir`/`teardown_tmpdir` from
+  `scripts/tests/test_helper.bash`.
+- Scenarios: AC-044-15.
+
+## Task 16 — Operator documentation, ADR, weight guard
+
+- `docs/VOICE_CONSOLE.md` exists and contains the headings `## Modes`,
+  `## Install`, `## Headless file modes`, `## Configuration`, `## Exit codes`,
+  `## Never-list`, `## Speech budget`, `## Speech recognition`,
+  `## Licensing and weights`, `## API mapping`, `## Troubleshooting`.
+- The document contains the word `half-duplex` and mentions full duplex only in
+  a sentence stating it is not supported or out of scope.
+- It states that audio never leaves the machine, that local ASR is the default,
+  and that the Bailian path is an optional fallback restricted to URL or long
+  audio and requiring a standard `sk-` key.
+- `## Licensing and weights` states that model weights are not redistributed
+  with this repository and names the Hugging Face model-card terms and the
+  prohibited-use clause on voice cloning.
+- `## Never-list` lists exactly the nine rule ids from `RULES`, in the same
+  order.
+- `## Exit codes` lists `0`, `2`, `3`, `4`, `5` with the meanings from D5.
+- `## Configuration` names the same env vars and defaults as `--print-config`.
+- `docs/adr/0026-voice-console.md` exists with status `Accepted` and sections
+  `Context`, `Decision`, `Consequences`; it references
+  `docs/adr/0007-media-agent-family.md` and
+  `docs/adr/0011-agent-model-agnostic-gate.md`.
+- `docs/adr/README.md` index lists 0026.
+- The Makefile `DOCS` list includes `docs/VOICE_CONSOLE.md`; `make validate`
+  passes.
+- Weight guard: `git ls-files` matches no `*.onnx`, `*.safetensors`, `*.pt`,
+  `*.ckpt`, `*.npz`, or `*.bin` path, and the configured model cache
+  (`.cache/voice/models`) sits under the already-gitignored `.cache/`.
+- `scripts/check-orchestration.sh` exits 0.
+- Scenarios: AC-044-16.
+
+## Open questions
+
+- **Q1 — default local ASR engine (from `00-informal.md`).** The informal spec
+  says "Pick one as the shipped default" without picking. Question for the
+  reviewer: `faster-whisper` or `sherpa-onnx`? Non-blocking: AC-044-08 asserts
+  single-source consistency (one constant, documented value equal to it) and a
+  one-line change pins the choice. Answering it adds one scenario asserting
+  `ASR_DEFAULT_ENGINE` equals the chosen engine.
+- **Q2 — live API fixture.** The repo carries no opencode v2 API reference.
+  Question: is a live `opencode serve` available on the operator's machine to
+  capture one real event stream into `scripts/tests/voice-fixture-events.jsonl`?
+  If yes, Task 6's mapping table must be pinned to that capture; if no, the
+  hand-written fixture in `scripts/tests/voice-fake-server.mjs` is the contract
+  of record. Non-blocking either way — the mapping lives in one table.
+- **Q3 — cross-spec ordering.** Task 13 places the agent in `agents-optional/`,
+  the folder spec 040 (accepted, not yet merged) creates; `agents/` still holds
+  `media-*.md` today. Question: if 040 is dropped or renames that folder before
+  either PR merges, should 044 create the directory itself (recorded default) or
+  wait and depend on 040? Non-blocking: creating it is additive and reversible.
+- **Q4 — spoken command vocabulary (D10).** `more` / `stop` / `repeat` are the
+  Specifier's choice for "the operator can ask for the rest". Question: does the
+  reviewer want different words, or keystroke-only control? Affects Task 10 and
+  Task 11 scenarios, which name the three words.
+
+## Acceptance scenarios
+
+## AC-044-01-01 — Help lists modes and exit codes
+## AC-044-01-02 — Print-config shape
+## AC-044-01-03 — Print-config is inert
+## AC-044-01-04 — Flag beats environment beats default
+## AC-044-01-05 — Unknown flag is a usage error
+## AC-044-01-06 — Invalid mode is a usage error
+## AC-044-01-07 — Sentence budget boundaries
+## AC-044-01-08 — Narrate and control require a parent session
+## AC-044-01-09 — Narrate rejects audio input
+## AC-044-01-10 — Ledger schema
+## AC-044-02-01 — Merge is blocked
+## AC-044-02-02 — Tag creation is blocked
+## AC-044-02-03 — Push to a protected branch is blocked
+## AC-044-02-04 — Force-push is blocked
+## AC-044-02-05 — Branch deletion is blocked
+## AC-044-02-06 — Gate-threshold edits are blocked
+## AC-044-02-07 — Secret creation and rotation are blocked
+## AC-044-02-08 — Writes outside the repository are blocked
+## AC-044-02-09 — Git scaffolding is blocked
+## AC-044-02-10 — Matching normalises case and whitespace
+## AC-044-02-11 — Read-only intents are allowed without confirmation
+## AC-044-02-12 — Unclassified intents require confirmation
+## AC-044-02-13 — Classification is pure
+## AC-044-03-01 — A blocked action is never sent
+## AC-044-03-02 — No flag overrides a never-list refusal
+## AC-044-03-03 — One reply path, guard first
+## AC-044-03-04 — Mutating tools need terminal confirmation
+## AC-044-03-05 — Read-only tools may be answered by voice
+## AC-044-03-06 — Policy refusal is a distinguishable exit
+## AC-044-04-01 — Self-check works without optional packages
+## AC-044-04-02 — Silent engine writes a valid WAV
+## AC-044-04-03 — Event order for a request
+## AC-044-04-04 — Bad request does not kill the worker
+## AC-044-04-05 — Cancel request stops the utterance
+## AC-044-04-06 — SIGINT cancels and exits cleanly
+## AC-044-04-07 — Missing Pocket TTS runtime is a dependency exit
+## AC-044-04-08 — Duration arithmetic is exact
+## AC-044-04-09 — The worker is file-only
+## AC-044-05-01 — Split on terminators
+## AC-044-05-02 — Decimals are not boundaries
+## AC-044-05-03 — Abbreviations are not boundaries
+## AC-044-05-04 — Question and exclamation boundaries need no capital
+## AC-044-05-05 — Sentence cap
+## AC-044-05-06 — Time cap wins when it is reached first
+## AC-044-05-07 — The first sentence is always spoken whole
+## AC-044-05-08 — Deferred windows drain to empty
+## AC-044-05-09 — Streaming emits each sentence once
+## AC-044-06-01 — Parent assistant text is spoken
+## AC-044-06-02 — Subtask chatter is suppressed
+## AC-044-06-03 — Foreign sessions and user parts are suppressed
+## AC-044-06-04 — Growing parts yield only the delta
+## AC-044-06-05 — One request per prompt
+## AC-044-06-06 — One request per reply
+## AC-044-06-07 — Upstream failure is bounded and loud
+## AC-044-06-08 — Stream reconnect is bounded
+## AC-044-06-09 — Dry run sends nothing
+## AC-044-06-10 — Fake server contract
+## AC-044-07-01 — Two utterances from two tones
+## AC-044-07-02 — Silence produces no utterance
+## AC-044-07-03 — Short blips are dropped
+## AC-044-07-04 — Long speech is force-split
+## AC-044-07-05 — Device mode uses arecord
+## AC-044-07-06 — Missing arecord is a dependency exit
+## AC-044-07-07 — File mode spawns nothing
+## AC-044-07-08 — Fixtures are deterministic
+## AC-044-08-01 — Engine precedence
+## AC-044-08-02 — Unknown engine is a usage error
+## AC-044-08-03 — File transcripts map by index
+## AC-044-08-04 — Missing transcript lines are skipped
+## AC-044-08-05 — Blank transcripts produce no prompt
+## AC-044-08-06 — No cloud path exists
+## AC-044-08-07 — Missing engine runtime is a dependency exit
+## AC-044-08-08 — Documentation matches the single source of truth
+## AC-044-09-01 — File sink numbers sequentially
+## AC-044-09-02 — Existing files are never overwritten
+## AC-044-09-03 — File mode spawns no child process
+## AC-044-09-04 — Device mode plays through ffplay
+## AC-044-09-05 — Missing ffplay is a dependency exit
+## AC-044-09-06 — Cancellation stops playback promptly
+## AC-044-09-07 — A new utterance supersedes the old one
+## AC-044-10-01 — Narrate never captures and never transcribes
+## AC-044-10-02 — Budget and parent-only filtering end to end
+## AC-044-10-03 — The operator can ask for the rest
+## AC-044-10-04 — Requesting more after exhaustion is recorded, not silent
+## AC-044-10-05 — Stop cancels the current utterance
+## AC-044-10-06 — SIGINT exits cleanly, twice forces exit
+## AC-044-10-07 — Non-interactive stdin never blocks
+## AC-044-11-01 — Two utterances become two prompts and two replies
+## AC-044-11-02 — Turns increment and stay contiguous
+## AC-044-11-03 — Empty transcript sends nothing
+## AC-044-11-04 — Reply budget applies, and more resumes it
+## AC-044-11-05 — A missing session is created with the concierge agent
+## AC-044-11-06 — Device capture without a device fails loudly
+## AC-044-12-01 — Control is opt-in
+## AC-044-12-02 — Questions surface numbered options
+## AC-044-12-03 — Answers by number or label
+## AC-044-12-04 — Unmatched answers re-prompt once, then stay pending
+## AC-044-12-05 — Free-text questions send the transcript verbatim
+## AC-044-12-06 — Read-only permissions are answerable by voice
+## AC-044-12-07 — Mutating permissions wait for the terminal
+## AC-044-12-08 — Declined or abandoned confirmations send nothing
+## AC-044-12-09 — Blocked permissions are refused and not overridable
+## AC-044-12-10 — Slash prompts need terminal confirmation
+## AC-044-13-01 — The agent lives outside the default agent set
+## AC-044-13-02 — Frontmatter shape
+## AC-044-13-03 — No pinned model
+## AC-044-13-04 — Read-only permissions are structural
+## AC-044-13-05 — The prompt states its limits
+## AC-044-13-06 — Governance row is present and T0
+## AC-044-13-07 — The model-pin gate is not weakened
+## AC-044-14-01 — Install writes the complete tree
+## AC-044-14-02 — Re-running is idempotent
+## AC-044-14-03 — Uninstall removes exactly what was installed
+## AC-044-14-04 — Dry run writes nothing
+## AC-044-14-05 — A missing source aborts without partial copies
+## AC-044-14-06 — No writes outside the config directory
+## AC-044-14-07 — Make targets exist
+## AC-044-14-08 — Smoke output is checkable
+## AC-044-14-09 — Smoke is offline and Python-optional
+## AC-044-15-01 — Every scenario is cited exactly once
+## AC-044-15-02 — Traceability passes
+## AC-044-15-03 — No vacuous assertions
+## AC-044-15-04 — The suite runs without the optional runtime
+## AC-044-15-05 — The suite is hermetic
+## AC-044-15-06 — Temp fixtures come from the shared helper
+## AC-044-16-01 — Required sections exist
+## AC-044-16-02 — The document does not overclaim duplex
+## AC-044-16-03 — Privacy and fallback are stated
+## AC-044-16-04 — Licensing and weights are stated
+## AC-044-16-05 — Never-list and exit codes match the code
+## AC-044-16-06 — Configuration matches print-config
+## AC-044-16-07 — The ADR is recorded
+## AC-044-16-08 — Repo gates stay green and no weights are tracked
+
+## Verification
+
 # Verification — Voice console (spec 044)
 
 Verifier: independent re-execution of stages 2–3. Every claim below was re-run
@@ -1594,3 +2336,516 @@ ok 3 record-gate-run: a missing required field exits 1 naming the field and appe
 ok 4 record-gate-run: an out-of-range outcome exits 1 naming the allowed values
 ok 5 AC-035-28 — the optional autopilot fields are accepted and appended unchanged
 ok 6 AC-035-29 — invalid autopilot field values are rejected, naming the field, appending nothing
+
+---
+
+# Post-PR CI check (phase 2) — round 1 of max 3
+
+**Round 1 — attempt 1, phase 2 (post-PR); overall phase-2 round 1.**
+Phase-2 counter is independent of phase 1 (`docs/SPEC_PIPELINE.md §Remediation budget`
+— Phase 2, max 3). Phase-1 state carried forward unchanged: attempt 1, PASS.
+Trigger: PR Opener (stage 5b) reported the PR URL; the Verifier was re-invoked for
+the post-PR CI check only — no local gate was re-run.
+
+PR: https://github.com/RexiAI/my-engineering-standards/pull/123 (draft, `OPEN`)
+Branch: `spec/044-voice-console` — head `78ae4405d65c429a01c1d8bc261d471dd8e122a3`
+(`docs(spec): record PR URL and commit count for 044-voice-console`), confirmed via
+`gh pr view 123 --json headRefOid` and matching the local `HEAD`; `git status --porcelain`
+was empty at the start of this phase.
+Observation window: first CI run created `2026-11-08T13:50:49Z`; both `Self CI` runs
+terminal by `2026-11-08T13:51:21Z`; the status query at `2026-11-08T13:51:16Z` already
+returned zero `pending` on the first poll (no polling wait consumed), re-confirmed
+`2026-11-08T13:52:23Z`. Effective window: ~37 s, one query round.
+
+Round 1 verdict: **FAIL**. Two of three checks are red, both `Self CI / Validate`,
+on the same head SHA (push event run `42486888148` and pull_request event run
+`42486892510`). The only failing step is `Check finished specs are archived`
+(`./scripts/check-specs-archived.sh`, exit 1). No fix was applied by the Verifier.
+
+| Check | Workflow / event | Bucket | Result | Check ID |
+|---|---|---|---|---|
+| Validate | Self CI / pull_request (run 42486892510) | fail | **FAIL** | 128750610761 |
+| Validate | Self CI / push (run 42486888148) | fail | **FAIL** | 128750597346 |
+| Review PR / Review PR | PR Review Agent / pull_request | pass | PASS | 128750611300 |
+
+No check is excluded: the `Review PR` agent workflow **passed** on this round (unlike
+specs 039/042, where it failed on an invalid credential), so nothing is attributed to
+environmental noise.
+
+**Whole-run step status (identical in both `Validate` runs, verified via
+`gh run view <id> --json jobs`):** steps 1–17 passed — including `make validate-all`,
+`Check design-gate blame scoping`, `Check gate list consistency`,
+`Check orchestration references`, `Check doc-section references`,
+`Check bats assertions are not vacuous`, `Check post-PR CI loop mechanics`,
+`Check skills specification`, `Check agent prompt line cap`. Step **18
+`Check finished specs are archived` failed**; steps 19–36 were skipped as a
+consequence (including `Check spec audit trails`, `make lint`, shellcheck,
+`Run shell gate bats tests`, `Run gate selftests`, `Check scenario traceability
+(live tree)`, `Validate YAML syntax`). Those downstream gates are therefore
+**not** independently validated on this head — not green, merely unexecuted.
+
+Failure reason, verbatim from the job log:
+
+```
+  [FAIL] 044-voice-console is finished (has 30-report.md) but not archived — missing docs/changes/044-voice-console.md
+         Run: scripts/archive-spec.sh 044-voice-console (stage 5d does this automatically)
+1 finished spec(s) not archived!
+##[error]Process completed with exit code 1.
+```
+
+Cause and routing (diagnosis only — nothing fixed here): stage 5b committed
+`specs/044-voice-console/30-report.md` (the pipeline's *finished* signal) in
+`78ae4405`, while stage 5d has not yet run `scripts/archive-spec.sh`, so
+`docs/changes/044-voice-console.md` does not exist. `30-report.md §PR` says so
+explicitly ("Stage 5d (archive) has not run — `specs/044-voice-console/` is still
+present for stage 5c's deploy verification"), and `docs/changes/` contains no
+`044-*` file. Per `docs/spec-pipeline/audit-contract.md §The gate`, self-ci runs
+`check-specs-archived.sh` for every folder carrying `30-report.md`, so this is a
+real deterministic gate finding, not env noise and not a Coder/Refactorer defect.
+The resolving act belongs to **stage 5d (Archiver)**: run
+`scripts/archive-spec.sh 044-voice-console` (pipeline order puts it after stage 5c
+deploy verification — non-frontend lane, so 5c records a skip). Orchestrator to
+route; phase-2 budget status after this round: **round 1 of 3 consumed**.
+
+## Evidence: phase-2 CI round 1
+
+command: gh pr checks 123 --json name,state,bucket,workflow,link
+exit: 0
+at: 2026-11-08T13:52:23Z
+
+[{"bucket":"fail","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/42486892510/job/128750610761","name":"Validate","state":"FAILURE","workflow":"Self CI"},{"bucket":"pass","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/42486892594/job/128750611300","name":"Review PR / Review PR","state":"SUCCESS","workflow":"PR Review Agent"},{"bucket":"fail","link":"https://github.com/RexiAI/my-engineering-standards/actions/runs/42486888148/job/128750597346","name":"Validate","state":"FAILURE","workflow":"Self CI"}]
+
+Per-check parse (bucket is the PASS/FAIL rule; `pending` would be neither — none seen):
+
+    fail    Self CI          Validate
+    pass    PR Review Agent  Review PR / Review PR
+    fail    Self CI          Validate
+
+Poll trace (`gh pr checks 123` once per iteration, 45 s sleep between iterations,
+18-iteration / ~13.5 min bound; the loop exited on the first iteration):
+
+    [2026-11-08T13:51:26Z] poll 1 pending=0
+      fail    Self CI          Validate
+      pass    PR Review Agent  Review PR / Review PR
+      fail    Self CI          Validate
+    TERMINAL
+
+Check IDs (failing check runs for head `78ae4405d65c429a01c1d8bc261d471dd8e122a3`):
+
+command: gh api repos/RexiAI/my-engineering-standards/commits/78ae4405d65c429a01c1d8bc261d471dd8e122a3/check-runs --jq '.check_runs[] | "\(.name) | id=\(.id) | \(.status)/\(.conclusion) | \(.details_url)"'
+exit: 0
+at: 2026-11-08T13:52:24Z
+
+Review PR / Review PR | id=128750611300 | completed/success | https://github.com/RexiAI/my-engineering-standards/actions/runs/42486892594/job/128750611300
+Validate | id=128750610761 | completed/failure | https://github.com/RexiAI/my-engineering-standards/actions/runs/42486892510/job/128750610761
+Validate | id=128750597346 | completed/failure | https://github.com/RexiAI/my-engineering-standards/actions/runs/42486888148/job/128750597346
+
+Run provenance (why two `Validate` checks on one SHA — two events, both red):
+
+command: gh run list --branch spec/044-voice-console --workflow "Self CI" --limit 10 --json databaseId,headSha,event,status,conclusion,createdAt,name,displayTitle
+exit: 0
+at: 2026-11-08T13:52:24Z
+
+42486892510 78ae4405 pull_request completed/failure 2026-11-08T13:50:52Z feat(voice): voice console (spec 044)
+42486888148 78ae4405 push completed/failure 2026-11-08T13:50:49Z docs(spec): record PR URL and commit count for 044-voice-console
+42486868641 4892c936 pull_request completed/failure 2026-11-08T13:50:34Z feat(voice): voice console (spec 044)
+42486853471 4892c936 push completed/failure 2026-11-08T13:50:22Z docs(voice): operator docs, ADR 0026 and weight guard (task 16)
+
+Pre-PR head `4892c93` was already red on the same two workflow events; its runs are
+context for the branch history, not evidence for this round — the round-1 evidence
+above is the head-`78ae4405` query only.
+
+Failing job log (pull_request run `42486892510`; the push run `42486888148` log is
+byte-equivalent apart from its timestamps):
+
+command: gh run view 42486892510 --log-failed
+exit: 0
+at: 2026-11-08T13:52:27Z
+
+Validate	Check finished specs are archived	﻿2026-11-08T13:51:17.4964672Z ##[group]Run ./scripts/check-specs-archived.sh
+Validate	Check finished specs are archived	2026-11-08T13:51:17.4965000Z ^[[36;1m./scripts/check-specs-archived.sh^[[0m
+Validate	Check finished specs are archived	2026-11-08T13:51:17.4986596Z shell: /usr/bin/bash -e {0}
+Validate	Check finished specs are archived	2026-11-08T13:51:17.5108074Z ^[[31m  [FAIL] 044-voice-console is finished (has 30-report.md) but not archived — missing docs/changes/044-voice-console.md^[[0m
+Validate	Check finished specs are archived	2026-11-08T13:51:17.5108713Z          Run: scripts/archive-spec.sh 044-voice-console (stage 5d does this automatically)
+Validate	Check finished specs are archived	2026-11-08T13:51:17.5109356Z ^[[31m1 finished spec(s) not archived!^[[0m
+Validate	Check finished specs are archived	2026-11-08T13:51:17.5119160Z ##[error]Process completed with exit code 1.
+
+Local reproduction on the identical tree (`HEAD` = `78ae4405`, `git status --porcelain`
+empty) — the finding is deterministic, not transient:
+
+command: ./scripts/check-specs-archived.sh
+exit: 1
+at: 2026-11-08T13:52:29Z
+
+  [FAIL] 044-voice-console is finished (has 30-report.md) but not archived — missing docs/changes/044-voice-console.md
+         Run: scripts/archive-spec.sh 044-voice-console (stage 5d does this automatically)
+1 finished spec(s) not archived!
+
+## Round verdict
+
+**FAIL — phase-2 round 1 of max 3 consumed.** Failing check IDs:
+`128750610761` (`Validate`, Self CI / pull_request) and `128750597346` (`Validate`,
+Self CI / push), head `78ae4405d65c429a01c1d8bc261d471dd8e122a3`. Single failing
+step: `Check finished specs are archived` → `check-specs-archived.sh` exit 1,
+`[FAIL] 044-voice-console is finished (has 30-report.md) but not archived — missing
+docs/changes/044-voice-console.md`. `Review PR / Review PR` (id `128750611300`)
+passed. Diagnosis handed to the orchestrator: the fix is stage 5d's archive commit,
+not a code change; the Verifier wrote no production code, committed nothing, and
+pushed nothing.
+
+## Quality gates
+
+# Report — Voice console (spec 044)
+
+Stage: 5a, Mutation Runner. Pipeline mode: `full`
+(`specs/044-voice-console/45-decisions.md`: classifier chose `full`, 61 named
+paths including `**/*golangci*.yml` outside the lite surface). Conformance tier:
+`mvp`.
+
+Precondition satisfied: `specs/044-voice-console/25-verification.md` exists and
+its verdict is **PASS**. No mutation-killing tests were written — at `mvp` tier
+the mutation gate does not run, so the worktree is the tree the Verifier ran
+against. No commit, no push, no production-code edit was made.
+
+`specs/044-voice-console/00-informal.md` was **not** read (information barrier).
+
+## Verdict
+
+**GREEN** — nothing blocked. Mutation testing is skipped by tier, not by
+failure; the final full-suite status is the Verifier's green run, reused on an
+exact worktree-hash match.
+
+| # | Item | Result |
+|---|---|---|
+| 1 | Verifier verdict (carried forward) | **PASS** — 5/5 runnable checks exit 0, 0 FAIL findings |
+| 2 | Mutation score | **skipped — mvp tier** (production-tier gate) |
+| 3 | Equivalent mutants | none — no mutants were generated or evaluated |
+| 4 | Complexity summary (carried from Refactorer) | 7 CC violations → 0; voice DRY 6 → 0; design gate re-run by Verifier: exit 0, **0 FAIL / 67 WARN** |
+| 5 | Final test status (full suite, one final time) | green — reused from `25-verification.md` on `REUSE 353be28a…22f75` (1195 `ok`, 0 `not ok`, 0 `skip`) |
+| 6 | Remediation record | none — no BLOCK occurred |
+| 7 | Flags carried to the Architect | 4 (recorded verbatim below; not gate failures, not fixed here) |
+
+## Mutation testing — skipped, tier rule
+
+`docs/SPEC_PIPELINE.md §Stages` places stage 5a after the Verifier;
+`docs/spec-pipeline/mutation-runner.md` and `docs/spec-pipeline/coder.md
+§Conformance tiers` scope mutation testing to `production` tier and above. This
+spec declares `mvp`, so the mutation *test* is skipped while the Architect role
+still runs (this report).
+
+No private mutation tool was invented for the `.mjs` / Python surface. The repo
+has no Stryker config (`package.json`, `.eslintrc*`, `eslint.config.*` absent),
+no PiTest setup, and no Go module in this lane; `scripts/check-code-principles.sh`
+discovers node files by `*.ts|*.tsx|*.js|*.jsx` only (script line 442), so the
+`.mjs` modules are outside every mutation lane this repo wires. That is a skip
+by tier and by absent tooling — not a failure, and nothing to block on.
+
+## Complexity summary — carried from the Refactorer
+
+Carried from the orchestrator's relay of stage 3 (the Refactorer leaves no
+artifact by design; the Verifier re-records the gates). Not re-measured by this
+stage — the numbers below are the stage-3 before/after, and the "after" column
+was independently re-run by the Verifier:
+
+| Measure | Before (Refactorer entry) | After (Refactorer exit) | Verifier re-check |
+|---|---|---|---|
+| Cyclomatic-complexity violations in the voice modules | 7 | **0** | design gate exit 0, 0 FAIL |
+| DRY duplication findings in the voice modules | 6 | **0** | design gate exit 0, 0 FAIL |
+| `scripts/check-code-principles.sh` aggregate | — | — | exit 0, **0 FAIL / 67 WARN** |
+
+The 67 WARNs are review hints, not stops (`docs/SPEC_PIPELINE.md §Stop-and-Ask
+decision matrix`: design-gate WARN → record and flag). Five of them are in this
+spec's `scripts/voice/tts-worker.py` (Naming: more than three parameters); the
+other 62 are pre-existing and untouched. Scope caveat carried verbatim from
+`25-verification.md`: no new `.mjs` file is analysed by that gate — the `.mjs`
+extension is outside its discovery set — so complexity evidence for those
+modules is `node --check` (17/17 files parse) plus the design-principles run.
+
+Property tests: `skipped (project tier is mvp — production+ required)`, matching
+the declared tier.
+
+## Equivalent mutants
+
+**None.** At `mvp` tier no mutation run happened, so no mutant was produced,
+killed, or survived; there is nothing to classify as equivalent. No mutant is
+being excused.
+
+## Flagged to the Architect (carried from `25-verification.md` §Flagged to the Architect, verbatim)
+
+These are check-5 review findings, **not** gate failures. They were not fixed
+here (this stage writes tests and a report, not production code) and they do not
+block the run.
+
+1. **[HIGH — unaccounted behavior]** `scripts/voice/converse.mjs:11,80` —
+   `const REPLY_TIMEOUT_MS = 1500;` and
+   `withTimeout(state.collector.nextTurn(), REPLY_TIMEOUT_MS, [])`. No task and no
+   scenario specifies a reply deadline; the 1.5 s bound is local invention. When
+   a real assistant turn takes longer than 1.5 s to emit `idle`/text, the turn
+   silently speaks nothing and writes no `spoken`/`deferred`/`skipped` record —
+   an operator hears dead air with no ledger trace. `AC-044-11-01`/`-04` cannot
+   catch it: `scripts/tests/voice-fake-server.mjs` answers instantly. Either the
+   spec gains a latency scenario or the bound becomes configurable and recorded.
+2. **[MEDIUM — spec-mandated but vacuous]** `scripts/voice/control.mjs:55,60,65` —
+   each outbound reply is preceded by
+   `authorize({ tool: "read", command: null, paths: [], repoRoot: process.cwd() })`.
+   A `read` intent can never be blocked (`policy.mjs:241-244` returns
+   `blocked:false` for `READ_TOOLS`), so these three calls enforce nothing. They
+   exist to satisfy `AC-044-03-03` literally ("every call … immediately preceded
+   by a `guard.authorize` call"). The real policy decision is
+   `authorize(event.intent)` at `control.mjs:157`. The scenario verifies shape,
+   not effect; a future edit could delete the effective call at line 157 and keep
+   the test green.
+3. **[LOW — spec gap]** `scripts/voice/tts-worker.py:87-95` — `run_engine` reports
+   `missing-runtime` for `--engine pocket-tts` unconditionally; `available("pocket_tts")`
+   is only consulted by `--self-check`. No scenario covers the engine being
+   present (`AC-044-04-07` covers absent only), so nothing is violated, but the
+   worker can never synthesize with Pocket TTS even when installed. Follow-up
+   spec if that engine is expected to work.
+4. **[TRIVIAL — dead code]** `scripts/voice/install.mjs:6` imports `basename` and
+   never uses it. YAGNI/DRY hint only.
+
+## Remediation record
+
+**none** — no BLOCK occurred during this run.
+
+Basis, carried forward and not guessed: `25-verification.md` line 9 records
+`Stage: 4, Verifier. Attempt: **1**, phase **1** (first full run, not a
+re-verification)`. There is no re-verification attempt entry and no BLOCK line in
+`25-verification.md`, so no phase-1 or phase-2 remediation was consumed. Phase 3
+(deploy verification) is out of scope for this stage. This stage itself produced
+no BLOCK.
+
+## Evidence: mutation score
+
+command: for f in AGENTS_*.md; do t=$(grep -oE 'Conformance tier: (mvp|production|multi-service)' "$f" 2>/dev/null | head -1 | awk '{print $3}'); if [ -n "$t" ]; then echo "declared: $t"; exit 0; fi; done; echo "tier: mvp (no AGENTS_*.md declaration; scripts/check-code-principles.sh:440 default)"
+exit: 0
+at: 2026-11-08T13:48:07Z
+
+```
+tier: mvp (no AGENTS_*.md declaration; scripts/check-code-principles.sh:440 default)
+```
+
+Mutation score: skipped — mvp tier
+
+Reason: mutation testing is a `production`-tier gate
+(`docs/spec-pipeline/coder.md §Conformance tiers`,
+`docs/spec-pipeline/mutation-runner.md`). No mutation tool is configured for this
+repo's `.mjs` / Python surface, and inventing one is out of scope at `mvp`.
+No mutants generated, none surviving, none equivalent.
+
+## Evidence: test-run reuse decision
+
+command: scripts/test-run-reuse.sh --check specs/044-voice-console/25-verification.md
+exit: 0
+at: 2026-11-08T13:48:18Z
+
+```
+REUSE 353be28a4e8f3ce27f4b93b0f4e27de800f62d47e64df98daad7460186e22f75
+```
+
+Post-check `scripts/test-run-reuse.sh --print-hash`:
+`353be28a4e8f3ce27f4b93b0f4e27de800f62d47e64df98daad7460186e22f75` — identical,
+so the tree is the one the Verifier ran against. Exit 0 means **reuse**: no test
+command was executed by this stage. (`git status --porcelain` is likewise
+unchanged apart from this report and the excluded `runs.jsonl`.)
+
+## Evidence: final test status
+
+command: scripts/agent-test-summary.sh --run /tmp/opencode/pipeline/044-verifier-suite.log -- env BATS_JOBS=8 make test-scripts
+exit: 0
+at: 2026-11-08T13:42:36Z
+reused-from: 25-verification.md §Evidence: full test suite (test-run hash 353be28a4e8f3ce27f4b93b0f4e27de800f62d47e64df98daad7460186e22f75)
+
+```
+SUMMARY: mode=run exit=0 signal=0 log_lines=1300 log=/tmp/opencode/pipeline/044-verifier-suite.log
+```
+
+The `command:` / `exit:` / `at:` values are the Verifier's, copied verbatim —
+that run did happen, then, on this exact tree. Independent counts over the full
+log (from `25-verification.md`): 1195 `ok`, 0 `not ok`, 0 `skip`, 133 of them
+`AC-044-*`. No test was skipped (a skipped test is a failure). Stage 5a added no
+tests, so there is no new code the Verifier's run could have missed.
+
+Final test status: **green** (reused, not re-run).
+
+## Notes
+
+- Nothing was committed, pushed, or opened as a PR; that is stage 5b's job.
+- No production code, gate config, threshold, or acceptance scenario was edited.
+- The only artifact written by this stage is this report.
+
+## PR
+
+PR: https://github.com/RexiAI/my-engineering-standards/pull/123
+Commits: 16 (one conventional commit per task in `10-tasks.md`, counted at PR
+open; this record commit is the 17th and is not included). Branch
+`spec/044-voice-console`, draft, base `main`. Stage 5d (archive) has not run —
+`specs/044-voice-console/` is still present for stage 5c's deploy verification.
+
+## 40-deploy.md
+
+# Deploy verification (stage 5c) — 044-voice-console
+
+Stage: 5c (Deploy Verifier), phase 3
+PR: https://github.com/RexiAI/my-engineering-standards/pull/123 (draft, open)
+Branch: `spec/044-voice-console`
+PR head: `78ae4405d65c429a01c1d8bc261d471dd8e122a3`
+Repo classification: **non-frontend** — no deploy lane applies
+Deploy URL: none — no Vercel preview deployment exists for this repository
+Build status: skip
+Health check status: skip
+E2E verdict: skip
+Phase-3 attempts: 0
+Timestamp: 2026-11-08T13:54:36Z
+
+Verdict: SKIPPED — Non-frontend repo — deploy verification not applicable
+
+## Why this is a recorded skip, not a failure
+
+This repository is the shared engineering-standards repo: docs, shell scripts,
+BATS tests, CI workflow templates, agent and skill definitions. It ships no web
+application, so there is no preview deployment for stage 5c to wait for, inspect,
+health-check, or point E2E at. Nothing here can produce Vercel preview evidence,
+and Phase 3 therefore never starts: the phase-3 counter stays at **0**, and no
+budget marker of any kind is written.
+
+Skip reason (verbatim): **Non-frontend repo — deploy verification not applicable**
+
+Scope statement required by stage 5c: **no Vercel preview deployment exists for
+this repository and this is a non-frontend lane.** The deploy gate is not being
+waived, and it is not being failed; the lane is inapplicable.
+
+The GHCR container path is unaffected: this skip neither cancels nor is cancelled
+by any container-image workflow.
+
+## Evidence: repo classification
+
+command: for f in vercel.json package.json angular.json next.config.js next.config.mjs; do test -f "$f" && echo "present: $f" || echo "absent: $f"; done; bash -c 'source <(sed -n "/^frontend_repo()/,/^}/p" scripts/check-audit-trail.sh); frontend_repo . && echo "frontend_repo: true" || echo "frontend_repo: false"'
+exit: 0
+at: 2026-11-08T13:53:44Z
+
+```
+absent: vercel.json
+absent: package.json
+absent: angular.json
+absent: next.config.js
+absent: next.config.mjs
+root framework deps:
+none (no root package.json)
+frontend_repo: false
+```
+
+`frontend_repo()` is the deploy-lane classifier used by
+`scripts/check-audit-trail.sh` (spec 031): a `vercel.json`, or a root
+`package.json` declaring `next` / `react` / `@angular/core` / `@ionic/angular`.
+None of the signals is present. The only `package.json` in the tree is
+`.opencode/package.json`, which declares `@opencode-ai/plugin` (tooling, not a
+frontend framework, not the repo root).
+
+## Evidence: Vercel preview deployment lookup for the PR head
+
+command: curl -sS "https://api.github.com/repos/RexiAI/my-engineering-standards/commits/78ae4405d65c429a01c1d8bc261d471dd8e122a3/status"; curl -sS "https://api.github.com/repos/RexiAI/my-engineering-standards/issues/123/comments"
+exit: 0
+at: 2026-11-08T13:53:44Z
+
+```
+state=pending total_count=0 contexts=[]
+comment_count=0
+```
+
+No `Vercel` commit status, no deployment `target_url`, no Vercel bot PR comment —
+the signals stage 5c uses to resolve a preview deployment (deployer.md
+§Vercel CLI access) are absent. There is also no local project link: `.vercel/`
+does not exist in the work tree. Nothing addresses a preview URL for this commit.
+
+Per `docs/spec-pipeline/deployer.md §Vercel CLI access`, the missing
+`VERCEL_TOKEN` in this shell is **not** the basis for this skip — a missing token
+is explicitly not a defect and not a reason to skip or to claim the project is
+unlinked. The skip rests on repo classification plus the absence of every
+deployment signal above.
+
+## Evidence: Vercel CLI — permitted commands only, no CLI deploy
+
+command: command -v vercel
+exit: 0
+at: 2026-11-08T13:53:44Z
+
+```
+/home/dbueno/.nvm/versions/node/v24.21.0/bin/vercel
+```
+
+The CLI is installed, so it was available and deliberately not used to build:
+`vercel deploy` and `vercel deploy --prod` were **refused**, not run. Reason: the
+Vercel Git integration is the source of truth for builds and deploys; a CLI
+deploy alongside a push-triggered Git-integration build causes a double-build,
+races the Git integration for the same commit, and leaves orphaned deployments
+that no PR or branch owns. No `vercel inspect` / `vercel ls` / `vercel logs`
+query was issued either, because there is no linked project or candidate
+deployment to query.
+
+## Evidence: build / health check / E2E — not run
+
+command: none — no deployment URL exists to verify
+exit: n/a
+at: 2026-11-08T13:54:36Z
+
+- **Build verification:** skip. No deployment to inspect; no `BUILD_FAILED`
+  exists to classify, and no build log exists to pull.
+- **Health check:** skip. No preview URL exists to `curl`. No response code and
+  no timeout is reported, because no request was made — inventing either would
+  be fabricated evidence.
+- **E2E:** skip. The `e2e-runner` subagent was not invoked: it would have had no
+  live preview URL to target, and stage 5c forbids pointing it at a local dev
+  server. Exit code: n/a, not fabricated.
+
+## Evidence: working tree state at stage start
+
+command: git status --porcelain
+exit: 0
+at: 2026-11-08T13:54:36Z
+
+```
+ M runs.jsonl
+ M specs/044-voice-console/25-verification.md
+```
+
+Recorded, not touched. Per `docs/SPEC_PIPELINE.md §Stop-and-Ask decision matrix`
+("Working tree dirty"): no stash, no commit, no revert was performed by this
+stage. `runs.jsonl` is appended by the harness on every run (machine telemetry),
+and `25-verification.md` carries the Verifier's own uncommitted phase-2 record.
+Both belong to other stages' artifacts; stage 5c writes only this file and
+reports the dirty state instead of acting on it.
+
+## Note: phase-2 CI observation (input to the phase-3 precondition, not a phase-3 result)
+
+At the PR head above, `gh`-visible check runs are:
+
+```
+Review PR / Review PR   success   128750611300
+Validate                failure   128750610761   (run 42486892510, pull_request)
+Validate                failure   128750597346   (run 42486888148, push)
+```
+
+The single failing step is `Check finished specs are archived`
+(`./scripts/check-specs-archived.sh`, exit 1), whose verbatim line is:
+
+```
+[FAIL] 044-voice-console is finished (has 30-report.md) but not archived — missing docs/changes/044-voice-console.md
+```
+
+Stage ordering states phase 3 runs only after the phase-2 loop is green, so a
+frontend lane would not have started here either. This non-frontend lane is
+skipped regardless, and the observation is recorded rather than routed: the
+archive-ordering gate is satisfied by stage 5d, and the Verifier's own phase-2
+record (round 1, FAIL) lives in `25-verification.md`. No deploy evidence is
+derived from it, and no attempt is charged to the phase-3 counter.
+
+## 45-decisions.md
+
+Condition: Pipeline mode for /home/dbueno/projects/my-engineering-standards/specs/044-voice-console
+Options: lite, full
+Chosen: full
+Why: classifier: 61 named path(s) include '**/*golangci*.yml', outside docs/, specs/, *.md and scripts/
+Reversibility: append a new entry with an explicit lite or full token
+At: 2026-11-06T16:56:24Z
+
