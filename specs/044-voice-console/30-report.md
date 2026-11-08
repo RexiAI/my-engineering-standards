@@ -176,3 +176,11 @@ Final test status: **green** (reused, not re-run).
 - Nothing was committed, pushed, or opened as a PR; that is stage 5b's job.
 - No production code, gate config, threshold, or acceptance scenario was edited.
 - The only artifact written by this stage is this report.
+
+## PR
+
+PR: https://github.com/RexiAI/my-engineering-standards/pull/123
+Commits: 16 (one conventional commit per task in `10-tasks.md`, counted at PR
+open; this record commit is the 17th and is not included). Branch
+`spec/044-voice-console`, draft, base `main`. Stage 5d (archive) has not run —
+`specs/044-voice-console/` is still present for stage 5c's deploy verification.
