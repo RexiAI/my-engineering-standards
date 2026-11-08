@@ -52,6 +52,7 @@ T3 prohibitions apply to all agents regardless of tier.
 | `media-video` | media family | **T1** | bash allow `ffmpeg`/`ffprobe`, edit `out/**` only, `git push*`/`rm -rf *` deny, `*` ask | none — batch renders require explicit user approval |
 | `media-voice` | media family | **T1** | bash allow `ffmpeg`/`ffplay`/`ffprobe`/`arecord`, edit `out/**` only, `git push*`/`rm -rf *` deny, `*` ask | none — turn-based only; no realtime app ships |
 | `media-producer` | media-family orchestrator | **T1** | bash allow `ffmpeg`/`ffprobe`, edit `out/**` only, `git push*`/`rm -rf *` deny, `*` ask, task allow | policy: storyboard human gate before the first paid video render |
+| `voice-concierge` | optional voice surface | **T0** | read `*` allow; edit `*` deny; bash `*` deny; task `*` deny | none — read-only by construction |
 
 No agent is mapped to T3: T3 is the universal prohibition, not an assignment.
 

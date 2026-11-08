@@ -1,4 +1,4 @@
-.PHONY: help validate validate-docs validate-refs validate-all lint format stats test test-scripts test-shell test-java test-go test-js mutation property-tests ci-fast ci ci-full judgment-up judgment-down judgment-status install-media uninstall-media smoke-media eval-sandbox
+.PHONY: help validate validate-docs validate-refs validate-all lint format stats test test-scripts test-shell test-java test-go test-js mutation property-tests ci-fast ci ci-full judgment-up judgment-down judgment-status install-media uninstall-media smoke-media install-voice uninstall-voice smoke-voice eval-sandbox
 
 DOCS := AGENTS.md README.md \
   docs/AGENTS_AND_SKILLS.md \
@@ -9,7 +9,7 @@ DOCS := AGENTS.md README.md \
   docs/IDEMPOTENCY.md docs/LOOP_ENGINEERING.md docs/MEDIA_AGENTS.md docs/MESSAGE_DELIVERY.md docs/OBSERVABILITY.md \
   docs/OUTBOX_PATTERN.md docs/RESILIENCE.md docs/SAGA_PATTERN.md \
   docs/SCALABILITY.md docs/SCHEMA_EVOLUTION.md docs/SECURITY.md \
-  docs/STREAM_PROCESSING.md docs/TESTING.md docs/SPEC_PIPELINE.md
+  docs/STREAM_PROCESSING.md docs/TESTING.md docs/SPEC_PIPELINE.md docs/VOICE_CONSOLE.md
 
 LANG_AGENTS := language-specific/java/SKILL.md \
   language-specific/go/SKILL.md \
@@ -34,6 +34,9 @@ help:
 	@echo "  stats          Show file sizes"
 	@echo "  install-media  Install media agents + backend example into ~/.config/opencode (Linux/macOS/Windows via node)"
 	@echo "  uninstall-media Remove the agents; smoke-media  Zero-cost structural smoke (structure + contract, no network)"
+	@echo "  install-voice  Install the opt-in voice console (agent + bridge) into ~/.config/opencode"
+	@echo "  uninstall-voice Remove exactly the installed voice-console paths"
+	@echo "  smoke-voice    Zero-cost structural smoke (agent, policy, installer, parse, config)"
 	@echo "  eval-sandbox   Build the pinned Docker image the agent eval harness runs the agent in"
 	@echo ""
 	@echo "Releases: handled by Semantic Release CI after merge to main."
@@ -180,6 +183,16 @@ uninstall-media:   # Remove the installed media agents (keeps backends.json)
 
 smoke-media:   # Zero-cost structural smoke (agents + backend contract, no network)
 	@node scripts/media/smoke-media.mjs
+
+# --- Voice console (spec 044) --------------------------------------------------
+install-voice:   # Copy the opt-in concierge agent + bridge into the opencode config dir
+	@node scripts/voice/install.mjs
+
+uninstall-voice:   # Remove exactly the installed voice-console paths
+	@node scripts/voice/install.mjs --uninstall
+
+smoke-voice:   # Zero-cost structural smoke (agent, policy, installer, parse, config)
+	@node scripts/voice/smoke.mjs
 
 # --- Local judgment backend (spec 029) ----------------------------------------
 judgment-up:     # Start the local judgment backend and print JUDGMENT_* env lines
