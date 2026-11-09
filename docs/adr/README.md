@@ -34,3 +34,4 @@ Proposed → Accepted → Deprecated → Superseded.
 | 0024 | [Agent prompt line cap: procedure lives in stage docs and scripts, not in the prompt](0024-agent-prompt-line-cap.md) | Accepted |
 | 0025 | [Agent test output: filtered capture and reuse of an unchanged run](0025-agent-test-output-and-run-reuse.md) | Accepted |
 | 0026 | [Voice console: a half-duplex operator surface with a structural never-list](0026-voice-console.md) | Accepted |
+| 0027 | [Telemetry ledger stays committed: the PR Opener commits runs.jsonl](0027-runs-jsonl-committed.md) | Accepted |

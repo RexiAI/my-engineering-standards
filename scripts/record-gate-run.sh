@@ -9,9 +9,12 @@
 #   record-gate-run.sh -record '<json>' [-f <file>]
 #   echo '<json>' | record-gate-run.sh [-f <file>]
 #
-# Default file: <repo-root>/runs.jsonl. -f or the GATE_RUNS_FILE env var
-# overrides it. The record is appended with `>>` (append-only: never rewritten,
-# no dedup, no sort).
+# Default file: the consuming repo's root `runs.jsonl`. In a child repo the
+# script runs from the `.standards/` submodule, whose own work tree is the
+# standards checkout — telemetry must land in the child's tracked ledger, so the
+# resolver walks to the superproject. -f or the GATE_RUNS_FILE env var overrides
+# it. The record is appended with `>>` (append-only: never rewritten, no dedup,
+# no sort).
 #
 # Record schema (all keys required except runId, loopCount, phase1Retries,
 # phase2Retries, autopilot, autoDecisions, stopReason, which are optional —
@@ -39,6 +42,18 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# resolve_root — the default ledger lives in the repo that consumes the pipeline,
+# not necessarily the checkout holding this script. A `.standards/` submodule's
+# work tree is the standards repo; --show-superproject-working-tree walks out to
+# the child. A plain checkout returns its own top level; a copied script with no
+# work tree keeps the historical script-parent default.
+resolve_root() {
+  local top super
+  top="$(git -C "$ROOT" rev-parse --show-toplevel 2>/dev/null)" || return 0
+  super="$(git -C "$ROOT" rev-parse --show-superproject-working-tree 2>/dev/null)" || super=""
+  ROOT="${super:-$top}"
+}
+resolve_root
 FILE="${GATE_RUNS_FILE:-$ROOT/runs.jsonl}"
 RECORD=""
 

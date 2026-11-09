@@ -293,6 +293,22 @@ bash "$TMP/scratch/scripts/record-gate-run.sh" -f "$TMP/other.jsonl" -record "$N
 [ -f "$TMP/other.jsonl" ] && [ "$(wc -l < "$TMP/scratch/runs.jsonl" | tr -d ' ')" = "1" ] \
   && ok "AC-012-05-07: -f overrides the default path, default untouched" || bad "AC-012-05-07: -f override wrong"
 
+# The default path follows the consuming repo, not the checkout that holds the
+# script: a `.standards/` submodule must append the superproject's ledger, never
+# dirty its own pinned checkout.
+mkdir -p "$TMP/inner-src" "$TMP/outer"
+git -C "$TMP/inner-src" init -q
+git -C "$TMP/inner-src" -c user.email=t@example.com -c user.name=t commit -q --allow-empty -m init
+git -C "$TMP/outer" init -q
+git -C "$TMP/outer" -c user.email=t@example.com -c user.name=t commit -q --allow-empty -m init
+git -C "$TMP/outer" -c protocol.file.allow=always submodule add -q "$TMP/inner-src" .standards
+mkdir -p "$TMP/outer/.standards/scripts"
+cp "$RECORD" "$TMP/outer/.standards/scripts/"
+bash "$TMP/outer/.standards/scripts/record-gate-run.sh" -record "$NOD" > /dev/null 2>&1
+[ -f "$TMP/outer/runs.jsonl" ] && [ ! -e "$TMP/outer/.standards/runs.jsonl" ] \
+  && ok "default ledger path resolves to the consuming repo (superproject), not the submodule" \
+  || bad "default ledger path wrote into the submodule checkout"
+
 # ── AC-012-06: Verifier / orchestrator telemetry wiring ───────────────────────
 echo "== AC-012-06 verifier + orchestrator =="
 VERIFIER="$ROOT/agents/spec-verifier.md"
@@ -320,6 +336,16 @@ for v in SPEC_LOOP_COUNT SPEC_PHASE1_RETRIES SPEC_PHASE2_RETRIES; do
   grep -q "$v" "$PIPELINE" || bad "AC-012-06-05: spec-pipeline.md missing $v export instruction"
 done
 ok "AC-012-06-05: spec-pipeline.md exports loop/retry context (SPEC_LOOP_COUNT, SPEC_PHASE1_RETRIES, SPEC_PHASE2_RETRIES)"
+
+# The ledger is tracked: the PR Opener commits its appends with the PR, so a
+# successful run never leaves runs.jsonl dirty in the working tree.
+for f in "$ROOT/agents/spec-pr-opener.md" "$ROOT/docs/spec-pipeline/pr-opener.md"; do
+  if grep -q 'runs.jsonl' "$f"; then
+    ok "PR Opener commits the tracked runs.jsonl ledger (${f#"$ROOT"/})"
+  else
+    bad "PR Opener does not commit the tracked runs.jsonl ledger (${f#"$ROOT"/})"
+  fi
+done
 
 # ── AC-012-07: gate-stats.sh ──────────────────────────────────────────────────
 echo "== AC-012-07 gate-stats =="

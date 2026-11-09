@@ -6,7 +6,7 @@
 #
 # Usage:
 #   gate-stats.sh [-f <file>] [-n <window>]
-# Defaults: <repo-root>/runs.jsonl, window 10.
+# Defaults: the consuming repo's root `runs.jsonl`, window 10.
 #
 # Output (minimum): total runs; outcome counts with percentages; failure rate
 # (fail + block) / total; most-failed gate with count; total warnings; for
@@ -22,6 +22,17 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# The ledger lives in the repo that consumes the pipeline. In a child repo this
+# script sits in the `.standards/` submodule, so walk to the superproject; a
+# plain checkout returns its own top level, and a copied script with no work tree
+# keeps the historical script-parent default.
+resolve_root() {
+  local top super
+  top="$(git -C "$ROOT" rev-parse --show-toplevel 2>/dev/null)" || return 0
+  super="$(git -C "$ROOT" rev-parse --show-superproject-working-tree 2>/dev/null)" || super=""
+  ROOT="${super:-$top}"
+}
+resolve_root
 FILE="${GATE_RUNS_FILE:-$ROOT/runs.jsonl}"
 WINDOW=10
 
