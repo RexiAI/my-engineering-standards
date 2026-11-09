@@ -1,16 +1,15 @@
 # Spec Pipeline
 
 A six-stage pipeline that turns an informal spec you write into a mutation-tested,
-gated pull request. Based on Robert C. Martin's agent-pipeline description
-(Specifier → Coder → Refactorer → Architect), adapted to this repo's languages and
-tooling, with an added independent QA stage (Verifier) between Refactorer and
-Architect — Uncle Bob's original has no dedicated agent whose only job is to
-re-verify prior stages' claims before the pipeline commits anything. You write
-stage 0. You review once, after stage 1. Everything after that runs to a draft PR.
+gated pull request, adapted from Robert C. Martin's agent pipeline
+(Specifier → Coder → Refactorer → Architect) plus an independent QA stage
+(Verifier) that re-verifies prior stages' claims before anything is committed.
+You write stage 0 and review once after stage 1; everything after that runs to a
+draft PR.
 
-This file is the index. Each stage's detailed rules live in its own file under
-`docs/spec-pipeline/` (table below); the cross-cutting rules stay here. Read the
-index sections your stage file names, plus that stage file — not the whole set.
+This file is the index; each stage's detailed rules live under
+`docs/spec-pipeline/` (table below), the cross-cutting rules here. Read the index
+sections your stage file names, plus that stage file — not the whole set.
 
 ## Stages
 
@@ -46,8 +45,7 @@ opens the PR.
 | 5c | Deploy Verifier | `docs/spec-pipeline/deployer.md` |
 | 5d | Archiver | `docs/spec-pipeline/pr-opener.md` |
 
-Shared reference files in the same directory — read one only when your stage
-file says "Must read" it:
+Shared files; read one only when your stage file says "Must read" it:
 
 - `docs/spec-pipeline/audit-contract.md` — audit contract, evidence blocks,
   definition of done.
@@ -195,6 +193,9 @@ a narrow, stated exception:
 - They may commit, push, and open a **draft** PR, but only:
   - on a branch named `spec/NNN-slug`, never `main`/`master`
   - one conventional commit per task from `10-tasks.md`
+  - the tracked, append-only ledger `runs.jsonl` is committed in the PR Opener's
+    own docs/archive commit — never in a task commit, never gitignored, never
+    left dirty in the working tree
   - only after the Verifier reports PASS and the Architect reports every
     configured gate green
 - Any gate failure halts the pipeline. Nothing is committed. `30-report.md`

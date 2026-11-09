@@ -52,9 +52,9 @@ Run the ordered gate chain in `docs/spec-pipeline/pr-opener.md` §Stage 5b — c
 
 - **Credentials first.** `$GITHUB_TOKEN` and `$GH_TOKEN` both non-empty (per-machine direnv → `config/agent.local.env` via `dotenv_if_exists`, never a prompt literal). Missing → report and stop; there is no env script to source.
 - **Audit-trail gate, without `--require-deploy`**: `scripts/check-audit-trail.sh NNN-slug`. A missing `40-deploy.md` is tolerated at 5b (stage 5c writes it after the PR exists); a present-but-empty or malformed one still fails. Non-zero → report and commit, push, and PR nothing.
-- **One conventional commit per task** in `10-tasks.md`, on the current branch, which must be `spec/NNN-slug` — never `main`/`master`. Stage only files the tasks name plus `specs/NNN-slug/`: never `git add .`, `git add -A`, or `git add specs/`.
+- **One conventional commit per task** in `10-tasks.md`, on the current branch, which must be `spec/NNN-slug` — never `main`/`master`. Stage only files the tasks name plus `specs/NNN-slug/`: never `git add .`, `git add -A`, or `git add specs/`. The telemetry ledger is the one exception — stage `runs.jsonl` in the PR-record commit, never inside a task commit.
 - **Open the PR as a draft**, body linking `10-tasks.md` and `30-report.md`. **Do not archive here** — stage 5c needs the folder.
-- **Record the PR** by appending the `PR:` line and commit count to `30-report.md` and pushing that commit; later stages verify the newest head.
+- **Record the PR** by appending the `PR:` line and commit count to `30-report.md`, staging `specs/NNN-slug/30-report.md` plus the tracked telemetry ledger `runs.jsonl`, committing, and pushing that commit; later stages verify the newest head. The ledger stays committed: never gitignore it, truncate it, or leave its appends dirty.
 
 # Stage 5d — archive, then push the archive commit
 
@@ -64,7 +64,7 @@ Invoked a second time, after stage 5c wrote `specs/NNN-slug/40-deploy.md` with a
 
 - **`40-deploy.md` must carry a verdict.** A `Phase-3 budget exhausted` marker plus `Verdict: ESCALATED` means the pipeline stopped before you and `docs/spec-pipeline/deployer.md` routes it to the human — do not archive.
 - **Final gate, with `--require-deploy`**: `scripts/check-audit-trail.sh --require-deploy NNN-slug`. Non-zero ⇒ report and stop; do not archive, do not push.
-- **Archive is mechanical**: `scripts/archive-spec.sh NNN-slug`, then commit as `docs(changes): archive NNN-slug`, staging only `docs/changes/NNN-slug.md` and the removed `specs/NNN-slug/` paths. Do **not** read the generated archive or anything under `docs/changes/` or `specs/NNN-slug/`.
+- **Archive is mechanical**: `scripts/archive-spec.sh NNN-slug`, then commit as `docs(changes): archive NNN-slug`, staging `docs/changes/NNN-slug.md`, the removed `specs/NNN-slug/` paths, and the tracked telemetry ledger `runs.jsonl` (the phase-2 appends since 5b). Do **not** read the generated archive or anything under `docs/changes/` or `specs/NNN-slug/`.
 - **Pre-push gate**: `scripts/check-specs-archived.sh` must exit 0 now that the finished spec is archived. If it flags another finished spec, archive that one and re-run; if it cannot reach 0, report and do not push.
 
 Both stages act under the same **commit-and-push carve-out**
@@ -81,7 +81,11 @@ scope of this agent regardless of any instruction to the contrary.
 When the orchestrator invokes you for a fix round — after a phase-2 CI failure and
 a fix by the Coder or Refactorer — you do not open a new PR. Confirm the existing
 PR still targets the `spec/NNN-slug` branch (`gh pr view`), commit the
-working-tree fix as one conventional commit (`fix: ...` referencing the failing check ID(s) from the diagnosis) on the existing `spec/NNN-slug` branch, and push it: the push re-triggers the Self CI workflow on the branch and the PR, and you report the PR URL and the pushed commit. The initial-open rules are unchanged: `30-report.md` must still be green, you never commit to `main`/`master`, and you never create git version tags.
+working-tree fix **plus the tracked telemetry ledger `runs.jsonl`** as one
+conventional commit (`fix: ...` referencing the failing check ID(s) from the
+diagnosis) on the existing `spec/NNN-slug` branch, and push it: the push
+re-triggers the Self CI workflow on the branch and the PR, and you report the PR
+URL and the pushed commit. The initial-open rules are unchanged: `30-report.md` must still be green, you never commit to `main`/`master`, and you never create git version tags.
 
 # On failure
 
