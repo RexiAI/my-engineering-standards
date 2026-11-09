@@ -1,3 +1,10 @@
+## [1.55.2](https://github.com/RexiAI/my-engineering-standards/compare/v1.55.1...v1.55.2) (2026-11-09)
+
+
+### Bug Fixes
+
+* **mutation:** bound and scope mutation runs (ADR 0028) ([#125](https://github.com/RexiAI/my-engineering-standards/issues/125)) ([ca80c8c](https://github.com/RexiAI/my-engineering-standards/commit/ca80c8cdbacad697bf19505adb90e994c2cec75a))
+
 ## [1.55.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.55.0...v1.55.1) (2026-11-09)
 
 
