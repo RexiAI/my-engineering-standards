@@ -35,7 +35,7 @@ refused on `production`/`multi-service`. It removes stages, never gates — see
 | Property testing (`production`+) | jqwik | stdlib `testing/quick` | fast-check |
 | Complexity gate | PMD `CyclomaticComplexity`/`CognitiveComplexity` (≤6) | golangci `cyclop`/`gocognit` (≤6) | ESLint `complexity` (≤6) |
 | Design-principles gate (KISS/DRY/YAGNI/SOLID) | `scripts/check-code-principles.sh` — language-agnostic heuristic | same | same |
-| Mutation testing (`production`+) | PiTest, `mvn verify -Pmutation`, ≥80% | `go-mutesting` or `gremlins` (verify current maintenance status before adopting) | Stryker, `npx stryker run`, ≥80% |
+| Mutation testing (`production`+) | PiTest, `mvn verify -Pmutation`, ≥80% | `go-mutesting` or `gremlins` (verify current maintenance status before adopting) | Stryker via `scripts/run-mutation.sh` (bounded, scoped — ADR 0028), ≥80% |
 
 `testing/quick` is stdlib — no new Go dependency, consistent with this repo's
 "prefer stdlib, justify each dependency" rule (`docs/CODING_CONVENTIONS.md`) and the

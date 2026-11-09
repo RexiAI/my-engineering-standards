@@ -1,9 +1,12 @@
 {
   "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
   "packageManager": "npm",
-  "reporters": ["html", "clear-text", "progress"],
+  "reporters": ["clear-text", "progress", "json"],
+  "jsonReporter": { "fileName": "reports/mutation/mutation.json" },
   "testRunner": "vitest",
   "coverageAnalysis": "perTest",
+  "incremental": true,
+  "incrementalFile": "reports/mutation/stryker-incremental.json",
   "mutate": [
     "src/**/*.ts",
     "!src/**/*.test.ts",
@@ -15,5 +18,6 @@
     "low": 80,
     "break": 80
   },
-  "timeoutMS": 10000
+  "timeoutMS": 30000,
+  "concurrency": 4
 }
