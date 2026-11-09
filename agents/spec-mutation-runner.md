@@ -55,13 +55,23 @@ tier gate. At `mvp` tier, skip this stage entirely and write a one-line note in
   project. If neither runs cleanly, report and skip rather than blocking —
   this tooling is known to be inconsistently maintained, see
   `docs/SPEC_PIPELINE.md`.
-- **JS/TS**: `npx stryker run`. Target ≥80%.
+- **JS/TS**: `scripts/run-mutation.sh --base <merge-base>`. Target ≥80%.
+
+# Bounded runs (ADR 0028) — mandatory
+
+Run mutation through `scripts/run-mutation.sh`; never `npx stryker run` directly and
+never the whole-tree config in a spec run. One scope pass (`--base <merge-base>`,
+default merge-base with `origin/main`) and at most one survivor pass
+(`--only <survivor files>`), under the wall-clock budget (default 900 s). Read an
+existing `reports/mutation/mutation.json` before starting another run. Below
+threshold after the survivor pass: record the scoped score, name the survivors, and
+BLOCK — no retry loop. Procedure and report rules:
+`docs/spec-pipeline/mutation-runner.md §Bounded runs`.
 
 For each surviving mutant, understand what behavior it implies is untested, and
 write exactly that test — not a broad net, the specific missing assertion. Kill
-every reachable survivor. Re-run until the suite is mutation-clean or you have
-exhausted genuinely un-testable mutants (equivalent mutants), which you must
-name explicitly in the report.
+every reachable survivor. A mutant that cannot be killed by any test is an
+equivalent mutant, which you must name explicitly with the reason in the report.
 
 # Full suite, one final time
 

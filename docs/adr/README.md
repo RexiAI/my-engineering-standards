@@ -35,3 +35,4 @@ Proposed → Accepted → Deprecated → Superseded.
 | 0025 | [Agent test output: filtered capture and reuse of an unchanged run](0025-agent-test-output-and-run-reuse.md) | Accepted |
 | 0026 | [Voice console: a half-duplex operator surface with a structural never-list](0026-voice-console.md) | Accepted |
 | 0027 | [Telemetry ledger stays committed: the PR Opener commits runs.jsonl](0027-runs-jsonl-committed.md) | Accepted |
+| 0028 | [Bound and scope mutation runs](0028-bounded-mutation-runs.md) | Proposed |

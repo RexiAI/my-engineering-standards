@@ -22,7 +22,7 @@ sections your stage file names, plus that stage file — not the whole set.
 | 2 | Coder | `spec-coder` | Nothing — runs to green tests |
 | 3 | Refactorer | `spec-refactorer` | Nothing — runs to clean structure |
 | 4 | Verifier | `spec-verifier` | Nothing — independently re-checks stages 2-3 |
-| 5a | Mutation Runner | `spec-mutation-runner` | Nothing — runs to mutation-clean, only if Verifier passed |
+| 5a | Mutation Runner | `spec-mutation-runner` | Nothing — bounded, scoped mutation (ADR 0028), only if Verifier passed |
 | 5b | PR Opener | `spec-pr-opener` | Nothing — commits, pushes, opens draft PR (no longer archives), only if Mutation Runner green |
 | 5c | Deploy Verifier | `spec-deployer` | Nothing — waits for the live Vercel preview deployment, verifies health check + E2E against it, writes `40-deploy.md`; frontend lanes only, otherwise a recorded skip |
 | 5d | Archiver | `spec-pr-opener` | Nothing — runs the archive as the genuinely final act, only if `40-deploy.md` carries a PASS verdict or a recorded skip |

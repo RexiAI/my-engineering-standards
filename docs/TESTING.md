@@ -302,9 +302,30 @@ The gap is not theoretical. A 2026 practitioner benchmark generated tests for on
 
 - **Java**: PiTest (`pitest-maven` plugin, profile-activated). Run with `mvn verify -Pmutation`. Target mutation coverage >= 80%. No shared parent POM exists in this repo to pin this centrally — copy `ci/templates/pitest-profile.xml` into each project.
 - **Go**: Gremlins (`gremlins unleash`), actively maintained and coverage-aware. See `ci/templates/mutation.mk`. `go-mutesting` was considered and rejected — fewer mutators, unmaintained.
-- **JS/TS**: Stryker Mutator for JavaScript/TypeScript projects. Run with `npx stryker run`. See `ci/templates/stryker.conf.json`.
+- **JS/TS**: Stryker Mutator for JavaScript/TypeScript projects. Run through `scripts/run-mutation.sh` (bounded, scoped — see below). See `ci/templates/stryker.conf.json`.
 - **React Native**: Stryker with the Jest runner (`testRunner: "jest"`, handles the jest-expo preset). Run with `npx stryker run`. See `ci/templates/stryker.react-native.conf.json`.
 - Run mutation tests periodically (not every commit — too slow). Run before major releases and when adding tests to ensure they are effective.
+
+### Bounded, scoped mutation runs (ADR 0028)
+
+A mutation run must finish, and it must describe the change under review — not
+the whole tree, and not an unbounded loop.
+
+- **Scope by the diff.** A spec-stage run mutates only the files changed since its
+  base ref (`scripts/run-mutation.sh --base <ref>`, which passes `--since` to
+  Stryker). The project's `mutate` globs still decide what is instrumentable.
+- **Keep the incremental cache.** `incremental: true` with a stable
+  `incrementalFile` means a re-run only tests mutants whose source or killing
+  tests changed.
+- **Enforce a wall-clock budget.** Default 900 s (`MUTATION_BUDGET_SECONDS`). On
+  expiry the partial report is kept and the exit code is 124; the stage records a
+  scoped score and stops.
+- **Two passes, then stop.** One scope pass, at most one targeted survivor pass
+  (`--only <files>`). No loop that retries until the score passes. Below threshold
+  after that: record the score and block.
+- **Label the score.** Always say whether it is *scoped* (with the file list and
+  no-coverage count) or *whole-tree*. Whole-tree is a pre-release activity
+  (`--all`), never a spec-stage gate.
 
 ## Static Analysis
 

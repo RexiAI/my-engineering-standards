@@ -7,6 +7,31 @@ Must read: `docs/spec-pipeline/audit-contract.md` (§Audit contract) for the
 Deliverable: `specs/NNN-slug/30-report.md`; the evidence-block format is in the
 audit contract named above.
 
+## Bounded runs
+
+Mutation testing is bounded and scoped (ADR 0028). The unbounded form — whole-tree Stryker,
+then a retry loop with no stopping rule — is a release activity, not a spec stage, and it was
+observed to dominate a run while proving nothing about the change under review.
+
+- **Scope**: the change surface, only. `scripts/run-mutation.sh --base <ref>` passes
+  `--since <ref>` to Stryker, so the project's `mutate` globs and the diff intersect.
+- **Cache**: `--incremental` with a stable incremental file, so a re-run tests only
+  mutants whose source or killing tests changed.
+- **Budget**: a wall-clock cap (default 900 s, `MUTATION_BUDGET_SECONDS`). On expiry
+  the partial report is kept and the exit code is 124 — the stage records a scoped
+  score and stops; it never hangs.
+- **Two passes, then stop**: one scope pass, at most one targeted survivor pass
+  (`--only <survivor files>`). Two runs are the whole budget for one spec; there is
+  no loop that retries until the score passes.
+- **Read before re-running**: an existing `reports/mutation/mutation.json` is evidence.
+  If the change surface has not moved, consume it; do not start another scope pass.
+- **Whole tree** (`--all`) is pre-release, never stage 5a.
+
+The report must label the score **scoped** (with the file list and the
+no-coverage count) or **whole-tree**, and never present one as the other. If the
+score is still below the threshold after the survivor pass, record it and BLOCK;
+do not spin.
+
 ## Full suite, one final time
 
 The Verifier already ran the full suite; your mutation-killing tests are new code
