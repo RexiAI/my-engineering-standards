@@ -1,3 +1,10 @@
+## [1.55.1](https://github.com/RexiAI/my-engineering-standards/compare/v1.55.0...v1.55.1) (2026-11-09)
+
+
+### Bug Fixes
+
+* **spec-pipeline:** commit runs.jsonl telemetry with the PR ([#124](https://github.com/RexiAI/my-engineering-standards/issues/124)) ([57a0e23](https://github.com/RexiAI/my-engineering-standards/commit/57a0e23f8d8e51cefe913580e149be98f9859926))
+
 # [1.55.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.54.0...v1.55.0) (2026-11-08)
 
 
