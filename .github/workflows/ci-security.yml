@@ -11,6 +11,10 @@ on:
         description: Enable Trivy filesystem scan
         default: true
         type: boolean
+      codeql-languages:
+        description: CodeQL languages (comma-separated, e.g. python or javascript-typescript)
+        default: javascript-typescript
+        type: string
       trivy-severity:
         description: Minimum severity for Trivy (CRITICAL,HIGH,MEDIUM)
         default: CRITICAL,HIGH
@@ -23,6 +27,7 @@ on:
 permissions:
   contents: read
   security-events: write
+  actions: read # codeql-action reads the workflow run; required on private repos
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -38,7 +43,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
       - uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
-          languages: javascript-typescript
+          languages: ${{ inputs.codeql-languages }}
           queries: security-and-quality
       - uses: github/codeql-action/autobuild@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
       - uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9

@@ -14,10 +14,11 @@ on:
   workflow_dispatch:
 
 # Caller-side cap (docs/SECURITY.md §CI/CD Supply Chain): the callee declares
-# contents: read + security-events: write for CodeQL uploads.
+# contents: read + security-events: write + actions: read for CodeQL uploads.
 permissions:
   contents: read
   security-events: write
+  actions: read
 
 jobs:
   security:
