@@ -11,6 +11,18 @@ on:
         description: Enable Trivy filesystem scan
         default: true
         type: boolean
+      codeql-languages:
+        description: CodeQL languages (comma-separated, e.g. python or javascript-typescript)
+        default: javascript-typescript
+        type: string
+      sarif-upload:
+        description: >-
+          Upload SARIF to GitHub code scanning. Needs GitHub Code Security on
+          private repos. When false, results are not uploaded and the jobs fail
+          directly on findings instead (CodeQL error-level results; Trivy
+          findings at trivy-severity).
+        default: true
+        type: boolean
       trivy-severity:
         description: Minimum severity for Trivy (CRITICAL,HIGH,MEDIUM)
         default: CRITICAL,HIGH
@@ -23,6 +35,7 @@ on:
 permissions:
   contents: read
   security-events: write
+  actions: read # codeql-action reads the workflow run; required on private repos
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -38,10 +51,22 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
       - uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
-          languages: javascript-typescript
+          languages: ${{ inputs.codeql-languages }}
           queries: security-and-quality
       - uses: github/codeql-action/autobuild@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
       - uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        with:
+          upload: ${{ inputs.sarif-upload && 'always' || 'never' }}
+          output: codeql-results
+      # Without an upload nothing surfaces the alerts, so error-level results
+      # fail the job here instead (warning/note quality findings do not).
+      - name: Fail on CodeQL error-level results
+        if: ${{ !inputs.sarif-upload }}
+        run: |
+          count=$(jq '[.runs[].results[]? | select((.level // "warning") == "error")] | length' codeql-results/*.sarif | awk '{s+=$1} END {print s+0}')
+          jq -r '.runs[].results[]? | select((.level // "warning") == "error") | "\(.ruleId): \(.locations[0].physicalLocation.artifactLocation.uri):\(.locations[0].physicalLocation.region.startLine) \(.message.text)"' codeql-results/*.sarif
+          echo "CodeQL error-level results: $count"
+          [ "$count" -eq 0 ]
 
   trivy:
     name: Trivy Filesystem Scan
@@ -51,12 +76,23 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        if: inputs.sarif-upload
         with:
           scan-type: fs
           scan-ref: .
           format: sarif
           output: trivy-results.sarif
           severity: ${{ inputs.trivy-severity }}
+      # No upload: print the table and fail the job on any finding.
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        if: ${{ !inputs.sarif-upload }}
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: table
+          exit-code: '1'
+          severity: ${{ inputs.trivy-severity }}
       - uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        if: inputs.sarif-upload
         with:
           sarif_file: trivy-results.sarif
