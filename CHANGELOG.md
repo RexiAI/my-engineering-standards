@@ -1,3 +1,10 @@
+## [1.55.5](https://github.com/RexiAI/my-engineering-standards/compare/v1.55.4...v1.55.5) (2026-11-24)
+
+
+### Bug Fixes
+
+* **gates:** prune vendored dirs in principles check; scope AC-041-53 ([#128](https://github.com/RexiAI/my-engineering-standards/issues/128)) ([991d64e](https://github.com/RexiAI/my-engineering-standards/commit/991d64e8272ef30d0df1395d4eb3cbfced657f56)), closes [#126](https://github.com/RexiAI/my-engineering-standards/issues/126)
+
 ## [1.55.4](https://github.com/RexiAI/my-engineering-standards/compare/v1.55.3...v1.55.4) (2026-11-24)
 
 
