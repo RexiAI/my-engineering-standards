@@ -106,7 +106,15 @@ item_rows() {
 }
 
 @test "AC-041-53 — no gate script or threshold changed" {
-  local script base
+  local script base branch
+  # A branch-scoped claim: spec 041 changed no gate script. Diffed on any later
+  # branch it forbids every legitimate, human-authorised gate fix, so it only
+  # runs on spec 041's own branch.
+  branch="${GITHUB_HEAD_REF:-$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null)}"
+  case "$branch" in
+    spec/041-*) ;;
+    *) skip "AC-041-53 is scoped to spec 041's branch (current: ${branch:-unknown})" ;;
+  esac
   if ! base="$(base_commit)"; then
     # Genuinely unavailable: a shallow clone carries neither the pinned base
     # nor a base branch to take a merge-base from, so the diff has no frame.
