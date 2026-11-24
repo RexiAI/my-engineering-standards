@@ -1,3 +1,10 @@
+## [1.55.3](https://github.com/RexiAI/my-engineering-standards/compare/v1.55.2...v1.55.3) (2026-11-24)
+
+
+### Bug Fixes
+
+* **ci-security:** configurable CodeQL languages and actions: read ([#127](https://github.com/RexiAI/my-engineering-standards/issues/127)) ([6eb2287](https://github.com/RexiAI/my-engineering-standards/commit/6eb22879b941ffa1d218e9f942eaf85234c71e84))
+
 ## [1.55.2](https://github.com/RexiAI/my-engineering-standards/compare/v1.55.1...v1.55.2) (2026-11-09)
 
 
