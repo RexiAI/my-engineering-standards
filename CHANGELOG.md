@@ -1,3 +1,10 @@
+## [1.55.4](https://github.com/RexiAI/my-engineering-standards/compare/v1.55.3...v1.55.4) (2026-11-24)
+
+
+### Bug Fixes
+
+* **traceability:** scan Python test files for scenario IDs ([#126](https://github.com/RexiAI/my-engineering-standards/issues/126)) ([898a711](https://github.com/RexiAI/my-engineering-standards/commit/898a7112a47eecf4f5ee26def564d45e317f5f66))
+
 ## [1.55.3](https://github.com/RexiAI/my-engineering-standards/compare/v1.55.2...v1.55.3) (2026-11-24)
 
 
