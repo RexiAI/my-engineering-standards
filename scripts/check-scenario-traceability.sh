@@ -161,7 +161,7 @@ fi
 # belt-and-braces for the default layout, while $(basename "$ARCHIVE_DIR") is
 # the general form that also covers a non-default archive dir passed as the
 # third positional argument — which the selftest fixtures rely on.
-GREP_EXCLUDES="--exclude-dir=node_modules --exclude-dir=target --exclude-dir=vendor --exclude-dir=.git --exclude-dir=.standards --exclude-dir=dist --exclude-dir=specs --exclude-dir=docs --exclude-dir=$(basename "$ARCHIVE_DIR")"
+GREP_EXCLUDES="--exclude-dir=node_modules --exclude-dir=target --exclude-dir=vendor --exclude-dir=.venv --exclude-dir=.git --exclude-dir=.standards --exclude-dir=dist --exclude-dir=specs --exclude-dir=docs --exclude-dir=$(basename "$ARCHIVE_DIR")"
 
 # ── Collect scenario IDs from specs/*/20-acceptance/*.md ─────────────────────
 # Match "## AC-NNN-NN" headings, e.g. "## AC-002-01 — Apply a percentage discount"
@@ -199,12 +199,21 @@ say ""
 # references AC-008-01) which are not test references and would otherwise
 # appear as dangling after the spec is archived. See spec 001 AC-002-06
 # hermetic note. Scan test files only: bats, Go _test.go, Java *Test.java,
-# JS/TS *.test.* / *.spec.*. Scaffold templates in ci/templates are also
-# considered test sources via their test files.
-REFERENCED_IDS=$(grep -rhoE 'AC[_-][0-9]{3}[_-][0-9]{2}' "$SOURCE_DIR" \
-  --include="*.bats" --include="*_test.go" --include="*Test.java" --include="*PropertyTest.java" \
-  --include="*.test.ts" --include="*.test.js" --include="*.spec.ts" --include="*.spec.js" \
-  $GREP_EXCLUDES 2>/dev/null | tr '_' '-' | sort -u || true)
+# JS/TS *.test.* / *.spec.*, Python test_*.py / *_test.py. Scaffold templates
+# in ci/templates are also considered test sources via their test files.
+# Python test functions are snake_case (test_ac_001_01_...), so Python files
+# alone are matched case-insensitively and normalised to upper case; other
+# languages keep the exact-case match (a lowercase file name such as
+# ac-004-005-007-trace.bats is not a scenario reference).
+REFERENCED_IDS=$( {
+  grep -rhoE 'AC[_-][0-9]{3}[_-][0-9]{2}' "$SOURCE_DIR" \
+    --include="*.bats" --include="*_test.go" --include="*Test.java" --include="*PropertyTest.java" \
+    --include="*.test.ts" --include="*.test.js" --include="*.spec.ts" --include="*.spec.js" \
+    $GREP_EXCLUDES 2>/dev/null || true
+  grep -rhoiE 'AC[_-][0-9]{3}[_-][0-9]{2}' "$SOURCE_DIR" \
+    --include="test_*.py" --include="*_test.py" \
+    $GREP_EXCLUDES 2>/dev/null || true
+} | tr '_' '-' | tr '[:lower:]' '[:upper:]' | sort -u)
 
 
 # ── Check 1: every scenario has a matching test reference (AC-007-04-01) ─────
