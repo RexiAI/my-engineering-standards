@@ -1,0 +1,63 @@
+# Generated E2E workflow for a Python project
+# Template: ci/templates/child-ci-python-e2e.yml
+#
+# Standard: language-specific/python/TESTING.md §E2E. Runs the pytest `e2e`
+# marker (excluded from the default run via `addopts = -m 'not e2e'`) against
+# real sandbox providers. Scheduled weekly + manual only — never per PR
+# (docs/TESTING.md §E2E Tests). No pull_request / pull_request_target trigger,
+# so fork code never runs with these secrets (docs/SECURITY.md §Pwn requests).
+#
+# Action pins mirror ci/templates/child-ci-python.yml (docs/SECURITY.md
+# §Pin third-party Actions and reusable workflows to a commit SHA).
+
+name: E2E (weekly)
+
+on:
+  schedule:
+    - cron: "0 5 * * 1" # Mondays 05:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # One E2E run at a time: runs share sandbox accounts.
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    name: E2E (sandbox)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # A skip in this job is a misconfiguration, not a pass: require_env()
+      # fails instead of skipping when E2E_REQUIRED=1.
+      E2E_REQUIRED: "1"
+      # Map each sandbox secret your suite names via require_env(). Values come
+      # from repository secrets only; never echo them in run: steps.
+      TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+      TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+      META_APP_SECRET: ${{ secrets.META_APP_SECRET }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version-file: .python-version
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked --all-extras --dev
+      # Uncomment when the suite has browser flows (pytest-playwright).
+      # - run: uv run playwright install --with-deps chromium
+      # The explicit -m e2e overrides the -m 'not e2e' in addopts.
+      - run: uv run pytest -m e2e tests/e2e --junitxml=reports/e2e-junit.xml
+      - name: Upload E2E artifacts
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: e2e-artifacts
+          path: |
+            reports/
+            test-results/
+          retention-days: 14
