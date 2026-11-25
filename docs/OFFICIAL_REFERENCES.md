@@ -36,6 +36,10 @@ describes behaviour from a different major version is a defect.
 | Java | **21** (LTS) | JDK `21` toolchain — records, sealed types, virtual threads | [Java SE 21 documentation](https://docs.oracle.com/en/java/javase/21/) |
 | Go | **resolved from `go.mod`** — the module's `go` and `toolchain` lines are authoritative, not this table | per-module `go.mod` | [Go toolchains](https://go.dev/doc/toolchain) |
 | React Native | **0.88.1** | Node `^22.13.0`, `^24.3.0`, `>= 26.0.0`; React peer `^19.3.0` | [npm registry — react-native@0.88.1](https://registry.npmjs.org/react-native/0.88.1) |
+| pytest (Python E2E) | **9.2.0** | Python `>= 3.10` | [PyPI JSON API](https://pypi.org/pypi/pytest/json) |
+| pytest-playwright (optional browser E2E) | **0.10.0** | Python `>= 3.10` | [PyPI JSON API](https://pypi.org/pypi/pytest-playwright/json) |
+
+**Added 2026-11-25:** the `pytest` and `pytest-playwright` rows (Python E2E guidance).
 
 **Added 2026-11-01 (spec 042):** the `Java`, `Go`, and `React Native` rows above were added on `2026-11-01`; the pre-existing rows keep the document's `2026-10-15` retrieval date.
 
@@ -250,6 +254,21 @@ Ecosystem (linked from fetched pages, not fetched directly):
 [`sqlmodel.tiangolo.com/tutorial/fastapi/tests/`](https://sqlmodel.tiangolo.com/tutorial/fastapi/tests/) ·
 [`github.com/fastapi/full-stack-fastapi-template`](https://github.com/fastapi/full-stack-fastapi-template) ·
 [`github.com/florimondmanca/asgi-lifespan`](https://github.com/florimondmanca/asgi-lifespan)
+
+Python E2E (added 2026-11-25, `language-specific/python/TESTING.md §E2E`):
+[`docs.pytest.org/en/stable/example/markers.html`](https://docs.pytest.org/en/stable/example/markers.html) ·
+[`/how-to/mark.html`](https://docs.pytest.org/en/stable/how-to/mark.html) ·
+[`/how-to/skipping.html`](https://docs.pytest.org/en/stable/how-to/skipping.html) ·
+[`/how-to/fixtures.html`](https://docs.pytest.org/en/stable/how-to/fixtures.html) ·
+[`www.python-httpx.org/advanced/timeouts/`](https://www.python-httpx.org/advanced/timeouts/) ·
+[`www.uvicorn.org/settings/`](https://www.uvicorn.org/settings/) ·
+[`playwright.dev/python/docs/test-runners`](https://playwright.dev/python/docs/test-runners) (+ `/trace-viewer`, `/test-assertions`) ·
+[`www.twilio.com/docs/usage/webhooks/webhooks-security`](https://www.twilio.com/docs/usage/webhooks/webhooks-security) ·
+[`developers.facebook.com/docs/graph-api/webhooks/getting-started`](https://developers.facebook.com/docs/graph-api/webhooks/getting-started) ·
+[`docs.pydantic.dev/latest/concepts/models/`](https://docs.pydantic.dev/latest/concepts/models/) ·
+ecosystem: [`pytest-timeout`](https://github.com/pytest-dev/pytest-timeout) ·
+[`pytest-rerunfailures`](https://github.com/pytest-dev/pytest-rerunfailures) ·
+[`PyYAML`](https://pyyaml.org/wiki/PyYAMLDocumentation)
 
 ### Rust — `doc.rust-lang.org`
 

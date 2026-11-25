@@ -122,6 +122,13 @@ budgets, replay cache, bug-bash bounds, CI wiring — lives in
 `skills/e2e-testing/SKILL.md` (references one level deep). The `e2e-runner`
 agent (`agents/e2e-runner.md`) operates it.
 
+**Python / FastAPI repos** do not use the agentic framework (TS/RN only).
+Their E2E standard — `e2e` pytest marker excluded by default, sandbox
+credentials via env with skip-with-reason, yield-fixture cleanup, signed
+webhook simulation, readiness polling, scheduled CI — lives in
+`language-specific/python/TESTING.md §E2E`, with the CI template
+`ci/templates/child-ci-python-e2e.yml`.
+
 Everything below in this E2E section (Dockerized-service HTTP E2E, readiness
 polling, bounded retries, the Playwright `retries:` guidance, and the Maestro
 React Native path) remains the guidance for repos not adopting `e2e` and for

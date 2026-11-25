@@ -40,7 +40,7 @@ addopts = "-q --strict-markers"
 | Unit | pytest + plain fakes / stdlib `unittest.mock` for repositories; no HTTP, no DB |
 | Acceptance | same frameworks, named to the scenario ID (`AC-NNN-NN`, spec pipeline — `docs/SPEC_PIPELINE.md`) |
 | Integration | `TestClient` (or `httpx.AsyncClient`) against the real app + in-memory SQLite; outbound HTTP stubbed with `httpx.MockTransport` **[ecosystem]** (https://www.python-httpx.org/advanced/transports/ — "accepts a handler function, which can be used to map requests onto pre-determined responses") |
-| E2E | full service in Docker compose; poll `GET /health` for readiness (never a fixed sleep — `docs/TESTING.md §Readiness polling, never a fixed sleep`) |
+| E2E | full service (live uvicorn or Docker compose) against real sandbox providers; `e2e` marker, excluded by default — see §E2E below |
 
 In-memory alternatives follow `docs/TESTING.md §Integration Tests`
 (SQLite `:memory:` is that table's in-memory SQL pick). The SQLModel/SQLite
@@ -201,6 +201,238 @@ class ItemFactory:
   `ci/templates/mutmut-pyproject.toml`. Like the other mutation assets it is
   opt-in and periodic, not per-PR. `docs/TESTING.md §Mutation Testing`'s tool
   table still lacks a Python row — a docs follow-up, not a gate change.
+
+## E2E
+
+Python and FastAPI repos use this section for end-to-end tests. The agentic E2E
+framework (`skills/e2e-testing/SKILL.md`) is the standard for TS/Node and
+React Native only. Python E2E stays pytest-driven: the real service runs
+against real **sandbox** providers (payment test mode, telephony test
+credentials, messaging sandboxes). The layer definition, cadence, and flake
+policy are inherited from `docs/TESTING.md §E2E Tests`.
+
+### Marker, excluded from the default run
+
+**[official]** pytest custom markers are registered in config and selected or
+deselected with `-m`
+(https://docs.pytest.org/en/stable/example/markers.html). With
+`--strict-markers`, an unregistered marker is an error
+(https://docs.pytest.org/en/stable/how-to/mark.html).
+
+**[convention]** Every E2E test carries `@pytest.mark.e2e` and lives under
+`tests/e2e/`. A plain `pytest` never runs it:
+
+```toml
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers -m 'not e2e'"
+markers = ["e2e: hits real sandbox providers; run with `pytest -m e2e`"]
+```
+
+Select it explicitly with `uv run pytest -m e2e tests/e2e`. When `-m` appears
+on the command line, it wins over the `-m` in `addopts`, because the later
+option overrides the earlier one.
+
+### Credentials: env vars, skip with a reason
+
+- **[convention]** Sandbox credentials come only from environment variables:
+  CI secrets in CI, and the gitignored `.env` locally (`docs/SECURITY.md
+  §Secrets Management`). They never come from a committed file.
+- **[official]** `pytest.skip(reason)` skips the test and shows the reason in
+  the report (https://docs.pytest.org/en/stable/how-to/skipping.html).
+- **[convention]** When a credential is missing, the test skips. The reason
+  names the **variable** and never its value. Never print, log, or assert on a
+  secret value.
+
+```python
+# tests/e2e/conftest.py
+import os
+
+import pytest
+
+
+def require_env(name: str) -> str:
+    value = os.environ.get(name)
+    if not value:
+        pytest.skip(f"{name} not set — sandbox E2E skipped")
+    return value
+```
+
+- **[convention]** In a CI job whose purpose is E2E, a skip is a
+  misconfiguration. Set `E2E_REQUIRED=1` there, and have `require_env` call
+  `pytest.fail` instead of `pytest.skip` when it is set. A silent all-skip run
+  is a false green.
+
+### Cleanup: yield fixtures, always
+
+**[official]** In a `yield` fixture, the code after `yield` is teardown. It
+runs even when the test fails, but it does not run if the fixture itself
+raised before `yield`
+(https://docs.pytest.org/en/stable/how-to/fixtures.html#yield-fixtures-recommended).
+`request.addfinalizer` is the alternative.
+
+**[convention]** Every sandbox resource a test creates (customer, phone
+number, webhook subscription, tenant) gets torn down by the fixture that
+created it. Teardown is best effort: log failures and do not raise them, so
+one leaked resource does not mask the real assertion failure.
+
+```python
+import logging
+import uuid
+
+log = logging.getLogger(__name__)
+
+
+@pytest.fixture
+def run_id() -> str:
+    return f"e2e-{uuid.uuid4().hex[:12]}"   # unique per test: re-runs never collide
+
+
+@pytest.fixture
+def sandbox_customer(payments_client, run_id):
+    customer = payments_client.create_customer(email=f"{run_id}@example.test",
+                                               metadata={"e2e_run": run_id})
+    yield customer
+    try:
+        payments_client.delete_customer(customer.id)
+    except Exception:                         # teardown must not mask the test result
+        log.warning("e2e cleanup failed", extra={"resource": customer.id})
+```
+
+- **[convention]** Tag every created resource with the `run_id` (metadata,
+  name prefix). A scheduled sweeper can then delete orphans older than N
+  hours, which catches anything a killed runner never tore down.
+- **[convention]** Test data is unique per run (`run_id`), and every assertion
+  is scoped to that data, so a re-run is idempotent. Never assert on global
+  counts in a shared sandbox account.
+
+### Inbound events: signed webhook simulation
+
+Providers sign the webhooks they deliver. Twilio sends `X-Twilio-Signature`,
+an HMAC-SHA1 over the full URL plus the sorted POST params, keyed by the auth
+token **[official]**
+(https://www.twilio.com/docs/usage/webhooks/webhooks-security). Meta sends
+`X-Hub-Signature-256`, an HMAC-SHA256 of the raw body, keyed by the app secret
+**[official]**
+(https://developers.facebook.com/docs/graph-api/webhooks/getting-started).
+
+**[convention]** E2E tests deliver inbound events by **signing them exactly as
+the provider would**, using the sandbox secret and stdlib `hmac`. Never turn
+off signature verification for tests. A test that bypasses the check proves
+nothing about the check. Also send one tampered payload and assert `403`.
+
+```python
+import hashlib
+import hmac
+
+
+def meta_signature(app_secret: str, raw_body: bytes) -> str:
+    digest = hmac.new(app_secret.encode(), raw_body, hashlib.sha256).hexdigest()
+    return f"sha256={digest}"
+
+
+def test_inbound_message_is_accepted(live_client, run_id):
+    secret = require_env("META_APP_SECRET")
+    body = build_whatsapp_event(text=f"hola {run_id}").encode()
+    r = live_client.post("/v1/webhooks/meta", content=body,
+                         headers={"X-Hub-Signature-256": meta_signature(secret, body),
+                                  "Content-Type": "application/json"})
+    assert r.status_code == 200
+```
+
+Prefer the provider SDK's own validator when one exists, for example
+`twilio.request_validator.RequestValidator`, to compute the expected
+signature. That keeps the test's signing aligned with the server's checking.
+
+### In-process client vs live server
+
+| Need | Use |
+|---|---|
+| Real providers, app in-process, no network hop to the app | `TestClient` as a context manager (runs lifespan — see §TestClient above) |
+| Real HTTP: a provider calls back into you, a browser drives the UI, middleware or proxy behavior | live `uvicorn` subprocess or the Docker compose stack, driven by `httpx.Client(base_url=..., timeout=...)` |
+
+**[convention]** Start the live server from a session fixture on a free port.
+Poll `GET /health` until it returns 200, with a bounded deadline. Never use a
+fixed `sleep` (`docs/TESTING.md §Readiness polling, never a fixed sleep`).
+Terminate the server in teardown, and attach its log on failure.
+
+```python
+import subprocess
+import time
+
+import httpx
+
+
+def wait_ready(url: str, deadline_s: float = 30.0) -> None:
+    end = time.monotonic() + deadline_s
+    while time.monotonic() < end:
+        try:
+            if httpx.get(url, timeout=2.0).status_code == 200:
+                return
+        except httpx.TransportError:
+            pass
+        time.sleep(0.25)                      # poll interval, not a readiness guess
+    raise TimeoutError(f"{url} not ready after {deadline_s}s")
+
+
+@pytest.fixture(scope="session")
+def live_client(tmp_path_factory):
+    port = 8765                               # or pick a free port via socket.bind(("", 0))
+    log_path = tmp_path_factory.mktemp("server") / "uvicorn.log"
+    with open(log_path, "wb") as log_file:
+        proc = subprocess.Popen(["uv", "run", "uvicorn", "app.main:app", "--port", str(port)],
+                                stdout=log_file, stderr=subprocess.STDOUT)
+        try:
+            wait_ready(f"http://127.0.0.1:{port}/health")
+            with httpx.Client(base_url=f"http://127.0.0.1:{port}", timeout=10.0) as c:
+                yield c
+        finally:
+            proc.terminate()
+            proc.wait(timeout=10)
+```
+
+uvicorn's command-line options are documented at
+https://www.uvicorn.org/settings/ **[official]**.
+
+### Timeouts, retries, artifacts
+
+- **[official]** httpx applies a 5-second default timeout. Set the timeout
+  explicitly on every client anyway
+  (https://www.python-httpx.org/advanced/timeouts/).
+- **[convention]** Give every test an upper bound so a hung sandbox call fails
+  the test instead of the job. pytest-timeout **[ecosystem]**
+  (https://github.com/pytest-dev/pytest-timeout) does this with
+  `timeout = 120` under `[tool.pytest.ini_options]`, and the CI job has its own
+  `timeout-minutes`.
+- **[convention]** Do not retry until green. If a rerun plugin is used
+  (pytest-rerunfailures **[ecosystem]**,
+  https://github.com/pytest-dev/pytest-rerunfailures), it is per test, starts
+  at `reruns=1`, and has a comment naming the transient condition it absorbs
+  (`docs/TESTING.md §Bounded, justified flake retry`). A sandbox 4xx is never
+  retried.
+- **[convention]** On failure, keep the evidence: `--junitxml`, the live
+  server log, and Playwright traces. Upload them as CI artifacts (see the
+  template below), and scrub secrets first.
+
+### Browser flows (optional): Playwright for Python
+
+**[official]** `pytest-playwright` provides a `page` fixture and the
+`--browser`, `--headed`, and `--tracing retain-on-failure` options
+(https://playwright.dev/python/docs/test-runners). Traces open in the trace
+viewer (https://playwright.dev/python/docs/trace-viewer). Use web-first
+assertions such as `expect(page.get_by_role(...)).to_be_visible()`, which
+retry until a timeout, instead of sleeps
+(https://playwright.dev/python/docs/test-assertions). Mark browser tests
+`e2e` as well, and run them against the live server fixture.
+
+### CI: scheduled/manual, never per PR
+
+**[convention]** E2E runs weekly and on `workflow_dispatch`. It is not a
+per-PR gate (`docs/TESTING.md §E2E Tests`, `docs/DEPLOYMENT.md §Quality
+Gates`). Copy `ci/templates/child-ci-python-e2e.yml`. Sandbox secrets map into
+`env:` from repository secrets (`docs/SECURITY.md §CI/CD Supply Chain`). They
+never appear in `run:` bodies, and the job never runs on fork-triggered
+events.
 
 ## Layer Boundaries (inherited)
 
