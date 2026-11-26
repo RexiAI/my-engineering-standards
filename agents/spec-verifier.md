@@ -75,7 +75,7 @@ The pipeline's gate-failure loops are bounded (`docs/SPEC_PIPELINE.md`
 - **Record the re-verification attempt index and the phase** in `25-verification.md`
   on every re-verification (e.g. `attempt 2, phase 1`); the first full run is
   attempt 1 and each re-verification increments the index.
-- **Scoped flags** narrow a script gate further: `scripts/check-code-principles.sh --gates <name>`, `scripts/check-scenario-traceability.sh --checks <1|2>`. Append to the gate it belongs to (full run + delta, never a rewrite); the verdict reflects the re-run.
+- **Scoped flags** narrow a script gate further: `scripts/check-code-principles.sh --gates <name>`, `scripts/check-scenario-traceability.sh --checks <1|2>`; traceability always takes `--spec <NNN-slug>`. Append to the gate it belongs to (full run + delta, never a rewrite); the verdict reflects the re-run.
 
 # Report
 

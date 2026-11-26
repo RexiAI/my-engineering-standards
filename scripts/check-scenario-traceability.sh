@@ -30,11 +30,18 @@
 # (AC-007-04-06): BLOCK, not PASS.
 #
 # Usage:
-#   .standards/scripts/check-scenario-traceability.sh [--checks 1|2|1,2] [--json] [-ReportPath <file>] [SPECS_DIR] [SOURCE_DIR] [ARCHIVE_DIR]
+#   .standards/scripts/check-scenario-traceability.sh [--checks 1|2|1,2] [--json] [--spec <NNN-slug|NNN>] [-ReportPath <file>] [SPECS_DIR] [SOURCE_DIR] [ARCHIVE_DIR]
 #   defaults: SPECS_DIR=specs  SOURCE_DIR=.  ARCHIVE_DIR=docs/changes
 #   --checks selects which checks run (default: both); --json prints a single
 #   JSON object { "checks": [...], "passes": [...], "fails": [...] } instead of
 #   the human output, with the same exit code.
+#   --spec scopes check 1 to the spec under verification (ADR 0029): only
+#   SPECS_DIR/<NNN-slug>/20-acceptance/*.md must be traced, so another in-flight
+#   spec's untested scenarios (which may reuse task-numbered IDs such as
+#   AC-008-02) cannot fail this spec's Verifier. The value is the folder name or
+#   its unique 3-digit prefix; a missing or ambiguous folder is exit 2. Check 2
+#   still resolves references against every in-flight and archived source.
+#   Without --spec the behavior is unchanged (every in-flight spec is checked).
 #
 # -ReportPath <file> additionally writes the machine-readable JSON report
 # (passes, fails) atomically to <file> — stdout is unchanged.
@@ -70,6 +77,7 @@ VIOLATIONS_LIST=()
 PASSED_IDS=()
 CHECKS="1,2"
 JSON=false
+SPEC=""
 POSITIONAL=()
 
 # One parser for both flag styles (see gate-report-lib.sh): 007's double-dash
@@ -81,6 +89,10 @@ while [ $# -gt 0 ]; do
     case "$name" in
       checks) CHECKS="${2:-}"; shift $(( $# > 1 ? 2 : 1 )) ;;
       json) JSON=true; shift ;;
+      spec)
+        SPEC="${2:-}"
+        [ -n "$SPEC" ] || { echo "Error: --spec requires a spec folder name (NNN-slug) or NNN" >&2; exit 2; }
+        shift $(( $# > 1 ? 2 : 1 )) ;;
       ReportPath)
         REPORT_PATH="${2:-}"
         [ -n "$REPORT_PATH" ] || { echo "Error: -ReportPath requires a non-empty file path" >&2; exit 2; }
@@ -171,6 +183,31 @@ if [ -d "$SPECS_DIR" ]; then
     | sed -E 's/^## //' | sort -u || true)
 fi
 
+# ── --spec: scope check 1 to the spec under verification (ADR 0029) ──────────
+# SCENARIO_IDS stays global (check 2 resolves against every in-flight spec);
+# CHECK1_IDS is what check 1 must trace.
+CHECK1_IDS="$SCENARIO_IDS"
+CHECK1_WHERE="$SPECS_DIR/*/20-acceptance/"
+if [ -n "$SPEC" ]; then
+  case "$SPEC" in
+    */*|.|..) echo "ERROR: --spec '$SPEC' must be a folder name under $SPECS_DIR, not a path" >&2; exit 2 ;;
+  esac
+  if [ -d "$SPECS_DIR/$SPEC" ]; then
+    SPEC_DIR="$SPECS_DIR/$SPEC"
+  else
+    matches=()
+    for d in "$SPECS_DIR/$SPEC"-*/; do [ -d "$d" ] && matches+=("${d%/}"); done
+    if [ "${#matches[@]}" -ne 1 ]; then
+      echo "ERROR: --spec '$SPEC' matches ${#matches[@]} folders under $SPECS_DIR (need exactly one) — cannot scope the traceability check" >&2
+      exit 2
+    fi
+    SPEC_DIR="${matches[0]}"
+  fi
+  CHECK1_IDS=$(grep -rhoE '^## (AC-[0-9]{3}-[0-9]{2})' "$SPEC_DIR"/20-acceptance/*.md 2>/dev/null \
+    | sed -E 's/^## //' | sort -u || true)
+  CHECK1_WHERE="$SPEC_DIR/20-acceptance/"
+fi
+
 # ── Collect scenario IDs from archived one-pagers (docs/changes/*.md) ────────
 # archive-spec.sh copies the '## AC-NNN-NN' headings verbatim into the archive,
 # so a merged spec's IDs stay resolvable after specs/NNN-slug/ is deleted
@@ -227,12 +264,12 @@ REFERENCED_IDS=$( {
 # workers invoked it concurrently, never in isolation. Same fix as
 # check-post-pr-ci-loop.sh's str_contains.
 if contains 1; then
-  for id in $SCENARIO_IDS; do
+  for id in $CHECK1_IDS; do
     if grep -qx "$id" <<< "$REFERENCED_IDS"; then
       pass "$id — traced to a test"
       PASSED_IDS+=("$id")
     else
-      fail "$id — scenario defined in $SPECS_DIR/*/20-acceptance/ but no test references it. " \
+      fail "$id — scenario defined in $CHECK1_WHERE but no test references it. " \
            "Add a test named after this ID, or confirm with 10-tasks.md that it's obsolete " \
            "and remove the scenario instead of leaving it untraced."
     fi
