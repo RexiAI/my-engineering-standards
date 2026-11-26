@@ -35,6 +35,12 @@ framework, with the ID in the test name:
 The ID is what `scripts/check-scenario-traceability.sh` greps for
 (`docs/spec-pipeline/rationale.md §Why no scenario mutation`).
 
+IDs are unique within a spec folder, not across folders: two in-flight specs
+may both number a task 008 and emit `AC-008-02`. The Verifier therefore runs the
+traceability gate with `--spec <NNN-slug>`, which traces only this spec's
+scenarios (ADR 0029). Prefer the spec number as `NNN` (`AC-<spec>-<n>`) where it
+fits; it keeps check 2 references unambiguous across folders.
+
 ## Ambiguity — `BLOCKED`
 
 Acceptance criteria must be checkable by reading code. When the informal spec

@@ -11,7 +11,7 @@ Run every check yourself; a prior stage's summary is no substitute.
 
 | # | Check | How it is run | Gate ID |
 |---|---|---|---|
-| 1 | Scenario traceability | `scripts/check-scenario-traceability.sh` (or `.standards/` twin); 0 = clean, 1 = findings, 2 = tooling failure | `traceability` |
+| 1 | Scenario traceability | `scripts/check-scenario-traceability.sh --spec <slug>` (or `.standards/` twin); 0 = clean, 1 = findings, 2 = tooling failure | `traceability` |
 | 2 | Full test suite | the project's real test command, via `scripts/agent-test-summary.sh --run` (§Test-log capture); a skipped test is a failure | `test-suite` |
 | 3 | Complexity gate | the real linter (`golangci-lint run`, `pmd check`, `eslint`) on the changed files | `complexity` |
 | 3.5 | Design-principles gate | `scripts/check-code-principles.sh`; every FAIL stops the pipeline, a WARN is recorded and flagged | `design-principles` |

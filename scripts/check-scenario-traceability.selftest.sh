@@ -17,6 +17,9 @@
 # Exits 0 only if all three cases produce their expected exit code and message;
 # otherwise names the failing case and exits 1.
 #
+# Also covers --spec scoping (ADR 0029): two in-flight specs whose
+# task-numbered IDs collide, where only the spec under verification is traced.
+#
 # Usage:
 #   bash scripts/check-scenario-traceability.selftest.sh
 # Exit codes:
@@ -32,6 +35,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CHECKER="$ROOT/scripts/check-scenario-traceability.sh"
 
 PASS_COUNT=0
+CASE_ARGS=()
 FAIL_COUNT=0
 
 ok() { PASS_COUNT=$((PASS_COUNT + 1)); echo -e "${GREEN}PASS${NC} $1"; }
@@ -50,7 +54,7 @@ run_case() {
   shift 2
   local out="$TMP/$name.out" missing=0 msg
   set +e
-  bash "$CHECKER" "$TMP/$name/specs" "$TMP/$name/src" "$TMP/$name/changes" >"$out" 2>&1
+  bash "$CHECKER" ${CASE_ARGS[@]+"${CASE_ARGS[@]}"} "$TMP/$name/specs" "$TMP/$name/src" "$TMP/$name/changes" >"$out" 2>&1
   local rc=$?
   set -e
   if [ "$rc" -ne "$expected_rc" ]; then
@@ -189,6 +193,20 @@ printf 'func TestLive_%s(t *testing.T) {}\nfunc TestTypo_%s(t *testing.T) {}\n' 
   "$(printf '%s' "$DUAL_TYPO_ID" | tr '-' '_')" \
   > "$TMP/dual_typo/src/dual_typo_test.go"
 
+# ── collision: two in-flight specs reuse task-numbered IDs (ADR 0029) ──────
+# 003-a is fully traced; 004-b defines its own task-numbered scenarios (same
+# AC-008-NN shape as 003-a would use) and has no tests yet. --spec 003-a must
+# pass; --spec 004 (prefix form) and the unscoped run must still fail on 004-b.
+COLL_A_ID="$(trace_id 8 1)"
+COLL_B_ID="$(trace_id 8 2)"
+mkdir -p "$TMP/collision/specs/003-a/20-acceptance" "$TMP/collision/specs/004-b/20-acceptance" \
+         "$TMP/collision/src" "$TMP/collision/specs/004-dup/20-acceptance"
+printf '## %s — spec A scenario\n' "$COLL_A_ID" > "$TMP/collision/specs/003-a/20-acceptance/a.md"
+printf '## %s — spec B scenario\n' "$COLL_B_ID" > "$TMP/collision/specs/004-b/20-acceptance/b.md"
+printf 'func TestA_%s(t *testing.T) {}\n' "$(printf '%s' "$COLL_A_ID" | tr '-' '_')" \
+  > "$TMP/collision/src/a_test.go"
+# 004-dup makes the bare "004" prefix ambiguous; it is removed after that case.
+
 # ── Run ──────────────────────────────────────────────────────────────────────
 echo "== AC-012-02 traceability selftest =="
 run_case pass 0 "$PASS_ID — traced to a test"
@@ -199,6 +217,17 @@ run_case out_of_flight 0 "$OUT_OF_FLIGHT_TRACED_ID — traced to a test"
 run_case stale_archived 1 "no matching scenario heading exists"
 run_case dual_authority 0 "every scenario traced, every reference resolves"
 run_case dual_typo 1 "no matching scenario heading exists"
+CASE_ARGS=(--spec 004)
+run_case collision 2 "matches 2 folders"
+rmdir "$TMP/collision/specs/004-dup/20-acceptance" "$TMP/collision/specs/004-dup"
+CASE_ARGS=(--spec 003-a)
+run_case collision 0 "$COLL_A_ID — traced to a test"
+CASE_ARGS=(--spec 004)
+run_case collision 1 "$COLL_B_ID — scenario defined in"
+CASE_ARGS=(--spec 999-missing)
+run_case collision 2 "matches 0 folders"
+CASE_ARGS=()
+run_case collision 1 "$COLL_B_ID — scenario defined in"
 
 echo ""
 if [ "$FAIL_COUNT" -gt 0 ]; then
