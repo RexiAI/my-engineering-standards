@@ -1,3 +1,10 @@
+## [1.55.6](https://github.com/RexiAI/my-engineering-standards/compare/v1.55.5...v1.55.6) (2026-11-26)
+
+
+### Bug Fixes
+
+* **traceability:** scope check 1 to the spec under verification ([#130](https://github.com/RexiAI/my-engineering-standards/issues/130)) ([1ff9221](https://github.com/RexiAI/my-engineering-standards/commit/1ff9221a037f8afaefadfe43c1b4c42de0ef556d))
+
 ## [1.55.5](https://github.com/RexiAI/my-engineering-standards/compare/v1.55.4...v1.55.5) (2026-11-24)
 
 
