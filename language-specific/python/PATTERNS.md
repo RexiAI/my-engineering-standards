@@ -314,6 +314,103 @@ def get_settings() -> Settings:
   default silently — fail-closed per `docs/SECURITY.md §Internal and
   Machine-Facing Endpoints Fail Closed`.
 
+## Multi-Tenant Config & Provider Registry
+
+All of this is **[convention]**. It is built on official Pydantic v2
+validation (https://docs.pydantic.dev/latest/concepts/models/) and PyYAML
+`safe_load` (https://pyyaml.org/wiki/PyYAMLDocumentation, **[ecosystem]**).
+Use it when each tenant chooses its own providers, for example telephony or
+LLM, from a YAML file.
+
+- **Validate everything at startup.** Load the YAML once in lifespan, parse it
+  into Pydantic models, and refuse to boot on any error, so the service fails
+  closed. Use `extra="forbid"` so a typo is an error and not a silently
+  ignored key.
+- **Secrets by reference.** YAML holds the *name* of an env var
+  (`api_key_env: TWILIO_AUTH_TOKEN`), never the value. Resolve it at startup,
+  and fail with the variable name if it is missing (`docs/SECURITY.md §Secrets
+  Management`).
+- **Registry, not if/else.** Providers register a builder under a name. The
+  factory looks the name up, so a new provider means one `register` call and
+  no edit to a dispatch chain (`docs/CODING_CONVENTIONS.md §SOLID`
+  Open/Closed). Validate unknown names at startup against the registry.
+
+```python
+# app/core/tenants.py
+import os
+from collections.abc import Callable
+from typing import Protocol
+
+import yaml
+from pydantic import BaseModel, ConfigDict, field_validator
+
+
+class ProviderConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    kind: str
+    api_key_env: str                          # env var NAME, never the secret
+
+
+class TenantConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    tenant_id: str
+    telephony: ProviderConfig
+
+
+class TelephonyProvider(Protocol):
+    def send(self, to: str, body: str) -> None: ...
+
+
+Builder = Callable[[str], TelephonyProvider]   # receives the resolved secret
+_registry: dict[str, Builder] = {}
+
+
+def register(name: str, builder: Builder) -> None:
+    if name in _registry:
+        raise ValueError(f"provider {name!r} already registered")
+    _registry[name] = builder
+
+
+def build(cfg: ProviderConfig) -> TelephonyProvider:
+    builder = _registry.get(cfg.kind)
+    if builder is None:
+        raise ValueError(f"unknown provider {cfg.kind!r}; known: {sorted(_registry)}")
+    secret = os.environ.get(cfg.api_key_env)
+    if not secret:
+        raise RuntimeError(f"{cfg.api_key_env} is not set")   # name, never value
+    return builder(secret)
+
+
+class TenantsFile(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    tenants: list[TenantConfig]
+
+    @field_validator("tenants")
+    @classmethod
+    def unique_ids(cls, v: list[TenantConfig]) -> list[TenantConfig]:
+        ids = [t.tenant_id for t in v]
+        if len(ids) != len(set(ids)):
+            raise ValueError("duplicate tenant_id")
+        return v
+
+
+def load_tenants(path: str) -> dict[str, TelephonyProvider]:
+    with open(path, encoding="utf-8") as f:
+        parsed = TenantsFile.model_validate(yaml.safe_load(f))   # never yaml.load
+    return {t.tenant_id: build(t.telephony) for t in parsed.tenants}
+```
+
+```python
+# app/providers/twilio_provider.py — one line wires a new provider
+register("twilio", lambda secret: TwilioProvider(auth_token=secret))
+```
+
+- Call `load_tenants` from the lifespan handler (§Health & Lifespan) and
+  store the result on `app.state`. Expose it through a dependency so tests can
+  swap it with `dependency_overrides`.
+- Tests register a fake builder under a test-only name, and never patch the
+  dict.
+
 ## Security & Auth
 
 **[official]** FastAPI ships security utilities in `fastapi.security`
