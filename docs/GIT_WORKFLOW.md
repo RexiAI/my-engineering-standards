@@ -172,6 +172,32 @@ unblock condition (a release of that plugin declaring peer support for the new m
 
 **Never merge a PR whose required gates are red.**
 
+## PR Size and Auto-Merge
+
+Small pull requests may merge automatically; large ones need a human. The
+`pr-size` required check counts changed lines after exclusions (additions +
+deletions; lockfiles, generated code, snapshots, and pure file deletions are
+excluded) and publishes the tier:
+
+| Changed lines | Tier | Auto-merge |
+|---|---|---|
+| 0–200 | `auto` | eligible |
+| 201–400 | `human` | a human merges |
+| > 400 | `blocked` | the check fails |
+
+A `> 400` PR can still pass the required check when a **CODEOWNER** applies the
+`size-override` label: an individual `@user` handle in the CODEOWNERS file must
+match the actor of the latest `labeled` event (with no CODEOWNERS file, the
+repository owner authorizes). A team handle never authorizes. An authorized
+override turns the check green but never auto-merges — a human still merges.
+
+**Prerequisite:** branch protection must require both `pr-size` and
+`review-verdict` (see `templates/branch-protection.md`). Auto-merge arms
+GitHub native auto-merge with squash only, after the required checks are green.
+
+Behavior is identical in every repo that wires the workflows: there is no per-repo allowlist and no repository-name condition, so every wired repo gets the same behavior. The mode setting lives in
+`docs/CI_CD.md §PR Size Gate and Review-Gated Auto-Merge`.
+
 ## Submodule Management
 
 ### Adding the Standards Submodule

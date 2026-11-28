@@ -1,0 +1,239 @@
+name: PR auto-merge
+
+# Reusable auto-merge workflow (spec 045). Two jobs: `automerge` decides with
+# read-only permissions and `arm` is the only job that may write — it posts the
+# decision comment and, in live mode, arms GitHub native auto-merge. No code
+# from the PR head is executed: the standards scripts come from the pinned
+# revision and the PR data comes from the GitHub API.
+#
+# Mode comes from the repository variable PR_AUTOMERGE_MODE. Only the exact
+# value `live` arms a merge; unset, empty, `report`, and any other value are
+# report-only.
+
+on:
+  workflow_call:
+    inputs:
+      pr-number:
+        required: true
+        type: number
+      base-sha:
+        required: true
+        type: string
+      head-sha:
+        required: true
+        type: string
+      base-ref:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+jobs:
+  automerge:
+    name: pr-automerge
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      outcome: ${{ steps.decide.outputs.outcome }}
+      mode: ${{ steps.decide.outputs.mode }}
+      action: ${{ steps.decide.outputs.action }}
+      size_tier: ${{ steps.recheck.outputs.size_tier }}
+      verdict: ${{ steps.recheck.outputs.verdict }}
+      body: ${{ steps.decide.outputs.body }}
+    steps:
+      - name: Get the standards scripts at the pinned revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+        with:
+          repository: RexiAI/my-engineering-standards
+          ref: 21046d96796467f8238d6d613ce3a552bf3fced0
+          path: .standards
+          persist-credentials: false
+          sparse-checkout: scripts
+
+      - name: Collect the PR inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr-number }}
+          BASE_SHA: ${{ inputs.base-sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p .pr-automerge
+          gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --paginate \
+            --jq '.[] | "\(.additions)\t\(.deletions)\t\(.filename)"' > .pr-automerge/numstat.txt
+          gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --paginate \
+            --jq '.[].filename' > .pr-automerge/changed.txt
+          gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" > .pr-automerge/pr.diff
+          gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json comments \
+            > .pr-automerge/comments.json
+          labels="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json labels --jq '.labels[].name')"
+          if grep -qx 'size-override' <<< "$labels"; then
+            echo "label=present" >> "$GITHUB_ENV"
+          else
+            echo "label=absent" >> "$GITHUB_ENV"
+          fi
+          actor="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/timeline" --paginate \
+            --jq '[.[] | select(.event == "labeled" and .label.name == "size-override")] | last | .actor.login // ""' \
+            | tail -n1 || true)"
+          echo "label_actor=$actor" >> "$GITHUB_ENV"
+          co_path=.pr-automerge/CODEOWNERS
+          if ! gh api "repos/${GITHUB_REPOSITORY}/contents/.github/CODEOWNERS?ref=${BASE_SHA}" \
+                 -H 'Accept: application/vnd.github.raw' > "$co_path" 2>/dev/null; then
+            rm -f "$co_path"
+          fi
+          echo "codeowners=$co_path" >> "$GITHUB_ENV"
+
+      - name: Require native auto-merge on the repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          allow="$(gh api "repos/${GITHUB_REPOSITORY}" --jq .allow_auto_merge)"
+          if [ "$allow" != "true" ]; then
+            echo "::error::allow_auto_merge is false — native auto-merge cannot be armed"
+            exit 1
+          fi
+
+      - name: Re-verify the size gate and the review verdict
+        id: recheck
+        env:
+          REPO_OWNER: ${{ github.repository_owner }}
+          HEAD_SHA: ${{ inputs.head-sha }}
+        run: |
+          set -euo pipefail
+          size_out="$(bash .standards/scripts/pr-size-gate.sh \
+            --numstat-file .pr-automerge/numstat.txt \
+            --diff-file .pr-automerge/pr.diff \
+            --label "$label" \
+            --label-actor "$label_actor" \
+            --repo-owner "$REPO_OWNER" \
+            --codeowners "$codeowners")" && rc=0 || rc=$?
+          printf '%s\n' "$size_out"
+          if [ "$rc" -gt 1 ]; then
+            echo "::error::pr-size-gate could not evaluate (exit $rc)"
+            exit "$rc"
+          fi
+          verdict_out="$(bash .standards/scripts/pr-review-verdict.sh \
+            --head-sha "$HEAD_SHA" \
+            --comments-file .pr-automerge/comments.json)" && vrc=0 || vrc=$?
+          printf '%s\n' "$verdict_out"
+          if [ "$vrc" -gt 1 ]; then
+            echo "::error::pr-review-verdict could not evaluate (exit $vrc)"
+            exit "$vrc"
+          fi
+          size_tier="$(sed -n 's/^tier=//p' <<< "$size_out")"
+          verdict="$(sed -n 's/^verdict=//p' <<< "$verdict_out")"
+          echo "size_tier=$size_tier" >> "$GITHUB_OUTPUT"
+          echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
+          # Anything other than tier=auto AND verdict=pass stops here and never
+          # reaches the arming step.
+          if grep -qx 'tier=auto' <<< "$size_out"; then
+            echo "size_auto=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "size_auto=false" >> "$GITHUB_OUTPUT"
+          fi
+          if grep -qx 'verdict=pass' <<< "$verdict_out"; then
+            echo "verdict_pass=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "verdict_pass=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Decide eligibility and render the notification
+        id: decide
+        env:
+          MODE_IN: ${{ vars.PR_AUTOMERGE_MODE }}
+          SIZE_AUTO: ${{ steps.recheck.outputs.size_auto }}
+          VERDICT_PASS: ${{ steps.recheck.outputs.verdict_pass }}
+          SIZE_TIER: ${{ steps.recheck.outputs.size_tier }}
+          VERDICT: ${{ steps.recheck.outputs.verdict }}
+          HEAD_SHA: ${{ inputs.head-sha }}
+          REPO_OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          MODE="${MODE_IN:-report}"
+          if [ "$MODE" != "live" ]; then MODE="report"; fi
+          eligible=false
+          action=none
+          outcome=none
+          exclusions=none
+          if [ "$SIZE_AUTO" = true ] && [ "$VERDICT_PASS" = true ]; then
+            eval_out="$(bash .standards/scripts/pr-automerge-eligibility.sh \
+              --size-tier "$SIZE_TIER" \
+              --review-verdict "$VERDICT" \
+              --changed-files .pr-automerge/changed.txt \
+              --mode "$MODE")"
+            printf '%s\n' "$eval_out"
+            eligible="$(sed -n 's/^eligible=//p' <<< "$eval_out")"
+            action="$(sed -n 's/^action=//p' <<< "$eval_out")"
+            reason="$(sed -n 's/^reason=//p' <<< "$eval_out")"
+            exclusions="$(sed -n 's/^exclusions=//p' <<< "$eval_out")"
+            case "$reason" in
+              all_green)      outcome=armed ;;
+              report_only)    outcome=would-merge ;;
+              excluded_path)  outcome=blocked-exclusion ;;
+              *)              outcome=none ;;
+            esac
+          fi
+          {
+            echo "mode=$MODE"
+            echo "action=$action"
+            echo "outcome=$outcome"
+          } >> "$GITHUB_OUTPUT"
+          if [ "$outcome" != none ]; then
+            bash .standards/scripts/pr-automerge-notify.sh \
+              --outcome "$outcome" \
+              --size-tier "$SIZE_TIER" \
+              --review-verdict "$VERDICT" \
+              --exclusions "$exclusions" \
+              --codeowners-file "$codeowners" \
+              --repo-owner "$REPO_OWNER" \
+              --head-sha "$HEAD_SHA" > .pr-automerge/comment.md
+            {
+              echo "body<<PR_AUTOMERGE_BODY_EOF"
+              cat .pr-automerge/comment.md
+              echo "PR_AUTOMERGE_BODY_EOF"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "body=" >> "$GITHUB_OUTPUT"
+          fi
+          echo "eligible=$eligible"
+
+  arm:
+    name: pr-automerge-arm
+    needs: automerge
+    if: needs.automerge.outputs.outcome != 'none'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      MODE: ${{ needs.automerge.outputs.mode }}
+    steps:
+      - name: Post the decision comment once per head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr-number }}
+          OUTCOME: ${{ needs.automerge.outputs.outcome }}
+          BODY: ${{ needs.automerge.outputs.body }}
+          HEAD_SHA: ${{ inputs.head-sha }}
+        run: |
+          set -euo pipefail
+          marker="<!-- pr-automerge: ${OUTCOME}:${HEAD_SHA} -->"
+          existing="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json comments \
+            --jq '.comments[].body')" || existing=""
+          if grep -qF -- "$marker" <<< "$existing"; then
+            echo "already posted for this head and outcome — skipping the duplicate comment"
+            exit 0
+          fi
+          printf '%s\n' "$BODY" > .pr-automerge-comment.md
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file .pr-automerge-comment.md
+
+      - name: Arm native auto-merge
+        if: env.MODE == 'live' && needs.automerge.outputs.action == 'merge'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr-number }}
+        run: gh pr merge --auto --squash --repo "$GITHUB_REPOSITORY" "$PR_NUMBER"

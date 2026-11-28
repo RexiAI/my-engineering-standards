@@ -86,6 +86,8 @@ gate-mutation|Mutation testing|Quality gates|backend|--with-mutation|no|copy-tem
 gate-security|Security scans|Quality gates|none|--with-security|no|copy-template|.github/workflows/security.yml:templates/ci-wrappers/security.yml||
 gate-e2e|E2E pipeline|Quality gates|none|--with-e2e|no|copy-template|.github/workflows/e2e.yml:templates/ci-wrappers/e2e.yml .github/workflows/e2e-weekly.yml:templates/ci-wrappers/e2e-weekly.yml||
 gate-sweeper|CI sweeper loop|Quality gates|ci|--with-sweeper|no|copy-template|.github/workflows/sweeper.yml:.github/workflows/ci-sweeper.yml||
+gate-pr-size|PR size gate (required check)|Quality gates|ci|--with-pr-size-gate|no|none|{ci}|--with-pr-size-gate|
+gate-pr-automerge|Review-gated auto-merge|Quality gates|ci|--with-pr-automerge|no|none|{ci}|--with-pr-automerge|
 deploy-kamal|Kamal (VPS)|Deploy|backend|--with-deploy kamal|no|none|{ci}|--deploy-tool kamal|deploy-dokku,deploy-ssh,deploy-vercel
 deploy-dokku|Dokku (VPS)|Deploy|backend|--with-deploy dokku|no|none|{ci}|--deploy-tool dokku|deploy-kamal,deploy-ssh,deploy-vercel
 deploy-ssh|SSH deploy|Deploy|backend|--with-deploy ssh|no|none|{ci}|--deploy-tool ssh|deploy-kamal,deploy-dokku,deploy-vercel

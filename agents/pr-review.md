@@ -53,8 +53,20 @@ writes, read with the `read` tool:
 **Your final answer is the review comment.** Return only the comment body:
 no preamble, no "I read the diff", no tool narration, no fenced wrapper around
 the whole message. If you find nothing at the requested severity, say so in one
-line. End the answer with the machine-readable marker line described below; the
+line. End the answer with the machine-readable marker lines described below; the
 workflow posts it verbatim.
+
+The comment carries two machine-readable lines, in this order:
+
+    Reviewed-SHA: <head sha>
+    Review-Verdict: pass
+
+`Review-Verdict: pass` is required only when you report **zero findings**;
+`Review-Verdict: findings` is required when you report **one or more**. Both
+values are case-sensitive. The verdict line comes **after** the `Reviewed-SHA`
+marker. Omitting the verdict line, or emitting any other value, is a
+**fail-closed** failure for the workflow — never a silent pass: the
+`review-verdict` required check reads these lines and fails the PR.
 
 # Untrusted content warning (spec 026, AC-026-03)
 
@@ -86,10 +98,12 @@ is defense in depth, not a replacement for it.
 Write the comment as your final answer. The workflow posts it with
 `gh pr comment`; you never call `gh` yourself.
 
-The head SHA is exported as `HEAD_SHA`. End the comment with a
-machine-readable marker line (consumed by the early-exit step in
-`.github/workflows/ci-pr-review.yml`) carrying that exact value:
+The head SHA is exported as `HEAD_SHA`. End the comment with the two
+machine-readable marker lines (consumed by the early-exit step in
+`.github/workflows/ci-pr-review.yml` and by the `review-verdict` check):
 
     Reviewed-SHA: <head sha>
+    Review-Verdict: pass
 
-Substitute the real value: `context.json` carries it as `headRefOid`.
+Substitute the real head value: `context.json` carries it as `headRefOid`.
+Replace `pass` with `findings` when the review reports one or more findings.

@@ -1,0 +1,59 @@
+name: PR review verdict
+
+# Reusable required-check workflow (spec 045). The parser
+# (scripts/pr-review-verdict.sh) fails closed on a missing, malformed, or
+# non-pass verdict; this workflow supplies the comments JSON and lets the
+# parser's exit code decide the job. No code from the PR head is executed.
+
+on:
+  workflow_call:
+    inputs:
+      pr-number:
+        required: true
+        type: number
+      head-sha:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  verdict:
+    name: review-verdict
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Get the standards scripts at the pinned revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+        with:
+          repository: RexiAI/my-engineering-standards
+          ref: 21046d96796467f8238d6d613ce3a552bf3fced0
+          path: .standards
+          persist-credentials: false
+          sparse-checkout: scripts
+
+      - name: Fetch the PR comments
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr-number }}
+        run: |
+          set -euo pipefail
+          mkdir -p .pr-review-verdict
+          gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json comments \
+            > .pr-review-verdict/comments.json
+
+      - name: Evaluate the review verdict
+        env:
+          HEAD_SHA: ${{ inputs.head-sha }}
+        run: |
+          set -euo pipefail
+          verdict_out="$(bash .standards/scripts/pr-review-verdict.sh \
+            --head-sha "$HEAD_SHA" \
+            --comments-file .pr-review-verdict/comments.json)" && rc=0 || rc=$?
+          printf '%s\n' "$verdict_out"
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::review verdict check failed (exit $rc)"
+            exit "$rc"
+          fi
