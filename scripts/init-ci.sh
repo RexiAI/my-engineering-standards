@@ -14,6 +14,8 @@ set -euo pipefail
 #                     --backend java,go,node,python,rust \
 #                     --frontend nextjs,react,angular,ionic,react-native,static \
 #                     --registry ghcr.io
+#   PR gates:       ./.standards/scripts/init-ci.sh --with-pr-size-gate
+#                   ./.standards/scripts/init-ci.sh --with-pr-automerge
 #
 # Acceptance scenario coverage (spec 033, docs/spec-pipeline/specifier.md §Scenario format):
 #   AC-033-31  usage line and invalid-flag error text updated together
@@ -72,6 +74,8 @@ WITH_SAGA_FLAG=""
 WITH_DEPLOY_FLAG=""
 WITH_RELEASE_FLAG=""
 WITH_PR_REVIEW_FLAG=""
+WITH_PR_SIZE_GATE_FLAG=""
+WITH_PR_AUTOMERGE_FLAG=""
 DEPLOY_TOOL="kamal"
 
 while [[ $# -gt 0 ]]; do
@@ -115,6 +119,19 @@ while [[ $# -gt 0 ]]; do
       WITH_PR_REVIEW_FLAG="true"
       shift
       ;;
+    --with-pr-size-gate)
+      # Opt-in `pr-size` required check (spec 045, AC-045-10-01). GitHub
+      # Actions-only: on GitLab the flag warns and emits nothing.
+      WITH_PR_SIZE_GATE_FLAG="true"
+      shift
+      ;;
+    --with-pr-automerge)
+      # Opt-in review-verdict + pr-automerge wiring, plus the pr-size job they
+      # depend on (spec 045, AC-045-10-01). Report-only until the repository
+      # variable PR_AUTOMERGE_MODE is `live`. GitHub Actions-only.
+      WITH_PR_AUTOMERGE_FLAG="true"
+      shift
+      ;;
     --deploy-tool)
       DEPLOY_TOOL="$2"
       WITH_DEPLOY_FLAG="true"
@@ -122,7 +139,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     *)
       err "Unknown flag: $1"
-      echo "Usage: $0 [--platform github|gitlab|both] [--backend java,go,node,python,rust] [--frontend nextjs,react,angular,ionic,react-native,static] [--registry ghcr.io] [--with-saga] [--with-deploy] [--deploy-tool kamal|dokku|ssh] [--with-release] [--with-pr-review]"
+      echo "Usage: $0 [--platform github|gitlab|both] [--backend java,go,node,python,rust] [--frontend nextjs,react,angular,ionic,react-native,static] [--registry ghcr.io] [--with-saga] [--with-deploy] [--deploy-tool kamal|dokku|ssh] [--with-release] [--with-pr-review] [--with-pr-size-gate] [--with-pr-automerge]"
       exit 1
       ;;
   esac
@@ -359,12 +376,31 @@ collect_secrets
 _caller_permissions() { # → CALLER_CONTENTS_PERM / CALLER_EXTRA_PERMS
   CALLER_CONTENTS_PERM="read"
   CALLER_EXTRA_PERMS=""
+  local want_pr=false issues_scope=""
   if [ "$WITH_RELEASE_FLAG" = "true" ]; then
     CALLER_CONTENTS_PERM="write"
-    CALLER_EXTRA_PERMS="  issues: write
+    issues_scope="  issues: write"
+    want_pr=true
+  fi
+  if [ "$WITH_PR_REVIEW_FLAG" = "true" ] || [ "$WITH_PR_AUTOMERGE_FLAG" = "true" ]; then
+    want_pr=true
+  fi
+  if [ "$WITH_PR_SIZE_GATE_FLAG" = "true" ] || [ "$WITH_PR_AUTOMERGE_FLAG" = "true" ]; then
+    # ci-pr-size-gate.yml reads the issue timeline, which the caller must grant.
+    if [ -z "$issues_scope" ]; then issues_scope="  issues: read"; fi
+  fi
+  if [ "$WITH_PR_AUTOMERGE_FLAG" = "true" ]; then
+    # The called auto-merge workflow's arming job declares contents: write.
+    CALLER_CONTENTS_PERM="write"
+  fi
+  CALLER_EXTRA_PERMS="$issues_scope"
+  if [ "$want_pr" = true ]; then
+    if [ -n "$CALLER_EXTRA_PERMS" ]; then
+      CALLER_EXTRA_PERMS="$CALLER_EXTRA_PERMS
   pull-requests: write"
-  elif [ "$WITH_PR_REVIEW_FLAG" = "true" ]; then
-    CALLER_EXTRA_PERMS="  pull-requests: write"
+    else
+      CALLER_EXTRA_PERMS="  pull-requests: write"
+    fi
   fi
 }
 
@@ -411,6 +447,8 @@ EOF
   _gh_release_job "$target"
 
   _gh_pr_review_job "$target"
+
+  _gh_pr_gate_jobs "$target"
 
   ok "Generated: .github/workflows/ci.yml"
 
@@ -557,6 +595,72 @@ EOF
   info "Set the OPENCODE_API_KEY secret (provider API key) in GitHub → Settings → Secrets and variables → Actions"
 }
 
+# PR gate jobs (spec 045, AC-045-10): `pr-size` is emitted by either flag;
+# `review-verdict` and `pr-automerge` only by --with-pr-automerge. Each job is
+# emitted exactly once when both flags are given. The reusable workflows are
+# GitHub Actions-only, so on GitLab the flags only warn (see generate_gitlab).
+_gh_pr_gate_jobs() {
+  local target="$1"
+  if [ "$WITH_PR_SIZE_GATE_FLAG" = "true" ] || [ "$WITH_PR_AUTOMERGE_FLAG" = "true" ]; then
+    _gh_pr_size_job "$target"
+  fi
+  if [ "$WITH_PR_AUTOMERGE_FLAG" = "true" ]; then
+    _gh_review_verdict_job "$target"
+    _gh_pr_automerge_job "$target"
+  fi
+}
+
+_gh_pr_size_job() {
+  local target="$1"
+  cat >> "$target" << EOF
+
+  pr-size:
+    if: \${{ github.event_name == 'pull_request' }}
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-pr-size-gate.yml@${STANDARDS_PIN} # pinned; bump deliberately, never track a branch
+    with:
+      pr-number: \${{ github.event.pull_request.number }}
+      base-sha: \${{ github.event.pull_request.base.sha }}
+      head-sha: \${{ github.event.pull_request.head.sha }}
+      base-ref: \${{ github.event.pull_request.base.ref }}
+EOF
+  ok "Added pr-size job to ci.yml (required check: changed-line tiers)"
+}
+
+_gh_review_verdict_job() {
+  local target="$1"
+  cat >> "$target" << EOF
+
+  review-verdict:
+    if: \${{ github.event_name == 'pull_request' }}
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-pr-review-verdict.yml@${STANDARDS_PIN} # pinned; bump deliberately, never track a branch
+    with:
+      pr-number: \${{ github.event.pull_request.number }}
+      head-sha: \${{ github.event.pull_request.head.sha }}
+EOF
+  ok "Added review-verdict job to ci.yml (required check: review verdict)"
+}
+
+_gh_pr_automerge_job() {
+  local target="$1"
+  cat >> "$target" << EOF
+
+  pr-automerge:
+    if: \${{ github.event_name == 'pull_request' }}
+    needs: [pr-size, review-verdict]
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-pr-auto-merge.yml@${STANDARDS_PIN} # pinned; bump deliberately, never track a branch
+    permissions:
+      contents: write
+      issues: read
+      pull-requests: write
+    with:
+      pr-number: \${{ github.event.pull_request.number }}
+      base-sha: \${{ github.event.pull_request.base.sha }}
+      head-sha: \${{ github.event.pull_request.head.sha }}
+      base-ref: \${{ github.event.pull_request.base.ref }}
+EOF
+  ok "Added pr-automerge job to ci.yml (report-only unless PR_AUTOMERGE_MODE is set to live)"
+}
+
 # Frontend job block: react-native swaps the docker-registry/GHCR pair for a
 # node-version/EXPO_TOKEN pair (EAS builds remotely, no registry push).
 # Ionic shares the Angular workflow until a dedicated ci-ionic.yml exists
@@ -672,6 +776,11 @@ generate_gitlab() {
     # GitHub-only feature (AC-024-04-07): warn on GitLab and emit nothing —
     # the shared pr-review workflow has no GitLab template.
     warn "PR review (--with-pr-review) is a GitHub Actions feature — nothing emitted into .gitlab-ci.yml"
+  fi
+  if [ "$WITH_PR_SIZE_GATE_FLAG" = "true" ] || [ "$WITH_PR_AUTOMERGE_FLAG" = "true" ]; then
+    # GitHub-only feature (spec 045, AC-045-10-06): warn on GitLab and emit
+    # nothing — the reusable PR gate workflows have no GitLab template.
+    warn "PR size gate and auto-merge are a GitHub Actions feature — nothing emitted into .gitlab-ci.yml"
   fi
 
   cat > "$target" << EOF
@@ -991,6 +1100,7 @@ print_summary() {
   _print_deploy_note
   _print_release_note
   _print_pr_review_note
+  _print_pr_gate_note
   _note_feature_templates
   echo ""
 }
@@ -1040,6 +1150,20 @@ _print_pr_review_note() {
   echo "  • pr-review job added to ci.yml (per-PR, review + suggested fixes only)"
   echo "  • Set secret: OPENCODE_API_KEY (provider API key — never commit the value)"
   echo "  • Reference: docs/CI_CD.md §PR Review Agent"
+}
+
+_print_pr_gate_note() {
+  # PR size gate + auto-merge note (spec 045, AC-045-10-09): documents the
+  # setting and the one-time branch-protection prerequisite. No secret is
+  # prompted — the gates run on the workflow token.
+  [ "${WITH_PR_SIZE_GATE_FLAG:-}" = "true" ] || [ "${WITH_PR_AUTOMERGE_FLAG:-}" = "true" ] || return 0
+  echo ""
+  echo "PR size gate and auto-merge (GitHub Actions):"
+  echo "  • Jobs: pr-size${WITH_PR_AUTOMERGE_FLAG:+ and review-verdict + pr-automerge}"
+  echo "  • Repository variable PR_AUTOMERGE_MODE: report (default) or live (opt-in)"
+  echo "  • One-time prerequisite: branch protection requires pr-size and review-verdict, and allow_auto_merge is enabled"
+  echo "  • No new secret required (the gates use the workflow token)"
+  echo "  • Reference: docs/CI_CD.md §PR Size Gate and Review-Gated Auto-Merge"
 }
 
 _print_generated_files() {

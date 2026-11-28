@@ -1,0 +1,94 @@
+name: PR size gate
+
+# Reusable required-check workflow (spec 045). Counting and classification live
+# in scripts/pr-size-gate.sh; this workflow only supplies the PR inputs and lets
+# the script's exit code decide the job. Nothing here is taken from the PR head:
+# the scripts come from the standards repository at the pinned revision and the
+# PR data comes from the GitHub API.
+
+on:
+  workflow_call:
+    inputs:
+      pr-number:
+        required: true
+        type: number
+      base-sha:
+        required: true
+        type: string
+      head-sha:
+        required: true
+        type: string
+      base-ref:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+jobs:
+  size:
+    name: pr-size
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Get the standards scripts at the pinned revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+        with:
+          repository: RexiAI/my-engineering-standards
+          ref: 21046d96796467f8238d6d613ce3a552bf3fced0
+          path: .standards
+          persist-credentials: false
+          sparse-checkout: scripts
+
+      - name: Collect the PR inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr-number }}
+          BASE_SHA: ${{ inputs.base-sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p .pr-size
+          gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --paginate \
+            --jq '.[] | "\(.additions)\t\(.deletions)\t\(.filename)"' > .pr-size/numstat.txt
+          gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" > .pr-size/pr.diff
+          labels="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json labels --jq '.labels[].name')"
+          if grep -qx 'size-override' <<< "$labels"; then
+            echo "label=present" >> "$GITHUB_ENV"
+          else
+            echo "label=absent" >> "$GITHUB_ENV"
+          fi
+          # The actor comes from the issue timeline, never github.actor: on a
+          # `labeled` event github.actor happens to be the labeller, but on any
+          # other event it is whoever pushed or reopened the PR.
+          actor="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/timeline" --paginate \
+            --jq '[.[] | select(.event == "labeled" and .label.name == "size-override")] | last | .actor.login // ""' \
+            | tail -n1 || true)"
+          echo "label_actor=$actor" >> "$GITHUB_ENV"
+          # CODEOWNERS is read at the BASE sha, never the PR head. A failed
+          # fetch leaves no file, so the script falls back to the repo owner.
+          co_path=.pr-size/CODEOWNERS
+          if ! gh api "repos/${GITHUB_REPOSITORY}/contents/.github/CODEOWNERS?ref=${BASE_SHA}" \
+                 -H 'Accept: application/vnd.github.raw' > "$co_path" 2>/dev/null; then
+            rm -f "$co_path"
+          fi
+          echo "codeowners=$co_path" >> "$GITHUB_ENV"
+
+      - name: Evaluate the PR size
+        env:
+          REPO_OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          size_out="$(bash .standards/scripts/pr-size-gate.sh \
+            --numstat-file .pr-size/numstat.txt \
+            --diff-file .pr-size/pr.diff \
+            --label "$label" \
+            --label-actor "$label_actor" \
+            --repo-owner "$REPO_OWNER" \
+            --codeowners "$codeowners")" && rc=0 || rc=$?
+          printf '%s\n' "$size_out"
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::pr-size-gate exited $rc — the PR size gate failed"
+            exit "$rc"
+          fi

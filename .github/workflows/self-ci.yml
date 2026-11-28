@@ -228,6 +228,16 @@ jobs:
           ./scripts/check-pr-review.sh
           ./scripts/check-pr-review.selftest.sh
 
+      # PR size gate + review-gated auto-merge deliverables (spec 045): the
+      # check script doubles as the spec's artifact test carrier for the ADR,
+      # the verdict contract, the workflows, the init-ci wiring, and the docs.
+      # --self-test proves the gate rejects a tree with a required artifact
+      # removed. No continue-on-error.
+      - name: Check PR size gate and auto-merge deliverables
+        run: |
+          ./scripts/check-pr-size-gate.sh
+          ./scripts/check-pr-size-gate.sh --self-test
+
       # Security-hardening gate (spec 026): the check script doubles as the
       # spec's test carrier for its thirteen findings — a regression in any
       # one of them (e.g. StrictHostKeyChecking=no creeping back in, a
@@ -275,6 +285,15 @@ jobs:
             echo "/tmp/bats-install/bin" >> "$GITHUB_PATH"
           fi
           /tmp/bats-install/bin/bats --version 2>/dev/null || bats --version
+
+      - name: Run PR size gate and auto-merge script tests (spec 045)
+        timeout-minutes: 8
+        run: |
+          set -euo pipefail
+          bats --tap scripts/tests/pr-size-gate.bats
+          bats --tap scripts/tests/pr-review-verdict.bats
+          bats --tap scripts/tests/pr-automerge-eligibility.bats
+          bats --tap scripts/tests/pr-automerge-notify.bats
 
       - name: Run shell gate bats tests (spec 001 Track B)
         timeout-minutes: 12

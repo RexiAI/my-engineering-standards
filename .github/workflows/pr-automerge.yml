@@ -1,0 +1,46 @@
+name: PR auto-merge
+
+# Self-hosted caller for this repository (spec 045). It wires the same three
+# reusable workflows every child repo gets, at the same pinned revision, and
+# creates the required status-check contexts `pr-size` and `review-verdict`.
+# Auto-merge stays report-only until PR_AUTOMERGE_MODE is set to `live`.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+concurrency:
+  group: pr-automerge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  pr-size:
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-pr-size-gate.yml@21046d96796467f8238d6d613ce3a552bf3fced0 # pinned; bump deliberately, never track a branch
+    with:
+      pr-number: ${{ github.event.pull_request.number }}
+      base-sha: ${{ github.event.pull_request.base.sha }}
+      head-sha: ${{ github.event.pull_request.head.sha }}
+      base-ref: ${{ github.event.pull_request.base.ref }}
+
+  review-verdict:
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-pr-review-verdict.yml@21046d96796467f8238d6d613ce3a552bf3fced0 # pinned; bump deliberately, never track a branch
+    with:
+      pr-number: ${{ github.event.pull_request.number }}
+      head-sha: ${{ github.event.pull_request.head.sha }}
+
+  pr-automerge:
+    needs: [pr-size, review-verdict]
+    uses: RexiAI/my-engineering-standards/.github/workflows/ci-pr-auto-merge.yml@21046d96796467f8238d6d613ce3a552bf3fced0 # pinned; bump deliberately, never track a branch
+    permissions:
+      contents: write
+      pull-requests: write
+    with:
+      pr-number: ${{ github.event.pull_request.number }}
+      base-sha: ${{ github.event.pull_request.base.sha }}
+      head-sha: ${{ github.event.pull_request.head.sha }}
+      base-ref: ${{ github.event.pull_request.base.ref }}

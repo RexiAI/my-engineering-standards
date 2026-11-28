@@ -11,13 +11,30 @@ or apply programmatically with the GitHub API / `gh` CLI:
 ```bash
 gh api repos/{owner}/{repo}/branches/main/protection \
   --method PUT \
-  --field required_status_checks='{"strict":true,"contexts":["unit-test","lint"]}' \
+  --field required_status_checks='{"strict":true,"contexts":["unit-test","lint","pr-size","review-verdict"]}' \
   --field enforce_admins=true \
   --field required_pull_request_reviews='{"dismiss_stale_reviews":true,"require_code_owner_reviews":false,"required_approving_review_count":1}' \
   --field restrictions=null \
   --field allow_force_pushes=false \
   --field allow_deletions=false
 ```
+
+### Required status checks
+
+`pr-size` and `review-verdict` are required contexts in every repo that wires
+the PR size gate and the review-verdict workflow
+(`docs/CI_CD.md §PR Size Gate and Review-Gated Auto-Merge`).
+
+### Auto-merge prerequisites
+
+GitHub native auto-merge may be armed only when all of the following hold:
+
+| Prerequisite | Value |
+|---|---|
+| Required checks include `pr-size` and `review-verdict` | ✅ always |
+| Required checks include `mutation` | ✅ only when `MUTATION_REQUIRED=true` (the repository variable) |
+| Repository setting `allow_auto_merge` | ✅ enabled |
+| Merge strategy | squash only |
 
 ### Minimum settings (all tiers)
 

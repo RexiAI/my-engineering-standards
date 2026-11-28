@@ -37,3 +37,4 @@ Proposed → Accepted → Deprecated → Superseded.
 | 0027 | [Telemetry ledger stays committed: the PR Opener commits runs.jsonl](0027-runs-jsonl-committed.md) | Accepted |
 | 0028 | [Bound and scope mutation runs](0028-bounded-mutation-runs.md) | Proposed |
 | 0029 | [Scope scenario traceability to the spec under verification](0029-traceability-spec-scope.md) | Proposed |
+| 0030 | [PR size gate and review-gated auto-merge through GitHub native auto-merge](0030-pr-size-gate-and-review-gated-auto-merge.md) | Proposed |
