@@ -135,6 +135,20 @@ file, tests next to the code under test.
   (see https://angular.dev/style-guide §Keep components focused on
   presentation).
 
+## Modern Web Platform
+
+Angular templates are HTML and its global styles are CSS, so
+[`../../skills/modern-web-guidance/SKILL.md`](../../skills/modern-web-guidance/SKILL.md)
+applies to both. Load it before implementing overlays, forms, layout, motion,
+or performance work; keep the guide's fallbacks for features below Baseline
+widely available. Angular-specific adaptation: style/attribute bindings
+(`[attr.popover]`), `ElementRef`/`viewChild` for `showModal()` and
+`moveBefore()`, `afterNextRender` for DOM work, and no `document` access during
+SSR. Angular's own signals, DI, and router decisions are unaffected.
+
+Reviewing an existing app: `npx -y modern-web-guidance@latest legacy-scan
+<path> --json`, then verify each hit against the rule's keep/drop rubric.
+
 ## Read in Order
 
 1. [`PATTERNS.md`](./PATTERNS.md) — signals, standalone components,

@@ -85,7 +85,7 @@ my-engineering-standards/
 ├── skills/
 │   ├── design-taste-frontend/   # Anti-slop frontend design skill (vendored)
 │   │   └── SKILL.md
-│   └── hallmark/                # Anti-AI-slop design system (v1.2.0, vendored, MIT)
+│   ├── hallmark/                # Anti-AI-slop design system (v1.2.0, vendored, MIT)
 │       ├── SKILL.md             # 66-gate slop test, 21 macrostructures, 20 themes
 │       ├── LICENSE              # Upstream MIT notice (github.com/Nutlope/hallmark)
 │       ├── references/          # genre files, components, verbs, upgrade techniques
@@ -94,6 +94,8 @@ my-engineering-standards/
 │       │   ├── examples/        #   cobalt-01 canonical build
 │       │   └── _tests/          #   03-maple-bakery, 05-tracejam-saas worked examples
 │       └── docs/                # recipes.md, study-examples.md (human reading)
+│   └── modern-web-guidance/     # Modern web platform guidance (Apache-2.0, CLI-backed)
+│       └── SKILL.md             # search/retrieve 475 upstream guides + legacy-scan audit
 ├── language-specific/           # One guide per stack; SKILL.md is the small entry
 │   ├── java/SKILL.md            # Spring Boot, Maven (+ TESTING, checkstyle/pmd/spotbugs)
 │   ├── go/SKILL.md              # Go, golangci (+ golangci.yml)

@@ -29,6 +29,14 @@ This is the entry point for the React Native stack. Repo-wide rules (conventiona
 - **Unit and component tests**: React Native Testing Library. **E2E tests**: Maestro.
 - **Build / release**: EAS Build, EAS Submit, EAS Update.
 
+## Modern Web Platform — Not Applicable
+
+React Native has no DOM, CSS cascade, or browser APIs, so
+`skills/modern-web-guidance` does not apply. Use React Native primitives and
+the Expo modules instead. The boundary case is a `.web.tsx` target built with
+React Native Web: the web build is a web platform surface, so load the skill
+for that file set only.
+
 ## Read in Order
 
 1. [`PATTERNS.md`](./PATTERNS.md) — state, navigation, forms, styling, performance, platform-specific code.
