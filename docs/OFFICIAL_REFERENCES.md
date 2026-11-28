@@ -38,8 +38,12 @@ describes behaviour from a different major version is a defect.
 | React Native | **0.88.1** | Node `^22.13.0`, `^24.3.0`, `>= 26.0.0`; React peer `^19.3.0` | [npm registry — react-native@0.88.1](https://registry.npmjs.org/react-native/0.88.1) |
 | pytest (Python E2E) | **9.2.0** | Python `>= 3.10` | [PyPI JSON API](https://pypi.org/pypi/pytest/json) |
 | pytest-playwright (optional browser E2E) | **0.10.0** | Python `>= 3.10` | [PyPI JSON API](https://pypi.org/pypi/pytest-playwright/json) |
+| Modern Web Guidance (CLI) | **1.0.2** (retrieved 2026-11-28) | Node.js 22+ | [npm registry — modern-web-guidance](https://registry.npmjs.org/modern-web-guidance/latest) |
 
 **Added 2026-11-25:** the `pytest` and `pytest-playwright` rows (Python E2E guidance).
+
+**Added 2026-11-28:** the `Modern Web Guidance (CLI)` row; the wrapper skill
+cites the CLI, which is what resolves the guide corpus.
 
 **Added 2026-11-01 (spec 042):** the `Java`, `Go`, and `React Native` rows above were added on `2026-11-01`; the pre-existing rows keep the document's `2026-10-15` retrieval date.
 
@@ -79,6 +83,7 @@ Short idiomatic code snippets are fine.
 | Java | — | Not reproduced — links only |
 | Go | — | Not reproduced — links only |
 | React Native | — | Not reproduced — links only |
+| Modern Web Guidance | **Apache-2.0** (`GoogleChrome/modern-web-guidance-src` `LICENSE`) | Apache-2.0 — skill wrapper paraphrased, guides fetched at runtime, never vendored |
 
 ---
 
@@ -167,6 +172,23 @@ Related: [Ionic Secure Storage](https://ionic.io/docs/secure-storage) (commercia
 and the [Capacitor Community plugin catalogue](https://github.com/capacitor-community/)
 — see `language-specific/ionic/NATIVE.md` for why no first-party encrypted
 keychain plugin exists in the OSS docs.
+
+### Modern Web Guidance — `developer.chrome.com/docs/modern-web-guidance`
+
+Source: <https://github.com/GoogleChrome/modern-web-guidance-src> (Apache-2.0) ·
+docs: <https://developer.chrome.com/docs/modern-web-guidance> ·
+CLI package: `modern-web-guidance` (**1.0.2**, retrieved 2026-11-28, Node.js 22+).
+
+Consumed by `skills/modern-web-guidance/SKILL.md`, and cited from
+`language-specific/javascript`, `angular`, and `ionic`.
+
+**Provenance note.** The wrapper paraphrases the upstream `SKILL.md`
+(`guides/modern-web-guidance/SKILL.md`) — search/retrieve workflow, framework
+adaptation, Baseline/fallback policy, and the `legacy-scan` rubric rules. The
+269 feature guides and 206 use-case guides are **not** vendored; they are
+fetched at runtime by the CLI, so their content is authoritative upstream and
+may move without a change here. Re-verify the CLI version and the package's
+published file list before claiming coverage.
 
 ### NestJS — `docs.nestjs.com`
 

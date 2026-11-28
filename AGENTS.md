@@ -87,6 +87,7 @@ Every guide is distilled from official upstream documentation at a pinned versio
 - Read `docs/SCHEMA_EVOLUTION.md` before designing data models or APIs.
 - Read `docs/CONTRACT_TESTING.md` before writing service integration tests.
 - Read `skills/e2e-testing/SKILL.md` before writing or running E2E tests in a TS/Node or RN child repo — agentic E2E is the standard for that stack (docs/TESTING.md §Agentic E2E).
+- Read `skills/modern-web-guidance/SKILL.md` before writing or reviewing any client-side HTML/CSS/JS — it is the authority on which web platform primitive to prefer (native `<dialog>`, Popover API, container queries, view transitions, `AbortSignal.timeout`, `Intl`) and carries the required fallbacks. For an audit, run its `legacy-scan` and verify each hit against the rule rubric.
 - Read `docs/SPEC_PIPELINE.md` (the index; its §Stage files table maps each stage to its own file) before running `/spec` or `/build`, or before writing an informal spec under `specs/`.
 - Read `docs/LOOP_ENGINEERING.md` before designing or running a loop (an automated agent cycle with durable state).
 - Read `docs/AGENTS_AND_SKILLS.md` before creating or modifying any agent in `agents/` or skill in `skills/`/`language-specific/`.

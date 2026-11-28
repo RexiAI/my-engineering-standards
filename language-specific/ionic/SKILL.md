@@ -45,6 +45,20 @@ A child repo picks one stack. Cross-stack reuse happens in shared TypeScript ser
 - **Change detection**: routed pages may use `OnPush` only when their state is signal-based or they call `markForCheck()`; components hosting `ion-router-outlet`/`ion-tabs` (and everything above them) must not silently block updates — Angular 22 makes `OnPush` the default (https://ionicframework.com/docs/angular/lifecycle §Angular Life Cycle Events note, https://ionicframework.com/docs/angular/zoneless).
 - **Tests**: the runner is **Angular's**, not Ionic's — Angular v22 defaults new CLI projects to Vitest (https://angular.dev/guide/testing), and [`../angular/TESTING.md`](../angular/TESTING.md) owns that decision. From the official Ionic Angular testing guide (https://ionicframework.com/docs/angular/testing) take only the Ionic-specific parts: Angular `TestBed` with `provideIonicAngular()`, and the `componentOnReady` helper from `@ionic/core` before any DOM assertion. That page's Jasmine/`HttpClientTestingModule` examples predate Angular's current defaults — see [`TESTING.md`](./TESTING.md) §What Official Ionic Documentation Covers. The layered strategy itself is inherited from [`../../docs/TESTING.md`](../../docs/TESTING.md).
 
+## Modern Web Platform
+
+Ionic renders web components, so
+[`../../skills/modern-web-guidance/SKILL.md`](../../skills/modern-web-guidance/SKILL.md)
+applies to page templates, global styles, and gesture/animation code. Two
+boundaries: Ionic's own components own their overlays — prefer `ion-modal`,
+`ion-popover`, `ion-select`, `ion-toast` over re-implementing the native
+equivalent — and Capacitor native APIs are out of scope. Everything else
+(container queries, view transitions, `:has()`, form validation states,
+`AbortSignal.timeout`) applies and should be adapted to Angular bindings.
+
+Reviewing an existing app: `npx -y modern-web-guidance@latest legacy-scan
+<path> --json`, then verify each hit against the rule's keep/drop rubric.
+
 ## Read in Order
 
 1. [`PATTERNS.md`](./PATTERNS.md) — components, lifecycle, navigation/routing, theming, adaptive styles, gestures/animations, performance.

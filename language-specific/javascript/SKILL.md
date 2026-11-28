@@ -128,11 +128,27 @@ Authoritative rules live in `docs/CODING_CONVENTIONS.md §Formatting / TypeScrip
 - Tokens via CSS variables (`:root { --color-*, --space-* }`, `var(--token)`). No duplicated hex/px literals across files.
 - BEM or CSS Modules, one convention per repo. No duplicated 4-line blocks (DRY gate).
 
+## Modern Web Platform
+
+Client-side HTML/CSS/JS decisions — overlays, forms, colour, layout, motion,
+performance, dates, sanitization — are governed by the `modern-web-guidance`
+skill ([`../../skills/modern-web-guidance/SKILL.md`](../../skills/modern-web-guidance/SKILL.md)).
+Load it before writing the UI, search the guide for the capability, and keep
+its fallbacks for features below Baseline widely available. Prefer the platform
+primitive (native `<dialog>`, Popover API, `AbortSignal.timeout`, `Intl`,
+`toSorted`) over a dependency or a hand-rolled equivalent. The skill carries the
+framework adaptation rules (attribute typing, SSR guards, ref-driven DOM APIs).
+
+Reviewing an existing frontend: `npx -y modern-web-guidance@latest legacy-scan
+<path> --json`, then verify each hit against the rule's keep/drop rubric before
+reporting it.
+
 ## Read in Order
 
 1. [`PATTERNS.md`](./PATTERNS.md) — React patterns, Redux, API client, Next.js (App Router), NestJS backend patterns.
-2. [`TESTING.md`](./TESTING.md) — framework table and per-stack examples (inherits the layered strategy from `docs/TESTING.md`).
-3. [`docs/CODING_CONVENTIONS.md`](../../docs/CODING_CONVENTIONS.md) — TypeScript / HTML-TSX / CSS clean-code gates and CI job-orchestration rule (parallel jobs, no `needs: [lint]` gating `build`).
+2. [`../../skills/modern-web-guidance/SKILL.md`](../../skills/modern-web-guidance/SKILL.md) — modern web platform guidance for any client-side UI work.
+3. [`TESTING.md`](./TESTING.md) — framework table and per-stack examples (inherits the layered strategy from `docs/TESTING.md`).
+4. [`docs/CODING_CONVENTIONS.md`](../../docs/CODING_CONVENTIONS.md) — TypeScript / HTML-TSX / CSS clean-code gates and CI job-orchestration rule (parallel jobs, no `needs: [lint]` gating `build`).
 
 ## Saga & Outbox CI Gates
 
