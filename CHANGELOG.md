@@ -1,3 +1,10 @@
+# [1.56.0](https://github.com/RexiAI/my-engineering-standards/compare/v1.55.6...v1.56.0) (2026-11-28)
+
+
+### Features
+
+* **skills:** add modern-web-guidance for frontend work ([#131](https://github.com/RexiAI/my-engineering-standards/issues/131)) ([ab4ac18](https://github.com/RexiAI/my-engineering-standards/commit/ab4ac18d30af37ebfc0583e7692546bf6e00d9b7))
+
 ## [1.55.6](https://github.com/RexiAI/my-engineering-standards/compare/v1.55.5...v1.55.6) (2026-11-26)
 
 
